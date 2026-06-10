@@ -1,0 +1,291 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STRYVR — Design System v2.0 (Flat Dark)
+   Référence : app/page.tsx homepage — 2026-04-06
+
+   PALETTE CANONIQUE
+   ─────────────────
+   Background app   #121212
+   Surface bloc     #181818  (landing + auth — identiques)
+   Surface input    #0a0a0a  (inputs, selects — plus sombre que le bloc)
+   Surface tooltip  #0f0f0f
+   Accent           #1f8a65  (CTA, actifs, progress)
+   Accent hover     #217356
+   Accent deep      #1f4637  (fonds succès)
+
+   RÈGLES
+   ──────
+   • Bordures très fines sur tous les éléments
+   • Pas d'ombres
+   • Pas de gradients décoratifs
+   • Hiérarchie = opacité texte + nuance fond + définition bordure
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Fonds ───────────────────────────────────────────── */
+  --bg-app: #121212;
+  --bg-surface: #181818;
+  --bg-input: #0a0a0a;
+  --bg-tooltip: #0f0f0f;
+
+  /* ── Accents ─────────────────────────────────────────── */
+  --accent: #1f8a65;
+  --accent-hover: #217356;
+  --accent-deep: #1f4637;
+
+  /* ── Texte ───────────────────────────────────────────── */
+  --text-primary: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.6);
+  --text-subtle: rgba(255, 255, 255, 0.45);
+  --text-very-muted: rgba(255, 255, 255, 0.4);
+  --text-placeholder: rgba(255, 255, 255, 0.2);
+
+  /* ── Overlays ────────────────────────────────────────── */
+  --overlay-soft: rgba(255, 255, 255, 0.03);
+  --overlay-hover: rgba(255, 255, 255, 0.05);
+  --overlay-active: rgba(255, 255, 255, 0.08);
+  --separator: rgba(255, 255, 255, 0.07);
+
+  /* ── Bordures subtiles ──────────────────────────────── */
+  --border-subtle: rgba(255, 255, 255, 0.02);
+  --border-card: rgba(255, 255, 255, 0.015);
+  --border-input: rgba(255, 255, 255, 0.025);
+  --border-button: rgba(255, 255, 255, 0.03);
+  --border-modal: rgba(255, 255, 255, 0.02);
+  --border-tooltip: rgba(255, 255, 255, 0.025);
+
+  /* ── Charts ──────────────────────────────────────────── */
+  --chart-1: #3d3d3d; /* gris neutre sombre DS v2.0 */
+  --chart-2: #525252; /* gris neutre moyen DS v2.0 */
+  --chart-3: #6a6a6a; /* gris neutre clair DS v2.0 */
+  --chart-4: #282828; /* gris très sombre */
+  --chart-5: #1f8a65; /* accent vert — highlights uniquement */
+
+  /* ── Radius ──────────────────────────────────────────── */
+  --radius-2xl: 16px; /* blocs principaux */
+  --radius-xl: 12px; /* inputs, icones, cards internes */
+  --radius-lg: 8px; /* feature rows, chips */
+  --radius-full: 9999px; /* badges, pills */
+
+  /* ── Transitions ─────────────────────────────────────── */
+  --transition-ui: 150ms;
+  --transition-form: 200ms;
+  --transition-page: 800ms;
+
+  /* ── shadcn/ui tokens (base-ui mapping) ──────────────── */
+  --background: 0 0% 7.06%; /* #121212 — identique à --bg-app */
+  --foreground: 0 0% 100%; /* white */
+  --card: 0 0% 9.4%; /* #181818 */
+  --card-foreground: 0 0% 100%;
+  --popover: 0 0% 5.9%; /* #0f0f0f */
+  --popover-foreground: 0 0% 100%;
+  --primary: 158 63% 33%; /* #1f8a65 */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 9.4%; /* #181818 */
+  --secondary-foreground: 0 0% 60%;
+  --muted: 0 0% 9.4%;
+  --muted-foreground: 0 0% 60%;
+  --accent: 158 63% 33%; /* #1f8a65 */
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 12%; /* subtle — utilisé par shadcn uniquement */
+  --input: 0 0% 3.9%; /* #0a0a0a */
+  --ring: 158 63% 33%; /* #1f8a65 */
+  --radius: 0.75rem;
+}
+
+.dark {
+  /* ── Charts ──────────────────────────────────────────── */
+  --chart-1: #3d3d3d;
+  --chart-2: #525252;
+  --chart-3: #6a6a6a;
+  --chart-4: #282828;
+  --chart-5: #1f8a65;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DS v4.0 — Client PWA : Dark Gray Minimal
+   Pure neutral gray scale. No borders. No colored accent.
+   Data colors used in charts ONLY — never in UI.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Gray scale ─────────────────────────────────────────── */
+  --c-bg:         #080808;   /* App background */
+  --c-surface-1:  #111111;   /* Cards, sheets — L1 */
+  --c-surface-2:  #1a1a1a;   /* Elevated cards — L2 */
+  --c-surface-3:  #222222;   /* Inputs, interactive — L3 */
+  --c-hover:      #2e2e2e;   /* Hover state */
+  --c-active:     #404040;   /* Active / pressed */
+  --c-icon-off:   #5a5a5a;   /* Icons disabled / inactive nav */
+  --c-text-muted: #808080;   /* Text muted */
+  --c-text-body:  #b0b0b0;   /* Text body */
+  --c-text-head:  #e0e0e0;   /* Headings */
+  --c-text-emph:  #f2f2f2;   /* Emphasis / primary btn bg */
+
+  /* ── Data colors (charts/SVG only — never in UI) ─────────── */
+  --data-copper:  #9d7052;
+  --data-gold:    #a89060;
+  --data-petrol:  #3d7070;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-primary font-sans antialiased;
+  }
+
+  ::selection {
+    background: rgba(31, 138, 101, 0.3);
+    color: #fff;
+  }
+
+  /* iOS Safari baseline — 16px minimum prevents auto-zoom; utility classes override via @layer utilities */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  /* Scrollbar discrète */
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.14);
+  }
+}
+
+@layer components {
+  /* ── Range slider natif DS v2.0 ──────────────────────── */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 8px;
+    border-radius: 9999px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 9999px;
+    background: #ffffff;
+    cursor: pointer;
+    border: 2px solid #1f8a65;
+    box-shadow: 0 0 0 3px rgba(31, 138, 101, 0.2);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 9999px;
+    background: #ffffff;
+    cursor: pointer;
+    border: 2px solid #1f8a65;
+    box-shadow: 0 0 0 3px rgba(31, 138, 101, 0.2);
+  }
+
+  /* ── Slider client app (DS v3.0 — no green accent) ────── */
+  input[type="range"].slider-client::-webkit-slider-thumb {
+    border: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  }
+  input[type="range"].slider-client::-moz-range-thumb {
+    border: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  }
+
+  /* ── Inputs natifs (pas shadcn) ──────────────────────── */
+  .field-input {
+    @apply w-full rounded-xl bg-[#0a0a0a] px-4 h-[52px] text-[14px] font-medium text-white placeholder:text-white/20 outline-none transition-all duration-200;
+  }
+
+  .field-label {
+    @apply block text-[10px] font-bold uppercase tracking-[0.18em] text-white/55 mb-1.5;
+  }
+
+  /* ── Section label ───────────────────────────────────── */
+  .section-label {
+    @apply text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40;
+  }
+
+  /* ── Séparateur ──────────────────────────────────────── */
+  .ui-separator {
+    @apply h-px bg-white/[0.07] my-6;
+  }
+
+  /* ── Bouton CTA accent ───────────────────────────────── */
+  .btn-accent {
+    @apply inline-flex items-center justify-center rounded-xl bg-[#1f8a65] px-6 h-[52px] text-[12px] font-bold uppercase tracking-[0.12em] text-white transition-all hover:bg-[#217356] active:scale-[0.99] disabled:opacity-50;
+  }
+
+  /* ── Bouton ghost ────────────────────────────────────── */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-xl bg-white/[0.03] text-white/35 transition-all hover:bg-white/[0.06] hover:text-white/60 active:scale-[0.97];
+  }
+
+  /* ── Card surface ────────────────────────────────────── */
+  .surface {
+    @apply bg-[#181818] rounded-2xl;
+  }
+
+  /* ── Top bar coach ───────────────────────────────────── */
+  .top-bar {
+    @apply sticky top-0 z-40 flex h-14 items-center justify-between bg-[#121212]/95 backdrop-blur-md px-6;
+  }
+
+  /* ── Bordures subtiles ──────────────────────────────── */
+  .border-subtle {
+    @apply border-[0.3px] border-white/[0.013];
+  }
+
+  .border-card {
+    @apply border-[0.3px] border-white/[0.01];
+  }
+
+  .border-input {
+    @apply border-[0.3px] border-white/[0.016];
+  }
+
+  .border-button {
+    @apply border-[0.3px] border-white/[0.02];
+  }
+
+  .border-modal {
+    @apply border-[0.3px] border-white/[0.013];
+  }
+
+  .border-tooltip {
+    @apply border-[0.3px] border-white/[0.016];
+  }
+}
+
+@layer utilities {
+  /* Cache la scrollbar sans désactiver le scroll */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

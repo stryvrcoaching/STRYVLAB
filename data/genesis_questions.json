@@ -1,0 +1,5431 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "totalQuestions": 253,
+    "triggerQuestions": 7,
+    "primaryQuestions": 54,
+    "secondaryQuestions": 192,
+    "modules": {
+      "1_PROFIL_INITIAL": {
+        "count": 15,
+        "dimensions": [
+          "Profil"
+        ]
+      },
+      "2_METABOLIQUE_P1": {
+        "count": 25,
+        "dimensions": [
+          "Métabolique"
+        ]
+      },
+      "3_METABOLIQUE_P2": {
+        "count": 15,
+        "dimensions": [
+          "Métabolique"
+        ]
+      },
+      "4_STRESS_P3_HPA_AXIS": {
+        "count": 35,
+        "dimensions": [
+          "Hormono-Récupération"
+        ]
+      },
+      "5_SOMMEIL_P4_RECUPERATION": {
+        "count": 38,
+        "dimensions": [
+          "Hormono-Récupération"
+        ]
+      },
+      "6_PSYCHO_ADH_P5_ADHERENCE": {
+        "count": 37,
+        "dimensions": [
+          "Psycho-Adhérence"
+        ]
+      },
+      "7_PSYCHO_ADH_P6_FRICTION": {
+        "count": 28,
+        "dimensions": [
+          "Psycho-Adhérence"
+        ]
+      },
+      "8_ENVIRONNEMENT_P7_CONTRAINTES": {
+        "count": 30,
+        "dimensions": [
+          "Environnement"
+        ]
+      },
+      "9_STIMULUS_P8_TRAINING": {
+        "count": 30,
+        "dimensions": [
+          "Stimulus"
+        ]
+      }
+    }
+  },
+  "questions": [
+    {
+      "id": "Q_PROFIL_01",
+      "dimension": "Profil",
+      "patterns": [],
+      "role": "TRIGGER",
+      "question": "Quel est votre âge ?",
+      "type": "Numérique",
+      "options": [
+        "Années (18-80)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "AGE_STRATIFICATION",
+      "impactScore": 0.95,
+      "scientificRef": "ACSM (2018) - Age-specific recommendations"
+    },
+    {
+      "id": "Q_PROFIL_02",
+      "dimension": "Profil",
+      "patterns": [],
+      "role": "TRIGGER",
+      "question": "Quel est votre sexe biologique ?",
+      "type": "Choix unique",
+      "options": [
+        "Homme",
+        "Femme"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "SEX_HORMONAL_CONTEXT",
+      "impactScore": 0.95,
+      "scientificRef": "Sex differences in metabolism (Mauvais-Jarvis 2015)"
+    },
+    {
+      "id": "Q_PROFIL_03",
+      "dimension": "Profil",
+      "patterns": [
+        "P8"
+      ],
+      "role": "TRIGGER",
+      "question": "Depuis combien de temps pratiquez-vous un entraînement structuré de musculation/fitness ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais / Irrégulier",
+        "<6 mois",
+        "6-12 mois",
+        "12-18 mois",
+        "18-36 mois",
+        ">36 mois"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "TRAINING_AGE",
+      "impactScore": 0.9,
+      "scientificRef": "ACSM (2018) - Beginner/Intermediate/Advanced classification"
+    },
+    {
+      "id": "Q_PROFIL_04",
+      "dimension": "Profil",
+      "patterns": [],
+      "role": "TRIGGER",
+      "question": "Quel est votre objectif principal avec VIRTUS Smart fit ?",
+      "type": "Choix unique",
+      "options": [
+        "Perte de poids/graisse",
+        "Prise de masse musculaire",
+        "Recomposition (muscle + perte graisse)",
+        "Performance sportive",
+        "Optimisation santé/bien-être",
+        "Autre"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "GOAL_ORIENTATION",
+      "impactScore": 0.95,
+      "scientificRef": "Self-Determination Theory (Ryan & Deci 2000)"
+    },
+    {
+      "id": "Q_PROFIL_05",
+      "dimension": "Profil",
+      "patterns": [],
+      "role": "PRIMARY",
+      "question": "Quel est votre poids actuel ?",
+      "type": "Numérique",
+      "options": [
+        "Kg (40-200)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "BASELINE_ANTHROPOMETRY",
+      "impactScore": 0.85,
+      "scientificRef": "WHO BMI classification"
+    },
+    {
+      "id": "Q_PROFIL_06",
+      "dimension": "Profil",
+      "patterns": [],
+      "role": "PRIMARY",
+      "question": "Quelle est votre taille ?",
+      "type": "Numérique",
+      "options": [
+        "cm (140-220)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "BASELINE_ANTHROPOMETRY",
+      "impactScore": 0.85,
+      "scientificRef": "WHO BMI classification"
+    },
+    {
+      "id": "Q_PROFIL_07",
+      "dimension": "Profil",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "Quel est votre tour de taille mesuré au niveau du nombril (en cm) ?",
+      "type": "Numérique",
+      "options": [
+        "cm (60-150)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "VISCERAL_ADIPOSITY",
+      "impactScore": 0.75,
+      "scientificRef": "Waist circumference & metabolic risk (Despres & Lemieux 2006)"
+    },
+    {
+      "id": "Q_PROFIL_08",
+      "dimension": "Profil",
+      "patterns": [
+        "P2"
+      ],
+      "role": "SECONDARY",
+      "question": "Combien de programmes de transformation physique avez-vous déjà tenté dans le passé ?",
+      "type": "Choix unique",
+      "options": [
+        "0 (premier)",
+        "1-2",
+        "3-4",
+        "5-7",
+        "8+"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "ADHERENCE_HISTORY",
+      "impactScore": 0.8,
+      "scientificRef": "Teixeira et al. (2015) - Past adherence predicts future"
+    },
+    {
+      "id": "Q_PROFIL_09",
+      "dimension": "Profil",
+      "patterns": [
+        "P5"
+      ],
+      "role": "PRIMARY",
+      "question": "Parmi ces programmes passés, combien avez-vous abandonné avant d'atteindre vos objectifs ?",
+      "type": "Choix unique",
+      "options": [
+        "0",
+        "1",
+        "2",
+        "3-4",
+        "5-6",
+        "7+"
+      ],
+      "triggerCondition": "IF Q_PROFIL_08 ≥ \"1-2\"",
+      "skipCondition": "IF Q_PROFIL_08 = \"0\"",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.88,
+      "scientificRef": "Teixeira et al. (2015)"
+    },
+    {
+      "id": "Q_PROFIL_10",
+      "dimension": "Profil",
+      "patterns": [
+        "P7"
+      ],
+      "role": "PRIMARY",
+      "question": "Combien d'heures par semaine pouvez-vous RÉALISTEMENT consacrer à l'entraînement (trajet inclus) ?",
+      "type": "Choix unique",
+      "options": [
+        "<2h",
+        "2-3h",
+        "3-4h",
+        "4-5h",
+        "5-6h",
+        "6h+"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ENV_02",
+      "impactScore": 0.85,
+      "scientificRef": "WHO Social Determinants Framework"
+    },
+    {
+      "id": "Q_PROFIL_11",
+      "dimension": "Profil",
+      "patterns": [],
+      "role": "TRIGGER",
+      "question": "Avez-vous des conditions médicales diagnostiquées ou traitements en cours ?",
+      "type": "Choix multiple",
+      "options": [
+        "Aucune",
+        "Diabète type 2",
+        "Pré-diabète",
+        "Hypertension",
+        "Hypothyroïdie",
+        "Hyperthyroïdie",
+        "SOPK",
+        "Troubles alimentaires (actuels/passés)",
+        "Dépression/Anxiété (traitement)",
+        "Autre"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "MEDICAL_CONTEXT",
+      "impactScore": 0.95,
+      "scientificRef": "Medical clearance (ACSM 2018)"
+    },
+    {
+      "id": "Q_PROFIL_12",
+      "dimension": "Profil",
+      "patterns": [],
+      "role": "TRIGGER",
+      "question": "[FEMMES] Êtes-vous actuellement ?",
+      "type": "Choix unique",
+      "options": [
+        "Cycles menstruels réguliers",
+        "Cycles irréguliers",
+        "Aménorrhée (absence règles)",
+        "Enceinte",
+        "Post-partum (<12 mois)",
+        "Allaitement",
+        "Péri-ménopause",
+        "Ménopause",
+        "Post-ménopause"
+      ],
+      "triggerCondition": "IF Q_PROFIL_02 = \"Femme\"",
+      "skipCondition": "IF Q_PROFIL_02 = \"Homme\"",
+      "rootCauseLink": "FEMALE_HORMONAL_STATUS",
+      "impactScore": 0.9,
+      "scientificRef": "Female Athlete Triad (De Souza et al. 2014)"
+    },
+    {
+      "id": "Q_PROFIL_13",
+      "dimension": "Profil",
+      "patterns": [],
+      "role": "TRIGGER",
+      "question": "[FEMMES] Prenez-vous actuellement une contraception hormonale ?",
+      "type": "Choix unique",
+      "options": [
+        "Non",
+        "Oui - Pilule combinée",
+        "Oui - Pilule progestative",
+        "Oui - Stérilet hormonal",
+        "Oui - Implant",
+        "Oui - Autre"
+      ],
+      "triggerCondition": "IF Q_PROFIL_02 = \"Femme\" AND Q_PROFIL_12 NOT IN [\"Enceinte\",\"Allaitement\",\"Ménopause\",\"Post-ménopause\"]",
+      "skipCondition": "IF Q_PROFIL_02 = \"Homme\" OR Q_PROFIL_12 IN [\"Enceinte\",\"Ménopause\"]",
+      "rootCauseLink": "HORMONAL_CONTRACEPTION_CONTEXT",
+      "impactScore": 0.65,
+      "scientificRef": "Contraception & metabolism (Lopez et al. 2016)"
+    },
+    {
+      "id": "Q_PROFIL_14",
+      "dimension": "Profil",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Quelle est votre profession ou situation actuelle ?",
+      "type": "Choix unique",
+      "options": [
+        "Sédentaire (bureau/écran 6h+/jour)",
+        "Actif debout (commerçant, enseignant...)",
+        "Physique modéré (infirmier, serveur...)",
+        "Physique intense (ouvrier, sportif pro...)",
+        "Étudiant",
+        "Sans emploi",
+        "Retraité",
+        "Autre"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "OCCUPATIONAL_PHYSICAL_ACTIVITY",
+      "impactScore": 0.7,
+      "scientificRef": "NEAT (Levine 2002)"
+    },
+    {
+      "id": "Q_PROFIL_15",
+      "dimension": "Profil",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Comment décririez-vous votre niveau de stress professionnel/études ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Très faible stress",
+        "10 = Stress extrême insoutenable"
+      ],
+      "triggerCondition": "IF Q_PROFIL_14 IN [\"Sédentaire\",\"Actif debout\",\"Étudiant\"]",
+      "skipCondition": "IF Q_PROFIL_14 IN [\"Sans emploi\",\"Retraité\"]",
+      "rootCauseLink": "OCCUPATIONAL_STRESS",
+      "impactScore": 0.75,
+      "scientificRef": "Job strain & health (Kivimaki et al. 2012)"
+    },
+    {
+      "id": "Q_MET_01",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "PRIMARY",
+      "question": "Comment décririez-vous votre niveau d'énergie général 1-2 heures APRÈS un repas standard ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Épuisement complet, besoin urgent sieste",
+        "10 = Énergie excellente, totalement alerte"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.9,
+      "scientificRef": "Postprandial fatigue (Benton & Parker 1998), Glycemic variability (Monnier et al. 2008)"
+    },
+    {
+      "id": "Q_MET_02",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "PRIMARY",
+      "question": "À quelle fréquence ressentez-vous des fringales ou une faim intense ENTRE les repas ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais ou très rare",
+        "1-2 fois/semaine",
+        "3-4 fois/semaine",
+        "Quotidiennement",
+        "Plusieurs fois par jour"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.85,
+      "scientificRef": "Hunger hormones dysregulation (Cummings & Overduin 2007)"
+    },
+    {
+      "id": "Q_MET_03",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "PRIMARY",
+      "question": "Comment votre poids a-t-il évolué au cours des 12 derniers mois (sans effort conscient de changement) ?",
+      "type": "Choix unique",
+      "options": [
+        "Stable (±2kg)",
+        "Augmentation progressive 2-5kg",
+        "Augmentation marquée 5-10kg",
+        "Augmentation >10kg",
+        "Perte progressive 2-5kg",
+        "Perte marquée >5kg",
+        "Fluctuations yo-yo (≥5kg variance)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.8,
+      "scientificRef": "Weight variability & metabolic dysfunction (Montani et al. 2006)"
+    },
+    {
+      "id": "Q_MET_04",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "À quelle fréquence vous réveillez-vous avec une faim intense ou un besoin urgent de manger ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Rare (<1x/semaine)",
+        "Occasionnel (1-2x/semaine)",
+        "Fréquent (3-4x/semaine)",
+        "Quotidien"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.7,
+      "scientificRef": "Nocturnal hypoglycemia (Cryer 2013)"
+    },
+    {
+      "id": "Q_MET_05",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous des symptômes de type \"brouillard mental\" ou difficulté concentration avant les repas ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Jamais, concentration excellente",
+        "10 = Très fréquent, concentration impossible"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.75,
+      "scientificRef": "Brain glucose sensing (Steinbusch et al. 2015)"
+    },
+    {
+      "id": "Q_MET_01a",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Quel(s) type(s) de repas provoquent le plus souvent ce crash énergétique ?",
+      "type": "Choix multiple",
+      "options": [
+        "Petit-déjeuner glucidique (céréales, pain, confiture...)",
+        "Déjeuner riche en glucides (pâtes, riz, sandwich...)",
+        "Dîner copieux",
+        "Tous les repas",
+        "Aucun pattern clair"
+      ],
+      "triggerCondition": "IF Q_MET_01 ≤ 4",
+      "skipCondition": "IF Q_MET_01 > 4",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.85,
+      "scientificRef": "Meal composition & glycemic response (Jenkins et al. 1981)"
+    },
+    {
+      "id": "Q_MET_01b",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Combien de temps APRÈS le repas survient généralement ce crash énergétique ?",
+      "type": "Choix unique",
+      "options": [
+        "15-30 minutes",
+        "30-60 minutes",
+        "1-2 heures",
+        "2-3 heures",
+        "Variable/imprévisible"
+      ],
+      "triggerCondition": "IF Q_MET_01 ≤ 4",
+      "skipCondition": "IF Q_MET_01 > 4",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.8,
+      "scientificRef": "Postprandial glycemic patterns (Monnier et al. 2008)"
+    },
+    {
+      "id": "Q_MET_01c",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Quels symptômes accompagnent ce crash énergétique ?",
+      "type": "Choix multiple",
+      "options": [
+        "Somnolence/besoin sieste",
+        "Irritabilité marquée",
+        "Fringales intenses",
+        "Brouillard mental/concentration difficile",
+        "Tremblements légers",
+        "Transpiration",
+        "Maux de tête",
+        "Aucun autre symptôme"
+      ],
+      "triggerCondition": "IF Q_MET_01 ≤ 4",
+      "skipCondition": "IF Q_MET_01 > 4",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.75,
+      "scientificRef": "Hypoglycemic symptoms (Cryer 2013)"
+    },
+    {
+      "id": "Q_MET_01d",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "PRIMARY",
+      "question": "[DEEP DIVE] Avez-vous remarqué une amélioration de votre énergie post-prandiale lorsque vous augmentez les protéines dans vos repas ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, amélioration très notable",
+        "Oui, légère amélioration",
+        "Pas de différence perceptible",
+        "N'ai jamais testé consciemment"
+      ],
+      "triggerCondition": "IF Q_MET_01 ≤ 4",
+      "skipCondition": "IF Q_MET_01 > 4",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.85,
+      "scientificRef": "Protein & glycemic control (Pasiakos et al. 2015)"
+    },
+    {
+      "id": "Q_MET_01e",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Une activité physique légère (marche 10-15min) après le repas améliore-t-elle votre énergie ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, nettement",
+        "Oui, légèrement",
+        "Non, aucun effet",
+        "Rend les choses pires",
+        "N'ai jamais testé"
+      ],
+      "triggerCondition": "IF Q_MET_01 ≤ 4",
+      "skipCondition": "IF Q_MET_01 > 4",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.7,
+      "scientificRef": "Postprandial walking & glucose (Colberg et al. 2009)"
+    },
+    {
+      "id": "Q_MET_01f",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Y a-t-il des antécédents de diabète type 2 ou pré-diabète dans votre famille proche (parents, fratrie) ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, diabète type 2 diagnostiqué",
+        "Oui, pré-diabète",
+        "Non, aucun",
+        "Ne sais pas"
+      ],
+      "triggerCondition": "IF Q_MET_01 ≤ 4",
+      "skipCondition": "IF Q_MET_01 > 4",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.65,
+      "scientificRef": "Genetic predisposition diabetes (Meigs et al. 2008)"
+    },
+    {
+      "id": "Q_MET_01g",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Avez-vous déjà fait mesurer votre glycémie à jeun ou votre HbA1c ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, glycémie à jeun normale (<1.00 g/L ou 5.6 mmol/L)",
+        "Oui, glycémie à jeun élevée (pré-diabète)",
+        "Oui, HbA1c normale (<5.7%)",
+        "Oui, HbA1c élevée (≥5.7%)",
+        "Non, jamais mesuré"
+      ],
+      "triggerCondition": "IF Q_MET_01 ≤ 4",
+      "skipCondition": "IF Q_MET_01 > 4",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.9,
+      "scientificRef": "Prediabetes criteria (ADA 2021)"
+    },
+    {
+      "id": "Q_MET_01h",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Consommez-vous fréquemment des boissons sucrées ou snacks sucrés pour \"tenir le coup\" énergétiquement ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Rare (<1x/semaine)",
+        "Occasionnel (1-3x/semaine)",
+        "Fréquent (4-6x/semaine)",
+        "Quotidien (1x/jour+)"
+      ],
+      "triggerCondition": "IF Q_MET_01 ≤ 4",
+      "skipCondition": "IF Q_MET_01 > 4",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.75,
+      "scientificRef": "Sugar-sweetened beverages & insulin resistance (Malik et al. 2010)"
+    },
+    {
+      "id": "Q_MET_01i",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Comment votre énergie évolue-t-elle si vous sautez un repas ?",
+      "type": "Choix unique",
+      "options": [
+        "Effondrement rapide, impossible de fonctionner",
+        "Baisse notable mais gérable",
+        "Légère baisse",
+        "Aucun changement ou amélioration",
+        "N'ai jamais sauté de repas"
+      ],
+      "triggerCondition": "IF Q_MET_01 ≤ 4",
+      "skipCondition": "IF Q_MET_01 > 4",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.7,
+      "scientificRef": "Meal skipping & glucose homeostasis (Nas et al. 2017)"
+    },
+    {
+      "id": "Q_MET_01j",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Votre énergie est-elle meilleure le matin au réveil (avant petit-déj) ou après avoir mangé ?",
+      "type": "Choix unique",
+      "options": [
+        "Bien meilleure au réveil (avant manger)",
+        "Légèrement meilleure au réveil",
+        "Pas de différence",
+        "Meilleure après avoir mangé",
+        "Variable"
+      ],
+      "triggerCondition": "IF Q_MET_01 ≤ 4",
+      "skipCondition": "IF Q_MET_01 > 4",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.65,
+      "scientificRef": "Dawn phenomenon (Monnier et al. 2002)"
+    },
+    {
+      "id": "Q_MET_16",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "Combien de temps pouvez-vous rester sans manger le matin (après réveil) avant de ressentir une faim urgente ou une baisse d'énergie majeure ?",
+      "type": "Choix unique",
+      "options": [
+        "<1h (besoin urgent petit-déj)",
+        "1-2h",
+        "2-3h",
+        "3-4h",
+        "4h+ (facilement)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_MET_03",
+      "impactScore": 0.75,
+      "scientificRef": "Metabolic flexibility (Galgani & Ravussin 2008)"
+    },
+    {
+      "id": "Q_MET_17",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous déjà pratiqué le jeûne intermittent (ex: 16/8, sauter petit-déj) pendant au moins 2 semaines ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, très bien toléré",
+        "Oui, moyennement toléré",
+        "Oui, très mal toléré (arrêté)",
+        "Non, jamais essayé"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_MET_03",
+      "impactScore": 0.7,
+      "scientificRef": "Intermittent fasting & metabolic adaptation (Tinsley & La Bounty 2015)"
+    },
+    {
+      "id": "Q_MET_18",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "Comment votre performance physique (entraînement, sport) est-elle affectée si vous vous entraînez à jeun (sans avoir mangé 3h+) ?",
+      "type": "Choix unique",
+      "options": [
+        "Excellente, aucun problème",
+        "Légèrement réduite mais OK",
+        "Très réduite, difficile",
+        "Impossible, énergie effondrée",
+        "N'ai jamais essayé"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "RC_MET_03",
+      "impactScore": 0.75,
+      "scientificRef": "Fasted training & substrate utilization (De Bock et al. 2008)"
+    },
+    {
+      "id": "Q_MET_19",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "Lorsque vous réduisez fortement les glucides pendant quelques jours, comment vous sentez-vous ?",
+      "type": "Choix unique",
+      "options": [
+        "Très bien, énergie excellente",
+        "Bien après adaptation 2-3 jours",
+        "Fatigue/irritabilité persistantes",
+        "Effondrement énergétique majeur",
+        "N'ai jamais testé"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_MET_03",
+      "impactScore": 0.7,
+      "scientificRef": "Low-carb adaptation (Volek et al. 2015)"
+    },
+    {
+      "id": "Q_MET_20",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous une différence d'énergie notable selon que vous consommez des glucides le soir ou non ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, bien meilleure énergie matin si glucides soir",
+        "Oui, meilleure énergie si PAS glucides soir",
+        "Aucune différence perceptible",
+        "N'ai jamais prêté attention"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_MET_03",
+      "impactScore": 0.6,
+      "scientificRef": "Carb timing & circadian (Sofer et al. 2011)"
+    },
+    {
+      "id": "Q_MET_21",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "Combien de temps après un repas riche en glucides ressentez-vous à nouveau la faim ?",
+      "type": "Choix unique",
+      "options": [
+        "<1h",
+        "1-2h",
+        "2-3h",
+        "3-4h",
+        "4h+"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.75,
+      "scientificRef": "Satiety & macronutrient composition (Blundell & MacDiarmid 1997)"
+    },
+    {
+      "id": "Q_MET_22",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "Combien de temps après un repas riche en protéines et graisses (faible glucides) ressentez-vous la faim ?",
+      "type": "Choix unique",
+      "options": [
+        "<2h",
+        "2-3h",
+        "3-4h",
+        "4-5h",
+        "5h+"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_MET_03",
+      "impactScore": 0.75,
+      "scientificRef": "Protein-induced satiety (Westerterp-Plantenga et al. 2009)"
+    },
+    {
+      "id": "Q_MET_23",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous remarqué des envies spécifiques (cravings) pour certains types d'aliments ?",
+      "type": "Choix multiple",
+      "options": [
+        "Sucré (chocolat, desserts...)",
+        "Salé (chips, crackers...)",
+        "Gras (fromage, charcuterie...)",
+        "Glucides (pain, pâtes, riz...)",
+        "Aucune envie particulière"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.65,
+      "scientificRef": "Food cravings neurophysiology (Pelchat 2002)"
+    },
+    {
+      "id": "Q_MET_24",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "Ces envies surviennent principalement :",
+      "type": "Choix multiple",
+      "options": [
+        "En fin d'après-midi (16h-19h)",
+        "En soirée (après dîner)",
+        "Pendant/après stress",
+        "Pendant/après effort physique",
+        "Pas de pattern clair",
+        "N'ai pas d'envies"
+      ],
+      "triggerCondition": "IF Q_MET_23 != \"Aucune envie particulière\"",
+      "skipCondition": "IF Q_MET_23 = \"Aucune envie particulière\"",
+      "rootCauseLink": "RC_MET_01",
+      "impactScore": 0.65,
+      "scientificRef": "Stress & food cravings (Dallman 2010)"
+    },
+    {
+      "id": "Q_MET_25",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P1"
+      ],
+      "role": "SECONDARY",
+      "question": "Quelle est votre consommation quotidienne moyenne de caféine (café, thé, energy drinks) ?",
+      "type": "Choix unique",
+      "options": [
+        "Aucune",
+        "1 tasse café/jour",
+        "2-3 tasses café/jour",
+        "4-5 tasses café/jour",
+        "6+ tasses ou energy drinks"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "CAFFEINE_DEPENDENCY",
+      "impactScore": 0.6,
+      "scientificRef": "Caffeine & energy regulation (Heckman et al. 2010)"
+    },
+    {
+      "id": "Q_MET_26",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P2"
+      ],
+      "role": "PRIMARY",
+      "question": "Avez-vous déjà suivi des régimes hypocaloriques (déficit >20%) pendant plus de 8 semaines ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "1 fois",
+        "2-3 fois",
+        "4-5 fois",
+        "6+ fois"
+      ],
+      "triggerCondition": "IF Q_PROFIL_04 IN [\"Perte de poids/graisse\",\"Recomposition\"]",
+      "skipCondition": "IF Q_PROFIL_04 NOT IN [\"Perte de poids/graisse\",\"Recomposition\"]",
+      "rootCauseLink": "RC_MET_02",
+      "impactScore": 0.9,
+      "scientificRef": "Metabolic adaptation (Trexler et al. 2014)"
+    },
+    {
+      "id": "Q_MET_27",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P2"
+      ],
+      "role": "PRIMARY",
+      "question": "Lors de ces périodes de restriction calorique, quelle était généralement votre perte de poids hebdomadaire moyenne ?",
+      "type": "Choix unique",
+      "options": [
+        "<0.3kg/sem (très lente)",
+        "0.3-0.5kg/sem (modérée)",
+        "0.5-1kg/sem (standard)",
+        "1-1.5kg/sem (agressive)",
+        ">1.5kg/sem (très agressive)",
+        "N/A - jamais fait"
+      ],
+      "triggerCondition": "IF Q_MET_26 != \"Jamais\"",
+      "skipCondition": "IF Q_MET_26 = \"Jamais\"",
+      "rootCauseLink": "RC_MET_02",
+      "impactScore": 0.85,
+      "scientificRef": "Rate of weight loss & adaptation (Garthe et al. 2011)"
+    },
+    {
+      "id": "Q_MET_28",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P2"
+      ],
+      "role": "PRIMARY",
+      "question": "Après ces périodes de diète, avez-vous repris du poids ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais fait diète",
+        "Aucune reprise (poids maintenu)",
+        "Reprise partielle (<50% poids perdu)",
+        "Reprise totale (100% poids perdu)",
+        "Reprise excessive (>100% - rebond)"
+      ],
+      "triggerCondition": "IF Q_MET_26 != \"Jamais\"",
+      "skipCondition": "IF Q_MET_26 = \"Jamais\"",
+      "rootCauseLink": "RC_MET_02",
+      "impactScore": 0.9,
+      "scientificRef": "Weight regain & metabolic adaptation (Dulloo & Montani 2015)"
+    },
+    {
+      "id": "Q_MET_29",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P2"
+      ],
+      "role": "SECONDARY",
+      "question": "Combien de temps après l'arrêt de la diète cette reprise de poids s'est-elle produite ?",
+      "type": "Choix unique",
+      "options": [
+        "<1 mois",
+        "1-3 mois",
+        "3-6 mois",
+        "6-12 mois",
+        ">12 mois",
+        "N/A - pas de reprise"
+      ],
+      "triggerCondition": "IF Q_MET_28 IN [\"Reprise partielle\",\"Reprise totale\",\"Reprise excessive\"]",
+      "skipCondition": "IF Q_MET_28 NOT IN [\"Reprise partielle\",\"Reprise totale\",\"Reprise excessive\"]",
+      "rootCauseLink": "RC_MET_02",
+      "impactScore": 0.7,
+      "scientificRef": "Timeline weight regain (Kraschnewski et al. 2010)"
+    },
+    {
+      "id": "Q_MET_30",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P2"
+      ],
+      "role": "PRIMARY",
+      "question": "Avez-vous remarqué qu'il devient de plus en plus difficile de perdre du poids à chaque nouvelle tentative ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Non, aussi facile à chaque fois",
+        "10 = Oui, quasi impossible maintenant"
+      ],
+      "triggerCondition": "IF Q_MET_26 >= \"2-3 fois\"",
+      "skipCondition": "IF Q_MET_26 IN [\"Jamais\",\"1 fois\"]",
+      "rootCauseLink": "RC_MET_02",
+      "impactScore": 0.88,
+      "scientificRef": "Cumulative metabolic adaptation (Dulloo & Montani 2015)"
+    },
+    {
+      "id": "Q_MET_31",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P2"
+      ],
+      "role": "SECONDARY",
+      "question": "Quelle était votre approche calorique lors de ces diètes passées ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - jamais fait",
+        "Déficit modéré stable (15-20%)",
+        "Déficit agressif stable (25-35%)",
+        "Déficit très agressif (40%+)",
+        "Déficit variable (yo-yo calories)",
+        "Low-carb/keto strict",
+        "Autre"
+      ],
+      "triggerCondition": "IF Q_MET_26 != \"Jamais\"",
+      "skipCondition": "IF Q_MET_26 = \"Jamais\"",
+      "rootCauseLink": "RC_MET_02",
+      "impactScore": 0.75,
+      "scientificRef": "Deficit magnitude & adaptation (Byrne et al. 2012)"
+    },
+    {
+      "id": "Q_MET_32",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P2"
+      ],
+      "role": "PRIMARY",
+      "question": "Pendant ces diètes, avez-vous ressenti une fatigue inhabituelle, une frilosité accrue, ou une baisse de libido ?",
+      "type": "Choix multiple",
+      "options": [
+        "N/A - jamais fait",
+        "Fatigue chronique marquée",
+        "Frilosité constante (froid anormal)",
+        "Baisse libido notable",
+        "Chute cheveux",
+        "Peau sèche",
+        "Aucun de ces symptômes"
+      ],
+      "triggerCondition": "IF Q_MET_26 != \"Jamais\"",
+      "skipCondition": "IF Q_MET_26 = \"Jamais\"",
+      "rootCauseLink": "RC_MET_02",
+      "impactScore": 0.85,
+      "scientificRef": "Metabolic downregulation symptoms (Rosenbaum et al. 2008)"
+    },
+    {
+      "id": "Q_MET_33",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P2"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous déjà pratiqué des \"refeeds\" (jours calories augmentées) ou \"diet breaks\" pendant vos diètes ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - jamais fait diète",
+        "Oui, régulièrement (1x/semaine ou +)",
+        "Oui, occasionnellement",
+        "Non, déficit continu sans pause",
+        "Ne sais pas ce que c'est"
+      ],
+      "triggerCondition": "IF Q_MET_26 != \"Jamais\"",
+      "skipCondition": "IF Q_MET_26 = \"Jamais\"",
+      "rootCauseLink": "RC_MET_02",
+      "impactScore": 0.7,
+      "scientificRef": "Refeeds & metabolic rate (Dirlewanger et al. 2000)"
+    },
+    {
+      "id": "Q_MET_34",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P2"
+      ],
+      "role": "SECONDARY",
+      "question": "Lorsque vous augmentez vos calories après une période de diète, prenez-vous du poids très rapidement (>1kg/semaine les 2 premières semaines) ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - jamais testé",
+        "Oui, reprise très rapide",
+        "Reprise modérée (0.5-1kg/sem)",
+        "Reprise lente (<0.5kg/sem)",
+        "Aucune reprise"
+      ],
+      "triggerCondition": "IF Q_MET_26 != \"Jamais\"",
+      "skipCondition": "IF Q_MET_26 = \"Jamais\"",
+      "rootCauseLink": "RC_MET_02",
+      "impactScore": 0.8,
+      "scientificRef": "Rebound hyperplasia (Dulloo 1997)"
+    },
+    {
+      "id": "Q_MET_35",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P2"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous déjà fait un \"reverse diet\" (augmentation progressive calories sur plusieurs semaines) après une diète ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - jamais fait",
+        "Oui, bien toléré (peu de reprise)",
+        "Oui, reprise poids malgré progressivité",
+        "Non, jamais fait",
+        "Ne sais pas ce que c'est"
+      ],
+      "triggerCondition": "IF Q_MET_26 != \"Jamais\"",
+      "skipCondition": "IF Q_MET_26 = \"Jamais\"",
+      "rootCauseLink": "RC_MET_02",
+      "impactScore": 0.75,
+      "scientificRef": "Reverse dieting (Trexler et al. 2014)"
+    },
+    {
+      "id": "Q_MET_36",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P2"
+      ],
+      "role": "SECONDARY",
+      "question": "Comment votre composition corporelle a-t-elle évolué avec vos tentatives passées de transformation ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - jamais tenté",
+        "Perte graisse + gain muscle (recomp réussie)",
+        "Perte graisse mais aussi muscle notable",
+        "Perte poids mais surtout muscle (skinny-fat)",
+        "Yo-yo constant (graisse perdue/reprise)"
+      ],
+      "triggerCondition": "IF Q_MET_26 != \"Jamais\"",
+      "skipCondition": "IF Q_MET_26 = \"Jamais\"",
+      "rootCauseLink": "RC_MET_02",
+      "impactScore": 0.8,
+      "scientificRef": "Lean mass preservation (Chaston et al. 2007)"
+    },
+    {
+      "id": "Q_MET_37",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P2"
+      ],
+      "role": "SECONDARY",
+      "question": "Où avez-vous tendance à stocker prioritairement la graisse corporelle ?",
+      "type": "Choix multiple",
+      "options": [
+        "Abdomen/ventre",
+        "Hanches/fessiers",
+        "Cuisses",
+        "Bras",
+        "Dos",
+        "Viscéral (graisse interne perceptible)",
+        "Répartition homogène"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "ADIPOSE_DISTRIBUTION",
+      "impactScore": 0.7,
+      "scientificRef": "Fat distribution & metabolic risk (Despres & Lemieux 2006)"
+    },
+    {
+      "id": "Q_MET_38",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P2"
+      ],
+      "role": "SECONDARY",
+      "question": "Où perdez-vous de la graisse en premier lorsque vous maigrissez ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - jamais maigri",
+        "Visage/haut du corps d'abord",
+        "Abdomen/taille",
+        "Hanches/cuisses",
+        "Répartition homogène",
+        "Ne sais pas"
+      ],
+      "triggerCondition": "IF Q_MET_26 != \"Jamais\"",
+      "skipCondition": "IF Q_MET_26 = \"Jamais\"",
+      "rootCauseLink": "LIPOLYSIS_PATTERN",
+      "impactScore": 0.65,
+      "scientificRef": "Regional fat loss (Stallknecht et al. 2007)"
+    },
+    {
+      "id": "Q_MET_39",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P2"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous déjà fait mesurer votre composition corporelle (DEXA scan, BodPod, ou impédancemètre professionnel) ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, DEXA scan",
+        "Oui, BodPod",
+        "Oui, impédancemètre professionnel",
+        "Oui, pince à pli cutané (coach/pro)",
+        "Non, jamais",
+        "Balance impédancemètre maison (non fiable)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "BODY_COMP_AWARENESS",
+      "impactScore": 0.6,
+      "scientificRef": "Body composition assessment (Heymsfield et al. 2005)"
+    },
+    {
+      "id": "Q_MET_40",
+      "dimension": "Métabolique",
+      "patterns": [
+        "P2"
+      ],
+      "role": "SECONDARY",
+      "question": "[Si mesuré] Quel était votre pourcentage de masse grasse le plus récent mesuré ?",
+      "type": "Numérique",
+      "options": [
+        "% (5-50)"
+      ],
+      "triggerCondition": "IF Q_MET_39 IN [\"Oui, DEXA scan\",\"Oui, BodPod\",\"Oui, impédancemètre professionnel\"]",
+      "skipCondition": "IF Q_MET_39 NOT IN [\"Oui, DEXA scan\",\"Oui, BodPod\",\"Oui, impédancemètre professionnel\"]",
+      "rootCauseLink": "BASELINE_BODY_FAT",
+      "impactScore": 0.75,
+      "scientificRef": "Body fat % norms (Gallagher et al. 2000)"
+    },
+    {
+      "id": "Q_REC_01",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "PRIMARY",
+      "question": "Au cours du dernier mois, comment évalueriez-vous votre niveau de stress GLOBAL (vie personnelle + professionnelle + santé) ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Aucun stress, totalement serein",
+        "10 = Stress extrême insoutenable, au bord du burnout"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.95,
+      "scientificRef": "PSS-10 (Cohen et al. 1983), Chronic stress & HPA (McEwen 2007)"
+    },
+    {
+      "id": "Q_REC_02",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "PRIMARY",
+      "question": "Au cours du dernier mois, à quelle fréquence avez-vous été contrarié(e) par un événement inattendu ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Presque jamais",
+        "Parfois",
+        "Assez souvent",
+        "Très souvent"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.75,
+      "scientificRef": "4_STRESS_P3_HPA_AXIS"
+    },
+    {
+      "id": "Q_REC_03",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "PRIMARY",
+      "question": "Au cours du dernier mois, à quelle fréquence avez-vous senti que vous étiez incapable de contrôler les choses importantes de votre vie ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Presque jamais",
+        "Parfois",
+        "Assez souvent",
+        "Très souvent"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.8,
+      "scientificRef": "PSS-10 Item 2 (Cohen et al. 1983), Locus of control"
+    },
+    {
+      "id": "Q_REC_04",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "PRIMARY",
+      "question": "Au cours du dernier mois, à quelle fréquence vous êtes-vous senti(e) nerveux/nerveuse et \"stressé(e)\" ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Presque jamais",
+        "Parfois",
+        "Assez souvent",
+        "Très souvent"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.85,
+      "scientificRef": "PSS-10 Item 3 (Cohen et al. 1983)"
+    },
+    {
+      "id": "Q_REC_05",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Au cours du dernier mois, à quelle fréquence avez-vous été contrarié(e) par des choses qui échappaient à votre contrôle ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Presque jamais",
+        "Parfois",
+        "Assez souvent",
+        "Très souvent"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.75,
+      "scientificRef": "PSS-10 Item 4 (Cohen et al. 1983)"
+    },
+    {
+      "id": "Q_REC_06",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Au cours du dernier mois, à quelle fréquence avez-vous senti que les difficultés s'accumulaient tellement que vous ne pouviez pas les surmonter ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Presque jamais",
+        "Parfois",
+        "Assez souvent",
+        "Très souvent"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.85,
+      "scientificRef": "PSS-10 Item 10 (Cohen et al. 1983), Overwhelm indicator"
+    },
+    {
+      "id": "Q_REC_07",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Depuis combien de temps ressentez-vous ce niveau de stress ?",
+      "type": "Choix unique",
+      "options": [
+        "<1 mois (récent/ponctuel)",
+        "1-3 mois",
+        "3-6 mois",
+        "6-12 mois",
+        "1-2 ans",
+        ">2 ans (chronique)"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 6",
+      "skipCondition": "IF Q_REC_01 < 6",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.9,
+      "scientificRef": "Chronic stress duration & HPA dysregulation (McEwen 2007)"
+    },
+    {
+      "id": "Q_REC_08",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "PRIMARY",
+      "question": "Quelle(s) est/sont la/les source(s) principale(s) de votre stress actuel ?",
+      "type": "Choix multiple",
+      "options": [
+        "Professionnel (charge travail, pression...)",
+        "Financier",
+        "Relationnel (couple, famille...)",
+        "Santé (moi ou proche)",
+        "Objectifs physiques (pression performance/image)",
+        "Isolement social",
+        "Incertitude avenir",
+        "Autre",
+        "Pas de stress majeur"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 5",
+      "skipCondition": "IF Q_REC_01 < 5",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.85,
+      "scientificRef": "Stressor classification (Lazarus & Folkman 1984)"
+    },
+    {
+      "id": "Q_REC_09",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous des stratégies actives de gestion du stress que vous pratiquez régulièrement ?",
+      "type": "Choix multiple",
+      "options": [
+        "Méditation/pleine conscience",
+        "Activité physique régulière",
+        "Thérapie/psychologue",
+        "Techniques respiration",
+        "Journaling",
+        "Temps nature régulier",
+        "Socialisation active",
+        "Hobbies/passions",
+        "Aucune stratégie active"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 6",
+      "skipCondition": "IF Q_REC_01 < 6",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.8,
+      "scientificRef": "Coping strategies (Folkman & Moskowitz 2004)"
+    },
+    {
+      "id": "Q_REC_01a",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Ressentez-vous une sensation de \"ne jamais pouvoir éteindre votre cerveau\" ou être constamment en alerte ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Jamais, déconnexion facile",
+        "10 = Constamment, hypervigilance permanente"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7",
+      "skipCondition": "IF Q_REC_01 < 7",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.88,
+      "scientificRef": "Hyperarousal & HPA axis (McEwen & Stellar 1993)"
+    },
+    {
+      "id": "Q_REC_01b",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Avez-vous des difficultés à vous \"détendre vraiment\" même pendant vos moments libres/vacances ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, détente facile",
+        "Oui, quelques jours nécessaires",
+        "Oui, impossible vraiment",
+        "N'ai pas eu de pause récente"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7",
+      "skipCondition": "IF Q_REC_01 < 7",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.85,
+      "scientificRef": "Recovery inability (Sonnentag & Fritz 2007)"
+    },
+    {
+      "id": "Q_REC_01c",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Ressentez-vous une irritabilité ou impatience accrues comparé à votre état normal ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Non, patience normale",
+        "10 = Oui, irritabilité constante incontrôlable"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7",
+      "skipCondition": "IF Q_REC_01 < 7",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.75,
+      "scientificRef": "Irritability as stress marker (Koh et al. 2001)"
+    },
+    {
+      "id": "Q_REC_01d",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Avez-vous remarqué une augmentation de comportements d'évitement (procrastination, isolement, consommation alcool/nourriture...) ?",
+      "type": "Choix multiple",
+      "options": [
+        "Procrastination accrue",
+        "Isolement social",
+        "Consommation alcool augmentée",
+        "Alimentation émotionnelle",
+        "Excès écrans/réseaux sociaux",
+        "Évitement responsabilités",
+        "Aucun comportement d'évitement"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7",
+      "skipCondition": "IF Q_REC_01 < 7",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.8,
+      "scientificRef": "Avoidance coping (Holahan & Moos 1987)"
+    },
+    {
+      "id": "Q_REC_01e",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "PRIMARY",
+      "question": "[DEEP DIVE] Ressentez-vous des symptômes physiques que vous attribuez au stress ?",
+      "type": "Choix multiple",
+      "options": [
+        "Tensions musculaires (nuque, épaules, mâchoire)",
+        "Maux de tête fréquents",
+        "Problèmes digestifs (ballonnements, diarrhée, constipation)",
+        "Palpitations cardiaques",
+        "Oppression thoracique",
+        "Vertiges",
+        "Aucun symptôme physique"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7",
+      "skipCondition": "IF Q_REC_01 < 7",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.85,
+      "scientificRef": "Somatic symptoms stress (Koh et al. 2004)"
+    },
+    {
+      "id": "Q_REC_01f",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Votre libido a-t-elle diminué de manière notable ces derniers mois ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, inchangée",
+        "Oui, légère baisse",
+        "Oui, baisse marquée",
+        "Oui, quasi inexistante",
+        "Préfère ne pas répondre"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7",
+      "skipCondition": "IF Q_REC_01 < 7",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.75,
+      "scientificRef": "Stress & libido (Hamilton & Meston 2013)"
+    },
+    {
+      "id": "Q_REC_01g",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Avez-vous des pensées intrusives/ruminations mentales difficiles à arrêter ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Jamais, contrôle pensées facile",
+        "10 = Constamment, ruminations incontrôlables"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7",
+      "skipCondition": "IF Q_REC_01 < 7",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.82,
+      "scientificRef": "Rumination & stress (Nolen-Hoeksema et al. 2008)"
+    },
+    {
+      "id": "Q_REC_01h",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Ressentez-vous une sensation de \"fatigue nerveuse\" (épuisé mentalement mais tendu, pas relaxé) ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Jamais",
+        "10 = État permanent, wired but tired"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7",
+      "skipCondition": "IF Q_REC_01 < 7",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.88,
+      "scientificRef": "Cortisol dysregulation pattern (McEwen 2008)"
+    },
+    {
+      "id": "Q_REC_01i",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Votre tolérance à l'effort physique a-t-elle diminué (performances baisse, récupération lente, fatigue rapide) ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, performances stables/progression",
+        "Oui, légère baisse",
+        "Oui, baisse notable",
+        "Oui, effondrement performances",
+        "N/A - pas d'entraînement régulier"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7 AND Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_REC_01 < 7 OR Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.85,
+      "scientificRef": "Overtraining & HPA axis (Cadegiani & Kater 2017)"
+    },
+    {
+      "id": "Q_REC_01j",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Avez-vous l'impression que votre système immunitaire est affaibli (rhumes fréquents, infections, cicatrisation lente) ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, santé normale",
+        "Oui, 1-2 rhumes/an plus que d'habitude",
+        "Oui, malade fréquemment (>4x/an)",
+        "Oui, infections récurrentes",
+        "N'ai pas remarqué"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7",
+      "skipCondition": "IF Q_REC_01 < 7",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.78,
+      "scientificRef": "Stress & immune function (Segerstrom & Miller 2004)"
+    },
+    {
+      "id": "Q_REC_01k",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Ressentez-vous une anhédonie (perte plaisir activités habituellement appréciées) ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Non, plaisir intact",
+        "10 = Oui, plus rien ne procure plaisir"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7",
+      "skipCondition": "IF Q_REC_01 < 7",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.9,
+      "scientificRef": "Anhedonia as burnout marker (Treadway & Zald 2011)"
+    },
+    {
+      "id": "Q_REC_01l",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Avez-vous déjà consulté un professionnel de santé mentale (psychologue, psychiatre) pour votre stress/anxiété ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, actuellement suivi",
+        "Oui, dans le passé",
+        "Non, jamais",
+        "Non, mais envisage sérieusement"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7",
+      "skipCondition": "IF Q_REC_01 < 7",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.85,
+      "scientificRef": "Mental health support necessity"
+    },
+    {
+      "id": "Q_REC_01m",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Prenez-vous actuellement des médicaments pour anxiété, dépression, ou sommeil ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, aucun",
+        "Oui, anxiolytiques (benzodiazépines...)",
+        "Oui, antidépresseurs (ISRS...)",
+        "Oui, somnifères",
+        "Oui, plusieurs",
+        "Préfère ne pas répondre"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7",
+      "skipCondition": "IF Q_REC_01 < 7",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.88,
+      "scientificRef": "Medication context assessment"
+    },
+    {
+      "id": "Q_REC_01n",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] À quelle fréquence avez-vous des pensées négatives sur vous-même ou votre capacité à réussir ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Rare",
+        "Occasionnel",
+        "Fréquent (plusieurs fois/sem)",
+        "Quotidien"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7",
+      "skipCondition": "IF Q_REC_01 < 7",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.82,
+      "scientificRef": "Negative self-talk & stress (Beck 1979)"
+    },
+    {
+      "id": "Q_REC_01o",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Avez-vous un sentiment de perte de sens/motivation dans votre vie en général ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Non, sens/motivation clairs",
+        "10 = Oui, total perte sens/direction"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7",
+      "skipCondition": "IF Q_REC_01 < 7",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.85,
+      "scientificRef": "Existential distress (Frankl 1959, Logotherapy)"
+    },
+    {
+      "id": "Q_REC_01p",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "PRIMARY",
+      "question": "[DEEP DIVE - CRITIQUE] Avez-vous eu des pensées d'auto-sabotage ou, dans les cas extrêmes, pensées suicidaires ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, jamais",
+        "Pensées auto-sabotage occasionnelles",
+        "Pensées suicidaires passagères",
+        "Pensées suicidaires fréquentes",
+        "Préfère ne pas répondre"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 8",
+      "skipCondition": "IF Q_REC_01 < 8",
+      "rootCauseLink": "MENTAL_HEALTH_CRISIS",
+      "impactScore": 0.98,
+      "scientificRef": "Suicidal ideation screening (Beck et al. 1979) - URGENT REFERRAL if positive"
+    },
+    {
+      "id": "Q_REC_30",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous une fatigue qui ne s'améliore pas malgré le repos (fatigue chronique) ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Non, repos efficace",
+        "10 = Oui, fatigue permanente insensible au repos"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.85,
+      "scientificRef": "Allostatic load & chronic fatigue (Juster et al. 2010)"
+    },
+    {
+      "id": "Q_REC_31",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous des variations d'énergie marquées au cours de la journée avec \"crashes\" d'énergie ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, énergie stable",
+        "Oui, 1 crash/jour (après-midi typiquement)",
+        "Oui, plusieurs crashes/jour",
+        "Oui, état permanent faible énergie"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.75,
+      "scientificRef": "Cortisol circadian dysregulation (Clow et al. 2010)"
+    },
+    {
+      "id": "Q_REC_32",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "PRIMARY",
+      "question": "Comment décririez-vous votre niveau d'énergie au réveil (avant petit-déjeuner/caféine) ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Épuisement total, impossible se lever",
+        "10 = Énergie excellente, réveil dynamique"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.88,
+      "scientificRef": "Morning cortisol awakening response (Pruessner et al. 1997)"
+    },
+    {
+      "id": "Q_REC_33",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Combien de temps après le réveil vous sentez-vous \"vraiment réveillé\" et opérationnel ?",
+      "type": "Choix unique",
+      "options": [
+        "Immédiatement au réveil",
+        "15-30min",
+        "30-60min",
+        "1-2h",
+        ">2h (besoin caféine massive)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.75,
+      "scientificRef": "Sleep inertia (Tassi & Muzet 2000)"
+    },
+    {
+      "id": "Q_REC_34",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous un \"second souffle\" d'énergie en fin de soirée (22h-minuit) qui rend l'endormissement difficile ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais, fatigue naturelle soirée",
+        "Occasionnellement",
+        "Fréquemment (3-4x/sem)",
+        "Quasi quotidien"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.82,
+      "scientificRef": "Evening cortisol elevation (Kudielka et al. 2007)"
+    },
+    {
+      "id": "Q_REC_35",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous des envies de sucre ou stimulants (caféine) pour \"tenir\" énergétiquement ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Rare (<2x/sem)",
+        "Fréquent (3-5x/sem)",
+        "Quotidien",
+        "Plusieurs fois/jour"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.7,
+      "scientificRef": "Sugar cravings & HPA dysregulation (Dallman 2010)"
+    },
+    {
+      "id": "Q_REC_36",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous des vertiges ou étourdissements en passant de position assise à debout (hypotension orthostatique) ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Rare",
+        "Occasionnel",
+        "Fréquent",
+        "Quotidien"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.68,
+      "scientificRef": "Orthostatic hypotension & adrenal fatigue (Teitelbaum et al. 2001)"
+    },
+    {
+      "id": "Q_REC_37",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous remarqué une sensibilité accrue au froid (frilosité inhabituelle) ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, tolérance normale",
+        "Oui, légèrement",
+        "Oui, très frileux/frileuse",
+        "Oui, constamment gelé(e)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.65,
+      "scientificRef": "Metabolic downregulation & temperature (Rosenbaum et al. 2008)"
+    },
+    {
+      "id": "Q_REC_38",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Votre pression artérielle est-elle naturellement basse ou avez-vous des antécédents d'hypotension ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, TA normale",
+        "Oui, TA basse diagnostiquée",
+        "Oui, symptômes hypotension fréquents",
+        "Ne sais pas / Jamais mesuré"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_01",
+      "impactScore": 0.6,
+      "scientificRef": "Hypotension & adrenal dysregulation (Teitelbaum et al. 2001)"
+    },
+    {
+      "id": "Q_REC_39",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous des taches brunes/foncées (hyperpigmentation) au niveau des plis cutanés, cicatrices, ou gencives ?",
+      "type": "Choix unique",
+      "options": [
+        "Non",
+        "Oui, léger",
+        "Oui, notable",
+        "N'ai jamais remarqué"
+      ],
+      "triggerCondition": "IF Q_REC_01 >= 7",
+      "skipCondition": "IF Q_REC_01 < 7",
+      "rootCauseLink": "ADDISON_SCREENING",
+      "impactScore": 0.55,
+      "scientificRef": "Addison disease screening (though rare, hyperpigmentation marker)"
+    },
+    {
+      "id": "Q_REC_10",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "PRIMARY",
+      "question": "Combien d'heures de sommeil obtenez-vous RÉELLEMENT par nuit en moyenne (pas temps au lit, mais sommeil effectif) ?",
+      "type": "Numérique",
+      "options": [
+        "Heures (3-12)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.95,
+      "scientificRef": "PSQI Component 4 (Buysse et al. 1989), Sleep duration recommendations (Walker 2017)"
+    },
+    {
+      "id": "Q_REC_11",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "PRIMARY",
+      "question": "Comment évalueriez-vous la QUALITÉ globale de votre sommeil ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Très mauvaise, sommeil non réparateur",
+        "10 = Excellente, réveil frais/dispo"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.92,
+      "scientificRef": "PSQI Component 1 (Buysse et al. 1989)"
+    },
+    {
+      "id": "Q_REC_12",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "Combien de temps vous faut-il généralement pour vous endormir après vous être couché(e) ?",
+      "type": "Choix unique",
+      "options": [
+        "<15min",
+        "15-30min",
+        "30-60min",
+        "1-2h",
+        ">2h"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.85,
+      "scientificRef": "PSQI Component 2 - Sleep latency (Buysse et al. 1989)"
+    },
+    {
+      "id": "Q_REC_13",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "PRIMARY",
+      "question": "À quelle fréquence vous réveillez-vous pendant la nuit ou tôt le matin ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais ou très rare",
+        "1-2x/semaine",
+        "3-4x/semaine",
+        "5-6x/semaine",
+        "Quotidien"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.88,
+      "scientificRef": "PSQI Component 5a (Buysse et al. 1989), Sleep fragmentation"
+    },
+    {
+      "id": "Q_REC_14",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "Combien de fois par nuit vous réveillez-vous en moyenne (si applicable) ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "1 fois",
+        "2-3 fois",
+        "4-5 fois",
+        "6+ fois"
+      ],
+      "triggerCondition": "IF Q_REC_13 IN [\"3-4x/semaine\",\"5-6x/semaine\",\"Quotidien\"]",
+      "skipCondition": "IF Q_REC_13 NOT IN [\"3-4x/semaine\",\"5-6x/semaine\",\"Quotidien\"]",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.82,
+      "scientificRef": "Sleep continuity disturbances (Bonnet & Arand 2003)"
+    },
+    {
+      "id": "Q_REC_15",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "Quelle(s) raison(s) principale(s) à vos réveils nocturnes ?",
+      "type": "Choix multiple",
+      "options": [
+        "Besoin uriner",
+        "Douleurs physiques",
+        "Trop chaud/froid",
+        "Cauchemars/pensées anxieuses",
+        "Bruit environnement",
+        "Apnée/difficulté respirer",
+        "Partenaire (ronflements...)",
+        "Sans raison claire",
+        "N/A - pas de réveils"
+      ],
+      "triggerCondition": "IF Q_REC_13 IN [\"3-4x/semaine\",\"5-6x/semaine\",\"Quotidien\"]",
+      "skipCondition": "IF Q_REC_13 NOT IN [\"3-4x/semaine\",\"5-6x/semaine\",\"Quotidien\"]",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.78,
+      "scientificRef": "PSQI Component 5 sub-items (Buysse et al. 1989)"
+    },
+    {
+      "id": "Q_REC_16",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "Utilisez-vous des médicaments ou suppléments pour dormir (prescrits ou en vente libre) ?",
+      "type": "Choix multiple",
+      "options": [
+        "Aucun",
+        "Mélatonine",
+        "Magnésium",
+        "Somnifères prescrits (benzodiazépines...)",
+        "Antihistaminiques (Benadryl...)",
+        "CBD/Cannabis",
+        "Plantes (valériane, passiflore...)",
+        "Autre"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "SLEEP_MEDICATION_DEPENDENCY",
+      "impactScore": 0.75,
+      "scientificRef": "PSQI Component 6 (Buysse et al. 1989)"
+    },
+    {
+      "id": "Q_REC_17",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "À quelle fréquence avez-vous eu des difficultés à rester éveillé(e) pendant la journée (conduite, repas, activités sociales) ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Rare (<1x/semaine)",
+        "Occasionnel (1-2x/semaine)",
+        "Fréquent (3-4x/semaine)",
+        "Quotidien"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.85,
+      "scientificRef": "PSQI Component 7 - Daytime dysfunction (Buysse et al. 1989)"
+    },
+    {
+      "id": "Q_REC_18",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous ressenti un manque d'enthousiasme pour accomplir vos tâches quotidiennes à cause du sommeil ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Rare",
+        "Occasionnel",
+        "Fréquent",
+        "Quotidien"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.78,
+      "scientificRef": "PSQI Component 7 (Buysse et al. 1989)"
+    },
+    {
+      "id": "Q_REC_10a",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] À quelle heure vous couchez-vous habituellement (heure moyenne) ?",
+      "type": "Heure",
+      "options": [
+        "Format 24h (ex: 22:30)"
+      ],
+      "triggerCondition": "IF Q_REC_10 < 6.5 OR Q_REC_11 <= 5",
+      "skipCondition": "IF Q_REC_10 >= 6.5 AND Q_REC_11 > 5",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.75,
+      "scientificRef": "Sleep timing & circadian alignment (Roenneberg et al. 2007)"
+    },
+    {
+      "id": "Q_REC_10b",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] À quelle heure vous réveillez-vous habituellement (heure moyenne) ?",
+      "type": "Heure",
+      "options": [
+        "Format 24h (ex: 06:30)"
+      ],
+      "triggerCondition": "IF Q_REC_10 < 6.5 OR Q_REC_11 <= 5",
+      "skipCondition": "IF Q_REC_10 >= 6.5 AND Q_REC_11 > 5",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.75,
+      "scientificRef": "Wake time consistency (Skeldon et al. 2016)"
+    },
+    {
+      "id": "Q_REC_10c",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Combien de temps passez-vous TOTALEMENT au lit (heure couché → heure levé) ?",
+      "type": "Numérique",
+      "options": [
+        "Heures (5-14)"
+      ],
+      "triggerCondition": "IF Q_REC_10 < 6.5 OR Q_REC_11 <= 5",
+      "skipCondition": "IF Q_REC_10 >= 6.5 AND Q_REC_11 > 5",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.72,
+      "scientificRef": "Sleep efficiency = Sleep time / Time in bed (Buysse et al. 1989)"
+    },
+    {
+      "id": "Q_REC_10d",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Quelle est votre efficacité de sommeil estimée (temps sommeil réel / temps au lit) ?",
+      "type": "Calculé",
+      "options": [
+        "Auto-calculé: (Q_REC_10 / Q_REC_10c) × 100"
+      ],
+      "triggerCondition": "IF Q_REC_10 < 6.5 OR Q_REC_11 <= 5",
+      "skipCondition": "IF Q_REC_10 >= 6.5 AND Q_REC_11 > 5",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.82,
+      "scientificRef": "Sleep efficiency <85% = insomnia marker (Buysse et al. 1989)"
+    },
+    {
+      "id": "Q_REC_10e",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Votre horaire sommeil varie-t-il fortement entre semaine et weekend (jet lag social) ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, horaire stable (±30min)",
+        "Oui, léger (1h différence)",
+        "Oui, modéré (2h différence)",
+        "Oui, majeur (3h+ différence)"
+      ],
+      "triggerCondition": "IF Q_REC_10 < 6.5 OR Q_REC_11 <= 5",
+      "skipCondition": "IF Q_REC_10 >= 6.5 AND Q_REC_11 > 5",
+      "rootCauseLink": "RC_REC_03",
+      "impactScore": 0.78,
+      "scientificRef": "Social jet lag (Wittmann et al. 2006)"
+    },
+    {
+      "id": "Q_REC_10f",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Consommez-vous de la caféine après 14h-15h ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Rare (<1x/sem)",
+        "Occasionnel (1-3x/sem)",
+        "Fréquent (4-6x/sem)",
+        "Quotidien"
+      ],
+      "triggerCondition": "IF Q_REC_10 < 6.5 OR Q_REC_11 <= 5",
+      "skipCondition": "IF Q_REC_10 >= 6.5 AND Q_REC_11 > 5",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.75,
+      "scientificRef": "Caffeine half-life 5-6h (Drake et al. 2013)"
+    },
+    {
+      "id": "Q_REC_10g",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Utilisez-vous des écrans (téléphone, tablette, ordinateur, TV) dans l'heure précédant le coucher ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Rare (<3x/sem)",
+        "Fréquent (3-5x/sem)",
+        "Quotidien"
+      ],
+      "triggerCondition": "IF Q_REC_10 < 6.5 OR Q_REC_11 <= 5",
+      "skipCondition": "IF Q_REC_10 >= 6.5 AND Q_REC_11 > 5",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.8,
+      "scientificRef": "Blue light & melatonin suppression (Chang et al. 2015)"
+    },
+    {
+      "id": "Q_REC_10h",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Votre chambre est-elle complètement obscure (aucune lumière) pendant le sommeil ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, obscurité totale",
+        "Quasi obscure (lumière minime)",
+        "Lumière modérée (réveil, street lights...)",
+        "Lumière importante"
+      ],
+      "triggerCondition": "IF Q_REC_10 < 6.5 OR Q_REC_11 <= 5",
+      "skipCondition": "IF Q_REC_10 >= 6.5 AND Q_REC_11 > 5",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.72,
+      "scientificRef": "Light exposure & sleep quality (Cho et al. 2013)"
+    },
+    {
+      "id": "Q_REC_10i",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Température de votre chambre pendant le sommeil ?",
+      "type": "Choix unique",
+      "options": [
+        "Fraîche optimale (16-19°C)",
+        "Confortable (19-22°C)",
+        "Chaude (22-25°C)",
+        "Très chaude (>25°C)",
+        "Trop froide (<16°C)"
+      ],
+      "triggerCondition": "IF Q_REC_10 < 6.5 OR Q_REC_11 <= 5",
+      "skipCondition": "IF Q_REC_10 >= 6.5 AND Q_REC_11 > 5",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.68,
+      "scientificRef": "Thermoregulation & sleep (Harding et al. 2019)"
+    },
+    {
+      "id": "Q_REC_10j",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Avez-vous un rituel pré-sommeil relaxant régulier (lecture, méditation, étirements...) ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, rituel structuré quotidien",
+        "Oui, occasionnellement",
+        "Non, aucun rituel",
+        "Activités stimulantes avant coucher (travail, sport intense...)"
+      ],
+      "triggerCondition": "IF Q_REC_10 < 6.5 OR Q_REC_11 <= 5",
+      "skipCondition": "IF Q_REC_10 >= 6.5 AND Q_REC_11 > 5",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.75,
+      "scientificRef": "Sleep hygiene practices (Irish et al. 2015)"
+    },
+    {
+      "id": "Q_REC_10k",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Avez-vous déjà été évalué(e) pour des troubles du sommeil (apnée, syndrome jambes sans repos, narcolepsie...) ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, jamais évalué",
+        "Oui, apnée du sommeil diagnostiquée",
+        "Oui, autre trouble diagnostiqué",
+        "En cours d'évaluation",
+        "Suspicion mais pas évalué"
+      ],
+      "triggerCondition": "IF Q_REC_10 < 6.5 OR Q_REC_11 <= 5",
+      "skipCondition": "IF Q_REC_10 >= 6.5 AND Q_REC_11 > 5",
+      "rootCauseLink": "SLEEP_DISORDER_SCREENING",
+      "impactScore": 0.88,
+      "scientificRef": "Sleep disorder prevalence (Ohayon 2002)"
+    },
+    {
+      "id": "Q_REC_41",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Quel est votre chronotype naturel (préférence horaire énergie/performance) ?",
+      "type": "Choix unique",
+      "options": [
+        "Très matinal (lark extrême)",
+        "Matinal modéré",
+        "Neutre/flexible",
+        "Vespéral modéré (owl)",
+        "Très vespéral (owl extrême)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_03",
+      "impactScore": 0.78,
+      "scientificRef": "Chronotype (Roenneberg et al. 2003), MEQ (Horne & Ostberg 1976)"
+    },
+    {
+      "id": "Q_REC_42",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Si vous pouviez choisir librement, à quelle heure vous coucheriez-vous naturellement ?",
+      "type": "Heure",
+      "options": [
+        "Format 24h (ex: 23:00)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_03",
+      "impactScore": 0.7,
+      "scientificRef": "Circadian preference (Roenneberg et al. 2007)"
+    },
+    {
+      "id": "Q_REC_43",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Si vous pouviez choisir librement, à quelle heure vous réveillez-vous naturellement (sans alarme) ?",
+      "type": "Heure",
+      "options": [
+        "Format 24h (ex: 07:30)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_03",
+      "impactScore": 0.7,
+      "scientificRef": "Natural wake time (Roenneberg et al. 2012)"
+    },
+    {
+      "id": "Q_REC_44",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Êtes-vous contraint(e) de vous réveiller à une heure différente de votre préférence naturelle (travail, famille...) ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, horaire aligné préférence",
+        "Oui, <1h différence",
+        "Oui, 1-2h différence",
+        "Oui, 2-3h différence",
+        "Oui, >3h différence"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_03",
+      "impactScore": 0.82,
+      "scientificRef": "Circadian misalignment (Roenneberg et al. 2012)"
+    },
+    {
+      "id": "Q_REC_45",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "À quel moment de la journée vous sentez-vous le PLUS alerte et performant(e) ?",
+      "type": "Choix unique",
+      "options": [
+        "Tôt matin (6h-9h)",
+        "Milieu matinée (9h-12h)",
+        "Début après-midi (12h-15h)",
+        "Fin après-midi (15h-18h)",
+        "Soirée (18h-22h)",
+        "Tard soirée/nuit (22h+)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_03",
+      "impactScore": 0.75,
+      "scientificRef": "Peak performance timing (Schmidt et al. 2007)"
+    },
+    {
+      "id": "Q_REC_46",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Travaillez-vous en horaires décalés (nuit, shifts rotatifs) ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, horaires classiques",
+        "Oui, shifts rotatifs (jour/nuit alternance)",
+        "Oui, nuit fixe",
+        "Oui, horaires très variables"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_03",
+      "impactScore": 0.88,
+      "scientificRef": "Shift work & circadian disruption (Kecklund & Axelsson 2016)"
+    },
+    {
+      "id": "Q_REC_47",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Vous exposez-vous à la lumière naturelle extérieure le matin (dans les 30-60min après réveil) ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, quotidiennement 15min+",
+        "Oui, occasionnellement",
+        "Rare",
+        "Jamais (réveil/travail intérieur)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_03",
+      "impactScore": 0.78,
+      "scientificRef": "Morning light exposure & circadian entrainment (Duffy & Czeisler 2009)"
+    },
+    {
+      "id": "Q_REC_48",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Portez-vous des lunettes bloquant la lumière bleue en soirée ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, systématiquement après coucher soleil",
+        "Oui, occasionnellement",
+        "Non, jamais",
+        "Ne sais pas ce que c'est"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_03",
+      "impactScore": 0.65,
+      "scientificRef": "Blue light blockers & melatonin (Burkhart & Phelps 2009)"
+    },
+    {
+      "id": "Q_REC_49",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous des variations saisonnières marquées (énergie/humeur) avec les changements de luminosité (hiver vs été) ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, stable toute année",
+        "Oui, légères variations",
+        "Oui, variations marquées",
+        "Oui, dépression saisonnière (SAD)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_03",
+      "impactScore": 0.7,
+      "scientificRef": "Seasonal affective disorder (Rosenthal et al. 1984)"
+    },
+    {
+      "id": "Q_REC_50",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P3"
+      ],
+      "role": "SECONDARY",
+      "question": "Utilisez-vous une alarme pour vous réveiller ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais, réveil naturel",
+        "Parfois (weekends uniquement)",
+        "Quotidiennement",
+        "Alarmes multiples nécessaires"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_REC_02",
+      "impactScore": 0.72,
+      "scientificRef": "Natural wake indicator (Walker 2017)"
+    },
+    {
+      "id": "Q_REC_60",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "Combien de temps après un entraînement intense ressentez-vous des courbatures (DOMS) ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas d'entraînement",
+        "24-48h (normal)",
+        "48-72h",
+        "72-96h",
+        ">96h (récupération très lente)"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "RC_REC_04",
+      "impactScore": 0.75,
+      "scientificRef": "DOMS timeline (Cheung et al. 2003)"
+    },
+    {
+      "id": "Q_REC_61",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous une fatigue persistante ou baisse performance qui dure plusieurs jours après entraînement ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas d'entraînement",
+        "Non, récupération 24-48h",
+        "Oui, 3-4 jours",
+        "Oui, 5-7 jours",
+        "Oui, >7 jours"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "RC_REC_04",
+      "impactScore": 0.82,
+      "scientificRef": "Overreaching vs overtraining (Meeusen et al. 2013)"
+    },
+    {
+      "id": "Q_REC_62",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "Votre motivation à vous entraîner a-t-elle diminué récemment malgré votre intérêt pour vos objectifs ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Non, motivation intacte",
+        "10 = Oui, perte motivation totale"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "RC_REC_04",
+      "impactScore": 0.78,
+      "scientificRef": "Motivation loss & overtraining (Kellmann 2010)"
+    },
+    {
+      "id": "Q_REC_63",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous remarqué une baisse de force ou performance lors de vos entraînements récents ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas d'entraînement",
+        "Non, progression normale",
+        "Oui, stagnation",
+        "Oui, régression légère",
+        "Oui, régression marquée"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "RC_REC_04",
+      "impactScore": 0.85,
+      "scientificRef": "Performance decrement (Halson & Jeukendrup 2004)"
+    },
+    {
+      "id": "Q_REC_64",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "Utilisez-vous des stratégies actives de récupération post-entraînement ?",
+      "type": "Choix multiple",
+      "options": [
+        "N/A - pas d'entraînement",
+        "Étirements/mobilité",
+        "Nutrition post-workout ciblée",
+        "Sommeil optimisé",
+        "Massage/foam rolling",
+        "Sauna/bains froids",
+        "HRV tracking",
+        "Aucune stratégie"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "RECOVERY_STRATEGIES",
+      "impactScore": 0.7,
+      "scientificRef": "Recovery modalities (Barnett 2006)"
+    },
+    {
+      "id": "Q_REC_65",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "Trackez-vous votre HRV (variabilité fréquence cardiaque) pour évaluer récupération ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, quotidiennement",
+        "Oui, occasionnellement",
+        "Non, mais sais ce que c'est",
+        "Non, ne sais pas ce que c'est"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\">18 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\">18 mois\",\">36 mois\"]",
+      "rootCauseLink": "HRV_MONITORING",
+      "impactScore": 0.75,
+      "scientificRef": "HRV & recovery (Plews et al. 2013)"
+    },
+    {
+      "id": "Q_REC_66",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "[Si HRV tracking] Avez-vous remarqué une tendance à la baisse de votre HRV baseline ces dernières semaines ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas de tracking",
+        "Non, HRV stable",
+        "Oui, baisse légère",
+        "Oui, baisse marquée"
+      ],
+      "triggerCondition": "IF Q_REC_65 IN [\"Oui, quotidiennement\",\"Oui, occasionnellement\"]",
+      "skipCondition": "IF Q_REC_65 NOT IN [\"Oui, quotidiennement\",\"Oui, occasionnellement\"]",
+      "rootCauseLink": "RC_REC_04",
+      "impactScore": 0.85,
+      "scientificRef": "HRV decline & overreaching (Plews et al. 2013)"
+    },
+    {
+      "id": "Q_REC_67",
+      "dimension": "Hormono-Récupération",
+      "patterns": [
+        "P4"
+      ],
+      "role": "SECONDARY",
+      "question": "Votre fréquence cardiaque au repos (RHR) a-t-elle augmenté de 5+ bpm récemment sans raison apparente ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, RHR stable",
+        "Oui, augmentation 5-10 bpm",
+        "Oui, augmentation >10 bpm",
+        "Ne sais pas / Ne mesure pas"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "RC_REC_04",
+      "impactScore": 0.8,
+      "scientificRef": "Elevated RHR & overtraining (Achten & Jeukendrup 2003)"
+    },
+    {
+      "id": "Q_ADH_01",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "PRIMARY",
+      "question": "RAPPEL Q_PROFIL_09 : Combien de programmes avez-vous abandonnés avant objectifs ? (Référence croisée)",
+      "type": "Référence",
+      "options": [
+        "Voir Q_PROFIL_09"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.9,
+      "scientificRef": "Teixeira et al. (2015) - Past adherence predicts future"
+    },
+    {
+      "id": "Q_ADH_01a",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Quelle était la durée moyenne de ces programmes avant abandon ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas d'abandons",
+        "<2 semaines",
+        "2-4 semaines",
+        "1-2 mois",
+        "2-3 mois",
+        "3-6 mois",
+        ">6 mois"
+      ],
+      "triggerCondition": "IF Q_PROFIL_09 >= \"1\"",
+      "skipCondition": "IF Q_PROFIL_09 = \"0\"",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.8,
+      "scientificRef": "Adherence timeline patterns (Marcus et al. 2000)"
+    },
+    {
+      "id": "Q_ADH_01b",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "PRIMARY",
+      "question": "[DEEP DIVE] Quelle(s) raison(s) principale(s) à vos abandons passés ?",
+      "type": "Choix multiple",
+      "options": [
+        "N/A - pas d'abandons",
+        "Manque temps/contraintes vie",
+        "Programmes trop complexes/contraignants",
+        "Résultats trop lents/inexistants",
+        "Blessure/douleur",
+        "Perte motivation",
+        "Événement vie stressant",
+        "Ennui/monotonie",
+        "Objectifs atteints",
+        "Autre"
+      ],
+      "triggerCondition": "IF Q_PROFIL_09 >= \"1\"",
+      "skipCondition": "IF Q_PROFIL_09 = \"0\"",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.88,
+      "scientificRef": "Dropout reasons (Teixeira et al. 2012)"
+    },
+    {
+      "id": "Q_ADH_01c",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Ces abandons se sont-ils produits de manière brutale (arrêt soudain) ou progressive (diminution graduelle) ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas d'abandons",
+        "Arrêt brutal systématiquement",
+        "Mix brutal/progressif",
+        "Diminution progressive généralement"
+      ],
+      "triggerCondition": "IF Q_PROFIL_09 >= \"1\"",
+      "skipCondition": "IF Q_PROFIL_09 = \"0\"",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.72,
+      "scientificRef": "Dropout patterns (Dishman 1988)"
+    },
+    {
+      "id": "Q_ADH_01d",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Après ces abandons, avez-vous repris un programme dans les 3-6 mois ou pause longue ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas d'abandons",
+        "Reprise rapide (<3 mois)",
+        "Pause moyenne (3-6 mois)",
+        "Pause longue (6-12 mois)",
+        "Pause très longue (>12 mois)"
+      ],
+      "triggerCondition": "IF Q_PROFIL_09 >= \"1\"",
+      "skipCondition": "IF Q_PROFIL_09 = \"0\"",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.68,
+      "scientificRef": "Exercise relapse patterns (Marcus et al. 2000)"
+    },
+    {
+      "id": "Q_ADH_01e",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Ressentez-vous de la culpabilité/honte face à vos abandons passés ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Aucune culpabilité, acceptation",
+        "10 = Culpabilité/honte énorme"
+      ],
+      "triggerCondition": "IF Q_PROFIL_09 >= \"1\"",
+      "skipCondition": "IF Q_PROFIL_09 = \"0\"",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.75,
+      "scientificRef": "Shame & self-efficacy (Dickerson et al. 2004)"
+    },
+    {
+      "id": "Q_ADH_01f",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5",
+        "P6"
+      ],
+      "role": "PRIMARY",
+      "question": "[DEEP DIVE] Ces programmes passés impliquaient-ils un tracking de nombreuses variables (calories, macros, steps, performance...) ?",
+      "type": "Numérique",
+      "options": [
+        "Nombre variables trackées (0-20)"
+      ],
+      "triggerCondition": "IF Q_PROFIL_09 >= \"1\"",
+      "skipCondition": "IF Q_PROFIL_09 = \"0\"",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.85,
+      "scientificRef": "Complexity & adherence (Sweller et al. 2011 - Cognitive Load)"
+    },
+    {
+      "id": "Q_ADH_01g",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Aviez-vous un coach/accompagnement ou programmes en autonomie totale ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas de programmes",
+        "Coach en personne",
+        "Coach en ligne",
+        "Programmes seuls (apps/livres)",
+        "Mix"
+      ],
+      "triggerCondition": "IF Q_PROFIL_09 >= \"1\"",
+      "skipCondition": "IF Q_PROFIL_09 = \"0\"",
+      "rootCauseLink": "SOCIAL_SUPPORT",
+      "impactScore": 0.78,
+      "scientificRef": "Coaching & adherence (Teixeira et al. 2012)"
+    },
+    {
+      "id": "Q_ADH_01h",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Les programmes abandonnés avaient-ils une flexibilité intégrée (Plan B si imprévu) ou rigidité stricte ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas de programmes",
+        "Très flexibles (adaptations faciles)",
+        "Moyennement flexibles",
+        "Rigides (tout ou rien)",
+        "Ne me rappelle pas"
+      ],
+      "triggerCondition": "IF Q_PROFIL_09 >= \"1\"",
+      "skipCondition": "IF Q_PROFIL_09 = \"0\"",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.82,
+      "scientificRef": "Flexibility & adherence (Teixeira et al. 2015)"
+    },
+    {
+      "id": "Q_ADH_01i",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Aviez-vous des objectifs clairs, mesurables, avec échéances ou objectifs vagues ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas de programmes",
+        "Objectifs SMART clairs",
+        "Objectifs moyennement définis",
+        "Objectifs vagues (\"être en forme\")",
+        "Pas d'objectifs précis"
+      ],
+      "triggerCondition": "IF Q_PROFIL_09 >= \"1\"",
+      "skipCondition": "IF Q_PROFIL_09 = \"0\"",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.75,
+      "scientificRef": "Goal setting theory (Locke & Latham 2002)"
+    },
+    {
+      "id": "Q_ADH_01j",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "[DEEP DIVE] Lorsque vous \"trébuchez\" (écart programme), que faites-vous généralement ?",
+      "type": "Choix unique",
+      "options": [
+        "Reprends immédiatement sans culpabilité",
+        "Reprends avec légère frustration",
+        "Compensation stricte (restriction/surentraînement)",
+        "Spirale négative → abandon complet",
+        "Variable selon humeur"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.88,
+      "scientificRef": "Lapse vs relapse (Marlatt & Gordon 1985)"
+    },
+    {
+      "id": "Q_ADH_01k",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous déjà réussi à maintenir un programme d'entraînement/nutrition >6 mois avec succès ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, plusieurs fois",
+        "Oui, une fois",
+        "Non, jamais dépassé 6 mois",
+        "N'ai jamais essayé sérieusement"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.85,
+      "scientificRef": "Long-term adherence (>6mo) as success predictor (Teixeira et al. 2015)"
+    },
+    {
+      "id": "Q_ADH_01l",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "[Si succès >6 mois] Qu'est-ce qui a rendu ce programme différent/réussi comparé aux autres ?",
+      "type": "Choix multiple",
+      "options": [
+        "N/A - jamais réussi",
+        "Simplicité du programme",
+        "Soutien social/coach",
+        "Plaisir activités",
+        "Résultats rapides visibles",
+        "Flexibilité intégrée",
+        "Alignement valeurs personnelles",
+        "Autre"
+      ],
+      "triggerCondition": "IF Q_ADH_01k IN [\"Oui, plusieurs fois\",\"Oui, une fois\"]",
+      "skipCondition": "IF Q_ADH_01k NOT IN [\"Oui, plusieurs fois\",\"Oui, une fois\"]",
+      "rootCauseLink": "SUCCESS_FACTORS",
+      "impactScore": 0.9,
+      "scientificRef": "Success patterns identification (Teixeira et al. 2015)"
+    },
+    {
+      "id": "Q_ADH_01m",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Comment réagissez-vous face à un plateau (stagnation résultats malgré efforts) ?",
+      "type": "Choix unique",
+      "options": [
+        "Patience, ajuste stratégie calmement",
+        "Frustration mais continue",
+        "Frustration → intensification efforts (surtraining/restriction)",
+        "Découragement → abandon",
+        "Variable"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.82,
+      "scientificRef": "Plateau tolerance (Byrne et al. 2006)"
+    },
+    {
+      "id": "Q_ADH_15",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "PRIMARY",
+      "question": "Je peux toujours résoudre des problèmes difficiles si je fais suffisamment d'efforts.",
+      "type": "Échelle 1-4",
+      "options": [
+        "1 = Pas du tout vrai",
+        "2 = À peine vrai",
+        "3 = Modérément vrai",
+        "4 = Tout à fait vrai"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "SELF_EFFICACY",
+      "impactScore": 0.8,
+      "scientificRef": "GSE Item 1 (Schwarzer & Jerusalem 1995)"
+    },
+    {
+      "id": "Q_ADH_16",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Si quelqu'un s'oppose à moi, je peux trouver les moyens d'obtenir ce que je veux.",
+      "type": "Échelle 1-4",
+      "options": [
+        "1 = Pas du tout vrai",
+        "2 = À peine vrai",
+        "3 = Modérément vrai",
+        "4 = Tout à fait vrai"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "SELF_EFFICACY",
+      "impactScore": 0.72,
+      "scientificRef": "GSE Item 2 (Schwarzer & Jerusalem 1995)"
+    },
+    {
+      "id": "Q_ADH_17",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "PRIMARY",
+      "question": "Il est facile pour moi de maintenir mes intentions et d'atteindre mes buts.",
+      "type": "Échelle 1-4",
+      "options": [
+        "1 = Pas du tout vrai",
+        "2 = À peine vrai",
+        "3 = Modérément vrai",
+        "4 = Tout à fait vrai"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "SELF_EFFICACY",
+      "impactScore": 0.88,
+      "scientificRef": "GSE Item 3 (Schwarzer & Jerusalem 1995) - KEY for adherence"
+    },
+    {
+      "id": "Q_ADH_18",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Je suis confiant(e) que je pourrais faire face efficacement à des événements inattendus.",
+      "type": "Échelle 1-4",
+      "options": [
+        "1 = Pas du tout vrai",
+        "2 = À peine vrai",
+        "3 = Modérément vrai",
+        "4 = Tout à fait vrai"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "SELF_EFFICACY",
+      "impactScore": 0.78,
+      "scientificRef": "GSE Item 4 (Schwarzer & Jerusalem 1995)"
+    },
+    {
+      "id": "Q_ADH_19",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Grâce à mes ressources, je sais comment gérer des situations imprévues.",
+      "type": "Échelle 1-4",
+      "options": [
+        "1 = Pas du tout vrai",
+        "2 = À peine vrai",
+        "3 = Modérément vrai",
+        "4 = Tout à fait vrai"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "SELF_EFFICACY",
+      "impactScore": 0.75,
+      "scientificRef": "GSE Item 5 (Schwarzer & Jerusalem 1995)"
+    },
+    {
+      "id": "Q_ADH_20",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "PRIMARY",
+      "question": "Je peux résoudre la plupart de mes problèmes si j'investis les efforts nécessaires.",
+      "type": "Échelle 1-4",
+      "options": [
+        "1 = Pas du tout vrai",
+        "2 = À peine vrai",
+        "3 = Modérément vrai",
+        "4 = Tout à fait vrai"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "SELF_EFFICACY",
+      "impactScore": 0.82,
+      "scientificRef": "GSE Item 6 (Schwarzer & Jerusalem 1995)"
+    },
+    {
+      "id": "Q_ADH_21",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Je reste calme face aux difficultés car je peux compter sur mes capacités.",
+      "type": "Échelle 1-4",
+      "options": [
+        "1 = Pas du tout vrai",
+        "2 = À peine vrai",
+        "3 = Modérément vrai",
+        "4 = Tout à fait vrai"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "SELF_EFFICACY",
+      "impactScore": 0.78,
+      "scientificRef": "GSE Item 7 (Schwarzer & Jerusalem 1995)"
+    },
+    {
+      "id": "Q_ADH_22",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Face à un problème, je peux généralement trouver plusieurs solutions.",
+      "type": "Échelle 1-4",
+      "options": [
+        "1 = Pas du tout vrai",
+        "2 = À peine vrai",
+        "3 = Modérément vrai",
+        "4 = Tout à fait vrai"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "SELF_EFFICACY",
+      "impactScore": 0.75,
+      "scientificRef": "GSE Item 8 (Schwarzer & Jerusalem 1995)"
+    },
+    {
+      "id": "Q_ADH_23",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Si je suis coincé(e), je peux généralement penser à une solution.",
+      "type": "Échelle 1-4",
+      "options": [
+        "1 = Pas du tout vrai",
+        "2 = À peine vrai",
+        "3 = Modérément vrai",
+        "4 = Tout à fait vrai"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "SELF_EFFICACY",
+      "impactScore": 0.72,
+      "scientificRef": "GSE Item 9 (Schwarzer & Jerusalem 1995)"
+    },
+    {
+      "id": "Q_ADH_24",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "PRIMARY",
+      "question": "Quoi qu'il arrive, je peux généralement y faire face.",
+      "type": "Échelle 1-4",
+      "options": [
+        "1 = Pas du tout vrai",
+        "2 = À peine vrai",
+        "3 = Modérément vrai",
+        "4 = Tout à fait vrai"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "SELF_EFFICACY",
+      "impactScore": 0.85,
+      "scientificRef": "GSE Item 10 (Schwarzer & Jerusalem 1995)"
+    },
+    {
+      "id": "Q_ADH_25",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "PRIMARY",
+      "question": "Je m'entraîne parce que d'autres personnes disent que je devrais.",
+      "type": "Échelle 0-4",
+      "options": [
+        "0 = Pas du tout vrai",
+        "1 = Rarement vrai",
+        "2 = Parfois vrai",
+        "3 = Souvent vrai",
+        "4 = Très souvent vrai"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "MOTIVATION_PROFILE",
+      "impactScore": 0.75,
+      "scientificRef": "BREQ-3 External Regulation (Markland & Tobin 2004)"
+    },
+    {
+      "id": "Q_ADH_26",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Je me sens coupable quand je ne m'entraîne pas.",
+      "type": "Échelle 0-4",
+      "options": [
+        "0 = Pas du tout vrai",
+        "1 = Rarement vrai",
+        "2 = Parfois vrai",
+        "3 = Souvent vrai",
+        "4 = Très souvent vrai"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "MOTIVATION_PROFILE",
+      "impactScore": 0.8,
+      "scientificRef": "BREQ-3 Introjected Regulation (Markland & Tobin 2004)"
+    },
+    {
+      "id": "Q_ADH_27",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "PRIMARY",
+      "question": "Je valorise les bénéfices de l'exercice physique.",
+      "type": "Échelle 0-4",
+      "options": [
+        "0 = Pas du tout vrai",
+        "1 = Rarement vrai",
+        "2 = Parfois vrai",
+        "3 = Souvent vrai",
+        "4 = Très souvent vrai"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "MOTIVATION_PROFILE",
+      "impactScore": 0.85,
+      "scientificRef": "BREQ-3 Identified Regulation (Markland & Tobin 2004)"
+    },
+    {
+      "id": "Q_ADH_28",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "PRIMARY",
+      "question": "Je m'entraîne parce que c'est cohérent avec mes valeurs et mon style de vie.",
+      "type": "Échelle 0-4",
+      "options": [
+        "0 = Pas du tout vrai",
+        "1 = Rarement vrai",
+        "2 = Parfois vrai",
+        "3 = Souvent vrai",
+        "4 = Très souvent vrai"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "MOTIVATION_PROFILE",
+      "impactScore": 0.9,
+      "scientificRef": "BREQ-3 Integrated Regulation (Markland & Tobin 2004) - STRONGEST for adherence"
+    },
+    {
+      "id": "Q_ADH_29",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "PRIMARY",
+      "question": "Je m'entraîne parce que c'est agréable et amusant.",
+      "type": "Échelle 0-4",
+      "options": [
+        "0 = Pas du tout vrai",
+        "1 = Rarement vrai",
+        "2 = Parfois vrai",
+        "3 = Souvent vrai",
+        "4 = Très souvent vrai"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "MOTIVATION_PROFILE",
+      "impactScore": 0.88,
+      "scientificRef": "BREQ-3 Intrinsic Motivation (Markland & Tobin 2004)"
+    },
+    {
+      "id": "Q_ADH_30",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Quelle est votre motivation PRINCIPALE actuelle pour votre transformation physique ?",
+      "type": "Choix unique",
+      "options": [
+        "Santé/bien-être",
+        "Performance physique",
+        "Apparence/esthétique",
+        "Pression sociale/autres",
+        "Bien-être mental",
+        "Défi personnel",
+        "Autre"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "MOTIVATION_PROFILE",
+      "impactScore": 0.82,
+      "scientificRef": "Motivation types & adherence (Teixeira et al. 2012)"
+    },
+    {
+      "id": "Q_ADH_31",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Cette motivation est-elle plutôt \"approche\" (vers quelque chose de positif) ou \"évitement\" (fuite quelque chose de négatif) ?",
+      "type": "Choix unique",
+      "options": [
+        "Approche (atteindre objectif positif)",
+        "Évitement (fuir conséquence négative)",
+        "Mix des deux"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "MOTIVATION_PROFILE",
+      "impactScore": 0.8,
+      "scientificRef": "Approach vs avoidance goals (Elliot & Church 1997)"
+    },
+    {
+      "id": "Q_ADH_32",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Sur une échelle de 1-10, à quel point êtes-vous motivé(e) ACTUELLEMENT pour votre objectif ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Aucune motivation",
+        "10 = Motivation maximale"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "MOTIVATION_LEVEL",
+      "impactScore": 0.85,
+      "scientificRef": "Motivation intensity (Ryan & Deci 2000)"
+    },
+    {
+      "id": "Q_ADH_53",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Pensez-vous que vos résultats dépendent principalement de vos efforts ou de facteurs externes (génétique, chance...) ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Totalement facteurs externes (génétique/chance)",
+        "10 = Totalement mes efforts"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "LOCUS_OF_CONTROL",
+      "impactScore": 0.85,
+      "scientificRef": "Locus of control (Rotter 1966), Internal LOC → better adherence"
+    },
+    {
+      "id": "Q_ADH_54",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Face à un échec/plateau, attribuez-vous cela à vous-même (efforts/stratégie) ou circonstances externes ?",
+      "type": "Choix unique",
+      "options": [
+        "Principalement moi (responsabilité personnelle)",
+        "Mix (moi + circonstances)",
+        "Principalement circonstances externes",
+        "Variable"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "LOCUS_OF_CONTROL",
+      "impactScore": 0.78,
+      "scientificRef": "Attribution theory (Weiner 1985)"
+    },
+    {
+      "id": "Q_ADH_55",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Pensez-vous avoir un contrôle réel sur votre poids/composition corporelle ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Aucun contrôle (tout génétique)",
+        "10 = Contrôle total"
+      ],
+      "triggerCondition": "IF Q_PROFIL_04 IN [\"Perte de poids/graisse\",\"Recomposition\"]",
+      "skipCondition": "IF Q_PROFIL_04 NOT IN [\"Perte de poids/graisse\",\"Recomposition\"]",
+      "rootCauseLink": "LOCUS_OF_CONTROL",
+      "impactScore": 0.82,
+      "scientificRef": "Weight locus of control (Saltzer 1982)"
+    },
+    {
+      "id": "Q_ADH_56",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Croyez-vous que \"certaines personnes ont de la chance génétiquement\" et que vous n'en faites pas partie ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Non, tout le monde peut réussir avec efforts",
+        "10 = Oui, génétique détermine tout"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "GENETIC_FATALISM",
+      "impactScore": 0.75,
+      "scientificRef": "Genetic fatalism & adherence (Senior et al. 1999)"
+    },
+    {
+      "id": "Q_ADH_57",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P5"
+      ],
+      "role": "SECONDARY",
+      "question": "Pensez-vous que votre métabolisme est \"cassé\" ou \"lent\" de manière irréversible ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Non, métabolisme fonctionnel adaptable",
+        "10 = Oui, métabolisme cassé irréversible"
+      ],
+      "triggerCondition": "IF Q_MET_26 >= \"2-3 fois\"",
+      "skipCondition": "IF Q_MET_26 IN [\"Jamais\",\"1 fois\"]",
+      "rootCauseLink": "METABOLIC_FATALISM",
+      "impactScore": 0.8,
+      "scientificRef": "Metabolic fatalism barrier (Trexler et al. 2014)"
+    },
+    {
+      "id": "Q_ADH_46",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "PRIMARY",
+      "question": "Je dois toujours faire les choses parfaitement ou je me sens insatisfait(e).",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Pas du tout vrai",
+        "10 = Totalement vrai"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.9,
+      "scientificRef": "Frost Multidimensional Perfectionism - Personal Standards (Frost et al. 1990)"
+    },
+    {
+      "id": "Q_ADH_47",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Je suis très critique envers moi-même lorsque je fais des erreurs.",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Pas du tout vrai",
+        "10 = Totalement vrai"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.85,
+      "scientificRef": "Frost - Concern over Mistakes (Frost et al. 1990)"
+    },
+    {
+      "id": "Q_ADH_48",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Si je ne fais pas aussi bien que les autres, cela signifie que je suis moins bon(ne) en tant que personne.",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Pas du tout vrai",
+        "10 = Totalement vrai"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.82,
+      "scientificRef": "Frost - Parental Expectations (Frost et al. 1990)"
+    },
+    {
+      "id": "Q_ADH_49",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Je doute souvent de la qualité de mon travail/efforts même quand les résultats sont bons.",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Jamais",
+        "10 = Constamment"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.78,
+      "scientificRef": "Frost - Doubts about Actions (Frost et al. 1990)"
+    },
+    {
+      "id": "Q_ADH_50",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "J'ai l'impression que mes parents (ou figures autorité) n'ont jamais été satisfaits de mes performances.",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Pas du tout vrai",
+        "10 = Totalement vrai"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.7,
+      "scientificRef": "Frost - Parental Criticism (Frost et al. 1990)"
+    },
+    {
+      "id": "Q_ADH_51",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "PRIMARY",
+      "question": "Lorsque je fais un écart alimentaire ou rate une séance training, j'ai du mal à accepter que ce n'est \"pas grave\".",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Acceptation facile, pas grave",
+        "10 = Culpabilité énorme, sentiment échec"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.88,
+      "scientificRef": "All-or-nothing thinking (Beck 1979)"
+    },
+    {
+      "id": "Q_ADH_52",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "PRIMARY",
+      "question": "Adoptez-vous une mentalité \"tout ou rien\" (si parfait OK, sinon abandon complet) ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Non, nuances/gris acceptable",
+        "10 = Oui, tout ou rien absolu"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.9,
+      "scientificRef": "Dichotomous thinking (Byrne et al. 2003)"
+    },
+    {
+      "id": "Q_ADH_52a",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous des standards/attentes TRÈS élevés pour vous-même (comparé à ce que vous attendriez d'autrui) ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Non, standards similaires pour tous",
+        "10 = Oui, standards bien plus élevés pour moi"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.82,
+      "scientificRef": "Self-oriented perfectionism (Hewitt & Flett 1991)"
+    },
+    {
+      "id": "Q_ADH_52b",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous que vous \"devriez\" être capable de tout faire parfaitement dès la première fois ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Non, processus apprentissage normal",
+        "10 = Oui, devrais être parfait immédiatement"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.78,
+      "scientificRef": "Unrealistic expectations (Ellis 1962 - REBT)"
+    },
+    {
+      "id": "Q_ADH_52c",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous déjà été diagnostiqué(e) ou suspecté(e) d'un trouble alimentaire (anorexie, boulimie, orthorexie...) ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, jamais",
+        "Oui, diagnostiqué actuellement",
+        "Oui, diagnostiqué passé (rémission)",
+        "Suspicion mais pas diagnostiqué",
+        "Préfère ne pas répondre"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "EATING_DISORDER_SCREENING",
+      "impactScore": 0.95,
+      "scientificRef": "ED screening critical (Fairburn & Harrison 2003)"
+    },
+    {
+      "id": "Q_ADH_36",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "PRIMARY",
+      "question": "Comment évalueriez-vous votre charge mentale/cognitive globale actuellement (travail + vie + transformation physique) ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Très faible, capacité mentale disponible",
+        "10 = Surcharge totale, cerveau saturé"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.88,
+      "scientificRef": "Cognitive load theory (Sweller et al. 2011)"
+    },
+    {
+      "id": "Q_ADH_37",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous une \"fatigue décisionnelle\" (difficulté prendre décisions même simples en fin journée) ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Rare",
+        "Fréquent (3-4x/sem)",
+        "Quotidien",
+        "Plusieurs fois/jour"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.82,
+      "scientificRef": "Decision fatigue (Baumeister & Tierney 2011)"
+    },
+    {
+      "id": "Q_ADH_38",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Combien de décisions actives votre programme actuel/passé nécessitait-il quotidiennement (quoi manger, quand training, macros...) ?",
+      "type": "Numérique",
+      "options": [
+        "Nombre décisions/jour (0-50)"
+      ],
+      "triggerCondition": "IF Q_PROFIL_08 >= \"1-2\"",
+      "skipCondition": "IF Q_PROFIL_08 = \"0\"",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.85,
+      "scientificRef": "Decision complexity & adherence (Schwartz 2004 - Paradox of Choice)"
+    },
+    {
+      "id": "Q_ADH_39",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Préférez-vous avoir BEAUCOUP d'options/flexibilité ou routines simples/automatisées ?",
+      "type": "Choix unique",
+      "options": [
+        "Routines strictes automatisées (zéro décision)",
+        "Routines avec légère flexibilité",
+        "Flexibilité modérée",
+        "Grande flexibilité/variété"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "COGNITIVE_PREFERENCE",
+      "impactScore": 0.8,
+      "scientificRef": "Routine vs variety preference (Lally et al. 2010)"
+    },
+    {
+      "id": "Q_ADH_40",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "PRIMARY",
+      "question": "Trouvez-vous qu'avoir à réfléchir constamment à votre nutrition/training est épuisant mentalement ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Non, agréable/stimulant",
+        "10 = Oui, épuisant/écrasant"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ADH_01",
+      "impactScore": 0.88,
+      "scientificRef": "Mental fatigue & dropout (Hagger et al. 2010)"
+    },
+    {
+      "id": "Q_ADH_41",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Aimez-vous tracker/mesurer vos données (calories, poids, performance...) ou trouvez-vous cela contraignant ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Déteste, très contraignant",
+        "10 = Adore, motivant/utile"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "TRACKING_PREFERENCE",
+      "impactScore": 0.78,
+      "scientificRef": "Self-monitoring & adherence (Burke et al. 2011)"
+    },
+    {
+      "id": "Q_ADH_42",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous une surcharge d'informations (trop de conseils contradictoires nutrition/training) ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Non, informations claires",
+        "10 = Oui, totalement submergé/confus"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "INFORMATION_OVERLOAD",
+      "impactScore": 0.8,
+      "scientificRef": "Information overload paralysis (Eppler & Mengis 2004)"
+    },
+    {
+      "id": "Q_ADH_43",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous tendance à chercher constamment \"la meilleure méthode\" ou à sauter de programme en programme (shiny object syndrome) ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Non, stabilité/consistance",
+        "10 = Oui, constamment à chercher mieux"
+      ],
+      "triggerCondition": "IF Q_PROFIL_08 >= \"3-4\"",
+      "skipCondition": "IF Q_PROFIL_08 IN [\"0\",\"1-2\"]",
+      "rootCauseLink": "PROGRAM_HOPPING",
+      "impactScore": 0.85,
+      "scientificRef": "Program hopping pattern (Dishman 1988)"
+    },
+    {
+      "id": "Q_ADH_44",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Passez-vous beaucoup de temps à planifier/optimiser votre programme au détriment de l'exécution ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, j'exécute directement",
+        "Planning modéré puis action",
+        "Oui, planning excessif (paralysie analyse)",
+        "Très variable"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "ANALYSIS_PARALYSIS",
+      "impactScore": 0.78,
+      "scientificRef": "Analysis paralysis (Schwartz 2004)"
+    },
+    {
+      "id": "Q_ADH_45",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous un besoin de \"tout comprendre scientifiquement\" avant d'agir ou pouvez-vous faire confiance à un protocole simple ?",
+      "type": "Choix unique",
+      "options": [
+        "Confiance facile protocole simple",
+        "Préfère comprendre mais exécute",
+        "Besoin comprendre détails avant action",
+        "Besoin TOUT comprendre (paralysie)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "UNDERSTANDING_DEPENDENCY",
+      "impactScore": 0.75,
+      "scientificRef": "Need for cognitive closure (Kruglanski & Webster 1996)"
+    },
+    {
+      "id": "Q_ADH_58",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "PRIMARY",
+      "question": "Je contrôle délibérément ma prise alimentaire pour ne pas prendre de poids.",
+      "type": "Échelle 1-4",
+      "options": [
+        "1 = Jamais",
+        "2 = Rarement",
+        "3 = Souvent",
+        "4 = Presque toujours"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "EATING_BEHAVIOR",
+      "impactScore": 0.8,
+      "scientificRef": "TFEQ-R18 Cognitive Restraint (Karlsson et al. 2000)"
+    },
+    {
+      "id": "Q_ADH_59",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Je me retrouve à manger quand je me sens seul(e), anxieux/anxieuse, ou déprimé(e).",
+      "type": "Échelle 1-4",
+      "options": [
+        "1 = Jamais",
+        "2 = Rarement",
+        "3 = Souvent",
+        "4 = Presque toujours"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "EMOTIONAL_EATING",
+      "impactScore": 0.85,
+      "scientificRef": "TFEQ-R18 Emotional Eating (Karlsson et al. 2000)"
+    },
+    {
+      "id": "Q_ADH_60",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "PRIMARY",
+      "question": "Une fois que je commence à manger, j'ai du mal à m'arrêter (perte contrôle).",
+      "type": "Échelle 1-4",
+      "options": [
+        "1 = Jamais",
+        "2 = Rarement",
+        "3 = Souvent",
+        "4 = Presque toujours"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "UNCONTROLLED_EATING",
+      "impactScore": 0.88,
+      "scientificRef": "TFEQ-R18 Uncontrolled Eating (Karlsson et al. 2000)"
+    },
+    {
+      "id": "Q_ADH_61",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "À quelle fréquence avez-vous des épisodes de \"binge eating\" (manger grande quantité avec sentiment perte contrôle) ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Rare (<1x/mois)",
+        "Occasionnel (1-3x/mois)",
+        "Fréquent (1x/semaine)",
+        "Très fréquent (plusieurs/semaine)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "BINGE_EATING",
+      "impactScore": 0.9,
+      "scientificRef": "Binge eating disorder screening (Gormally et al. 1982)"
+    },
+    {
+      "id": "Q_ADH_62",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Utilisez-vous des comportements compensatoires après excès alimentaires (restriction sévère, exercice excessif, purge) ?",
+      "type": "Choix multiple",
+      "options": [
+        "Jamais",
+        "Restriction sévère lendemain",
+        "Exercice excessif compensatoire",
+        "Jeûne prolongé",
+        "Purge (vomissements)",
+        "Laxatifs/diurétiques",
+        "Préfère ne pas répondre"
+      ],
+      "triggerCondition": "IF Q_ADH_61 IN [\"Occasionnel\",\"Fréquent\",\"Très fréquent\"]",
+      "skipCondition": "IF Q_ADH_61 NOT IN [\"Occasionnel\",\"Fréquent\",\"Très fréquent\"]",
+      "rootCauseLink": "COMPENSATORY_BEHAVIORS",
+      "impactScore": 0.95,
+      "scientificRef": "Compensatory behaviors screening (DSM-5 ED criteria)"
+    },
+    {
+      "id": "Q_ADH_63",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous une anxiété importante si vous ne pouvez pas contrôler/connaître exactement ce que vous mangez ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Aucune anxiété, flexibilité OK",
+        "10 = Anxiété majeure, besoin contrôle absolu"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "ORTHOREXIA_SCREENING",
+      "impactScore": 0.82,
+      "scientificRef": "Orthorexia tendencies (Bratman & Knight 2000)"
+    },
+    {
+      "id": "Q_ADH_64",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Évitez-vous des situations sociales (restaurants, fêtes...) à cause de contraintes alimentaires ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais, vie sociale normale",
+        "Rare",
+        "Occasionnel",
+        "Fréquent",
+        "Systématique"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "SOCIAL_ISOLATION_FOOD",
+      "impactScore": 0.8,
+      "scientificRef": "Social impairment orthorexia (Varga et al. 2013)"
+    },
+    {
+      "id": "Q_ADH_65",
+      "dimension": "Psycho-Adhérence",
+      "patterns": [
+        "P6"
+      ],
+      "role": "SECONDARY",
+      "question": "Passez-vous beaucoup de temps à penser à la nourriture/nutrition (>3h/jour) ?",
+      "type": "Choix unique",
+      "options": [
+        "Non (<30min/jour)",
+        "Modéré (30min-1h/jour)",
+        "Important (1-3h/jour)",
+        "Excessif (>3h/jour)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "FOOD_PREOCCUPATION",
+      "impactScore": 0.78,
+      "scientificRef": "Food preoccupation ED marker (Fairburn & Beglin 1994)"
+    },
+    {
+      "id": "Q_ENV_01",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "PRIMARY",
+      "question": "RAPPEL Q_PROFIL_10 : Heures/semaine disponibles training (Référence)",
+      "type": "Référence",
+      "options": [
+        "Voir Q_PROFIL_10"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ENV_02",
+      "impactScore": 0.9,
+      "scientificRef": "Time availability & adherence (Trost et al. 2002)"
+    },
+    {
+      "id": "Q_ENV_02",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Cette disponibilité est-elle stable/prévisible ou très variable semaine à semaine ?",
+      "type": "Choix unique",
+      "options": [
+        "Très stable (même horaires chaque semaine)",
+        "Stable avec variations mineures",
+        "Variable modérée",
+        "Très variable/imprévisible",
+        "Chaotique"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ENV_01",
+      "impactScore": 0.85,
+      "scientificRef": "Schedule stability & adherence (Marcus et al. 2000)"
+    },
+    {
+      "id": "Q_ENV_03",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Combien de fois par mois vos plans training/nutrition sont-ils perturbés par imprévus (voyages, urgences, événements...) ?",
+      "type": "Numérique",
+      "options": [
+        "Nombre perturbations/mois (0-30)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ENV_01",
+      "impactScore": 0.82,
+      "scientificRef": "Disruption frequency (Teixeira et al. 2015)"
+    },
+    {
+      "id": "Q_ENV_04",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous accès à une salle de sport/équipement training ?",
+      "type": "Choix unique",
+      "options": [
+        "Salle sport abonnement illimité",
+        "Salle accès limité (horaires/jours)",
+        "Home gym équipé",
+        "Équipement minimal maison",
+        "Aucun équipement (bodyweight)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "TRAINING_ACCESS",
+      "impactScore": 0.75,
+      "scientificRef": "Environmental barriers (Trost et al. 2002)"
+    },
+    {
+      "id": "Q_ENV_05",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "PRIMARY",
+      "question": "Combien de personnes dépendent de vous au quotidien (enfants, parents âgés, autres) ?",
+      "type": "Numérique",
+      "options": [
+        "Nombre personnes dépendantes (0-10)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ENV_01",
+      "impactScore": 0.88,
+      "scientificRef": "Caregiving burden (Pinquart & Sörensen 2003)"
+    },
+    {
+      "id": "Q_ENV_06",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "[Si dépendants] Quelle est l'intensité de cette charge (temps quotidien consacré) ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas de dépendants",
+        "Légère (<2h/jour)",
+        "Modérée (2-4h/jour)",
+        "Importante (4-8h/jour)",
+        "Très importante (>8h/jour)"
+      ],
+      "triggerCondition": "IF Q_ENV_05 >= 1",
+      "skipCondition": "IF Q_ENV_05 = 0",
+      "rootCauseLink": "RC_ENV_01",
+      "impactScore": 0.85,
+      "scientificRef": "Caregiving time burden (Pinquart & Sörensen 2003)"
+    },
+    {
+      "id": "Q_ENV_07",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "PRIMARY",
+      "question": "Combien d'heures travaillez-vous par semaine (job principal + side hustles) ?",
+      "type": "Numérique",
+      "options": [
+        "Heures/semaine (0-100)"
+      ],
+      "triggerCondition": "IF Q_PROFIL_14 NOT IN [\"Sans emploi\",\"Retraité\"]",
+      "skipCondition": "IF Q_PROFIL_14 IN [\"Sans emploi\",\"Retraité\"]",
+      "rootCauseLink": "RC_ENV_01",
+      "impactScore": 0.82,
+      "scientificRef": "Work hours & exercise time (Burton & Turrell 2000)"
+    },
+    {
+      "id": "Q_ENV_08",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Temps de trajet quotidien domicile-travail (aller-retour) ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - télétravail/retraité",
+        "<30min",
+        "30-60min",
+        "1-2h",
+        "2-3h",
+        ">3h"
+      ],
+      "triggerCondition": "IF Q_PROFIL_14 NOT IN [\"Sans emploi\",\"Retraité\"]",
+      "skipCondition": "IF Q_PROFIL_14 IN [\"Sans emploi\",\"Retraité\"]",
+      "rootCauseLink": "RC_ENV_01",
+      "impactScore": 0.72,
+      "scientificRef": "Commute time & health behaviors (Hoehner et al. 2012)"
+    },
+    {
+      "id": "Q_ENV_09",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Voyagez-vous fréquemment pour le travail/obligations (déplacements professionnels) ?",
+      "type": "Choix unique",
+      "options": [
+        "Jamais",
+        "Rare (<1x/mois)",
+        "Occasionnel (1-2x/mois)",
+        "Fréquent (1x/semaine)",
+        "Très fréquent (plusieurs/semaine)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ENV_03",
+      "impactScore": 0.8,
+      "scientificRef": "Business travel & routine disruption (DeFrank et al. 2000)"
+    },
+    {
+      "id": "Q_ENV_10",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous des horaires de travail atypiques (nuit, shifts, weekends obligatoires) ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, horaires classiques",
+        "Oui, shifts rotatifs",
+        "Oui, nuit fixe",
+        "Oui, weekends systématiques",
+        "Très variable"
+      ],
+      "triggerCondition": "IF Q_PROFIL_14 NOT IN [\"Sans emploi\",\"Retraité\"]",
+      "skipCondition": "IF Q_PROFIL_14 IN [\"Sans emploi\",\"Retraité\"]",
+      "rootCauseLink": "RC_REC_03",
+      "impactScore": 0.78,
+      "scientificRef": "Shift work & health (Kecklund & Axelsson 2016)"
+    },
+    {
+      "id": "Q_ENV_15",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "PRIMARY",
+      "question": "Votre entourage proche (partenaire, famille) soutient-il vos objectifs de transformation physique ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Aucun soutien ou opposition active",
+        "10 = Soutien total actif"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "SOCIAL_SUPPORT",
+      "impactScore": 0.88,
+      "scientificRef": "Social support & adherence (Teixeira et al. 2012)"
+    },
+    {
+      "id": "Q_ENV_16",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Vivez-vous seul(e) ou avec d'autres personnes ?",
+      "type": "Choix unique",
+      "options": [
+        "Seul(e)",
+        "Couple sans enfants",
+        "Couple avec enfants",
+        "Colocation",
+        "Famille élargie",
+        "Autre"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "LIVING_SITUATION",
+      "impactScore": 0.75,
+      "scientificRef": "Living arrangement & health behaviors (Umberson 1992)"
+    },
+    {
+      "id": "Q_ENV_17",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "[Si vie commune] Ces personnes ont-elles des habitudes alimentaires/lifestyle compatibles avec vos objectifs ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - vie seul(e)",
+        "Oui, totalement compatibles",
+        "Compatibles modérément",
+        "Peu compatibles",
+        "Incompatibles (conflit)"
+      ],
+      "triggerCondition": "IF Q_ENV_16 != \"Seul(e)\"",
+      "skipCondition": "IF Q_ENV_16 = \"Seul(e)\"",
+      "rootCauseLink": "HOUSEHOLD_ALIGNMENT",
+      "impactScore": 0.82,
+      "scientificRef": "Household food environment (Gorin et al. 2008)"
+    },
+    {
+      "id": "Q_ENV_18",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous des amis/collègues qui partagent des objectifs similaires (fitness, santé) ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, plusieurs",
+        "Oui, quelques-uns",
+        "Un ou deux",
+        "Aucun"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "PEER_SUPPORT",
+      "impactScore": 0.78,
+      "scientificRef": "Peer support & exercise adherence (Carron et al. 1996)"
+    },
+    {
+      "id": "Q_ENV_19",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "À quelle fréquence êtes-vous dans des situations sociales où la nourriture/alcool sont difficiles à gérer (restaurants, soirées, événements professionnels) ?",
+      "type": "Choix unique",
+      "options": [
+        "Rare (<2x/mois)",
+        "Occasionnel (1x/semaine)",
+        "Fréquent (2-3x/semaine)",
+        "Très fréquent (4+x/semaine)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ENV_03",
+      "impactScore": 0.8,
+      "scientificRef": "Social eating challenges (Herman et al. 2003)"
+    },
+    {
+      "id": "Q_ENV_20",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous de la pression sociale pour manger/boire dans ces situations ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Aucune pression, autonomie totale",
+        "10 = Pression énorme, refus difficile"
+      ],
+      "triggerCondition": "IF Q_ENV_19 IN [\"Fréquent\",\"Très fréquent\"]",
+      "skipCondition": "IF Q_ENV_19 NOT IN [\"Fréquent\",\"Très fréquent\"]",
+      "rootCauseLink": "SOCIAL_PRESSURE",
+      "impactScore": 0.75,
+      "scientificRef": "Social pressure & eating (Herman et al. 2003)"
+    },
+    {
+      "id": "Q_ENV_21",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Quelqu'un dans votre entourage sabote-t-il activement vos efforts (critique, tente, décourage) ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, aucun sabotage",
+        "Oui, critiques passives",
+        "Oui, sabotage actif occasionnel",
+        "Oui, sabotage actif fréquent"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "SOCIAL_SABOTAGE",
+      "impactScore": 0.85,
+      "scientificRef": "Social sabotage barriers (Kiernan et al. 2012)"
+    },
+    {
+      "id": "Q_ENV_22",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous quelqu'un à qui parler de vos défis/frustrations liés à votre transformation ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, plusieurs personnes",
+        "Oui, une personne de confiance",
+        "Pas vraiment",
+        "Non, personne"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "EMOTIONAL_SUPPORT",
+      "impactScore": 0.78,
+      "scientificRef": "Emotional support & adherence (Cohen & Wills 1985)"
+    },
+    {
+      "id": "Q_ENV_23",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Faites-vous partie d'une communauté (en ligne ou réelle) autour fitness/santé ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, très actif",
+        "Oui, modérément actif",
+        "Membre passif",
+        "Non, aucune communauté"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "COMMUNITY_SUPPORT",
+      "impactScore": 0.72,
+      "scientificRef": "Community support & behavior change (Ballew et al. 2013)"
+    },
+    {
+      "id": "Q_ENV_24",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Seriez-vous prêt(e) à communiquer vos objectifs/progrès à quelqu'un pour accountability ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, déjà en place",
+        "Oui, ouvert à l'idée",
+        "Neutre",
+        "Préfère garder privé",
+        "Non, absolument pas"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "ACCOUNTABILITY_READINESS",
+      "impactScore": 0.75,
+      "scientificRef": "Accountability & adherence (Wing & Jeffery 1999)"
+    },
+    {
+      "id": "Q_ENV_25",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "PRIMARY",
+      "question": "Qui fait les courses alimentaires dans votre foyer ?",
+      "type": "Choix unique",
+      "options": [
+        "Moi uniquement",
+        "Moi principalement",
+        "Partagé équitablement",
+        "Autre personne principalement",
+        "Autre personne uniquement",
+        "Vie seul(e) - moi"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "FOOD_PROCUREMENT_CONTROL",
+      "impactScore": 0.82,
+      "scientificRef": "Food procurement control (Gorin et al. 2008)"
+    },
+    {
+      "id": "Q_ENV_26",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "PRIMARY",
+      "question": "Qui prépare les repas dans votre foyer ?",
+      "type": "Choix unique",
+      "options": [
+        "Moi uniquement",
+        "Moi principalement",
+        "Partagé",
+        "Autre personne principalement",
+        "Autre personne uniquement",
+        "Repas extérieurs majoritaires"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "MEAL_PREP_CONTROL",
+      "impactScore": 0.85,
+      "scientificRef": "Meal preparation control (Larson et al. 2006)"
+    },
+    {
+      "id": "Q_ENV_27",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Combien de repas par semaine mangez-vous à l'extérieur (restaurants, cantines, fast-food, livraison) ?",
+      "type": "Numérique",
+      "options": [
+        "Repas/semaine (0-21)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "RC_ENV_03",
+      "impactScore": 0.8,
+      "scientificRef": "Restaurant frequency & diet quality (Lachat et al. 2012)"
+    },
+    {
+      "id": "Q_ENV_28",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous accès facilement à aliments sains (supermarchés qualité, marchés) ou environnement alimentaire limité ?",
+      "type": "Choix unique",
+      "options": [
+        "Accès excellent (multiples options)",
+        "Accès bon",
+        "Accès modéré",
+        "Accès limité (food desert)",
+        "Très limité"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "FOOD_ENVIRONMENT",
+      "impactScore": 0.72,
+      "scientificRef": "Food environment & diet (Walker et al. 2010)"
+    },
+    {
+      "id": "Q_ENV_29",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Y a-t-il constamment des aliments \"tentants\" (snacks, sucreries, junk food) accessibles chez vous ?",
+      "type": "Choix unique",
+      "options": [
+        "Non, environnement contrôlé",
+        "Quelques aliments occasionnels",
+        "Modérément présents",
+        "Très présents",
+        "Omniprésents"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "HOME_FOOD_ENVIRONMENT",
+      "impactScore": 0.8,
+      "scientificRef": "Home food environment (Wansink 2006)"
+    },
+    {
+      "id": "Q_ENV_30",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous un budget alimentaire limité qui contraint vos choix nutritionnels ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Aucune contrainte budget",
+        "10 = Contrainte majeure, choix très limités"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "FINANCIAL_CONSTRAINTS",
+      "impactScore": 0.75,
+      "scientificRef": "Food insecurity & diet quality (Laraia 2013)"
+    },
+    {
+      "id": "Q_ENV_31",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Disposez-vous d'équipement cuisine adéquat pour meal prep (frigo, four, micro-ondes, contenants...) ?",
+      "type": "Choix unique",
+      "options": [
+        "Oui, équipement complet",
+        "Oui, équipement basique suffisant",
+        "Équipement limité",
+        "Équipement très limité/absent"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "MEAL_PREP_CAPABILITY",
+      "impactScore": 0.7,
+      "scientificRef": "Kitchen equipment & cooking (Condrasky & Hegler 2010)"
+    },
+    {
+      "id": "Q_ENV_32",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous des compétences culinaires de base (cuisiner protéines, légumes, repas simples) ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Aucune compétence cuisine",
+        "10 = Excellent cuisinier/cuisinière"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "COOKING_SKILLS",
+      "impactScore": 0.72,
+      "scientificRef": "Cooking skills & diet quality (Hartmann et al. 2013)"
+    },
+    {
+      "id": "Q_ENV_33",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Combien de temps pouvez-vous consacrer RÉALISTEMENT à meal prep par semaine ?",
+      "type": "Choix unique",
+      "options": [
+        "<1h",
+        "1-2h",
+        "2-3h",
+        "3-4h",
+        "4h+"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "MEAL_PREP_TIME",
+      "impactScore": 0.78,
+      "scientificRef": "Meal prep time & adherence (Larson et al. 2006)"
+    },
+    {
+      "id": "Q_ENV_34",
+      "dimension": "Environnement",
+      "patterns": [
+        "P7"
+      ],
+      "role": "SECONDARY",
+      "question": "Y a-t-il des occasions sociales OBLIGATOIRES avec nourriture (fêtes familiales, événements culturels/religieux) fréquentes ?",
+      "type": "Choix unique",
+      "options": [
+        "Rare (<1x/mois)",
+        "Occasionnel (1-2x/mois)",
+        "Fréquent (1x/semaine)",
+        "Très fréquent (plusieurs/semaine)"
+      ],
+      "triggerCondition": "ALWAYS",
+      "skipCondition": "NEVER",
+      "rootCauseLink": "OBLIGATORY_SOCIAL_EATING",
+      "impactScore": 0.75,
+      "scientificRef": "Cultural food events (Satia et al. 2001)"
+    },
+    {
+      "id": "Q_STM_01",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "PRIMARY",
+      "question": "[Si training actuel] Combien de séances d'entraînement effectuez-vous par semaine ACTUELLEMENT ?",
+      "type": "Numérique",
+      "options": [
+        "Séances/semaine (0-14)"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "TRAINING_FREQUENCY",
+      "impactScore": 0.85,
+      "scientificRef": "Training frequency (ACSM 2018)"
+    },
+    {
+      "id": "Q_STM_02",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "PRIMARY",
+      "question": "[Si training actuel] Combien de séries totales par groupe musculaire effectuez-vous par semaine (estimation) ?",
+      "type": "Numérique",
+      "options": [
+        "Séries/groupe/semaine (0-50)"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\"6-12 mois\",\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\"6-12 mois\",\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "rootCauseLink": "RC_STM_01",
+      "impactScore": 0.9,
+      "scientificRef": "Volume landmarks (Schoenfeld et al. 2017) - 10-20 sets/muscle/week hypertrophy"
+    },
+    {
+      "id": "Q_STM_03",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[Si training actuel] Quelle est la durée moyenne de vos séances ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas training",
+        "<30min",
+        "30-45min",
+        "45-60min",
+        "60-90min",
+        "90-120min",
+        ">120min"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "SESSION_DURATION",
+      "impactScore": 0.7,
+      "scientificRef": "Session duration efficiency (Schoenfeld et al. 2019)"
+    },
+    {
+      "id": "Q_STM_04",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "PRIMARY",
+      "question": "[Si training actuel] Comment évalueriez-vous l'intensité moyenne de vos entraînements (RPE - Rate of Perceived Exertion) ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Très facile, quasi aucun effort",
+        "10 = Maximal absolu, échec chaque série"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "TRAINING_INTENSITY",
+      "impactScore": 0.88,
+      "scientificRef": "RPE scale (Borg 1982), Training intensity & adaptation"
+    },
+    {
+      "id": "Q_STM_05",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[Si training actuel] Quel type d'entraînement pratiquez-vous principalement ?",
+      "type": "Choix multiple",
+      "options": [
+        "N/A - pas training",
+        "Musculation/résistance",
+        "HIIT/circuits",
+        "Cardio steady-state",
+        "Crossfit/fonctionnel",
+        "Sports (running, natation...)",
+        "Yoga/Pilates",
+        "Autre"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "TRAINING_MODALITY",
+      "impactScore": 0.75,
+      "scientificRef": "Training modality specificity (Kraemer et al. 2002)"
+    },
+    {
+      "id": "Q_STM_06",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[Si musculation] Quelle est votre structure d'entraînement actuelle ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas musculation",
+        "Full-body 2-3x/sem",
+        "Upper/Lower split",
+        "Push/Pull/Legs",
+        "Bro split (1 muscle/jour)",
+        "Autre",
+        "Aucune structure claire"
+      ],
+      "triggerCondition": "IF Q_STM_05 contains \"Musculation\"",
+      "skipCondition": "IF Q_STM_05 NOT contains \"Musculation\"",
+      "rootCauseLink": "TRAINING_SPLIT",
+      "impactScore": 0.78,
+      "scientificRef": "Training splits (Schoenfeld et al. 2019)"
+    },
+    {
+      "id": "Q_STM_07",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "PRIMARY",
+      "question": "[Si training actuel] Progressez-vous régulièrement (charge, reps, volume) ou stagnation ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas training",
+        "Progression régulière",
+        "Progression lente",
+        "Stagnation (<3 mois)",
+        "Stagnation longue (3-6 mois)",
+        "Régression"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "RC_STM_02",
+      "impactScore": 0.9,
+      "scientificRef": "Progressive overload principle (ACSM 2009)"
+    },
+    {
+      "id": "Q_STM_08",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[Si training actuel] Trackez-vous vos performances (poids soulevés, reps, charge totale) ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas training",
+        "Oui, systématiquement chaque série",
+        "Oui, principales séries seulement",
+        "Occasionnellement",
+        "Non, jamais"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "PERFORMANCE_TRACKING",
+      "impactScore": 0.75,
+      "scientificRef": "Training log & progression (Peterson et al. 2004)"
+    },
+    {
+      "id": "Q_STM_09",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[Si training actuel] Intégrez-vous des semaines de deload (réduction volume/intensité planifiée) ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas training",
+        "Oui, régulièrement (toutes 4-6 sem)",
+        "Oui, quand fatigue",
+        "Rare",
+        "Jamais, training continu"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "rootCauseLink": "DELOAD_PRACTICE",
+      "impactScore": 0.82,
+      "scientificRef": "Deload necessity (Rhea et al. 2003)"
+    },
+    {
+      "id": "Q_STM_10",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[Si training actuel] Ressentez-vous du plaisir/satisfaction pendant vos entraînements ?",
+      "type": "Échelle 1-10",
+      "options": [
+        "1 = Aucun plaisir, corvée totale",
+        "10 = Énorme plaisir, highlight de la journée"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "TRAINING_ENJOYMENT",
+      "impactScore": 0.85,
+      "scientificRef": "Exercise enjoyment & adherence (Rhodes et al. 2009)"
+    },
+    {
+      "id": "Q_STM_11",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[INTERMÉDIAIRE+] Utilisez-vous une périodisation structurée (blocs hypertrophie/force/puissance) ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - débutant",
+        "Oui, périodisation planifiée",
+        "Oui, intuitive/auto-régulée",
+        "Non, training linéaire continu",
+        "Ne sais pas ce que c'est"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\"6-12 mois\",\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\"6-12 mois\",\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "rootCauseLink": "PERIODIZATION",
+      "impactScore": 0.8,
+      "scientificRef": "Periodization models (Rhea et al. 2003)"
+    },
+    {
+      "id": "Q_STM_12",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[INTERMÉDIAIRE+] Utilisez-vous le concept RIR (Reps In Reserve - reps restantes avant échec) ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - débutant",
+        "Oui, systématiquement",
+        "Oui, occasionnellement",
+        "Non, pousse à échec systématique",
+        "Ne sais pas ce que c'est"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "rootCauseLink": "RIR_USAGE",
+      "impactScore": 0.85,
+      "scientificRef": "RIR & autoregulation (Helms et al. 2016, Zourdos et al. 2016)"
+    },
+    {
+      "id": "Q_STM_13",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[AVANCÉ] Variez-vous les gammes de répétitions selon phases (force 1-5 reps, hypertrophie 6-12, endurance 12+) ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - débutant/intermédiaire",
+        "Oui, variation périodisée",
+        "Oui, variation intuitive",
+        "Non, gamme fixe",
+        "Mix non structuré"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\">18 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\">18 mois\",\">36 mois\"]",
+      "rootCauseLink": "REP_RANGE_VARIATION",
+      "impactScore": 0.75,
+      "scientificRef": "Rep ranges & hypertrophy (Schoenfeld et al. 2017)"
+    },
+    {
+      "id": "Q_STM_14",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[AVANCÉ] Utilisez-vous des techniques d'intensification (drop sets, rest-pause, supersets, tempo...) ?",
+      "type": "Choix multiple",
+      "options": [
+        "N/A - débutant",
+        "Drop sets",
+        "Rest-pause",
+        "Supersets/circuits",
+        "Tempo contrôlé",
+        "Clusters",
+        "Aucune technique avancée"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\">18 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\">18 mois\",\">36 mois\"]",
+      "rootCauseLink": "INTENSIFICATION_TECHNIQUES",
+      "impactScore": 0.72,
+      "scientificRef": "Intensification techniques (Schoenfeld 2011)"
+    },
+    {
+      "id": "Q_STM_15",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[AVANCÉ] Ajustez-vous votre volume/intensité en fonction de votre récupération (auto-régulation) ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - débutant",
+        "Oui, systématiquement (HRV, RPE, performance)",
+        "Oui, intuitivement",
+        "Non, programme fixe strict"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\">18 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\">18 mois\",\">36 mois\"]",
+      "rootCauseLink": "AUTOREGULATION",
+      "impactScore": 0.88,
+      "scientificRef": "Autoregulation (Mann et al. 2010)"
+    },
+    {
+      "id": "Q_STM_16",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[AVANCÉ] Connaissez-vous vos \"Maximum Recoverable Volume\" (MRV) et \"Minimum Effective Volume\" (MEV) par groupe musculaire ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - débutant",
+        "Oui, déterminé empiriquement",
+        "Estimation approximative",
+        "Non, concepts inconnus"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\">18 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\">18 mois\",\">36 mois\"]",
+      "rootCauseLink": "VOLUME_LANDMARKS_KNOWLEDGE",
+      "impactScore": 0.8,
+      "scientificRef": "Volume landmarks (Israetel et al. 2017 - Renaissance Periodization)"
+    },
+    {
+      "id": "Q_STM_17",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[INTERMÉDIAIRE+] Quelle est votre approche progression ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - débutant",
+        "Linear progression (ajout poids régulier)",
+        "Double progression (reps puis poids)",
+        "DUP (Daily Undulating)",
+        "Progression ondulatoire",
+        "Aucune méthode claire"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\"6-12 mois\",\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\"6-12 mois\",\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "rootCauseLink": "PROGRESSION_METHOD",
+      "impactScore": 0.82,
+      "scientificRef": "Progression schemes (Williams et al. 2017)"
+    },
+    {
+      "id": "Q_STM_18",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[INTERMÉDIAIRE+] Incluez-vous du travail unilatéral (single-leg, single-arm) pour corriger asymétries ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - débutant",
+        "Oui, systématiquement",
+        "Oui, occasionnellement",
+        "Rarement",
+        "Jamais"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "rootCauseLink": "UNILATERAL_TRAINING",
+      "impactScore": 0.7,
+      "scientificRef": "Unilateral training benefits (Makaruk et al. 2011)"
+    },
+    {
+      "id": "Q_STM_19",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[INTERMÉDIAIRE+] Faites-vous des tests de force réguliers (1RM, 3RM, 5RM) ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - débutant",
+        "Oui, régulièrement (toutes 8-12 sem)",
+        "Oui, occasionnellement",
+        "Rarement",
+        "Jamais"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "rootCauseLink": "STRENGTH_TESTING",
+      "impactScore": 0.68,
+      "scientificRef": "Testing protocols (Baechle & Earle 2008)"
+    },
+    {
+      "id": "Q_STM_20",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[AVANCÉ] Utilisez-vous la spécialisation (phases focus un muscle/qualité spécifique) ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - débutant/intermédiaire",
+        "Oui, blocs spécialisation planifiés",
+        "Oui, quand nécessaire",
+        "Non, approche équilibrée toujours"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\">18 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\">18 mois\",\">36 mois\"]",
+      "rootCauseLink": "SPECIALIZATION",
+      "impactScore": 0.72,
+      "scientificRef": "Specialization phases (Israetel et al. 2020)"
+    },
+    {
+      "id": "Q_STM_21",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[AVANCÉ] Intégrez-vous du travail mobilité/prehab ciblé ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - débutant",
+        "Oui, protocole structuré régulier",
+        "Oui, quand douleurs",
+        "Occasionnellement",
+        "Jamais"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\">18 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\">18 mois\",\">36 mois\"]",
+      "rootCauseLink": "PREHAB_MOBILITY",
+      "impactScore": 0.75,
+      "scientificRef": "Injury prevention (Lauersen et al. 2014)"
+    },
+    {
+      "id": "Q_STM_22",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[AVANCÉ] Avez-vous des faiblesses/points faibles musculaires identifiés que vous adressez spécifiquement ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - débutant/intermédiaire",
+        "Oui, protocole correctif en place",
+        "Oui, identifiés mais non adressés",
+        "Non, développement équilibré",
+        "Ne sais pas"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\">18 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\">18 mois\",\">36 mois\"]",
+      "rootCauseLink": "WEAK_POINT_TRAINING",
+      "impactScore": 0.7,
+      "scientificRef": "Weak point specialization (Nuckols et al. 2019)"
+    },
+    {
+      "id": "Q_STM_23",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "PRIMARY",
+      "question": "Ressentez-vous des douleurs articulaires/tendineuses chroniques liées à l'entraînement ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas training",
+        "Aucune",
+        "Douleurs mineures occasionnelles",
+        "Douleurs modérées fréquentes",
+        "Douleurs sévères limitantes"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "JOINT_PAIN",
+      "impactScore": 0.85,
+      "scientificRef": "Overuse injuries (DiFiori et al. 2014)"
+    },
+    {
+      "id": "Q_STM_24",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "PRIMARY",
+      "question": "Avez-vous déjà subi des blessures significatives liées à l'entraînement (nécessitant arrêt >2 semaines) ?",
+      "type": "Numérique",
+      "options": [
+        "Nombre blessures (0-20)"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "INJURY_HISTORY",
+      "impactScore": 0.88,
+      "scientificRef": "Injury history & risk (Hägglund et al. 2006)"
+    },
+    {
+      "id": "Q_STM_25",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "[Si blessures] Quelle était la nature principale de ces blessures ?",
+      "type": "Choix multiple",
+      "options": [
+        "N/A - pas blessures",
+        "Tendineuses (tendinites)",
+        "Articulaires",
+        "Musculaires (déchirures, claquages)",
+        "Dos/lombaires",
+        "Épaules",
+        "Genoux",
+        "Autre"
+      ],
+      "triggerCondition": "IF Q_STM_24 >= 1",
+      "skipCondition": "IF Q_STM_24 = 0",
+      "rootCauseLink": "INJURY_TYPE",
+      "impactScore": 0.8,
+      "scientificRef": "Injury patterns (Keogh & Winwood 2017)"
+    },
+    {
+      "id": "Q_STM_26",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous que votre volume actuel est : ",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas training",
+        "Trop faible (sous-stimulation)",
+        "Optimal (progression + récupération)",
+        "Légèrement excessif",
+        "Très excessif (surtraining)"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "RC_STM_01",
+      "impactScore": 0.85,
+      "scientificRef": "Volume tolerance (Schoenfeld et al. 2019)"
+    },
+    {
+      "id": "Q_STM_27",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "Votre qualité de sommeil est-elle affectée négativement les jours post-entraînement ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas training",
+        "Non, sommeil normal",
+        "Oui, légèrement",
+        "Oui, modérément",
+        "Oui, fortement perturbé"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "RC_STM_01",
+      "impactScore": 0.78,
+      "scientificRef": "Overreaching & sleep (Hausswirth et al. 2014)"
+    },
+    {
+      "id": "Q_STM_28",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous une baisse de libido/fonction sexuelle depuis intensification training ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas training",
+        "Non, inchangé",
+        "Oui, légère baisse",
+        "Oui, baisse marquée",
+        "Préfère ne pas répondre"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 IN [\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "skipCondition": "IF Q_PROFIL_03 NOT IN [\"12-18 mois\",\"18-36 mois\",\">36 mois\"]",
+      "rootCauseLink": "RC_STM_01",
+      "impactScore": 0.82,
+      "scientificRef": "Overtraining & hormones (Hackney et al. 2017)"
+    },
+    {
+      "id": "Q_STM_29",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "Avez-vous des courbatures CONSTANTES qui ne disparaissent jamais complètement ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas training",
+        "Non, récupération normale",
+        "Oui, courbatures persistantes modérées",
+        "Oui, courbatures sévères constantes"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "RC_STM_01",
+      "impactScore": 0.8,
+      "scientificRef": "Chronic DOMS & overtraining (Meeusen et al. 2013)"
+    },
+    {
+      "id": "Q_STM_30",
+      "dimension": "Stimulus",
+      "patterns": [
+        "P8"
+      ],
+      "role": "SECONDARY",
+      "question": "Ressentez-vous un déclin progressif des performances malgré efforts constants/accrus ?",
+      "type": "Choix unique",
+      "options": [
+        "N/A - pas training",
+        "Non, progression normale",
+        "Stagnation",
+        "Oui, déclin léger",
+        "Oui, déclin marqué"
+      ],
+      "triggerCondition": "IF Q_PROFIL_03 != \"Jamais / Irrégulier\"",
+      "skipCondition": "IF Q_PROFIL_03 = \"Jamais / Irrégulier\"",
+      "rootCauseLink": "RC_STM_01",
+      "impactScore": 0.9,
+      "scientificRef": "Performance decrement overtraining (Halson & Jeukendrup 2004)"
+    }
+  ]
+}

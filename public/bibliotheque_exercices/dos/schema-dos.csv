@@ -1,0 +1,53 @@
+exercise_id,name,pattern,plane,mechanic,unilateral,primary_muscle,primary_activation,secondary_muscles,secondary_activations,stabilizers,joint_stress_spine,joint_stress_knee,joint_stress_shoulder,global_instability,coordination_demand,constraint_profile
+BACK-001,Bent over row halteres,horizontal_pull,sagittal,compound,false,lats,0.6,rhomboids|biceps,0.25|0.15,spine_erectors,6,2,3,5,5,hinge_load
+BACK-002,Bent over row disque,horizontal_pull,sagittal,compound,false,lats,0.6,rhomboids|biceps,0.25|0.15,spine_erectors,6,2,3,5,5,hinge_load
+BACK-003,Bird dog,core_stability,sagittal,compound,true,transverse_abdominis,0.6,glutes|shoulders,0.25|0.15,spine_erectors,2,1,2,6,6,coordination_core
+BACK-004,Chin up,vertical_pull,sagittal,compound,false,lats,0.65,biceps|rhomboids,0.25|0.1,core,5,1,5,6,6,bodyweight_pull
+BACK-005,Extension lombaire machine,spine_extension,sagittal,isolation,false,spine_erectors,0.7,glutes|hamstrings,0.2|0.1,core,5,1,1,2,2,lumbar_extension
+BACK-006,Extension lombaire banc 45,spine_extension,sagittal,compound,false,spine_erectors,0.65,glutes|hamstrings,0.25|0.1,core,6,1,1,3,3,hinge_pattern
+BACK-007,Extension lombaire swiss ball,spine_extension,sagittal,compound,false,spine_erectors,0.6,glutes|hamstrings,0.25|0.15,core,5,1,1,5,5,instability_high
+BACK-008,Pull over machine,shoulder_extension,sagittal,isolation,false,lats,0.7,teres_major|triceps,0.2|0.1,core,3,1,3,2,2,stable_machine
+BACK-009,Oiseau TRX,horizontal_pull,transverse,compound,false,rear_delts,0.6,rhomboids|traps,0.25|0.15,core,4,1,3,7,7,instability_high
+BACK-010,Overhead shrug,scapular_elevation,frontal,isolation,false,traps,0.75,shoulders,0.25,core,3,1,3,3,3,overhead_load
+BACK-011,Pull over barre,shoulder_extension,sagittal,compound,false,lats,0.65,teres_major|triceps,0.2|0.15,core,4,1,3,3,3,loaded_stretch
+BACK-012,Pull over poulie,shoulder_extension,sagittal,isolation,false,lats,0.7,teres_major,0.3,core,3,1,2,3,3,cable_control
+BACK-013,Pull over deux halteres,shoulder_extension,sagittal,compound,false,lats,0.65,teres_major|triceps,0.2|0.15,core,4,1,3,4,4,coordination_load
+BACK-014,Pull over haltere,shoulder_extension,sagittal,compound,false,lats,0.7,teres_major|triceps,0.2|0.1,core,4,1,3,3,3,classic_pattern
+BACK-015,Renegade row,horizontal_pull,transverse,compound,true,lats,0.5,core|shoulders,0.3|0.2,core_global,5,2,4,8,8,anti_rotation
+BACK-016,Rowing machine hammer,horizontal_pull,sagittal,compound,false,lats,0.7,rhomboids|biceps,0.2|0.1,core,3,1,2,2,2,stable_machine
+BACK-017,Rowing machine pronation,horizontal_pull,sagittal,compound,false,lats,0.7,rhomboids|biceps,0.2|0.1,core,3,1,2,2,2,stable_machine
+BACK-018,Rowing TRX,horizontal_pull,transverse,compound,false,lats,0.6,rhomboids|biceps,0.25|0.15,core,4,1,3,7,7,instability_high
+BACK-019,Rowing barre,horizontal_pull,sagittal,compound,false,lats,0.65,rhomboids|biceps,0.2|0.15,spine_erectors,6,2,3,5,5,hinge_load
+BACK-020,Rowing landmine,horizontal_pull,sagittal,compound,false,lats,0.65,rhomboids|biceps,0.2|0.15,core,5,2,3,4,4,angled_pull
+BACK-021,Rowing elastique penche,horizontal_pull,sagittal,compound,false,lats,0.6,rhomboids|biceps,0.25|0.15,core,4,2,2,4,4,elastic_resistance
+BACK-022,Rowing haltere un bras,horizontal_pull,sagittal,compound,true,lats,0.7,rhomboids|biceps,0.2|0.1,core,5,2,3,5,5,unilateral_stability
+BACK-023,Rowing incline halteres,horizontal_pull,sagittal,compound,false,lats,0.7,rhomboids|biceps,0.2|0.1,core,2,1,2,2,2,chest_supported
+BACK-024,Rowing bande elastique,horizontal_pull,sagittal,compound,false,lats,0.6,rhomboids|biceps,0.25|0.15,core,3,1,2,3,3,elastic_control
+BACK-025,Rowing smith machine,horizontal_pull,sagittal,compound,false,lats,0.65,rhomboids|biceps,0.2|0.15,core,3,1,2,2,2,guided_bar
+BACK-026,Rowing t-bar machine,horizontal_pull,sagittal,compound,false,lats,0.7,rhomboids|biceps,0.2|0.1,core,4,2,3,3,3,heavy_load
+BACK-027,Rowing unilateral elastique,horizontal_pull,sagittal,compound,true,lats,0.65,rhomboids|biceps,0.2|0.15,core,4,1,2,4,4,unilateral_control
+BACK-028,Meadows row,horizontal_pull,sagittal,compound,true,lats,0.7,rhomboids|rear_delts,0.2|0.1,core,5,2,3,5,5,offset_load
+BACK-029,Seal row halteres,horizontal_pull,sagittal,compound,false,lats,0.7,rhomboids|biceps,0.2|0.1,core,2,1,2,2,2,chest_supported
+BACK-030,Shrug barre,scapular_elevation,frontal,isolation,false,traps,0.8,levator_scapulae,0.2,core,3,1,2,2,2,heavy_load
+BACK-031,Shrug machine,scapular_elevation,frontal,isolation,false,traps,0.8,levator_scapulae,0.2,core,2,1,2,1,1,stable_machine
+BACK-032,Shrug poulie,scapular_elevation,frontal,isolation,false,traps,0.75,levator_scapulae,0.25,core,2,1,2,2,2,cable_tension
+BACK-033,Shrugs halteres,scapular_elevation,frontal,isolation,false,traps,0.8,levator_scapulae,0.2,core,3,1,2,2,2,free_weights
+BACK-034,Sled pull,hip_hinge,sagittal,compound,false,glutes,0.5,hamstrings|lats,0.3|0.2,core,4,3,2,5,5,functional_pull
+BACK-035,Souleve de terre,hip_hinge,sagittal,compound,false,glutes,0.6,hamstrings|spine_erectors,0.25|0.15,core,8,4,3,5,5,heavy_spine_load
+BACK-036,Souleve de terre machine,hip_hinge,sagittal,compound,false,glutes,0.6,hamstrings|spine_erectors,0.25|0.15,core,5,3,2,3,3,guided_load
+BACK-037,Superman,spine_extension,sagittal,isometric,false,spine_erectors,0.7,glutes,0.3,core,3,1,1,3,3,low_load_extension
+BACK-038,Tirage iso lateral hammer,vertical_pull,sagittal,compound,true,lats,0.7,rhomboids|biceps,0.2|0.1,core,3,1,3,3,3,machine_control
+BACK-039,Tirage horizontal poulie,horizontal_pull,sagittal,compound,false,lats,0.7,rhomboids|biceps,0.2|0.1,core,3,1,2,2,2,cable_row
+BACK-040,Tirage horizontal prise large,horizontal_pull,sagittal,compound,false,upper_back,0.65,rhomboids|rear_delts,0.2|0.15,core,3,1,2,3,3,upper_bias
+BACK-041,Tirage incline poulie haute,vertical_pull,sagittal,compound,false,lats,0.65,rhomboids|biceps,0.2|0.15,core,3,1,3,3,3,angled_pull
+BACK-042,Tirage vertical poitrine,vertical_pull,sagittal,compound,false,lats,0.7,biceps|rhomboids,0.2|0.1,core,3,1,3,2,2,classic_lat_pull
+BACK-043,Tirage vertical prise inversee,vertical_pull,sagittal,compound,false,lats,0.65,biceps,0.35,core,3,1,3,2,2,biceps_bias
+BACK-044,Tirage vertical prise serree,vertical_pull,sagittal,compound,false,lats,0.7,biceps|rhomboids,0.2|0.1,core,3,1,3,2,2,neutral_grip
+BACK-045,Traction assiste elastique,vertical_pull,sagittal,compound,false,lats,0.65,biceps|rhomboids,0.25|0.1,core,4,1,4,5,5,assisted_pull
+BACK-046,Traction assiste banc,vertical_pull,sagittal,compound,false,lats,0.65,biceps|rhomboids,0.25|0.1,core,4,1,4,5,5,assisted_pull
+BACK-047,Traction assiste machine,vertical_pull,sagittal,compound,false,lats,0.7,biceps|rhomboids,0.2|0.1,core,3,1,3,3,3,stable_assist
+BACK-048,Traction australienne, horizontal_pull,sagittal,compound,false,lats,0.65,rhomboids|biceps,0.2|0.15,core,3,1,2,4,4,bodyweight_row
+BACK-049,Traction lestee,vertical_pull,sagittal,compound,false,lats,0.7,biceps|rhomboids,0.2|0.1,core,6,1,5,6,6,high_load
+BACK-050,Traction classique,vertical_pull,sagittal,compound,false,lats,0.7,biceps|rhomboids,0.2|0.1,core,5,1,4,6,6,bodyweight_pull
+BACK-051,Traction prise neutre,vertical_pull,sagittal,compound,false,lats,0.7,biceps|rhomboids,0.2|0.1,core,5,1,4,6,6,neutral_grip
+BACK-052,Traction australienne TRX,horizontal_pull,transverse,compound,false,lats,0.6,rhomboids|biceps,0.25|0.15,core,4,1,3,7,7,instability_high

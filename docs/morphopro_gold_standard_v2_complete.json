@@ -1,0 +1,4042 @@
+{
+  "meta": {
+    "version": "2.0.0",
+    "schema": "MorphoPro-GoldStandard-Complete",
+    "generated": "2026-04-03",
+    "description": "Base de données Gold Standard complète pour le moteur de recommandation MorphoPro. 12 groupes musculaires, 6 slots stratégiques, 72 exercices. Production-ready pour filtrage algorithmique.",
+    "total_muscle_groups": 12,
+    "total_slots": 72,
+    "slot_definitions": {
+      "S1_HEAVY_COMPOUND": "Ancrage Axial — torque maximal sur articulation motrice principale, stabilité structurelle.",
+      "S2_STRETCH_MEDIATED": "Extension en Étirement — pic de tension sarcomérique en position longue, hypertrophie en série.",
+      "S3_PEAK_CONTRACTION": "Pic de Contraction — tension maximale en position raccourcie, hypertrophie en parallèle.",
+      "S4_STRUCTURAL_BALANCE": "Correcteur de Profil — vecteur orthogonal au mouvement dominant, compensation des déséquilibres synergiste/antagoniste.",
+      "S5_PRECISION_ISOLATION": "Isolation de Précision — neutralisation des synergistes, ciblage d'un chef musculaire unique.",
+      "S6_UNILATERAL_DRIVER": "Pilote Unilatéral — détection et correction des asymétries de force/volume inter-hémi-corps."
+    },
+    "field_definitions": {
+      "ex_name": "Nom technique complet de l'exercice avec variante précise.",
+      "slot": "Identifiant du slot stratégique [S1..S6].",
+      "morpho_logic": "Justification biomécanique de la sélection selon le type de levier et la morphologie.",
+      "primary_lever": "Articulation motrice principale [Knee|Hip|Shoulder|Elbow|Spine|Ankle].",
+      "mobility_gate": "Scores minimaux requis par articulation (0-10) pour autoriser l'exercice. Clé = articulation, valeur = score minimal.",
+      "resistance_profile": "Profil du moment de force externe [Ascending|Descending|Bell-Curve].",
+      "emg_activation_pct": "Pourcentage d'activation EMG relatif (100 = exercice de référence du groupe). Source: données agrégées études peer-reviewed.",
+      "equipment_required": "Équipements nécessaires [Barbell|Dumbbell|Cable|Machine|Bands|Bodyweight|Rings|TRX|Kettlebell|Belt].",
+      "session_order": "Position optimale dans la séance [1=premier|2=milieu|3=finisseur]. Basé sur le coût neuro-musculaire.",
+      "fatigue_cost": "Coût de fatigue systémique sur 10. Détermine la récupération inter-séances nécessaire.",
+      "rep_range_hypertrophy": "Plage de répétitions optimale pour l'hypertrophie [min, max].",
+      "rir_target": "Reps In Reserve cible en fin de série [0=échec|1|2|3].",
+      "mev_per_week": "Volume minimal efficace en séries par semaine (Minimum Effective Volume).",
+      "mav_per_week": "Volume adaptatif maximal en séries par semaine (Maximum Adaptive Volume).",
+      "mrv_per_week": "Volume maximal récupérable par semaine (Maximum Recoverable Volume). Au-delà = surentraînement.",
+      "frequency_per_week": "Fréquence optimale de stimulation par semaine [min, max].",
+      "progression_model": "Modèle de progression recommandé [Double_Progression|RPE_Based|Wave_Loading|Linear|Cluster_Sets].",
+      "plateau_threshold_sessions": "Nombre de séances sans progression avant de déclencher une substitution ou variation.",
+      "optimal_morphotype": "Ratios morphologiques pour lesquels cet exercice est optimal.",
+      "risk_tags": "Tags de risque biomécanique. Chaque tag est un enum exploitable pour filtrage.",
+      "substitution_trigger": "Condition logique structurée pour le remplacement automatique.",
+      "biomechanics_note": "Contrainte d'exécution critique pour le module de feedback technique."
+    },
+    "resistance_profile_definitions": {
+      "Ascending": "Moment de force externe croissant vers la fin de course concentrique. Optimal pour muscles forts en position courte.",
+      "Descending": "Moment de force externe maximal en début de course (position étirée). Optimal pour stimulus d'étirement.",
+      "Bell-Curve": "Moment de force maximal en position mi-course. Typique des charges libres en plan sagittal."
+    },
+    "risk_tags_enum": [
+      "AXIAL_COMPRESSION",
+      "SHEAR_FORCE",
+      "IMPINGEMENT_ZONE",
+      "VALGUS_STRESS",
+      "ANTERIOR_SHEAR_LUMBAR",
+      "DISC_FLEXION_LOAD",
+      "HYPEREXTENSION_ELBOW",
+      "POSTERIOR_CAPSULE_STRETCH",
+      "BICIPITAL_TENDON_LOAD",
+      "PATELLAR_TENDON_OVERLOAD",
+      "PROXIMAL_HAMSTRING_TENDINOPATHY",
+      "WRIST_ULNAR_DEVIATION",
+      "AC_JOINT_STRESS",
+      "VARUS_KNEE_STRESS",
+      "THORACIC_KYPHOSIS_LOAD",
+      "MEDIAL_ELBOW_STRESS",
+      "LATERAL_ELBOW_STRESS",
+      "ACHILLES_LOAD",
+      "PLANTAR_FASCIA_LOAD",
+      "CERVICAL_COMPRESSION",
+      "SACROILIAC_STRESS",
+      "ROTATOR_CUFF_IMPINGEMENT"
+    ],
+    "substitution_trigger_schema": {
+      "description": "Structure JSON pour le moteur de règles. Chaque trigger est évaluable algorithmiquement.",
+      "fields": {
+        "condition_field": "Champ du profil utilisateur Phase 1 à évaluer.",
+        "operator": "Opérateur logique [>|<|>=|<=|==|!=|IN|NOT_IN].",
+        "threshold": "Valeur seuil ou tableau de valeurs.",
+        "logic": "Opérateur booléen si plusieurs conditions [AND|OR].",
+        "substitute_slot": "Slot de remplacement recommandé.",
+        "substitute_ex_name": "Exercice de substitution recommandé."
+      }
+    },
+    "morphotype_fields": {
+      "arm_span_height_ratio": "Envergure / Taille. Court < 0.98, Moyen 0.98-1.03, Long > 1.03.",
+      "femur_tibia_ratio": "Longueur fémur / longueur tibia. Court < 0.70, Moyen 0.70-0.78, Long > 0.78.",
+      "torso_leg_ratio": "Longueur buste assis / longueur jambes. Court < 0.85, Moyen 0.85-0.95, Long > 0.95.",
+      "q_angle_deg": "Angle Q du genou en degrés. Normal homme < 18°, femme < 22°.",
+      "ankle_dorsiflexion_cm": "Test genou-mur en cm. < 10cm = raide, 10-15cm = moyen, > 15cm = mobile.",
+      "shoulder_external_rotation_deg": "Rotation externe d'épaule en degrés. < 45° = limitée, 45-90° = normale, > 90° = laxe.",
+      "glenohumeral_anteversion_deg": "Antéversion de la tête humérale. > 15° = à risque de conflit antérieur.",
+      "femoral_anteversion_deg": "Antéversion fémorale. Test de Craig. > 25° = antéversion excessive.",
+      "pelvic_tilt_deg": "Inclinaison pelvienne. > 15° antérieure = hyperlordose, < 5° = rétroversion.",
+      "clavicle_length_cm": "Longueur de la clavicule. Court < 14cm, Long > 18cm.",
+      "acromion_type": "Type d'acromion radiologique [I=plat|II=courbe|III=crochu]. Type III = risque d'impingement élevé."
+    }
+  },
+  "muscle_groups": {
+    "PECTORAUX": {
+      "label": "Pectoraux",
+      "anatomy": {
+        "heads": [
+          "Grand pectoral — chef claviculaire",
+          "Grand pectoral — chef sternal",
+          "Grand pectoral — chef costal",
+          "Petit pectoral"
+        ],
+        "primary_function": "Adduction horizontale + flexion + rotation interne de l'épaule.",
+        "dominant_fiber_orientation": "Oblique — convergence vers le tubercule majeur de l'humérus.",
+        "bi_articular": false
+      },
+      "morpho_key_factors": [
+        "arm_span_height_ratio",
+        "glenohumeral_anteversion_deg",
+        "thoracic_kyphosis_deg",
+        "shoulder_external_rotation_deg"
+      ],
+      "volume_landmarks_per_week": {
+        "mev": 10,
+        "mav": 16,
+        "mrv": 22
+      },
+      "slots": {
+        "S1_HEAVY_COMPOUND": {
+          "ex_name": "Barbell Bench Press — prise pronation, largeur biakromiale +20%",
+          "slot": "S1_HEAVY_COMPOUND",
+          "morpho_logic": "Prise suprabiakromiale réduit le bras de levier interne du deltoïde antérieur, maximisant le torque net sur le grand pectoral. Pour arm_span_height_ratio > 1.03 (bras longs) : descendre la trajectoire de la barre vers le bas du sternum pour réduire le moment de cisaillement antérieur sur la capsule gléno-humérale. Pour glenohumeral_anteversion_deg > 15° : substitution obligatoire.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "thoracic_extension": 6,
+            "shoulder_external_rotation": 6,
+            "wrist_flexion": 5
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 100,
+          "equipment_required": [
+            "Barbell",
+            "Bench"
+          ],
+          "session_order": 1,
+          "fatigue_cost": 9,
+          "rep_range_hypertrophy": [
+            6,
+            10
+          ],
+          "rir_target": 1,
+          "mev_per_week": 3,
+          "mav_per_week": 5,
+          "mrv_per_week": 8,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 4,
+          "optimal_morphotype": {
+            "arm_span_height_ratio": "< 1.03",
+            "glenohumeral_anteversion_deg": "< 15",
+            "thoracic_kyphosis_deg": "< 40"
+          },
+          "risk_tags": [
+            "SHEAR_FORCE",
+            "POSTERIOR_CAPSULE_STRETCH",
+            "AC_JOINT_STRESS"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "glenohumeral_anteversion_deg",
+                "operator": ">",
+                "threshold": 15,
+                "substitute_ex_name": "Incline Barbell Press 20deg"
+              },
+              {
+                "condition_field": "shoulder_external_rotation_deg",
+                "operator": "<",
+                "threshold": 45,
+                "substitute_ex_name": "Dumbbell Press Neutral Grip"
+              },
+              {
+                "condition_field": "thoracic_kyphosis_deg",
+                "operator": ">",
+                "threshold": 45,
+                "substitute_ex_name": "Low-to-High Cable Press"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Moment de force maximal à ~75-80° de flexion d'épaule. Verrouillage des coudes en extension finale transfère la charge sur le triceps — ne pas bloquer. Descente jusqu'à contact barre/poitrine uniquement si mobilité thoracique suffisante."
+        },
+        "S2_STRETCH_MEDIATED": {
+          "ex_name": "Dumbbell Fly Banc Plat — amplitude maximale, coude fixe à 20° de flexion",
+          "slot": "S2_STRETCH_MEDIATED",
+          "morpho_logic": "Position d'étirement maximal (bras à l'horizontale) génère un pic de tension sarcomérique excentrique. Coude fixe à 20° réduit la charge huméro-radiale sans compromettre l'étirement pectoral. arm_span_height_ratio > 1.03 : réduire charge de 35% et limiter l'amplitude à 10° sous l'horizontale. arm_span_height_ratio < 0.98 : augmenter l'inclinaison du banc à 20° pour récupérer la course mécanique.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_external_rotation": 7,
+            "thoracic_extension": 7
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 72,
+          "equipment_required": [
+            "Dumbbell",
+            "Bench"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 6,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "arm_span_height_ratio": "0.98-1.03",
+            "shoulder_external_rotation_deg": "> 60"
+          },
+          "risk_tags": [
+            "SHEAR_FORCE",
+            "BICIPITAL_TENDON_LOAD",
+            "POSTERIOR_CAPSULE_STRETCH"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "glenohumeral_laxity_score",
+                "operator": ">",
+                "threshold": 2,
+                "substitute_ex_name": "Low Pulley Cable Fly"
+              },
+              {
+                "condition_field": "shoulder_external_rotation_deg",
+                "operator": "<",
+                "threshold": 50,
+                "substitute_ex_name": "Pec Deck Machine Full ROM"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Ne jamais dépasser le plan scapulaire en abduction — risque de subluxation antérieure. La descente doit s'arrêter à la sensation de tension capsulaire, non à la douleur. Priorité à la qualité de l'étirement sur la charge."
+        },
+        "S3_PEAK_CONTRACTION": {
+          "ex_name": "Cable Crossover Haute Poulie — trajectoire diagonale vers la ligne médiane inférieure",
+          "slot": "S3_PEAK_CONTRACTION",
+          "morpho_logic": "La résistance constante du câble maintient le vecteur de charge en adduction horizontale même en position courte — contrairement aux haltères où la tension chute à zéro à l'adduction complète. Trajectoire diagonale vers le bas cible le chef sternal inférieur. Pour glenohumeral_anteversion_deg > 15° : orienter les coudes légèrement fléchis et réduire le cross-over.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_flexion": 5,
+            "thoracic_extension": 4
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 85,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 5,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {
+            "glenohumeral_anteversion_deg": "< 15"
+          },
+          "risk_tags": [
+            "AC_JOINT_STRESS",
+            "BICIPITAL_TENDON_LOAD"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "ac_joint_pathology",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Pec Deck Machine 90deg vector"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le vecteur de force du câble doit être coplanaire au plan scapulaire. Une trajectoire trop verticale transfère la charge sur le deltoïde antérieur. Maintenir les coudes à 160° d'extension (jamais verrouillés)."
+        },
+        "S4_STRUCTURAL_BALANCE": {
+          "ex_name": "Face Pull Poulie Haute — rotation externe forcée + abduction horizontale 90°",
+          "slot": "S4_STRUCTURAL_BALANCE",
+          "morpho_logic": "Cible les rotateurs externes (infra-épineux + petit rond) et le deltoïde postérieur pour rééquilibrer le ratio rotation interne/externe chroniquement déséquilibré chez les pratiquants de press. Vecteur de force strictement postérieur. Indispensable si shoulder_external_rotation_deg < 60° ou protraction scapulaire chronique.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_external_rotation": 4,
+            "thoracic_extension": 3
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 68,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            15,
+            25
+          ],
+          "rir_target": 2,
+          "mev_per_week": 3,
+          "mav_per_week": 6,
+          "mrv_per_week": 9,
+          "frequency_per_week": [
+            2,
+            4
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 8,
+          "optimal_morphotype": {
+            "shoulder_external_rotation_deg": "< 70"
+          },
+          "risk_tags": [],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "subacromial_pain_vas",
+                "operator": ">",
+                "threshold": 3,
+                "substitute_ex_name": "Band External Rotation 0deg abduction"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Ratio optimal RI/RE : 3:2. Si déficit RE > 20° versus RI, prioriser avant tout press lourd. Prescription systématique : 2 séries de Face Pull pour chaque série de Bench Press."
+        },
+        "S5_PRECISION_ISOLATION": {
+          "ex_name": "Incline Dumbbell Press 30° — ciblage chef claviculaire exclusif",
+          "slot": "S5_PRECISION_ISOLATION",
+          "morpho_logic": "30° d'inclinaison oriente le vecteur de force vers la clavicule, maximisant le bras de levier sur le chef claviculaire du grand pectoral. Au-delà de 45° : le deltoïde antérieur domine (ratio EMG bascule). Thoracic_kyphosis_deg > 45° : réduire à 20° pour maintenir l'appui dorsal sans hyperlordose compensatoire.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "thoracic_extension": 6,
+            "shoulder_external_rotation": 6
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 88,
+          "equipment_required": [
+            "Dumbbell",
+            "Bench"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 7,
+          "rep_range_hypertrophy": [
+            8,
+            12
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "thoracic_kyphosis_deg": "< 45"
+          },
+          "risk_tags": [
+            "AC_JOINT_STRESS",
+            "SHEAR_FORCE"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "thoracic_kyphosis_structural",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Low-to-High Cable Press Standing"
+              },
+              {
+                "condition_field": "thoracic_kyphosis_deg",
+                "operator": ">",
+                "threshold": 50,
+                "substitute_ex_name": "Low-to-High Cable Press Standing"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Chaque degré d'inclinaison supplémentaire au-delà de 30° transfère progressivement l'activation vers le deltoïde antérieur. Contrôler l'angle du banc systématiquement."
+        },
+        "S6_UNILATERAL_DRIVER": {
+          "ex_name": "Single-Arm Cable Press — plan sagittal légèrement décalé, prise neutre",
+          "slot": "S6_UNILATERAL_DRIVER",
+          "morpho_logic": "Élimine la compensation controlatérale du bench bilatéral. Chaque côté produit son propre torque sans transfert de force inter-membres. Révèle et corrige les déficits asymétriques (seuil de déclenchement : >15% de différence de force brute).",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_external_rotation": 5,
+            "thoracic_extension": 4
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 92,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 6,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {
+            "asymmetry_force_pct": "> 15"
+          },
+          "risk_tags": [
+            "SHEAR_FORCE",
+            "POSTERIOR_CAPSULE_STRETCH"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "shoulder_dash_score",
+                "operator": ">",
+                "threshold": 30,
+                "substitute_ex_name": "Ring Push-Up Unilateral Assisted"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Si rotation du tronc > 10° sous effort maximal : réduire la charge et renforcer l'oblique interne homolatéral. Le gainage latéral est le facteur limitant principal."
+        }
+      }
+    },
+    "DORSAUX": {
+      "label": "Dorsaux — Grand Dorsal",
+      "anatomy": {
+        "heads": [
+          "Grand dorsal — chef iliaque",
+          "Grand dorsal — chef costal",
+          "Grand dorsal — chef scapulaire",
+          "Grand rond (synergiste direct)"
+        ],
+        "primary_function": "Extension + adduction + rotation interne de l'épaule. Dépresseur de l'épaule.",
+        "dominant_fiber_orientation": "Oblique — convergence vers le tubercule mineur de l'humérus.",
+        "bi_articular": false
+      },
+      "morpho_key_factors": [
+        "arm_span_height_ratio",
+        "torso_leg_ratio",
+        "shoulder_external_rotation_deg",
+        "thoracic_kyphosis_deg"
+      ],
+      "volume_landmarks_per_week": {
+        "mev": 10,
+        "mav": 16,
+        "mrv": 25
+      },
+      "slots": {
+        "S1_HEAVY_COMPOUND": {
+          "ex_name": "Weighted Pull-Up — prise pronation, largeur biakromiale +20%",
+          "slot": "S1_HEAVY_COMPOUND",
+          "morpho_logic": "Prise suprabiakromiale réduit la participation des fléchisseurs du coude et maximise le bras de levier du grand dorsal. arm_span_height_ratio > 1.03 (bras longs) : réduire à prise strictement biakromiale pour éviter la dominance du biceps brachial. Épaules étroites (clavicle_length_cm < 14) : prise neutre pour réduire le stress sous-acromial.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_flexion": 8,
+            "thoracic_extension": 6,
+            "wrist_extension": 5
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 100,
+          "equipment_required": [
+            "Barbell",
+            "Belt"
+          ],
+          "session_order": 1,
+          "fatigue_cost": 9,
+          "rep_range_hypertrophy": [
+            5,
+            10
+          ],
+          "rir_target": 1,
+          "mev_per_week": 3,
+          "mav_per_week": 5,
+          "mrv_per_week": 8,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 4,
+          "optimal_morphotype": {
+            "shoulder_flexion_deg": "> 160",
+            "arm_span_height_ratio": "< 1.03"
+          },
+          "risk_tags": [
+            "SHEAR_FORCE",
+            "BICIPITAL_TENDON_LOAD",
+            "AC_JOINT_STRESS"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "shoulder_flexion_deg",
+                "operator": "<",
+                "threshold": 160,
+                "substitute_ex_name": "Lat Pulldown Machine Pronation"
+              },
+              {
+                "condition_field": "bicipital_tendinopathy",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Lat Pulldown Machine Neutral Grip"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le grand dorsal génère son torque maximal entre 30-60° d'abduction d'épaule. La position de départ bras tendus est critique pour l'étirement sarcomérique complet. Ne pas couper la course en haut."
+        },
+        "S2_STRETCH_MEDIATED": {
+          "ex_name": "Straight-Arm Pulldown Câble — bras tendus, légère antéflexion du tronc 10-15°",
+          "slot": "S2_STRETCH_MEDIATED",
+          "morpho_logic": "Extension complète du coude élimine la contribution des fléchisseurs du coude. Le pic de tension excentrique du grand dorsal est atteint à 45° au-dessus de l'horizontale (bras à 135° de flexion d'épaule). L'antéflexion légère du tronc allonge le bras de levier. torso_leg_ratio > 0.95 : tronc plus vertical pour maintenir la neutralité lombaire.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_flexion": 9,
+            "thoracic_extension": 7
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 78,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 5,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {
+            "shoulder_flexion_deg": "> 150"
+          },
+          "risk_tags": [
+            "SHEAR_FORCE",
+            "BICIPITAL_TENDON_LOAD"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "shoulder_flexion_deg",
+                "operator": "<",
+                "threshold": 150,
+                "substitute_ex_name": "Incline DB Row 30deg"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Position de départ : bras à la verticale (90° de flexion d'épaule). Descendre jusqu'à 30° de flexion pour la contraction maximale. L'amplitude asymétrique est le principal avantage vs Lat Pulldown."
+        },
+        "S3_PEAK_CONTRACTION": {
+          "ex_name": "Seated Cable Row Prise Neutre Étroite — rétraction scapulaire maximale en fin de course",
+          "slot": "S3_PEAK_CONTRACTION",
+          "morpho_logic": "La rétraction scapulaire forcée en fin de course crée le pic de contraction des rhomboïdes, du trapèze moyen et du grand dorsal en position raccourcie. Prise neutre étroite positionne l'humérus en légère rotation interne — vecteur optimal pour le grand dorsal. torso_leg_ratio > 0.95 : risque de flexion lombaire augmenté, utiliser le Chest-Supported Row.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "thoracic_extension": 5,
+            "hip_flexion": 4,
+            "lumbar_neutrality": 6
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 88,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 6,
+          "rep_range_hypertrophy": [
+            8,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 7,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "torso_leg_ratio": "< 0.95"
+          },
+          "risk_tags": [
+            "ANTERIOR_SHEAR_LUMBAR",
+            "DISC_FLEXION_LOAD"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "pelvic_tilt_anterior_deg",
+                "operator": ">",
+                "threshold": 20,
+                "substitute_ex_name": "Chest-Supported Row 45deg Incline"
+              },
+              {
+                "condition_field": "lumbar_disc_pathology",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Chest-Supported Row 45deg Incline"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "La flexion lombaire sous charge est le risque principal. Co-activation érecteurs + grand fessier requise pour la neutralité. Si échec de gainage avant l'échec musculaire : priorité au renforcement du core."
+        },
+        "S4_STRUCTURAL_BALANCE": {
+          "ex_name": "Band Pull-Apart — abduction horizontale bande élastique, pouce vers le ciel",
+          "slot": "S4_STRUCTURAL_BALANCE",
+          "morpho_logic": "Cible le trapèze moyen, l'inférieur et le deltoïde postérieur pour corriger la protraction scapulaire chronique. Le pouce vers le ciel en fin de course force la rotation externe et active l'infra-épineux. Vecteur strictement postérieur, sans charge axiale — aucune contre-indication morphologique.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_external_rotation": 4,
+            "thoracic_extension": 3
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 62,
+          "equipment_required": [
+            "Bands"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 2,
+          "rep_range_hypertrophy": [
+            15,
+            30
+          ],
+          "rir_target": 2,
+          "mev_per_week": 3,
+          "mav_per_week": 6,
+          "mrv_per_week": 10,
+          "frequency_per_week": [
+            2,
+            5
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 8,
+          "optimal_morphotype": {},
+          "risk_tags": [],
+          "substitution_trigger": {
+            "conditions": [],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Ratio prescription : 2-3 séries de Pull-Apart pour chaque série de Press horizontal. Indicateur d'alarme : protraction spontanée de l'épaule à l'arrêt de l'effort."
+        },
+        "S5_PRECISION_ISOLATION": {
+          "ex_name": "Single-Arm Dumbbell Row Banc — coude à 45° du tronc, rétraction finale",
+          "slot": "S5_PRECISION_ISOLATION",
+          "morpho_logic": "Angle du coude à 45° du tronc (vs 90°) oriente le vecteur vers le grand dorsal plutôt que le trapèze. La rétraction scapulaire en fin de course active le rhomboïde. torso_leg_ratio > 0.95 : augmenter la flexion de hanche à 30° pour maintenir la neutralité lombaire et raccourcir le bras de levier.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_external_rotation": 5,
+            "thoracic_extension": 4
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 91,
+          "equipment_required": [
+            "Dumbbell",
+            "Bench"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 6,
+          "rep_range_hypertrophy": [
+            8,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "ANTERIOR_SHEAR_LUMBAR"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "lumbar_pain_vas",
+                "operator": ">",
+                "threshold": 5,
+                "substitute_ex_name": "Unilateral Lat Pulldown Seated"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Erreur la plus fréquente : rotation du tronc pour compenser. Placer un miroir latéral ou utiliser un appui stable. L'isolation scapulaire est l'objectif — pas la charge maximale."
+        },
+        "S6_UNILATERAL_DRIVER": {
+          "ex_name": "Single-Arm Lat Pulldown Poulie Haute — trajectoire diagonale 30° de la verticale",
+          "slot": "S6_UNILATERAL_DRIVER",
+          "morpho_logic": "Révèle les asymétries de force entre grand dorsal G/D, fréquentes chez les sportifs unilatéraux (tennis, golf, natation). Trajectoire à 30° de la verticale augmente le bras de levier. Main libre au repos sur la cuisse empêche la compensation du tronc. Seuil de déclenchement du protocole correctif : >15% de différence de 1RM estimé.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_flexion": 7,
+            "thoracic_extension": 5
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 87,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 5,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {
+            "asymmetry_force_pct": "> 15"
+          },
+          "risk_tags": [
+            "SHEAR_FORCE",
+            "AC_JOINT_STRESS"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "glenohumeral_instability_anterior",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "TRX Row Unilateral Assisted"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Protocole correctif asymétrie : 3 séries côté faible, puis 2 séries côté fort. Continuer jusqu'à réduction du déficit à < 10%. Réévaluer toutes les 4 semaines."
+        }
+      }
+    },
+    "QUADRICEPS": {
+      "label": "Quadriceps",
+      "anatomy": {
+        "heads": [
+          "Rectus Femoris (bi-articulaire)",
+          "Vaste Médial Oblique (VMO)",
+          "Vaste Latéral",
+          "Vaste Intermédiaire"
+        ],
+        "primary_function": "Extension du genou. Rectus Femoris : flexion de hanche complémentaire.",
+        "dominant_fiber_orientation": "Longitudinal convergeant vers la rotule via le tendon quadricipital.",
+        "bi_articular": true
+      },
+      "morpho_key_factors": [
+        "femur_tibia_ratio",
+        "ankle_dorsiflexion_cm",
+        "q_angle_deg",
+        "femoral_anteversion_deg",
+        "pelvic_tilt_deg"
+      ],
+      "volume_landmarks_per_week": {
+        "mev": 8,
+        "mav": 14,
+        "mrv": 20
+      },
+      "slots": {
+        "S1_HEAVY_COMPOUND": {
+          "ex_name": "High-Bar Back Squat — descente profonde sous parallèle, talons dans l'axe des genoux",
+          "slot": "S1_HEAVY_COMPOUND",
+          "morpho_logic": "La position High-Bar (barre haute) induit une plus grande flexion de genou et moins de flexion de hanche vs Low-Bar, maximisant le recrutement quadricipital. femur_tibia_ratio > 0.78 (fémurs longs) : écartement plus large et orteils à 35-45° pour compenser le basculement antérieur du tronc. ankle_dorsiflexion_cm < 10 : cales 1-2cm sous les talons en transition uniquement.",
+          "primary_lever": "Knee",
+          "mobility_gate": {
+            "ankle_dorsiflexion": 7,
+            "hip_internal_rotation": 5,
+            "thoracic_extension": 6,
+            "hip_flexion": 8
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 100,
+          "equipment_required": [
+            "Barbell"
+          ],
+          "session_order": 1,
+          "fatigue_cost": 10,
+          "rep_range_hypertrophy": [
+            6,
+            10
+          ],
+          "rir_target": 1,
+          "mev_per_week": 3,
+          "mav_per_week": 5,
+          "mrv_per_week": 8,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 4,
+          "optimal_morphotype": {
+            "femur_tibia_ratio": "< 0.78",
+            "ankle_dorsiflexion_cm": "> 12"
+          },
+          "risk_tags": [
+            "AXIAL_COMPRESSION",
+            "ANTERIOR_SHEAR_LUMBAR",
+            "PATELLAR_TENDON_OVERLOAD",
+            "VALGUS_STRESS"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "ankle_dorsiflexion_cm",
+                "operator": "<",
+                "threshold": 8,
+                "substitute_ex_name": "Cyclist Squat Heels Elevated 4cm"
+              },
+              {
+                "condition_field": "femoral_anteversion_deg",
+                "operator": ">",
+                "threshold": 25,
+                "substitute_ex_name": "Hack Squat Machine 45deg"
+              },
+              {
+                "condition_field": "lumbar_spondylolisthesis",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Leg Press 45deg Bilateral"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le moment de force sur le genou est maximal à 90° de flexion sous charge. Le valgus dynamique du genou (genou rentrant sous charge) est une contre-indication absolue avant correction par renforcement du fessier moyen et travail de mobilité."
+        },
+        "S2_STRETCH_MEDIATED": {
+          "ex_name": "Bulgarian Split Squat — pied arrière sur banc 35cm, pied avant avancé d'un pas long",
+          "slot": "S2_STRETCH_MEDIATED",
+          "morpho_logic": "La flexion de hanche du côté arrière et l'extension du genou avant crée un étirement combiné du rectus femoris (bi-articulaire) et du vaste médial. Le pied avant avancé augmente la flexion du genou au-delà de 90° et le bras de levier. Adapté aux fémurs longs qui limitent le Squat bilatéral classique.",
+          "primary_lever": "Knee",
+          "mobility_gate": {
+            "hip_flexor_flexibility": 6,
+            "ankle_dorsiflexion": 5,
+            "knee_flexion": 8
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 86,
+          "equipment_required": [
+            "Dumbbell",
+            "Bench"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 8,
+          "rep_range_hypertrophy": [
+            8,
+            12
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "femur_tibia_ratio": "> 0.75"
+          },
+          "risk_tags": [
+            "PATELLAR_TENDON_OVERLOAD",
+            "VALGUS_STRESS",
+            "PROXIMAL_HAMSTRING_TENDINOPATHY"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "patellar_tendinopathy_vas",
+                "operator": ">",
+                "threshold": 4,
+                "substitute_ex_name": "Leg Extension 0-60deg Partial ROM"
+              },
+              {
+                "condition_field": "knee_flexion_deg",
+                "operator": "<",
+                "threshold": 100,
+                "substitute_ex_name": "Split Squat Static Short Step"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Hauteur du banc arrière : 30cm = recrutement quadricipital dominant. 50cm = étirement hip flexors dominant. Personnaliser selon le déficit cible identifié en Phase 1."
+        },
+        "S3_PEAK_CONTRACTION": {
+          "ex_name": "Leg Extension Machine — extension complète 90-0°, tempo 2-0-2, pointe vers le tibia",
+          "slot": "S3_PEAK_CONTRACTION",
+          "morpho_logic": "Seul exercice qui maximise la tension quadricipitale en position de raccourcissement complet (genou à 0° d'extension). q_angle_deg > 18° (homme) ou > 22° (femme) : légère rotation interne de la hanche réduit le stress fémoro-patellaire. Adapter le coussin de la machine à la longueur du tibia pour aligner le pivot.",
+          "primary_lever": "Knee",
+          "mobility_gate": {
+            "knee_extension": 6
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 82,
+          "equipment_required": [
+            "Machine"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 4,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 7,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "PATELLAR_TENDON_OVERLOAD",
+            "SHEAR_FORCE"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "patellofemoral_syndrome",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Terminal Knee Extension Band 0-30deg"
+              },
+              {
+                "condition_field": "acl_post_op_months",
+                "operator": "<",
+                "threshold": 12,
+                "substitute_ex_name": "Leg Extension 60-0deg LCA Safe ROM"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "La plage 90-60° génère le cisaillement antérieur maximal sur le LCA — critique en post-opératoire. Pour hypertrophie en bonne santé, la plage complète est supérieure en stimulus. Ne jamais aller en hyperextension en fin de course."
+        },
+        "S4_STRUCTURAL_BALANCE": {
+          "ex_name": "Hip Thrust Barre — poussée de hanches, neutralité lombaire, pause 1s en haut",
+          "slot": "S4_STRUCTURAL_BALANCE",
+          "morpho_logic": "Renforce le grand fessier comme antagoniste fonctionnel des quadriceps et correcteur de l'antéversion pelvienne. Rééquilibre le ratio fessier/quadriceps (optimal ≥ 0.80). Vecteur de force postérieur pur, sans charge compressive sur le genou. Pour pelvic_tilt_anterior_deg > 15° : exercice prioritaire avant tout volume quadricipital supplémentaire.",
+          "primary_lever": "Hip",
+          "mobility_gate": {
+            "hip_extension": 5,
+            "thoracic_extension": 4
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 95,
+          "equipment_required": [
+            "Barbell",
+            "Bench"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 7,
+          "rep_range_hypertrophy": [
+            8,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 3,
+          "mav_per_week": 5,
+          "mrv_per_week": 8,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "glute_quad_ratio": "< 0.80"
+          },
+          "risk_tags": [
+            "ANTERIOR_SHEAR_LUMBAR"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "hip_anterior_impingement",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Glute Bridge Floor No Load"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Ratio fessier/quadriceps < 0.60 : prédicteur statistique de rupture du LCA et de lombalgie chronique. Prioriser cet exercice systématiquement avant d'augmenter le volume des Squats."
+        },
+        "S5_PRECISION_ISOLATION": {
+          "ex_name": "Cyclist Squat — talons élevés sur disque 4cm, pieds joints, charge frontale",
+          "slot": "S5_PRECISION_ISOLATION",
+          "morpho_logic": "L'élévation des talons réduit la demande en dorsiflexion de cheville et déplace le centre de gravité vers l'avant, forçant une flexion de genou maximale avec tronc quasi-vertical. Isole les vastes (médial et latéral) en réduisant la participation des fessiers à quasi-zéro. Solution optimale pour femur_tibia_ratio > 0.78 ou ankle_dorsiflexion_cm < 10.",
+          "primary_lever": "Knee",
+          "mobility_gate": {
+            "ankle_dorsiflexion": 2,
+            "knee_flexion": 9,
+            "hip_flexion": 5
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 89,
+          "equipment_required": [
+            "Dumbbell",
+            "Barbell"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 6,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "femur_tibia_ratio": "> 0.75",
+            "ankle_dorsiflexion_cm": "< 12"
+          },
+          "risk_tags": [
+            "PATELLAR_TENDON_OVERLOAD",
+            "VALGUS_STRESS"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "patellofemoral_arthritis_grade",
+                "operator": ">=",
+                "threshold": 2,
+                "substitute_ex_name": "Leg Press 45deg Foot Low Platform"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le shin angle (inclinaison du tibia vers l'avant) est critiquement plus élevé qu'au Squat conventionnel — le tendon patellaire est sous tension maximale. Progression graduée obligatoire. Commencer à 50% de la charge du Squat conventionnel."
+        },
+        "S6_UNILATERAL_DRIVER": {
+          "ex_name": "Step-Up Box 40-50cm — pas d'élan, départ statique, retour contrôlé 3 secondes",
+          "slot": "S6_UNILATERAL_DRIVER",
+          "morpho_logic": "Révèle et corrige les déficits unilatéraux des extenseurs du genou. La hauteur de la box (ajustée à 40% de la longueur du membre inférieur) impose une flexion de genou proche de 90° au départ. L'absence d'élan et le retour excentrique contrôlé éliminent le momentum et forcent le travail concentrique + excentrique pur.",
+          "primary_lever": "Knee",
+          "mobility_gate": {
+            "ankle_dorsiflexion": 6,
+            "hip_flexion": 7,
+            "knee_flexion": 9
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 83,
+          "equipment_required": [
+            "Dumbbell",
+            "Barbell"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 7,
+          "rep_range_hypertrophy": [
+            8,
+            12
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "asymmetry_force_pct": "> 10"
+          },
+          "risk_tags": [
+            "PATELLAR_TENDON_OVERLOAD",
+            "VALGUS_STRESS"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "star_excursion_balance_pct",
+                "operator": "<",
+                "threshold": 80,
+                "substitute_ex_name": "Bulgarian Split Squat Support Hand"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Seuil de déclenchement du protocole correctif : déficit > 10% en test unilatéral (leg press 1RM estimé, dynamométrie isométrique). Protocole : 3 séries côté faible : 2 séries côté fort, jusqu'à réduction du déficit à < 8%."
+        }
+      }
+    },
+    "ISCHIO_JAMBIERS": {
+      "label": "Ischio-Jambiers",
+      "anatomy": {
+        "heads": [
+          "Biceps Fémoral chef long (bi-articulaire)",
+          "Biceps Fémoral chef court (mono-articulaire)",
+          "Semi-Tendineux (bi-articulaire)",
+          "Semi-Membraneux (bi-articulaire)"
+        ],
+        "primary_function": "Flexion du genou + extension de hanche. Tension optimale en position allongée (hanche en extension).",
+        "dominant_fiber_orientation": "Penné pour le biceps fémoral. Parallèle pour semi-tendineux — plus de course mécanique.",
+        "bi_articular": true
+      },
+      "morpho_key_factors": [
+        "femur_tibia_ratio",
+        "pelvic_tilt_deg",
+        "lumbar_mobility",
+        "hamstring_fascicle_length"
+      ],
+      "volume_landmarks_per_week": {
+        "mev": 6,
+        "mav": 12,
+        "mrv": 18
+      },
+      "slots": {
+        "S1_HEAVY_COMPOUND": {
+          "ex_name": "Romanian Deadlift Barre — genoux légèrement fléchis 15°, descente jusqu'au tibia",
+          "slot": "S1_HEAVY_COMPOUND",
+          "morpho_logic": "Le genou en légère flexion (15-20°) désactive le biceps fémoral court comme fléchisseur du genou, forçant les chefs longs à agir uniquement comme extenseurs de hanche — torque maximal sur la chaîne postérieure. femur_tibia_ratio > 0.78 : réduire la flexion de hanche à 80° max, écarter les pieds de 3cm pour maintenir la neutralité lombaire. Ischio-jambiers longs : étirement possible jusqu'au tibia.",
+          "primary_lever": "Hip",
+          "mobility_gate": {
+            "hip_flexion": 7,
+            "lumbar_neutrality": 8,
+            "ankle_dorsiflexion": 4
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 100,
+          "equipment_required": [
+            "Barbell"
+          ],
+          "session_order": 1,
+          "fatigue_cost": 9,
+          "rep_range_hypertrophy": [
+            6,
+            10
+          ],
+          "rir_target": 1,
+          "mev_per_week": 3,
+          "mav_per_week": 5,
+          "mrv_per_week": 7,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 4,
+          "optimal_morphotype": {
+            "femur_tibia_ratio": "< 0.78",
+            "pelvic_tilt_anterior_deg": "< 15"
+          },
+          "risk_tags": [
+            "ANTERIOR_SHEAR_LUMBAR",
+            "DISC_FLEXION_LOAD",
+            "PROXIMAL_HAMSTRING_TENDINOPATHY"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "lumbar_flexion_loss_before_deg",
+                "operator": "<",
+                "threshold": 60,
+                "substitute_ex_name": "Nordic Hamstring Curl Eccentric"
+              },
+              {
+                "condition_field": "proximal_hamstring_tendinopathy",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "45deg Back Extension Machine Hip Hinge"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "La neutralité lombaire est non-négociable. Un seul épisode de flexion lombaire sous charge maximale peut provoquer une hernie discale. Scanner visuel ou feedback coach systématique. La perte de neutralité avant 60° de flexion de hanche = arrêt de la série."
+        },
+        "S2_STRETCH_MEDIATED": {
+          "ex_name": "Nordic Hamstring Curl — excentrique contrôlé 4 secondes, retour assisté",
+          "slot": "S2_STRETCH_MEDIATED",
+          "morpho_logic": "Génère le pic de tension le plus élevé en position d'étirement maximal (genou en extension complète) de tous les exercices d'ischio-jambiers. Le levier du poids de corps crée un torque considérable en position longue. Augmente la longueur des fascicules musculaires (hypertrophie en série — la forme la plus protectrice contre les claquages).",
+          "primary_lever": "Knee",
+          "mobility_gate": {
+            "knee_flexion": 5,
+            "hip_extension": 4
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 95,
+          "equipment_required": [
+            "Bodyweight"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 7,
+          "rep_range_hypertrophy": [
+            4,
+            8
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 3,
+          "mrv_per_week": 5,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Linear",
+          "plateau_threshold_sessions": 8,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "PROXIMAL_HAMSTRING_TENDINOPATHY"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "hamstring_tear_grade",
+                "operator": ">=",
+                "threshold": 2,
+                "substitute_ex_name": "Lying Leg Curl 90-45deg Partial ROM"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Réduit le risque de claquage des ischio-jambiers de 51% sur une saison sportive (méta-analyse Petersen 2011). La décélération sur 4 secondes est critique. Le retour doit être assisté par les mains — ne jamais contractuellement en concentrique."
+        },
+        "S3_PEAK_CONTRACTION": {
+          "ex_name": "Lying Leg Curl Machine — flexion complète, dorsiflexion de cheville en fin de course",
+          "slot": "S3_PEAK_CONTRACTION",
+          "morpho_logic": "La position allongée place la hanche en extension, raccourcissant le rectus femoris et réduisant l'antagonisme sur les ischio-jambiers. La dorsiflexion de cheville en fin de course contracte le gastrocnémien, participant à la flexion du genou par synergie. Le pic de contraction en position raccourcie complète le S2.",
+          "primary_lever": "Knee",
+          "mobility_gate": {
+            "knee_flexion": 8,
+            "hip_extension": 5
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 79,
+          "equipment_required": [
+            "Machine"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 4,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "PROXIMAL_HAMSTRING_TENDINOPATHY"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "pcl_laxity_positive",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Seated Leg Curl 90deg Hip"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Rétroversion légère du bassin = meilleur pré-étirement des ischio-jambiers et activation optimale. Éviter l'hyperextension lombaire en fin de flexion du genou — risque de pincement lombaire postérieur."
+        },
+        "S4_STRUCTURAL_BALANCE": {
+          "ex_name": "Copenhagen Adductor Plank — adduction isométrique + excentrique sur banc latéral",
+          "slot": "S4_STRUCTURAL_BALANCE",
+          "morpho_logic": "Renforce le groupe adducteur de la hanche (gracilis, adducteur long/court, grand adducteur), synergiste des ischio-jambiers en rotation interne du fémur. Corrige le déséquilibre abducteur/adducteur (ratio optimal ≈ 1.1:1), prédicteur de pubalgie et de claquage des adducteurs. Position de charge en étirement maximise l'hypertrophie.",
+          "primary_lever": "Hip",
+          "mobility_gate": {
+            "hip_abduction": 6,
+            "hip_adduction": 4
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 77,
+          "equipment_required": [
+            "Bench",
+            "Bodyweight"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 5,
+          "rep_range_hypertrophy": [
+            8,
+            15
+          ],
+          "rir_target": 2,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            2,
+            3
+          ],
+          "progression_model": "Linear",
+          "plateau_threshold_sessions": 8,
+          "optimal_morphotype": {
+            "abductor_adductor_ratio": "> 1.2"
+          },
+          "risk_tags": [],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "osteitis_pubis_active",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Cable Hip Adduction Non-Weight-Bearing"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Ratio abducteur/adducteur > 1.2 : risque élevé de pubalgie dans les sports à changement de direction. Le Copenhagen Exercise est l'outil de correction le plus efficace selon les données actuelles."
+        },
+        "S5_PRECISION_ISOLATION": {
+          "ex_name": "Seated Leg Curl Machine — hanche à 90°, ciblage biceps fémoral chef court",
+          "slot": "S5_PRECISION_ISOLATION",
+          "morpho_logic": "La position assise place la hanche en flexion à 90°, mettant les chefs longs bi-articulaires (semi-tendineux, semi-membraneux) en position raccourcie relative. Le biceps fémoral court (mono-articulaire, non affecté par la position de la hanche) devient le muscle limitant — ciblage précis du chef court. Indiqué pour les déséquilibres entre chefs longs et courts.",
+          "primary_lever": "Knee",
+          "mobility_gate": {
+            "knee_flexion": 8,
+            "hip_flexion": 5
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 71,
+          "equipment_required": [
+            "Machine"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "PROXIMAL_HAMSTRING_TENDINOPATHY"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "posterior_femoral_compression_syndrome",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Lying Leg Curl Neutral Pelvis Support"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "La différence d'activation EMG entre Seated et Lying Leg Curl est principalement sur le biceps fémoral chef court (plus élevé en Seated) vs les chefs longs (plus élevés en Lying). Utiliser les deux variantes pour couvrir l'intégralité du groupe."
+        },
+        "S6_UNILATERAL_DRIVER": {
+          "ex_name": "Single-Leg Romanian Deadlift Haltère — équilibre unilatéral strict, sans appui",
+          "slot": "S6_UNILATERAL_DRIVER",
+          "morpho_logic": "Révèle les asymétries fonctionnelles entre ischio-jambiers G/D, avec co-activation obligatoire du fessier moyen et maximal comme stabilisateurs. Le déficit de force inter-membres > 15% est le prédicteur le plus puissant de claquage en sprint. Progression : Split Stance RDL (70/30) → SL-RDL avec appui → SL-RDL strict.",
+          "primary_lever": "Hip",
+          "mobility_gate": {
+            "hip_flexion": 7,
+            "ankle_dorsiflexion": 6,
+            "lumbar_neutrality": 7
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 88,
+          "equipment_required": [
+            "Dumbbell",
+            "Kettlebell"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 7,
+          "rep_range_hypertrophy": [
+            8,
+            12
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Linear",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "asymmetry_force_pct": "> 15"
+          },
+          "risk_tags": [
+            "ANTERIOR_SHEAR_LUMBAR",
+            "PROXIMAL_HAMSTRING_TENDINOPATHY"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "y_balance_lower_pct",
+                "operator": "<",
+                "threshold": 90,
+                "substitute_ex_name": "Split Stance RDL 70-30 Weight Forward"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Protocole de correction asymétrie : 3 séries côté faible, 2 séries côté fort. Réévaluation toutes les 4 semaines. Seuil d'arrêt du protocole différentiel : déficit < 8%."
+        }
+      }
+    },
+    "EPAULES": {
+      "label": "Épaules — Deltoïde (3 chefs) + Coiffe des Rotateurs",
+      "anatomy": {
+        "heads": [
+          "Deltoïde Antérieur — faisceau claviculaire",
+          "Deltoïde Médial — faisceau acromial (abduction pure)",
+          "Deltoïde Postérieur — faisceau épineux",
+          "Sus-épineux (coiffe)",
+          "Infra-épineux (coiffe)",
+          "Petit Rond (coiffe)",
+          "Sous-scapulaire (coiffe)"
+        ],
+        "primary_function": "Abduction (médial), flexion-rotation interne (antérieur), extension-rotation externe (postérieur).",
+        "dominant_fiber_orientation": "Multi-pennée — trois vecteurs distincts convergeant sur la tubérosité deltoïdienne.",
+        "bi_articular": false
+      },
+      "morpho_key_factors": [
+        "clavicle_length_cm",
+        "glenohumeral_anteversion_deg",
+        "acromion_type",
+        "shoulder_external_rotation_deg",
+        "thoracic_kyphosis_deg"
+      ],
+      "volume_landmarks_per_week": {
+        "mev": 8,
+        "mav": 14,
+        "mrv": 20
+      },
+      "slots": {
+        "S1_HEAVY_COMPOUND": {
+          "ex_name": "Seated Dumbbell Overhead Press — prise neutre-pronation, coudes à 45° du tronc",
+          "slot": "S1_HEAVY_COMPOUND",
+          "morpho_logic": "L'haltère (vs barre) permet à chaque épaule de trouver son plan de mouvement naturel (plan scapulaire ≈ 30° de la frontale), réduisant le stress sous-acromial. Coudes à 45° du tronc = plan scapulaire optimal. Position assise élimine la compensation lombaire. clavicle_length_cm > 18 (clavicules longues) : légèrement plus d'écartement des coudes.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_external_rotation": 7,
+            "thoracic_extension": 7,
+            "wrist_extension": 5
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 100,
+          "equipment_required": [
+            "Dumbbell",
+            "Bench"
+          ],
+          "session_order": 1,
+          "fatigue_cost": 8,
+          "rep_range_hypertrophy": [
+            8,
+            12
+          ],
+          "rir_target": 1,
+          "mev_per_week": 3,
+          "mav_per_week": 5,
+          "mrv_per_week": 8,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 4,
+          "optimal_morphotype": {
+            "acromion_type": "IN [I, II]",
+            "shoulder_external_rotation_deg": "> 60"
+          },
+          "risk_tags": [
+            "IMPINGEMENT_ZONE",
+            "AC_JOINT_STRESS",
+            "SHEAR_FORCE"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "subacromial_pain_arc_60_120",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Landmine Press Bilateral Standing"
+              },
+              {
+                "condition_field": "acromion_type",
+                "operator": "==",
+                "threshold": "III",
+                "substitute_ex_name": "Cable Lateral Raise Progressive 0-70deg"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Moment de force gléno-huméral maximal à 90° d'abduction. Ne jamais verrouiller les coudes en extension finale. L'espace sous-acromial est minimal entre 60° et 120° d'abduction — zone de risque à traverser rapidement sous charge légère."
+        },
+        "S2_STRETCH_MEDIATED": {
+          "ex_name": "Incline Cable Lateral Raise — bras croisé devant le corps, traction en abduction",
+          "slot": "S2_STRETCH_MEDIATED",
+          "morpho_logic": "Position de départ croisée (bras en adduction + légère rotation interne) place le deltoïde médial en pré-étirement maximal. L'abduction contre résistance constante du câble crée le pic de tension en position allongée. clavicle_length_cm > 18 : amplitude naturellement plus grande, réduire la résistance de 20%.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_external_rotation": 6,
+            "thoracic_extension": 5
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 81,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 4,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "IMPINGEMENT_ZONE",
+            "BICIPITAL_TENDON_LOAD"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "shoulder_abduction_deg",
+                "operator": "<",
+                "threshold": 150,
+                "substitute_ex_name": "Lateral Raise Machine CAM Controlled"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Deltoïde médial : activation principale entre 30° et 90° d'abduction. En dessous de 30° : sus-épineux dominant. Au-dessus de 90° : trapèze supérieur prend le relais. Cibler cette fenêtre de travail."
+        },
+        "S3_PEAK_CONTRACTION": {
+          "ex_name": "Machine Lateral Raise (CAM) — résistance variable, pic à 80° d'abduction",
+          "slot": "S3_PEAK_CONTRACTION",
+          "morpho_logic": "La came (CAM) de la machine modifie le profil de résistance pour que le moment de force soit maximal à 80° d'abduction — pic d'activation EMG du deltoïde médial. Élimine le swing et la compensation trapézienne caractéristiques du Lateral Raise haltère. Aligner l'axe de rotation de la machine sur l'acromion selon la morphologie.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_abduction": 7
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 86,
+          "equipment_required": [
+            "Machine"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 4,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "IMPINGEMENT_ZONE"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "subacromial_pain_arc_60_120",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Cable Lateral Raise 0-60deg Restricted"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Erreur principale : rotation interne en fin d'abduction (pouce vers le bas = pincement sous-acromial). Maintenir le pouce pointant légèrement vers le haut pour ouvrir l'espace sous-acromial. Jamais d'élévation au-delà de 90° sous charge maximale."
+        },
+        "S4_STRUCTURAL_BALANCE": {
+          "ex_name": "Prone Y-T-W Banc Incliné 30° — renforcement trapèze inférieur + coiffe profonde",
+          "slot": "S4_STRUCTURAL_BALANCE",
+          "morpho_logic": "Trois positions : Y (150° d'abduction, sus-épineux + deltoïde médial), T (90°, infra-épineux + trapèze moyen), W (45° + rotation externe, petit rond + trapèze inférieur). Renforce les antagonistes du deltoïde antérieur chroniquement sur-développé. Corrige le haussement compensatoire des épaules (trapèze supérieur dominant).",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_external_rotation": 6,
+            "thoracic_extension": 6
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 65,
+          "equipment_required": [
+            "Dumbbell",
+            "Bench"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 2,
+          "mev_per_week": 3,
+          "mav_per_week": 6,
+          "mrv_per_week": 9,
+          "frequency_per_week": [
+            2,
+            4
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 8,
+          "optimal_morphotype": {},
+          "risk_tags": [],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "posterior_shoulder_pain_vas",
+                "operator": ">",
+                "threshold": 3,
+                "substitute_ex_name": "Band Y-T Only Bodyweight"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Sous-dosé dans 90% des programmes d'hypertrophie. Ratio de prescription : 2 séries Y-T-W pour chaque série de Overhead Press ou Bench Press. Indicateur d'alarme : haussement des épaules spontané sous charge légère."
+        },
+        "S5_PRECISION_ISOLATION": {
+          "ex_name": "Cable Rear Delt Fly — position penchée, traction horizontale en abduction horizontale",
+          "slot": "S5_PRECISION_ISOLATION",
+          "morpho_logic": "Position penchée à 45° place le deltoïde postérieur dans son axe de traction optimal. Le câble maintient une résistance constante tout au long de l'abduction horizontale. Cible le faisceau épineux du deltoïde postérieur avec neutralisation du grand dorsal et du trapèze. Ratio deltoïde postérieur/antérieur optimal : 0.75.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_flexion": 6,
+            "thoracic_extension": 5
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 78,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            15,
+            25
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {
+            "posterior_anterior_delt_ratio": "< 0.70"
+          },
+          "risk_tags": [
+            "BICIPITAL_TENDON_LOAD"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "ac_joint_pathology",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Prone Dumbbell Rear Delt Raise"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le deltoïde postérieur est chroniquement sous-développé dans les programmes orientés esthétique. Son renforcement améliore l'équilibre visuel ET réduit le risque de conflit sous-acromial en maintenant la tête humérale centrée."
+        },
+        "S6_UNILATERAL_DRIVER": {
+          "ex_name": "Single-Arm Arnold Press Assis — rotation pronation→supination contrôlée",
+          "slot": "S6_UNILATERAL_DRIVER",
+          "morpho_logic": "La rotation de la paume (pronation en bas → supination en haut) recrute les trois chefs du deltoïde séquentiellement sur toute l'amplitude. Révèle les asymétries de coordination et de force inter-chefs entre épaule G et D. Charge modérée pour contrôle neuro-musculaire optimal. Les asymétries de coordination précèdent les asymétries de force.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_external_rotation": 7,
+            "thoracic_extension": 6,
+            "wrist_supination": 7
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 88,
+          "equipment_required": [
+            "Dumbbell"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 6,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "asymmetry_force_pct": "> 15"
+          },
+          "risk_tags": [
+            "IMPINGEMENT_ZONE",
+            "AC_JOINT_STRESS",
+            "WRIST_ULNAR_DEVIATION"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "shoulder_external_rotation_deg",
+                "operator": "<",
+                "threshold": 45,
+                "substitute_ex_name": "Single-Arm Dumbbell Press Neutral Grip"
+              },
+              {
+                "condition_field": "carpal_tunnel_syndrome",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Single-Arm Dumbbell Press Neutral Grip"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Exercice diagnostique autant qu'hypertrophique. Filmer de face et de profil pour comparer les trajectoires G/D. Une asymétrie de trajectoire sans asymétrie de force indique un déficit de coordination neuro-musculaire — priorité à la technique avant la charge."
+        }
+      }
+    },
+    "TRICEPS": {
+      "label": "Triceps Brachial",
+      "anatomy": {
+        "heads": [
+          "Chef Long (bi-articulaire — épaule + coude)",
+          "Chef Médial (mono-articulaire)",
+          "Chef Latéral (mono-articulaire)"
+        ],
+        "primary_function": "Extension du coude. Chef long : adduction + extension de l'épaule.",
+        "dominant_fiber_orientation": "Parallèle pour les chefs mono-articulaires. Penné pour le chef long.",
+        "bi_articular": true
+      },
+      "morpho_key_factors": [
+        "arm_span_height_ratio",
+        "elbow_carrying_angle_deg",
+        "shoulder_flexion_deg"
+      ],
+      "volume_landmarks_per_week": {
+        "mev": 6,
+        "mav": 12,
+        "mrv": 18
+      },
+      "slots": {
+        "S1_HEAVY_COMPOUND": {
+          "ex_name": "Close-Grip Bench Press — prise à largeur des épaules, coudes à 45° du tronc",
+          "slot": "S1_HEAVY_COMPOUND",
+          "morpho_logic": "La prise à largeur des épaules maximise le recrutement des triceps en réduisant la participation des pectoraux. Coudes à 45° du tronc réduit le valgus du coude et le stress sur le ligament latéral médial. arm_span_height_ratio > 1.03 : utiliser une barre EZ pour réduire la pronation forcée du poignet.",
+          "primary_lever": "Elbow",
+          "mobility_gate": {
+            "shoulder_flexion": 6,
+            "wrist_extension": 6,
+            "elbow_extension": 7
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 100,
+          "equipment_required": [
+            "Barbell",
+            "Bench"
+          ],
+          "session_order": 1,
+          "fatigue_cost": 8,
+          "rep_range_hypertrophy": [
+            6,
+            10
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 7,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 4,
+          "optimal_morphotype": {
+            "elbow_carrying_angle_deg": "< 15"
+          },
+          "risk_tags": [
+            "MEDIAL_ELBOW_STRESS",
+            "WRIST_ULNAR_DEVIATION",
+            "SHEAR_FORCE"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "elbow_carrying_angle_deg",
+                "operator": ">",
+                "threshold": 18,
+                "substitute_ex_name": "Close-Grip EZ Bar Press"
+              },
+              {
+                "condition_field": "medial_epicondylitis_active",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Tricep Dip Machine Assisted"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "La prise trop étroite (mains rapprochées) augmente le valgus du coude et le stress médial. La largeur optimale est biakromiale — pas plus étroite. Contrôler la trajectoire de la barre vers le bas du sternum."
+        },
+        "S2_STRETCH_MEDIATED": {
+          "ex_name": "Overhead Tricep Extension Câble — bras à la verticale, coude au-dessus de la tête",
+          "slot": "S2_STRETCH_MEDIATED",
+          "morpho_logic": "Avec le bras en flexion au-dessus de la tête, le chef long du triceps est en position d'étirement maximal (elongation bi-articulaire : épaule en flexion + coude en flexion). Pic de tension sarcomérique du chef long. shoulder_flexion_deg < 150° : substituer par French Press couché pour éviter la contrainte cervicale.",
+          "primary_lever": "Elbow",
+          "mobility_gate": {
+            "shoulder_flexion": 8,
+            "elbow_flexion": 8,
+            "thoracic_extension": 5
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 91,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 5,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "shoulder_flexion_deg": "> 150"
+          },
+          "risk_tags": [
+            "HYPEREXTENSION_ELBOW",
+            "CERVICAL_COMPRESSION"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "shoulder_flexion_deg",
+                "operator": "<",
+                "threshold": 150,
+                "substitute_ex_name": "EZ Bar French Press Lying"
+              },
+              {
+                "condition_field": "cervical_stenosis",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "EZ Bar French Press Lying"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le chef long représente ~55% du volume total du triceps. Son étirement maximal en position overhead est le stimulus hypertrophique le plus puissant pour le triceps. Ne pas négliger cette variante au profit des Pushdowns seuls."
+        },
+        "S3_PEAK_CONTRACTION": {
+          "ex_name": "Tricep Pushdown Câble Poulie Haute — corde ou barre droite, extension complète",
+          "slot": "S3_PEAK_CONTRACTION",
+          "morpho_logic": "Le coude en extension complète (0°) en position haute de la poulie place les trois chefs en contraction maximale. La corde permet une légère supination en fin de course qui optimise le recrutement du chef médial. Pour elbow_carrying_angle_deg > 15° : préférer la barre EZ pour réduire la déviation ulnaire.",
+          "primary_lever": "Elbow",
+          "mobility_gate": {
+            "elbow_extension": 6,
+            "wrist_extension": 5
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 79,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "HYPEREXTENSION_ELBOW",
+            "LATERAL_ELBOW_STRESS"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "lateral_epicondylitis_active",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Reverse Grip Pushdown Supination"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Verrouillage du coude en hyperextension en fin de course = contrainte ligamentaire. Maintenir 5° de flexion résiduelle. Les coudes doivent rester fixes et collés au corps — si migration des coudes vers l'avant : réduire la charge."
+        },
+        "S4_STRUCTURAL_BALANCE": {
+          "ex_name": "Band Pull-Apart Prise Pronation — renforcement du triceps chef long en adduction",
+          "slot": "S4_STRUCTURAL_BALANCE",
+          "morpho_logic": "Le chef long du triceps est extenseur et adducteur de l'épaule. Son renforcement en position d'adduction horizontale rééquilibre le ratio biceps/triceps chef long et améliore la stabilité postérieure de l'épaule. Exercice de ré-équilibrage articulaire, non de charge maximale.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_extension": 5,
+            "elbow_extension": 6
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 55,
+          "equipment_required": [
+            "Bands"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 2,
+          "rep_range_hypertrophy": [
+            15,
+            30
+          ],
+          "rir_target": 2,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            2,
+            4
+          ],
+          "progression_model": "Linear",
+          "plateau_threshold_sessions": 10,
+          "optimal_morphotype": {
+            "bicep_tricep_ratio": "> 1.1"
+          },
+          "risk_tags": [],
+          "substitution_trigger": {
+            "conditions": [],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Ratio biceps/triceps optimal : 1:1 en force isométrique. Un ratio > 1.2 en faveur du biceps corrèle avec une instabilité postérieure de l'épaule et un risque d'impingement sous-acromial."
+        },
+        "S5_PRECISION_ISOLATION": {
+          "ex_name": "Tricep Kickback Haltère — coude à 90° du tronc, extension complète en supination",
+          "slot": "S5_PRECISION_ISOLATION",
+          "morpho_logic": "Position penchée à 45° + bras parallèle au sol place le chef latéral du triceps en position de travail isolé. La supination en fin de course active le chef médial de façon différentielle. Charge faible obligatoire : le bras de levier est maximal à l'extension complète, créant un torque articulaire important avec peu de poids.",
+          "primary_lever": "Elbow",
+          "mobility_gate": {
+            "elbow_extension": 7,
+            "shoulder_extension": 5
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 62,
+          "equipment_required": [
+            "Dumbbell"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 3,
+          "mrv_per_week": 5,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "LATERAL_ELBOW_STRESS",
+            "ANTERIOR_SHEAR_LUMBAR"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "lumbar_pain_vas",
+                "operator": ">",
+                "threshold": 3,
+                "substitute_ex_name": "Cable Kickback Unilateral Standing"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le bras de levier du poids est quasi-nul en début de course et maximal en extension complète — profil de résistance Ascending pur. Ne pas utiliser d'élan pour compenser : éliminer la charge si swing visible."
+        },
+        "S6_UNILATERAL_DRIVER": {
+          "ex_name": "Single-Arm Cable Overhead Extension — bras au-dessus de la tête, prise neutre",
+          "slot": "S6_UNILATERAL_DRIVER",
+          "morpho_logic": "Révèle les asymétries de force et d'amplitude articulaire entre triceps G et D. Le chef long en étirement maximal (position overhead) amplifie les différences inter-membres. L'appui du coude libre sur le banc empêche la compensation du tronc.",
+          "primary_lever": "Elbow",
+          "mobility_gate": {
+            "shoulder_flexion": 8,
+            "elbow_flexion": 9
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 88,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 5,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 3,
+          "mrv_per_week": 5,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "asymmetry_force_pct": "> 15"
+          },
+          "risk_tags": [
+            "HYPEREXTENSION_ELBOW",
+            "CERVICAL_COMPRESSION"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "shoulder_flexion_deg",
+                "operator": "<",
+                "threshold": 150,
+                "substitute_ex_name": "Single-Arm Dumbbell French Press Lying"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Protocole asymétrie : 3 séries côté faible, 2 côté fort. Seuil déclenchement : différence > 15% estimée par le poids utilisé à même RPE. Réévaluer toutes les 3 semaines."
+        }
+      }
+    },
+    "BICEPS": {
+      "label": "Biceps Brachial + Brachial + Brachioradial",
+      "anatomy": {
+        "heads": [
+          "Biceps Brachial chef long (bi-articulaire)",
+          "Biceps Brachial chef court (bi-articulaire)",
+          "Brachial (mono-articulaire — fléchisseur pur)",
+          "Brachioradial (synergiste en semi-pronation)"
+        ],
+        "primary_function": "Flexion du coude + supination de l'avant-bras. Chef long : abduction de l'épaule.",
+        "dominant_fiber_orientation": "Parallèle — course mécanique longue favorable à l'hypertrophie en étirement.",
+        "bi_articular": true
+      },
+      "morpho_key_factors": [
+        "arm_span_height_ratio",
+        "elbow_carrying_angle_deg",
+        "shoulder_flexion_deg"
+      ],
+      "volume_landmarks_per_week": {
+        "mev": 6,
+        "mav": 12,
+        "mrv": 18
+      },
+      "slots": {
+        "S1_HEAVY_COMPOUND": {
+          "ex_name": "Barbell Curl Debout — prise supination légèrement suprabiakromiale",
+          "slot": "S1_HEAVY_COMPOUND",
+          "morpho_logic": "La prise légèrement supérieure à la largeur des épaules place l'humérus en adduction, favorisant le chef long du biceps (bras de levier plus long). elbow_carrying_angle_deg > 15° : utiliser une barre EZ (prise semi-pronée) pour réduire le stress sur le ligament collatéral médial du coude.",
+          "primary_lever": "Elbow",
+          "mobility_gate": {
+            "elbow_flexion": 8,
+            "wrist_supination": 7,
+            "shoulder_flexion": 4
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 100,
+          "equipment_required": [
+            "Barbell"
+          ],
+          "session_order": 1,
+          "fatigue_cost": 5,
+          "rep_range_hypertrophy": [
+            8,
+            12
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 7,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 4,
+          "optimal_morphotype": {
+            "elbow_carrying_angle_deg": "< 15"
+          },
+          "risk_tags": [
+            "MEDIAL_ELBOW_STRESS",
+            "BICIPITAL_TENDON_LOAD"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "elbow_carrying_angle_deg",
+                "operator": ">",
+                "threshold": 15,
+                "substitute_ex_name": "EZ Bar Curl Suprabiakromiale"
+              },
+              {
+                "condition_field": "bicipital_tendinopathy_active",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Hammer Curl Dumbbell Neutral"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le biceps génère son torque maximal à 90° de flexion du coude (position mi-course). La prise en supination complète maximise l'activation — ne jamais laisser les poignets se dévier en pronation sous charge."
+        },
+        "S2_STRETCH_MEDIATED": {
+          "ex_name": "Incline Dumbbell Curl 45° — bras en extension complète, supination lente",
+          "slot": "S2_STRETCH_MEDIATED",
+          "morpho_logic": "L'inclinaison du banc à 45° place l'épaule en légère extension, allongeant le chef long du biceps au-delà de sa longueur neutre (étirement bi-articulaire). Le pic de tension en position allongée est considérablement augmenté. Bras courts : augmenter l'inclinaison à 60° pour maximiser l'étirement.",
+          "primary_lever": "Elbow",
+          "mobility_gate": {
+            "shoulder_extension": 6,
+            "elbow_flexion": 9,
+            "wrist_supination": 7
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 88,
+          "equipment_required": [
+            "Dumbbell",
+            "Bench"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 4,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "BICIPITAL_TENDON_LOAD",
+            "SHEAR_FORCE"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "bicipital_tendinopathy_active",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Cable Curl Low Pulley Standing"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Ne jamais hyperextendre le coude à la position basse — risque de contrainte ligamentaire. Descente contrôlée sur 3 secondes. La rotation de la paume (pronation en bas → supination en montée) optimise le recrutement sur toute la course."
+        },
+        "S3_PEAK_CONTRACTION": {
+          "ex_name": "Concentration Curl Haltère — coude appuyé sur la cuisse, supination forcée en haut",
+          "slot": "S3_PEAK_CONTRACTION",
+          "morpho_logic": "L'appui du coude sur la cuisse fixe l'articulation et isole le biceps. La supination forcée en fin de course maximise le pic de contraction du chef court (bras de levier favorable en supination complète). Élimine le momentum et la compensation par le deltoïde antérieur.",
+          "primary_lever": "Elbow",
+          "mobility_gate": {
+            "elbow_flexion": 9,
+            "wrist_supination": 8
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 86,
+          "equipment_required": [
+            "Dumbbell"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 3,
+          "mrv_per_week": 5,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "MEDIAL_ELBOW_STRESS"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "medial_epicondylitis_active",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Scott Curl Machine"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le pic d'activation EMG du biceps est documenté comme l'un des plus élevés en Concentration Curl. La rotation supine complète en fin de course est l'élément différenciant — ne pas l'omettre."
+        },
+        "S4_STRUCTURAL_BALANCE": {
+          "ex_name": "Hammer Curl Câble — prise neutre, brachial et brachioradial",
+          "slot": "S4_STRUCTURAL_BALANCE",
+          "morpho_logic": "La prise neutre (pouce vers le haut) active préférentiellement le brachial (sous le biceps) et le brachioradial, muscles de ré-équilibrage souvent négligés. Le brachial est le fléchisseur du coude le plus puissant — son renforcement réduit le stress articulaire global. Câble préféré aux haltères pour la résistance constante.",
+          "primary_lever": "Elbow",
+          "mobility_gate": {
+            "elbow_flexion": 7
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 75,
+          "equipment_required": [
+            "Cable",
+            "Dumbbell"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 2,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [],
+          "substitution_trigger": {
+            "conditions": [],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le brachial ne peut pas être mis en repos par la pronation (contrairement au biceps). Il reste actif dans tous les angles et positions — c'est le fléchisseur universel du coude. Son renforcement améliore l'épaisseur globale du bras vue de profil."
+        },
+        "S5_PRECISION_ISOLATION": {
+          "ex_name": "Scott Curl Machine (Preacher Curl) — bras en appui incliné à 45°, supination maximale",
+          "slot": "S5_PRECISION_ISOLATION",
+          "morpho_logic": "L'appui incliné du bras à 45° place l'épaule en légère flexion, raccourcissant le chef long et forçant le chef court à travailler en dominant. Cible le chef court du biceps avec une tension plus élevée en position raccourcie que les curls standard. La machine guide la trajectoire et élimine les compensations.",
+          "primary_lever": "Elbow",
+          "mobility_gate": {
+            "elbow_flexion": 9,
+            "wrist_supination": 7
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 82,
+          "equipment_required": [
+            "Machine"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 3,
+          "mrv_per_week": 5,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "BICIPITAL_TENDON_LOAD",
+            "HYPEREXTENSION_ELBOW"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "distal_bicep_tendinopathy",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Hammer Curl Cable Neutral Low Load"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "CRITIQUE : Ne jamais laisser le coude s'hyperextendre à la position basse (poids lourd + gravité + levier défavorable = risque de rupture du tendon distal du biceps). Toujours maintenir une légère flexion résiduelle au point bas."
+        },
+        "S6_UNILATERAL_DRIVER": {
+          "ex_name": "Single-Arm Cable Curl Poulie Basse — debout, prise supination, sans appui",
+          "slot": "S6_UNILATERAL_DRIVER",
+          "morpho_logic": "Révèle les asymétries de force entre biceps G et D. Le câble bas maintient la tension en position d'étirement (bras tendu) contrairement à l'haltère. La position debout sans appui force la stabilisation du tronc et révèle les compensations controlatérales.",
+          "primary_lever": "Elbow",
+          "mobility_gate": {
+            "elbow_flexion": 8,
+            "wrist_supination": 7
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 90,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 4,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 3,
+          "mrv_per_week": 5,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "asymmetry_force_pct": "> 15"
+          },
+          "risk_tags": [
+            "MEDIAL_ELBOW_STRESS"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "bicipital_tendinopathy_active",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Hammer Curl Unilateral Neutral Grip"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Seuil de déclenchement du protocole correctif : différence de charge > 15% à même nombre de répétitions et même RIR. Protocole : 3 séries côté faible, 2 côté fort, jusqu'à équilibre < 10%."
+        }
+      }
+    },
+    "FESSIERS": {
+      "label": "Grand Fessier + Fessier Moyen + Petit Fessier",
+      "anatomy": {
+        "heads": [
+          "Grand Fessier — extension + rotation externe de hanche",
+          "Fessier Moyen — abduction + stabilisation frontale",
+          "Petit Fessier — abduction + rotation interne"
+        ],
+        "primary_function": "Extension et rotation externe de hanche (grand fessier). Stabilisation frontale du bassin (moyen + petit fessier).",
+        "dominant_fiber_orientation": "Multi-pennée pour le grand fessier. Parallèle pour le moyen.",
+        "bi_articular": false
+      },
+      "morpho_key_factors": [
+        "femur_tibia_ratio",
+        "pelvic_tilt_deg",
+        "hip_internal_rotation_deg",
+        "femoral_anteversion_deg"
+      ],
+      "volume_landmarks_per_week": {
+        "mev": 6,
+        "mav": 12,
+        "mrv": 20
+      },
+      "slots": {
+        "S1_HEAVY_COMPOUND": {
+          "ex_name": "Hip Thrust Barre — banc à 90°, pause 1s en extension complète, neutralité lombaire",
+          "slot": "S1_HEAVY_COMPOUND",
+          "morpho_logic": "Génère le moment de force le plus élevé sur le grand fessier en extension de hanche avec le tronc en position horizontale. La pause d'une seconde en haut élimine le momentum et maximise la contraction isométrique. pelvic_tilt_anterior_deg > 15° : exercice prioritaire pour corriger l'antéversion avant tout squat lourd.",
+          "primary_lever": "Hip",
+          "mobility_gate": {
+            "hip_extension": 6,
+            "thoracic_extension": 4
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 100,
+          "equipment_required": [
+            "Barbell",
+            "Bench"
+          ],
+          "session_order": 1,
+          "fatigue_cost": 8,
+          "rep_range_hypertrophy": [
+            8,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 3,
+          "mav_per_week": 5,
+          "mrv_per_week": 8,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 4,
+          "optimal_morphotype": {
+            "pelvic_tilt_anterior_deg": "> 10"
+          },
+          "risk_tags": [
+            "ANTERIOR_SHEAR_LUMBAR",
+            "SACROILIAC_STRESS"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "hip_anterior_impingement_fai",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Glute Bridge Floor Bilateral"
+              },
+              {
+                "condition_field": "sacroiliac_pain_vas",
+                "operator": ">",
+                "threshold": 4,
+                "substitute_ex_name": "Glute Bridge Floor Bilateral"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "La position neutre du bassin en haut est critique — éviter l'hyperextension lombaire compensatoire. Le grand fessier doit être contracté avant la montée, pas pendant. Indicateur de bon alignement : tronc, hanches, genoux forment une ligne droite en haut."
+        },
+        "S2_STRETCH_MEDIATED": {
+          "ex_name": "Bulgarian Split Squat Hanche — pied arrière élevé, tronc légèrement fléchi vers l'avant",
+          "slot": "S2_STRETCH_MEDIATED",
+          "morpho_logic": "Le pied arrière élevé crée une extension de hanche du côté postérieur avec simultanément une flexion de hanche du côté antérieur — étirement maximum du grand fessier et des hip flexors. Le léger penchement du tronc vers l'avant (vs vertical) augmente la flexion de hanche et le recrutement du grand fessier vs quadriceps.",
+          "primary_lever": "Hip",
+          "mobility_gate": {
+            "hip_flexor_flexibility": 7,
+            "ankle_dorsiflexion": 5,
+            "hip_flexion": 8
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 88,
+          "equipment_required": [
+            "Dumbbell",
+            "Bench"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 8,
+          "rep_range_hypertrophy": [
+            8,
+            12
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "PATELLAR_TENDON_OVERLOAD",
+            "PROXIMAL_HAMSTRING_TENDINOPATHY"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "hip_flexor_flexibility_score",
+                "operator": "<",
+                "threshold": 4,
+                "substitute_ex_name": "Step-Up High Box Tronc Penché"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le tronc légèrement penché vers l'avant (10-15°) est la variable clé de ce slot. Un tronc vertical sur ce Split Squat cible davantage les quadriceps. Contrôler l'angle du tronc systématiquement."
+        },
+        "S3_PEAK_CONTRACTION": {
+          "ex_name": "Cable Pull-Through — poulie basse entre les jambes, extension de hanche explosive",
+          "slot": "S3_PEAK_CONTRACTION",
+          "morpho_logic": "Le câble en poulie basse maintient la résistance en extension complète de hanche — contrairement aux kettlebell swings où la tension chute en haut. Le pic de contraction du grand fessier est maintenu à la verticale. Sans charge axiale sur la colonne vertébrale — indication pour les morphologies avec AXIAL_COMPRESSION contre-indiquée.",
+          "primary_lever": "Hip",
+          "mobility_gate": {
+            "hip_extension": 6,
+            "hip_flexion": 7
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 82,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 4,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "ANTERIOR_SHEAR_LUMBAR"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "lumbar_disc_pathology",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Glute Kickback Cable Standing"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "La charnière de hanche (hip hinge) doit être fluide et contrôlée. Le dos reste plat à la descente. L'erreur classique est la flexion lombaire à la place de la flexion de hanche — corriger avant d'augmenter la charge."
+        },
+        "S4_STRUCTURAL_BALANCE": {
+          "ex_name": "Clamshell Bande Élastique — abduction rotation externe de hanche en décubitus latéral",
+          "slot": "S4_STRUCTURAL_BALANCE",
+          "morpho_logic": "Cible le fessier moyen et le petit fessier en rotation externe de hanche. Rééquilibre le ratio abducteur/adducteur et corrige le valgus dynamique du genou en chaîne fermée. Indispensable pour les morphologies à femoral_anteversion_deg > 20° ou valgus dynamique détecté au Squat/Step-Down.",
+          "primary_lever": "Hip",
+          "mobility_gate": {
+            "hip_abduction": 5,
+            "hip_external_rotation": 4
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 69,
+          "equipment_required": [
+            "Bands"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 2,
+          "rep_range_hypertrophy": [
+            15,
+            30
+          ],
+          "rir_target": 2,
+          "mev_per_week": 3,
+          "mav_per_week": 6,
+          "mrv_per_week": 9,
+          "frequency_per_week": [
+            2,
+            4
+          ],
+          "progression_model": "Linear",
+          "plateau_threshold_sessions": 8,
+          "optimal_morphotype": {
+            "femoral_anteversion_deg": "> 20",
+            "dynamic_valgus_detected": true
+          },
+          "risk_tags": [],
+          "substitution_trigger": {
+            "conditions": [],
+            "logic": "OR"
+          },
+          "biomechanics_note": "La stabilité frontale du bassin (fessier moyen) est le prédicteur le plus puissant du risque de blessure au membre inférieur. Tester avec le Single-Leg Squat : si le bassin s'abaisse du côté opposé (signe de Trendelenburg) → protocole fessier moyen prioritaire."
+        },
+        "S5_PRECISION_ISOLATION": {
+          "ex_name": "Glute Kickback Cable — quadrupédie, coude de hanche à 90°, extension complète",
+          "slot": "S5_PRECISION_ISOLATION",
+          "morpho_logic": "En position quadrupède, la hanche fléchie à 90° place le grand fessier dans son axe de travail pur (extension de hanche sans contribution des ischio-jambiers qui sont raccourcis). L'extension complète en fin de course maximise la contraction du grand fessier chef supérieur.",
+          "primary_lever": "Hip",
+          "mobility_gate": {
+            "hip_extension": 5,
+            "hip_flexion": 6
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 73,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "ANTERIOR_SHEAR_LUMBAR"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "lumbar_pain_vas",
+                "operator": ">",
+                "threshold": 3,
+                "substitute_ex_name": "Standing Cable Kickback Vertical"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Neutralité lombaire stricte en quadrupédie. L'extension au-delà de la ligne du tronc = hyperextension lombaire compensatoire — arrêter à l'horizontale. Le genou peut rester fléchi à 90° ou s'étendre selon la cible (genou fléchi = fessier pur, genou tendu = ischio-jambiers en complément)."
+        },
+        "S6_UNILATERAL_DRIVER": {
+          "ex_name": "Single-Leg Hip Thrust — un seul pied en appui, genou du côté actif à 90°",
+          "slot": "S6_UNILATERAL_DRIVER",
+          "morpho_logic": "Isole chaque grand fessier séparément avec le double de la charge relative par membre vs le Hip Thrust bilatéral. Révèle les asymétries droite/gauche et force la stabilisation latérale. La jambe inactive en l'air oblige le bassin à rester horizontal — excellent outil de détection du déficit de fessier moyen.",
+          "primary_lever": "Hip",
+          "mobility_gate": {
+            "hip_extension": 6,
+            "hip_flexion": 7
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 95,
+          "equipment_required": [
+            "Barbell",
+            "Bench",
+            "Dumbbell"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 7,
+          "rep_range_hypertrophy": [
+            8,
+            12
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "asymmetry_force_pct": "> 15"
+          },
+          "risk_tags": [
+            "SACROILIAC_STRESS",
+            "ANTERIOR_SHEAR_LUMBAR"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "sacroiliac_pain_vas",
+                "operator": ">",
+                "threshold": 3,
+                "substitute_ex_name": "Single-Leg Glute Bridge Floor"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Si le bassin s'incline latéralement sous effort : déficit confirmé du fessier moyen. Corriger avec Clamshell (S4) avant de progresser en charge sur ce slot. Protocole asymétrie : 3 séries côté faible, 2 côté fort."
+        }
+      }
+    },
+    "MOLLETS": {
+      "label": "Gastrocnémien + Soléaire",
+      "anatomy": {
+        "heads": [
+          "Gastrocnémien chef médial (bi-articulaire — genou + cheville)",
+          "Gastrocnémien chef latéral (bi-articulaire)",
+          "Soléaire (mono-articulaire — cheville uniquement)"
+        ],
+        "primary_function": "Flexion plantaire de la cheville. Gastrocnémien : flexion du genou complémentaire.",
+        "dominant_fiber_orientation": "Penné pour les deux muscles — fibres courtes, haute densité de sarcomères en parallèle.",
+        "bi_articular": true
+      },
+      "morpho_key_factors": [
+        "ankle_dorsiflexion_cm",
+        "achilles_tendon_length",
+        "calf_insertion_height"
+      ],
+      "volume_landmarks_per_week": {
+        "mev": 8,
+        "mav": 16,
+        "mrv": 22
+      },
+      "slots": {
+        "S1_HEAVY_COMPOUND": {
+          "ex_name": "Standing Calf Raise Machine — genou tendu, amplitude complète talon sous le niveau du step",
+          "slot": "S1_HEAVY_COMPOUND",
+          "morpho_logic": "Genou tendu = gastrocnémien en position allongée (bi-articulaire actif). Amplitude complète : talon sous le niveau du step en bas (étirement maximal) + montée sur la pointe des pieds jusqu'au verrouillage. calf_insertion_height élevée (insertion gastrocnémien haute sur le genou) : amplitude réduite naturellement, ne pas forcer.",
+          "primary_lever": "Ankle",
+          "mobility_gate": {
+            "ankle_plantar_flexion": 8,
+            "ankle_dorsiflexion": 3
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 100,
+          "equipment_required": [
+            "Machine"
+          ],
+          "session_order": 1,
+          "fatigue_cost": 5,
+          "rep_range_hypertrophy": [
+            8,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 3,
+          "mav_per_week": 6,
+          "mrv_per_week": 10,
+          "frequency_per_week": [
+            2,
+            4
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "ACHILLES_LOAD",
+            "PLANTAR_FASCIA_LOAD"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "achilles_tendinopathy_active",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Eccentric Calf Raise Single-Leg 3s Down"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Les mollets requièrent un volume hebdomadaire élevé (>12 séries) et une fréquence élevée (3-4x/semaine) pour une adaptation optimale — ils sont sollicités quotidiennement en locomotion. La progression est lente : attendre 6-8 semaines avant d'évaluer l'adaptation."
+        },
+        "S2_STRETCH_MEDIATED": {
+          "ex_name": "Single-Leg Calf Raise sur Step — excentrique lent 4s, genou tendu",
+          "slot": "S2_STRETCH_MEDIATED",
+          "morpho_logic": "L'excentrique lent sur le bord du step génère le plus haut degré de tension sarcomérique du gastrocnémien en position allongée. Le poids du corps seul sur un pied crée un torque suffisant. achilles_tendon_length court : réduire l'amplitude de descente de 50% pour éviter la surcharge tendineuse.",
+          "primary_lever": "Ankle",
+          "mobility_gate": {
+            "ankle_dorsiflexion": 3,
+            "ankle_plantar_flexion": 7
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 91,
+          "equipment_required": [
+            "Bodyweight"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 5,
+          "rep_range_hypertrophy": [
+            8,
+            12
+          ],
+          "rir_target": 1,
+          "mev_per_week": 3,
+          "mav_per_week": 5,
+          "mrv_per_week": 8,
+          "frequency_per_week": [
+            2,
+            4
+          ],
+          "progression_model": "Linear",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "ACHILLES_LOAD",
+            "PLANTAR_FASCIA_LOAD"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "achilles_tendinopathy_active",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Isometric Calf Hold Mid-Range"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "L'excentrique unilatéral sur step est le traitement gold standard de la tendinopathie d'Achille (protocole Alfredson). En prévention, il est le stimulus le plus efficace pour augmenter la longueur des fascicules du gastrocnémien."
+        },
+        "S3_PEAK_CONTRACTION": {
+          "ex_name": "Leg Press Calf Raise — plateau en bas, pointe des pieds contre la plateforme en haut",
+          "slot": "S3_PEAK_CONTRACTION",
+          "morpho_logic": "Le leg press permet une charge supérieure au poids du corps avec contrôle précis de l'amplitude. La position allongée maintient le genou en extension (gastrocnémien actif). Le pic de tension en flexion plantaire maximale est maintenu plus longtemps que debout. Charge très élevée possible sans risque d'équilibre.",
+          "primary_lever": "Ankle",
+          "mobility_gate": {
+            "ankle_plantar_flexion": 8
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 88,
+          "equipment_required": [
+            "Machine"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 4,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "ACHILLES_LOAD"
+          ],
+          "substitution_trigger": {
+            "conditions": [],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Ne pas placer les pieds trop bas sur la plateforme : les orteils doivent dépasser légèrement pour autoriser la flexion plantaire complète. Éviter de verrouiller les genoux pendant l'exercice."
+        },
+        "S4_STRUCTURAL_BALANCE": {
+          "ex_name": "Seated Calf Raise Machine — genou à 90°, isolation du soléaire",
+          "slot": "S4_STRUCTURAL_BALANCE",
+          "morpho_logic": "Genou fléchi à 90° raccourcit le gastrocnémien (bi-articulaire), le mettant en insuffisance active. Le soléaire (mono-articulaire) devient le seul moteur. Rééquilibre le ratio soléaire/gastrocnémien, crucial pour l'endurance à la station debout et la stabilité de la cheville. Indiqué si cheville_dorsiflexion_cm < 10 (soléaire souvent raide et faible).",
+          "primary_lever": "Ankle",
+          "mobility_gate": {
+            "ankle_plantar_flexion": 7,
+            "knee_flexion": 7
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 80,
+          "equipment_required": [
+            "Machine"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            10,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 7,
+          "frequency_per_week": [
+            2,
+            4
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {
+            "ankle_dorsiflexion_cm": "< 12"
+          },
+          "risk_tags": [
+            "ACHILLES_LOAD",
+            "PLANTAR_FASCIA_LOAD"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "plantar_fasciitis_active",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Isometric Seated Calf Press Towel"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le soléaire est composé à ~80% de fibres lentes (type I). Il répond mieux aux répétitions élevées (15-25) et à la fréquence élevée qu'aux charges maximales. Priorité au volume sur l'intensité pour ce muscle."
+        },
+        "S5_PRECISION_ISOLATION": {
+          "ex_name": "Donkey Calf Raise — tronc horizontal, genou tendu, partenaire sur le bassin",
+          "slot": "S5_PRECISION_ISOLATION",
+          "morpho_logic": "La position horizontale du tronc et la position suspendue des hanches créent un étirement unique du gastrocnémien en position allongée de hanche ET genou tendu. Recrutement préférentiel du gastrocnémien médial. Exercice difficile à reproduire avec machine — nécessite partenaire ou harnais.",
+          "primary_lever": "Ankle",
+          "mobility_gate": {
+            "hip_flexion": 7,
+            "ankle_plantar_flexion": 8
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 94,
+          "equipment_required": [
+            "Bodyweight"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 5,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "ACHILLES_LOAD",
+            "ANTERIOR_SHEAR_LUMBAR"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "no_partner_available",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Standing Calf Raise Machine Full ROM"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Position de sécurité : le tronc doit être supporté par un rack ou banc pour les hanches. Ne pas comprimer la colonne vertébrale. Arnold Schwarzenegger popularisé l'exercice — son efficacité EMG est documentée comme supérieure aux variantes machine."
+        },
+        "S6_UNILATERAL_DRIVER": {
+          "ex_name": "Single-Leg Standing Calf Raise Libre — sans appui, step, amplitude complète",
+          "slot": "S6_UNILATERAL_DRIVER",
+          "morpho_logic": "Révèle les asymétries de force et de proprioception entre cheville gauche et droite. L'absence d'appui force la stabilisation active du tronc et de la cheville. Seuil de déclenchement : différence de force > 15% OU antécédent d'entorse de cheville unilatérale. Progresser depuis appui d'un doigt → strict.",
+          "primary_lever": "Ankle",
+          "mobility_gate": {
+            "ankle_plantar_flexion": 8,
+            "ankle_dorsiflexion": 4
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 95,
+          "equipment_required": [
+            "Bodyweight"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 4,
+          "rep_range_hypertrophy": [
+            10,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            2,
+            3
+          ],
+          "progression_model": "Linear",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "asymmetry_force_pct": "> 15",
+            "ankle_sprain_history": true
+          },
+          "risk_tags": [
+            "ACHILLES_LOAD",
+            "PLANTAR_FASCIA_LOAD"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "star_excursion_balance_pct",
+                "operator": "<",
+                "threshold": 80,
+                "substitute_ex_name": "Single-Leg Calf Raise Machine Supported"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "L'instabilité de cheville chronique est la conséquence la plus fréquente d'une entorse mal réhabilitée. Le SL Calf Raise sans appui est un test ET un traitement. Progression : 10 répétitions sans compensation avant d'ajouter une charge dorsale."
+        }
+      }
+    },
+    "TRAPEZE": {
+      "label": "Trapèze (Supérieur, Moyen, Inférieur)",
+      "anatomy": {
+        "heads": [
+          "Trapèze Supérieur — élévation + rotation scapulaire",
+          "Trapèze Moyen — rétraction scapulaire",
+          "Trapèze Inférieur — dépression + rotation scapulaire"
+        ],
+        "primary_function": "Contrôle de la scapula en 3 plans. Rotation supérieure en abduction d'épaule (supérieur + inférieur). Rétraction (moyen).",
+        "dominant_fiber_orientation": "Convergent vers la scapula et la clavicule depuis les vertèbres C1-T12.",
+        "bi_articular": false
+      },
+      "morpho_key_factors": [
+        "thoracic_kyphosis_deg",
+        "shoulder_external_rotation_deg",
+        "scapular_winging_detected",
+        "clavicle_length_cm"
+      ],
+      "volume_landmarks_per_week": {
+        "mev": 6,
+        "mav": 12,
+        "mrv": 18
+      },
+      "slots": {
+        "S1_HEAVY_COMPOUND": {
+          "ex_name": "Barbell Shrug Lourd — prise pronation, trapèze supérieur en élévation pure",
+          "slot": "S1_HEAVY_COMPOUND",
+          "morpho_logic": "Charge maximale en élévation pure de la scapula. Prise pronation légèrement supérieure à la largeur des épaules pour réduire le stress acromioclaviculaire. Mouvement strict : élévation verticale sans rotation cervicale. Pour clavicule_length_cm < 14 (épaules étroites) : utiliser haltères pour trajectoire naturelle.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "cervical_rotation": 6,
+            "shoulder_elevation": 7
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 100,
+          "equipment_required": [
+            "Barbell"
+          ],
+          "session_order": 1,
+          "fatigue_cost": 6,
+          "rep_range_hypertrophy": [
+            8,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 7,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "CERVICAL_COMPRESSION",
+            "AC_JOINT_STRESS"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "cervical_stenosis",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Dumbbell Shrug Neutral Grip"
+              },
+              {
+                "condition_field": "cervical_disc_pathology",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Cable Shrug Behind-Body Low Pulley"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "ATTENTION : le trapèze supérieur est souvent sur-développé et TROP tendu chez les sédentaires et les pratiquants de press. Évaluer la nécessité avant de prescrire ce slot — souvent contre-indiqué au profit du trapèze inférieur (S4)."
+        },
+        "S2_STRETCH_MEDIATED": {
+          "ex_name": "Dumbbell Shrug sur Incline Bench 30° (tête en bas) — étirement + élévation",
+          "slot": "S2_STRETCH_MEDIATED",
+          "morpho_logic": "L'inclinaison inversée du banc place le trapèze supérieur en pré-étirement avant l'élévation. Le pic de tension en position longue (bras pendants) est supérieur à toute autre variante. Pour thoracic_kyphosis_deg > 40° : réduire l'angle à 15° pour éviter l'augmentation de la compression discale cervicale.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "cervical_flexion": 5,
+            "shoulder_elevation": 6
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 85,
+          "equipment_required": [
+            "Dumbbell",
+            "Bench"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 4,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 2,
+          "mev_per_week": 2,
+          "mav_per_week": 3,
+          "mrv_per_week": 5,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "CERVICAL_COMPRESSION"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "cervical_vertigo",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Barbell Shrug Standard Amplitude Complète"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Cet exercice est rare et très efficace pour l'hypertrophie en étirement du trapèze supérieur. La descente contrôlée (3 secondes) en position inversée est la phase critique. Ne pas utiliser si antécédents de vertiges positionnels."
+        },
+        "S3_PEAK_CONTRACTION": {
+          "ex_name": "Cable Shrug Haute Poulie — traction vers le bas et rétraction en fin de course",
+          "slot": "S3_PEAK_CONTRACTION",
+          "morpho_logic": "Le câble en haute poulie maintient la résistance en contraction maximale (épaules élevées). La légère rétraction en fin de course active le trapèze moyen en synchronisation. Profil de résistance Ascending pur — tension maximale en contraction.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_elevation": 7
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 82,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 3,
+          "mrv_per_week": 5,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "AC_JOINT_STRESS"
+          ],
+          "substitution_trigger": {
+            "conditions": [],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Ne pas inclure de rotation cervicale à l'élévation — mouvement stéréotypique et non physiologique. L'élévation doit être strictement verticale dans le plan frontal."
+        },
+        "S4_STRUCTURAL_BALANCE": {
+          "ex_name": "Prone T-Raise sur Banc 30° — abduction horizontale à 90°, pause 2s",
+          "slot": "S4_STRUCTURAL_BALANCE",
+          "morpho_logic": "Cible le trapèze moyen et inférieur exclusivement. Position T à 90° d'abduction = vecteur optimal du trapèze moyen. La pause en contraction maximale augmente le temps sous tension. Correction du déséquilibre trapèze supérieur dominant / trapèze inférieur faible — très fréquent en population générale.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_external_rotation": 6,
+            "thoracic_extension": 6
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 75,
+          "equipment_required": [
+            "Dumbbell",
+            "Bench"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 2,
+          "mev_per_week": 3,
+          "mav_per_week": 5,
+          "mrv_per_week": 8,
+          "frequency_per_week": [
+            2,
+            4
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 8,
+          "optimal_morphotype": {
+            "scapular_winging_detected": true,
+            "thoracic_kyphosis_deg": "> 35"
+          },
+          "risk_tags": [],
+          "substitution_trigger": {
+            "conditions": [],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Indicateur d'alarme du déséquilibre : haussement spontané des épaules lors de l'abduction d'épaule (trapèze supérieur dominant = trapèze inférieur insuffisant). Ratio souhaité trapèze inf./trapèze sup. : 1:1 en force isométrique."
+        },
+        "S5_PRECISION_ISOLATION": {
+          "ex_name": "Low Pulley Y-Raise Câble — bras tendus, trajectoire vers le haut à 150°",
+          "slot": "S5_PRECISION_ISOLATION",
+          "morpho_logic": "La trajectoire à 150° (entre l'abduction et la flexion) cible le trapèze inférieur et le sus-épineux dans leur vecteur optimal. Le câble bas maintient la tension en position d'étirement (bras bas). Pour scapular_winging_detected : priorité absolue à cet exercice avant tout press vertical.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_flexion": 8,
+            "thoracic_extension": 7
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 68,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 2,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            2,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 8,
+          "optimal_morphotype": {
+            "scapular_winging_detected": true
+          },
+          "risk_tags": [
+            "IMPINGEMENT_ZONE"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "shoulder_flexion_deg",
+                "operator": "<",
+                "threshold": 150,
+                "substitute_ex_name": "Prone Y-Raise on Incline Bench 30deg"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le décollement scapulaire (winging) est le signe clinique le plus visible d'un déficit du serratus antérieur et du trapèze inférieur. Cet exercice est prioritaire avant tout volume de presse dans ce cas."
+        },
+        "S6_UNILATERAL_DRIVER": {
+          "ex_name": "Single-Arm Dumbbell Shrug — bras tendu, élévation ipsilatérale isolée",
+          "slot": "S6_UNILATERAL_DRIVER",
+          "morpho_logic": "Révèle les asymétries de hauteur et de force entre trapèzes supérieurs G et D. Fréquent chez les individus qui portent un sac à une épaule ou pratiquent des sports asymétriques. La main libre pendante permet de comparer visuellement la hauteur des épaules en temps réel.",
+          "primary_lever": "Shoulder",
+          "mobility_gate": {
+            "shoulder_elevation": 6
+          },
+          "resistance_profile": "Bell-Curve",
+          "emg_activation_pct": 90,
+          "equipment_required": [
+            "Dumbbell"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 4,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 3,
+          "mrv_per_week": 5,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "asymmetry_force_pct": "> 15",
+            "shoulder_height_asymmetry_mm": "> 10"
+          },
+          "risk_tags": [
+            "CERVICAL_COMPRESSION"
+          ],
+          "substitution_trigger": {
+            "conditions": [],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Seuil clinique d'asymétrie de hauteur d'épaule au repos : > 10mm = consultation recommandée pour exclure une scoliose ou une inégalité de longueur des membres supérieurs avant de traiter par renforcement unilatéral."
+        }
+      }
+    },
+    "ABDOMINAUX_CORE": {
+      "label": "Abdominaux & Core (Rectus Abdominis, Obliques, Transverse)",
+      "anatomy": {
+        "heads": [
+          "Rectus Abdominis — flexion lombaire + stabilisation sagittale",
+          "Oblique Externe — rotation + flexion latérale (ipsilatéral)",
+          "Oblique Interne — rotation + flexion latérale (controlatéral)",
+          "Transverse Abdominal — stabilisation circonférentielle (ceinture profonde)"
+        ],
+        "primary_function": "Stabilisation du rachis lombaire. Flexion, rotation et flexion latérale du tronc. Gestion de la pression intra-abdominale.",
+        "dominant_fiber_orientation": "Parallèle (rectus). Diagonal croisé (obliques). Transversal (transverse).",
+        "bi_articular": false
+      },
+      "morpho_key_factors": [
+        "pelvic_tilt_deg",
+        "lumbar_lordosis_deg",
+        "thoracic_kyphosis_deg",
+        "torso_leg_ratio"
+      ],
+      "volume_landmarks_per_week": {
+        "mev": 6,
+        "mav": 12,
+        "mrv": 18
+      },
+      "slots": {
+        "S1_HEAVY_COMPOUND": {
+          "ex_name": "Ab Wheel Rollout — position genoux, extension maximale contrôlée",
+          "slot": "S1_HEAVY_COMPOUND",
+          "morpho_logic": "Le rollout crée une résistance anti-extension maximale sur le rectus abdominis et les obliques. Le bras de levier augmente linéairement avec l'extension — profil de résistance Ascending pur. Pour pelvic_tilt_anterior_deg > 15° : réduire l'amplitude à 60% de l'extension complète pour éviter le pincement lombaire.",
+          "primary_lever": "Spine",
+          "mobility_gate": {
+            "shoulder_flexion": 7,
+            "hip_flexion": 6,
+            "lumbar_neutrality": 7
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 100,
+          "equipment_required": [
+            "Bodyweight"
+          ],
+          "session_order": 1,
+          "fatigue_cost": 6,
+          "rep_range_hypertrophy": [
+            6,
+            12
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            2,
+            3
+          ],
+          "progression_model": "Linear",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "ANTERIOR_SHEAR_LUMBAR",
+            "DISC_FLEXION_LOAD"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "lumbar_disc_pathology",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Dead Bug Anti-Extension Progressive"
+              },
+              {
+                "condition_field": "pelvic_tilt_anterior_deg",
+                "operator": ">",
+                "threshold": 20,
+                "substitute_ex_name": "TRX Fallout Assisted"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le Rollout est l'exercice abdominal le plus difficile et le plus efficace en termes d'activation EMG. La progression est : Dead Bug → TRX Fallout → Rollout genoux → Rollout debout. Ne pas sauter les étapes."
+        },
+        "S2_STRETCH_MEDIATED": {
+          "ex_name": "Cable Crunch sur Genoux — flexion maximale du rachis, étirement complet en extension",
+          "slot": "S2_STRETCH_MEDIATED",
+          "morpho_logic": "Le câble maintient la résistance en position d'étirement (tronc en extension complète — rectus abdominis allongé). La flexion vers le bas avec charge est le seul exercice qui crée un pic de tension en étirement ET en contraction du rectus. torso_leg_ratio > 0.95 : amplitude d'étirement naturellement plus grande.",
+          "primary_lever": "Spine",
+          "mobility_gate": {
+            "thoracic_extension": 6,
+            "hip_flexion": 5
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 88,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 4,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            2,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "DISC_FLEXION_LOAD",
+            "CERVICAL_COMPRESSION"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "lumbar_disc_pathology",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Machine Crunch Amplitude Partielle"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "La corde doit être amenée entre les cuisses (pas vers la poitrine) pour maximiser la flexion lombaire et le recrutement du rectus abdominis inférieur. La tête et le cou restent neutres — ne pas tirer avec le cou."
+        },
+        "S3_PEAK_CONTRACTION": {
+          "ex_name": "Machine Crunch — flexion complète en fin de course, pause 2s en contraction",
+          "slot": "S3_PEAK_CONTRACTION",
+          "morpho_logic": "La machine à came (CAM) génère sa résistance maximale en flexion complète — pic de tension en position raccourcie. La pause de 2 secondes augmente le temps sous tension isométrique. Profil de résistance Ascending optimal pour l'hypertrophie du rectus abdominis distal.",
+          "primary_lever": "Spine",
+          "mobility_gate": {
+            "thoracic_extension": 5,
+            "hip_flexion": 4
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 82,
+          "equipment_required": [
+            "Machine"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            2,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "DISC_FLEXION_LOAD"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "lumbar_disc_pathology_acute",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Hollow Body Hold Isometric"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "La machine crunch est sous-estimée pour l'hypertrophie du rectus. La charge progressive et le profil de résistance adapté en font un outil supérieur au crunch au sol pour le développement musculaire pur."
+        },
+        "S4_STRUCTURAL_BALANCE": {
+          "ex_name": "Pallof Press Câble — anti-rotation isométrique, maintien 3s par répétition",
+          "slot": "S4_STRUCTURAL_BALANCE",
+          "morpho_logic": "Exercice anti-rotation ciblant le transverse abdominal et les obliques dans leur fonction stabilisatrice primaire. Rééquilibre le ratio flexion/stabilisation — la plupart des programmes surchargent la flexion (Crunch) au détriment de la stabilisation rotatoire. Indispensable pour les sports rotatoires et la protection lombaire.",
+          "primary_lever": "Spine",
+          "mobility_gate": {
+            "shoulder_flexion": 5,
+            "lumbar_neutrality": 6
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 70,
+          "equipment_required": [
+            "Cable"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 3,
+          "rep_range_hypertrophy": [
+            8,
+            15
+          ],
+          "rir_target": 2,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            2,
+            4
+          ],
+          "progression_model": "Linear",
+          "plateau_threshold_sessions": 8,
+          "optimal_morphotype": {},
+          "risk_tags": [],
+          "substitution_trigger": {
+            "conditions": [],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Cet exercice est le fondement de la prévention des lombalgies. Le transverse abdominal est activé avant tout mouvement des membres chez les sujets sains — cette pré-activation est souvent absente chez les sujets douloureux."
+        },
+        "S5_PRECISION_ISOLATION": {
+          "ex_name": "Hanging Leg Raise — suspension à la barre, genoux tendus, flexion lombaire complète",
+          "slot": "S5_PRECISION_ISOLATION",
+          "morpho_logic": "En suspension, le rectus abdominis inférieur doit effectuer la flexion lombaire (réversion du mouvement). Les genoux tendus augmentent le bras de levier et le recrutement. Pour torso_leg_ratio > 0.95 (jambes longues) : charge de flexion nettement plus élevée — réduire en fléchissant les genoux initialement.",
+          "primary_lever": "Spine",
+          "mobility_gate": {
+            "shoulder_flexion": 9,
+            "hip_flexion": 8
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 78,
+          "equipment_required": [
+            "Barbell"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 5,
+          "rep_range_hypertrophy": [
+            8,
+            15
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            2,
+            3
+          ],
+          "progression_model": "Linear",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "DISC_FLEXION_LOAD",
+            "SHEAR_FORCE"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "grip_strength_insufficient",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Reverse Crunch sur Banc Incliné"
+              },
+              {
+                "condition_field": "shoulder_flexion_deg",
+                "operator": "<",
+                "threshold": 170,
+                "substitute_ex_name": "Captain Chair Leg Raise"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Erreur classique : balancement du bassin (hip flexors dominant, abdos absents). Corriger en partant d'une position de rétroversion pelvienne (périnée vers le haut) avant l'élévation. La flexion lombaire (arrondi du bas du dos) est l'indicateur de l'activation abdo correcte."
+        },
+        "S6_UNILATERAL_DRIVER": {
+          "ex_name": "Single-Arm Farmer's Walk — portage unilatéral lourd, neutralité du tronc",
+          "slot": "S6_UNILATERAL_DRIVER",
+          "morpho_logic": "Le portage unilatéral crée un moment de force latéral sur le tronc, forçant les obliques et le quadratus lumborum du côté porteur à résister à la flexion latérale. Révèle les asymétries de force du core latéral. Exercice fonctionnel avec fort transfert aux activités de la vie quotidienne.",
+          "primary_lever": "Spine",
+          "mobility_gate": {
+            "lumbar_neutrality": 7,
+            "shoulder_stabilization": 6
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 72,
+          "equipment_required": [
+            "Dumbbell",
+            "Kettlebell"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 5,
+          "rep_range_hypertrophy": [
+            0,
+            0
+          ],
+          "rir_target": 2,
+          "distance_meters": [
+            20,
+            40
+          ],
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Linear",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {
+            "asymmetry_lateral_core": "> 15"
+          },
+          "risk_tags": [
+            "ANTERIOR_SHEAR_LUMBAR"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "lumbar_pain_vas",
+                "operator": ">",
+                "threshold": 4,
+                "substitute_ex_name": "Side Plank Unilatéral Isométrique"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Cet exercice prescrit en distance (20-40m) et non en répétitions. La charge optimale : 50% du poids du corps dans la main. Si le tronc penche latéralement de > 5° : charge trop lourde. La neutralité du tronc est l'indicateur de succès."
+        }
+      }
+    },
+    "ERECTEURS_SPINAUX": {
+      "label": "Érecteurs Spinaux (Iliocostal, Longissimus, Épineux) + Quadratus Lumborum",
+      "anatomy": {
+        "heads": [
+          "Iliocostal (latéral) — extension + flexion latérale",
+          "Longissimus (médial) — extension + légère rotation",
+          "Épineux (médian, cervico-thoracique) — extension",
+          "Quadratus Lumborum — stabilisation + flexion latérale"
+        ],
+        "primary_function": "Extension du rachis. Stabilisation posturale contre la gravité. Contrôle excentrique de la flexion.",
+        "dominant_fiber_orientation": "Longitudinal — muscles les plus longs du corps.",
+        "bi_articular": false
+      },
+      "morpho_key_factors": [
+        "pelvic_tilt_deg",
+        "lumbar_lordosis_deg",
+        "torso_leg_ratio",
+        "femur_tibia_ratio"
+      ],
+      "volume_landmarks_per_week": {
+        "mev": 4,
+        "mav": 8,
+        "mrv": 12
+      },
+      "slots": {
+        "S1_HEAVY_COMPOUND": {
+          "ex_name": "Conventional Deadlift — barre au sol, prise en crochet ou mixte, neutralité complète",
+          "slot": "S1_HEAVY_COMPOUND",
+          "morpho_logic": "Le Deadlift conventionnel génère le moment de force le plus élevé sur les érecteurs spinaux en position de flexion de hanche sous charge axiale maximale. femur_tibia_ratio > 0.78 : position plus large (Sumo partiel) pour compenser le basculement du tronc. torso_leg_ratio < 0.85 : tronc court = position naturellement plus verticale, adapté au Deadlift standard.",
+          "primary_lever": "Hip",
+          "mobility_gate": {
+            "hip_flexion": 8,
+            "ankle_dorsiflexion": 5,
+            "thoracic_extension": 6,
+            "lumbar_neutrality": 8
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 100,
+          "equipment_required": [
+            "Barbell"
+          ],
+          "session_order": 1,
+          "fatigue_cost": 10,
+          "rep_range_hypertrophy": [
+            4,
+            8
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 3,
+          "mrv_per_week": 5,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Wave_Loading",
+          "plateau_threshold_sessions": 4,
+          "optimal_morphotype": {
+            "torso_leg_ratio": "0.85-0.95",
+            "femur_tibia_ratio": "< 0.78"
+          },
+          "risk_tags": [
+            "AXIAL_COMPRESSION",
+            "ANTERIOR_SHEAR_LUMBAR",
+            "DISC_FLEXION_LOAD"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "lumbar_disc_herniation_active",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Trap Bar Deadlift ROM Réduit"
+              },
+              {
+                "condition_field": "femur_tibia_ratio",
+                "operator": ">",
+                "threshold": 0.82,
+                "substitute_ex_name": "Sumo Deadlift Wide Stance"
+              },
+              {
+                "condition_field": "lumbar_neutrality_score",
+                "operator": "<",
+                "threshold": 6,
+                "substitute_ex_name": "Romanian Deadlift Charge Réduite"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le Deadlift est l'exercice le plus exigeant techniquement et le plus risqué de la bibliothèque. Maîtrise obligatoire de la charnière de hanche (hip hinge) SANS charge avant de progresser en charge. La flexion lombaire sous charge maximale est la cause n°1 de hernie discale à l'entraînement."
+        },
+        "S2_STRETCH_MEDIATED": {
+          "ex_name": "Back Extension Machine 45° — hyperextension complète, pause 2s en bas (étirement)",
+          "slot": "S2_STRETCH_MEDIATED",
+          "morpho_logic": "La position penchée à 45° avec les hanches en appui place les érecteurs en étirement maximal en bas. L'extension complète contre résistance (poids de corps ou disque sur la poitrine) crée le pic de tension en position allongée. torso_leg_ratio > 0.95 : réduire l'amplitude de l'étirement à 30° de flexion max pour protéger les disques.",
+          "primary_lever": "Spine",
+          "mobility_gate": {
+            "hip_flexion": 7,
+            "lumbar_neutrality": 5
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 85,
+          "equipment_required": [
+            "Machine",
+            "Bodyweight"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 5,
+          "rep_range_hypertrophy": [
+            10,
+            15
+          ],
+          "rir_target": 2,
+          "mev_per_week": 2,
+          "mav_per_week": 3,
+          "mrv_per_week": 5,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "DISC_FLEXION_LOAD",
+            "ANTERIOR_SHEAR_LUMBAR"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "lumbar_disc_pathology",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Reverse Hyper Machine"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "En bas de l'exercice, la colonne peut (et doit) se fléchir légèrement pour maximiser l'étirement des érecteurs. Ce n'est PAS un exercice de neutralité lombaire stricte — c'est l'exception contrôlée. La flexion est contrôlée et partielle, jamais à pleine détente."
+        },
+        "S3_PEAK_CONTRACTION": {
+          "ex_name": "Good Morning Barre — barre haute, flexion de hanche contrôlée jusqu'à 45°",
+          "slot": "S3_PEAK_CONTRACTION",
+          "morpho_logic": "Le Good Morning génère le pic de contraction des érecteurs en extension lombaire contre le bras de levier de la barre. L'arrêt à 45° de flexion de hanche limite le risque discal tout en maximisant le torque sur les érecteurs. Pour femur_tibia_ratio > 0.78 : réduire la charge de 30% (bras de levier naturellement plus long).",
+          "primary_lever": "Spine",
+          "mobility_gate": {
+            "hip_flexion": 7,
+            "hamstring_flexibility": 6,
+            "lumbar_neutrality": 8
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 92,
+          "equipment_required": [
+            "Barbell"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 7,
+          "rep_range_hypertrophy": [
+            8,
+            12
+          ],
+          "rir_target": 2,
+          "mev_per_week": 2,
+          "mav_per_week": 3,
+          "mrv_per_week": 5,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "lumbar_neutrality_score": "> 7"
+          },
+          "risk_tags": [
+            "AXIAL_COMPRESSION",
+            "DISC_FLEXION_LOAD",
+            "ANTERIOR_SHEAR_LUMBAR"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "lumbar_disc_pathology",
+                "operator": "==",
+                "threshold": true,
+                "substitute_ex_name": "Seated Good Morning Machine"
+              },
+              {
+                "condition_field": "lumbar_pain_vas",
+                "operator": ">",
+                "threshold": 3,
+                "substitute_ex_name": "GHR Glute-Ham Raise Extension"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le Good Morning est un exercice avancé réservé aux pratiquants ayant maîtrisé le Deadlift et le RDL. La neutralité lombaire est non-négociable. Progression recommandée : 8 semaines de RDL avant d'introduire le Good Morning."
+        },
+        "S4_STRUCTURAL_BALANCE": {
+          "ex_name": "Bird Dog — quadrupédie, extension bras/jambe opposés, neutralité stricte",
+          "slot": "S4_STRUCTURAL_BALANCE",
+          "morpho_logic": "Renforce les érecteurs spinaux et le multifidus en stabilisation isométrique multi-plan. Corrige le déséquilibre entre les extenseurs et les fléchisseurs du tronc. Exercice de rééducation ET de renforcement préventif. Indiqué pour toutes les morphologies — aucune contre-indication.",
+          "primary_lever": "Spine",
+          "mobility_gate": {
+            "lumbar_neutrality": 4,
+            "shoulder_stabilization": 4
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 58,
+          "equipment_required": [
+            "Bodyweight"
+          ],
+          "session_order": 1,
+          "fatigue_cost": 2,
+          "rep_range_hypertrophy": [
+            8,
+            15
+          ],
+          "rir_target": 2,
+          "mev_per_week": 2,
+          "mav_per_week": 4,
+          "mrv_per_week": 6,
+          "frequency_per_week": [
+            2,
+            5
+          ],
+          "progression_model": "Linear",
+          "plateau_threshold_sessions": 10,
+          "optimal_morphotype": {},
+          "risk_tags": [],
+          "substitution_trigger": {
+            "conditions": [],
+            "logic": "OR"
+          },
+          "biomechanics_note": "Le Bird Dog active le multifidus — un muscle profond clé dans la stabilisation vertébrale et souvent atrophié en cas de lombalgies chroniques. Prescrit en PRIMO-SÉANCE avant tout exercice de charge pour activer la stabilisation lombaire."
+        },
+        "S5_PRECISION_ISOLATION": {
+          "ex_name": "Reverse Hyper Machine — extension des jambes en décubitus ventral sur pivot de hanches",
+          "slot": "S5_PRECISION_ISOLATION",
+          "morpho_logic": "La Reverse Hyper permet l'extension lombaire et de hanche sans charge axiale sur la colonne — les érecteurs travaillent en extension mais sans compression discale. Indiqué pour les morphologies avec AXIAL_COMPRESSION contre-indiquée ou en récupération de lombalgie. Cible les érecteurs lombaires bas (L4-L5).",
+          "primary_lever": "Spine",
+          "mobility_gate": {
+            "hip_extension": 5,
+            "lumbar_extension": 5
+          },
+          "resistance_profile": "Ascending",
+          "emg_activation_pct": 76,
+          "equipment_required": [
+            "Machine"
+          ],
+          "session_order": 3,
+          "fatigue_cost": 4,
+          "rep_range_hypertrophy": [
+            12,
+            20
+          ],
+          "rir_target": 2,
+          "mev_per_week": 2,
+          "mav_per_week": 3,
+          "mrv_per_week": 5,
+          "frequency_per_week": [
+            1,
+            3
+          ],
+          "progression_model": "Double_Progression",
+          "plateau_threshold_sessions": 6,
+          "optimal_morphotype": {},
+          "risk_tags": [
+            "SACROILIAC_STRESS"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "sacroiliac_pain_vas",
+                "operator": ">",
+                "threshold": 3,
+                "substitute_ex_name": "Back Extension Machine 45deg Amplitude Réduite"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "La Reverse Hyper est l'un des rares exercices qui décompresse la colonne lombaire pendant l'effort (traction en bas des jambes). Utilisée en thérapeutique pour les hernies discales sous la supervision d'un professionnel."
+        },
+        "S6_UNILATERAL_DRIVER": {
+          "ex_name": "Single-Leg Romanian Deadlift avec Barre — côté faible d'abord",
+          "slot": "S6_UNILATERAL_DRIVER",
+          "morpho_logic": "Révèle et corrige les asymétries des érecteurs et des fessiers entre côté dominant et non-dominant. La barre bilatérale force un alignement symétrique tout en travaillant unilatéralement via le poids du corps en équilibre. Seuil de déclenchement : différence de force > 15% ou antécédent de lombalgie unilatérale.",
+          "primary_lever": "Hip",
+          "mobility_gate": {
+            "hip_flexion": 7,
+            "ankle_dorsiflexion": 6,
+            "lumbar_neutrality": 8
+          },
+          "resistance_profile": "Descending",
+          "emg_activation_pct": 82,
+          "equipment_required": [
+            "Barbell",
+            "Dumbbell"
+          ],
+          "session_order": 2,
+          "fatigue_cost": 7,
+          "rep_range_hypertrophy": [
+            8,
+            12
+          ],
+          "rir_target": 1,
+          "mev_per_week": 2,
+          "mav_per_week": 3,
+          "mrv_per_week": 5,
+          "frequency_per_week": [
+            1,
+            2
+          ],
+          "progression_model": "Linear",
+          "plateau_threshold_sessions": 5,
+          "optimal_morphotype": {
+            "asymmetry_force_pct": "> 15"
+          },
+          "risk_tags": [
+            "ANTERIOR_SHEAR_LUMBAR",
+            "DISC_FLEXION_LOAD"
+          ],
+          "substitution_trigger": {
+            "conditions": [
+              {
+                "condition_field": "lumbar_pain_vas",
+                "operator": ">",
+                "threshold": 3,
+                "substitute_ex_name": "Split Stance Deadlift 70-30 Rear Foot"
+              }
+            ],
+            "logic": "OR"
+          },
+          "biomechanics_note": "La lombalgie unilatérale chronique est souvent associée à une asymétrie des érecteurs de 15-25%. Le protocole unilatéral est le traitement de première ligne avant tout travail bilatéral lourd. Réévaluation à 6 semaines."
+        }
+      }
+    }
+  }
+}

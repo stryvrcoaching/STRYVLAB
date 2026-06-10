@@ -1,0 +1,24 @@
+exercise_id,name,pattern,plane,mechanic,unilateral,primary_muscle,primary_activation,secondary_muscles,secondary_activations,stabilizers,joint_stress_spine,joint_stress_knee,joint_stress_shoulder,global_instability,coordination_demand,constraint_profile
+BIC-001,Chin up supination,pull_vertical,sagittal,compound,false,biceps_brachii,0.5,lats|brachialis,0.3|0.2,core|grip,5,2,6,6,6,bodyweight_pull
+BIC-002,Curl allonge poulie,elbow_flexion,sagittal,isolation,false,biceps_brachii,0.8,brachialis|brachioradialis,0.1|0.1,shoulders,2,1,2,2,2,constant_tension
+BIC-003,Curl pupitre barre EZ,elbow_flexion,sagittal,isolation,false,biceps_brachii,0.85,brachialis,0.15,none,2,1,1,1,1,strict_isolation
+BIC-004,Curl elastique,elbow_flexion,sagittal,isolation,false,biceps_brachii,0.75,brachialis|brachioradialis,0.15|0.1,core,2,1,1,3,3,variable_resistance
+BIC-005,Curl TRX,elbow_flexion,sagittal,compound,false,biceps_brachii,0.6,brachialis|shoulders,0.2|0.2,core,4,2,4,7,7,instability_high
+BIC-006,Curl barre,elbow_flexion,sagittal,compound,false,biceps_brachii,0.75,brachialis|brachioradialis,0.15|0.1,core,3,1,2,3,3,free_weight
+BIC-007,Curl incline alterne,elbow_flexion,sagittal,isolation,true,biceps_brachii,0.8,brachialis,0.2,shoulders,2,1,2,3,3,stretch_bias
+BIC-008,Curl alterne halteres,elbow_flexion,sagittal,compound,true,biceps_brachii,0.75,brachialis|brachioradialis,0.15|0.1,core,3,1,2,3,3,alternating
+BIC-009,Curl poulie basse,elbow_flexion,sagittal,isolation,false,biceps_brachii,0.8,brachialis|brachioradialis,0.1|0.1,core,2,1,1,2,2,cable_constant
+BIC-011,Curl concentre,elbow_flexion,sagittal,isolation,true,biceps_brachii,0.9,brachialis,0.1,none,1,1,1,1,1,max_isolation
+BIC-012,Curl incline haltere,elbow_flexion,sagittal,isolation,false,biceps_brachii,0.85,brachialis,0.15,shoulders,2,1,2,2,2,stretch_emphasis
+BIC-015,Curl incline poulie,elbow_flexion,sagittal,isolation,false,biceps_brachii,0.85,brachialis,0.15,shoulders,2,1,2,2,2,constant_stretch
+BIC-017,Curl poulie squat,elbow_flexion,sagittal,compound,false,biceps_brachii,0.7,brachialis|quads,0.2|0.1,core,4,3,2,4,4,full_body
+BIC-018,Curl vis a vis,elbow_flexion,sagittal,isolation,false,biceps_brachii,0.8,brachialis,0.2,shoulders,2,1,2,2,2,symmetric_tension
+BIC-019,Curl machine prechargee,elbow_flexion,sagittal,isolation,false,biceps_brachii,0.85,brachialis,0.15,none,2,1,1,1,1,machine_stable
+BIC-020,Curl pupitre poulie,elbow_flexion,sagittal,isolation,false,biceps_brachii,0.85,brachialis,0.15,none,2,1,1,1,1,strict_cable
+BIC-021,Curl TRX unilateral,elbow_flexion,sagittal,compound,true,biceps_brachii,0.6,brachialis|shoulders,0.2|0.2,core,4,2,4,8,8,instability_unilateral
+BIC-023,Drag curl,elbow_flexion,sagittal,compound,false,biceps_brachii,0.75,brachialis,0.25,shoulders,3,1,3,3,3,shoulder_involvement
+BIC-024,Drag curl assis,elbow_flexion,sagittal,isolation,false,biceps_brachii,0.8,brachialis,0.2,shoulders,2,1,2,2,2,seated_control
+BIC-025,Drag curl smith,elbow_flexion,sagittal,compound,false,biceps_brachii,0.75,brachialis,0.25,shoulders,3,1,2,2,2,guided_bar
+BIC-026,Sled pull,pull_horizontal,sagittal,compound,false,biceps_brachii,0.4,lats|rear_delts,0.3|0.3,core|legs,5,5,4,6,6,full_body_pull
+BIC-027,Spider curl,elbow_flexion,sagittal,isolation,false,biceps_brachii,0.9,brachialis,0.1,none,1,1,1,1,1,strict_peak
+BIC-028,Waiter curl,elbow_flexion,sagittal,isolation,false,biceps_brachii,0.8,brachialis,0.2,shoulders,2,1,2,2,2,unique_grip

@@ -1,0 +1,55 @@
+exercise_id,name,pattern,plane,mechanic,unilateral,primary_muscle,primary_activation,secondary_muscles,secondary_activations,stabilizers,joint_stress_spine,joint_stress_knee,joint_stress_shoulder,global_instability,coordination_demand,constraint_profile
+ABS-001,Ab coaster abdominaux,core_flexion,sagittal,isolation,false,rectus_abdominis,0.7,hip_flexors|obliques,0.2|0.1,transverse_abdominis,4,1,1,3,3,spine_flexion_control
+ABS-002,Abdominaux a la barre,core_flexion,sagittal,compound,false,rectus_abdominis,0.6,hip_flexors|lats,0.25|0.15,grip|shoulders,5,1,5,6,6,grip_demand|shoulder_load
+ABS-003,Bear plank avec kickback,core_anti_extension,sagittal,compound,true,transverse_abdominis,0.5,glutes|shoulders,0.3|0.2,core_global,3,2,4,7,7,instability_high|coordination_high
+ABS-004,Cercles jambes tendues,core_anti_extension,transverse,isolation,false,lower_abs,0.6,hip_flexors|obliques,0.25|0.15,transverse_abdominis,4,1,1,6,6,lumbar_control
+ABS-005,Chinese plank,core_anti_extension,sagittal,isometric,false,transverse_abdominis,0.7,glutes|hamstrings,0.2|0.1,spine_erectors,3,1,1,5,4,posterior_chain_engagement
+ABS-006,Ciseaux,core_anti_extension,sagittal,isolation,false,lower_abs,0.65,hip_flexors|obliques,0.2|0.15,transverse_abdominis,4,1,1,5,5,lumbar_stability
+ABS-007,Cocon abdominaux,core_flexion,sagittal,isolation,false,rectus_abdominis,0.75,hip_flexors|obliques,0.15|0.1,transverse_abdominis,4,1,1,4,4,controlled_flexion
+ABS-008,Crunch poulie obliques,core_rotation,transverse,isolation,false,obliques,0.7,rectus_abdominis|hip_flexors,0.2|0.1,transverse_abdominis,3,1,1,3,4,rotational_load
+ABS-009,Crunch au sol,core_flexion,sagittal,isolation,false,rectus_abdominis,0.8,obliques,0.2,transverse_abdominis,3,1,1,2,2,low_instability
+ABS-010,Crunch jambes verticales,core_flexion,sagittal,isolation,false,rectus_abdominis,0.75,hip_flexors|obliques,0.15|0.1,transverse_abdominis,4,1,1,3,3,hip_flexor_bias
+ABS-011,Crunch debout elastique,core_flexion,sagittal,isolation,false,rectus_abdominis,0.65,obliques|shoulders,0.2|0.15,core_global,3,1,3,4,4,elastic_resistance
+ABS-012,Crunch lateral banc,core_rotation,frontal,isolation,false,obliques,0.75,rectus_abdominis,0.25,transverse_abdominis,3,1,1,3,3,side_bias
+ABS-013,Crunch machine,core_flexion,sagittal,isolation,false,rectus_abdominis,0.85,obliques,0.15,transverse_abdominis,3,1,1,2,2,stable_machine
+ABS-014,Crunch papillon,core_flexion,sagittal,isolation,false,rectus_abdominis,0.7,hip_flexors|adductors,0.2|0.1,transverse_abdominis,4,1,1,3,3,hip_opening
+ABS-015,Crunch poulie haute,core_flexion,sagittal,isolation,false,rectus_abdominis,0.8,obliques|hip_flexors,0.15|0.05,transverse_abdominis,4,1,2,3,3,cable_load
+ABS-016,Crunch TRX,core_flexion,sagittal,compound,false,rectus_abdominis,0.6,shoulders|hip_flexors,0.25|0.15,core_global,5,1,4,7,7,instability_high
+ABS-017,Crunch swiss ball,core_flexion,sagittal,isolation,false,rectus_abdominis,0.75,obliques,0.25,transverse_abdominis,3,1,1,4,3,extended_range
+ABS-018,Dead bug,core_anti_extension,sagittal,compound,true,transverse_abdominis,0.6,hip_flexors|shoulders,0.25|0.15,core_global,2,1,2,6,6,coordination_core
+ABS-019,Dragon flag,core_anti_extension,sagittal,compound,false,rectus_abdominis,0.6,glutes|lats,0.2|0.2,core_global,8,1,5,8,9,extreme_tension
+ABS-020,Bicycle crunch,core_rotation,transverse,compound,true,obliques,0.65,rectus_abdominis|hip_flexors,0.2|0.15,core_global,4,1,1,5,6,dynamic_rotation
+ABS-021,V-ups,core_flexion,sagittal,compound,false,rectus_abdominis,0.7,hip_flexors|obliques,0.2|0.1,core_global,5,1,1,6,6,lumbar_load
+ABS-022,Flexion obliques banc 45,core_rotation,frontal,isolation,false,obliques,0.75,rectus_abdominis,0.25,core_global,4,1,1,3,3,side_flexion
+ABS-023,Flexions laterales haltere,core_lateral_flexion,frontal,isolation,false,obliques,0.7,quadratus_lumborum,0.3,core_stability,5,1,2,3,3,loaded_side_bend
+ABS-024,Flexions laterales poulie,core_lateral_flexion,frontal,isolation,false,obliques,0.75,quadratus_lumborum,0.25,core_stability,4,1,2,3,3,cable_tension
+ABS-025,Bear plank,core_anti_extension,sagittal,isometric,false,transverse_abdominis,0.7,shoulders|quads,0.15|0.15,core_global,3,2,3,6,5,quadruped_stability
+ABS-026,Hollow hold,core_anti_extension,sagittal,isometric,false,transverse_abdominis,0.75,rectus_abdominis|hip_flexors,0.15|0.1,core_global,4,1,1,5,4,lumbar_flattening
+ABS-027,Jackknife swiss ball,core_flexion,sagittal,compound,false,rectus_abdominis,0.65,hip_flexors|shoulders,0.2|0.15,core_global,5,2,4,7,7,instability_high
+ABS-028,Mountain climber,core_anti_extension,sagittal,compound,true,transverse_abdominis,0.5,hip_flexors|shoulders,0.3|0.2,core_global,4,3,3,7,7,dynamic_core
+ABS-029,Planche,core_stability,sagittal,isometric,false,transverse_abdominis,0.7,rectus_abdominis|glutes,0.2|0.1,core_global,3,1,2,4,3,static_hold
+ABS-030,Planche swiss ball,core_stability,sagittal,isometric,false,transverse_abdominis,0.65,shoulders|glutes,0.2|0.15,core_global,4,1,3,7,6,instability_high
+ABS-031,Planche TRX,core_stability,sagittal,isometric,false,transverse_abdominis,0.6,shoulders|rectus_abdominis,0.25|0.15,core_global,5,1,4,8,7,suspension_instability
+ABS-032,Planche inversee,core_stability,sagittal,isometric,false,glutes,0.6,hamstrings|shoulders,0.25|0.15,spine_erectors,2,1,3,4,3,posterior_chain
+ABS-033,Planche laterale rotation,core_rotation,transverse,compound,true,obliques,0.7,transverse_abdominis|shoulders,0.2|0.1,core_global,4,1,3,7,7,rotation_control
+ABS-034,Planche laterale,core_lateral_flexion,frontal,isometric,true,obliques,0.75,transverse_abdominis,0.25,core_global,3,1,2,5,4,side_stability
+ABS-035,Releve genoux suspendu,core_flexion,sagittal,compound,false,lower_abs,0.65,hip_flexors|lats,0.25|0.1,grip,5,1,4,6,6,grip_demand
+ABS-036,Releve jambes assis,core_flexion,sagittal,isolation,false,lower_abs,0.7,hip_flexors,0.3,core_stability,4,1,1,3,3,seated_control
+ABS-037,Releve jambes suspendu,core_flexion,sagittal,compound,false,lower_abs,0.7,hip_flexors|lats,0.2|0.1,grip,6,1,5,7,7,high_spine_load
+ABS-038,Releve jambes chaise romaine,core_flexion,sagittal,compound,false,lower_abs,0.7,hip_flexors,0.3,core_stability,5,1,2,5,5,support_stability
+ABS-039,Rotation buste barre,core_rotation,transverse,isolation,false,obliques,0.65,spine_erectors,0.35,core_stability,5,1,2,3,4,spinal_rotation
+ABS-040,Rotation poulie,core_rotation,transverse,isolation,false,obliques,0.7,transverse_abdominis,0.3,core_stability,4,1,2,4,4,cable_rotation
+ABS-041,Pallof press,core_anti_rotation,transverse,isometric,false,transverse_abdominis,0.7,obliques,0.3,core_global,2,1,2,4,4,anti_rotation
+ABS-042,Rotation landmine,core_rotation,transverse,compound,false,obliques,0.65,shoulders|core,0.2|0.15,core_global,5,2,4,6,6,loaded_rotation
+ABS-043,Rotation suspendu,core_rotation,transverse,compound,false,obliques,0.7,hip_flexors|lats,0.2|0.1,grip,6,1,5,7,7,high_instability
+ABS-044,Russian twist,core_rotation,transverse,compound,false,obliques,0.7,rectus_abdominis|hip_flexors,0.2|0.1,core_global,4,1,1,5,5,rotational_volume
+ABS-045,Roulette abdos,core_anti_extension,sagittal,compound,false,transverse_abdominis,0.6,rectus_abdominis|shoulders,0.25|0.15,core_global,7,1,5,8,8,extreme_extension_load
+ABS-046,Russian twist developpe,core_rotation,transverse,compound,false,obliques,0.6,shoulders|rectus_abdominis,0.25|0.15,core_global,5,2,4,6,6,coordination_complex
+ABS-047,Russian twist poulie,core_rotation,transverse,isolation,false,obliques,0.75,transverse_abdominis,0.25,core_stability,4,1,2,4,4,cable_control
+ABS-048,Sit up med ball,core_flexion,sagittal,compound,false,rectus_abdominis,0.7,hip_flexors|shoulders,0.2|0.1,core_global,5,1,2,4,4,loaded_flexion
+ABS-049,Sit up med ball mur,core_flexion,sagittal,compound,false,rectus_abdominis,0.7,shoulders|hip_flexors,0.2|0.1,core_global,5,1,3,5,5,throw_component
+ABS-050,Sit up decline,core_flexion,sagittal,compound,false,rectus_abdominis,0.75,hip_flexors,0.25,core_global,6,1,1,4,4,increased_rom
+ABS-051,Sit up chaise romaine,core_flexion,sagittal,compound,false,rectus_abdominis,0.7,hip_flexors,0.3,core_stability,5,1,2,4,4,support_assist
+ABS-052,Touche talons,core_lateral_flexion,frontal,isolation,false,obliques,0.75,rectus_abdominis,0.25,core_stability,3,1,1,3,3,short_range
+ABS-053,Windmill,core_rotation,frontal,compound,true,obliques,0.6,shoulders|hamstrings,0.25|0.15,core_global,6,2,5,7,7,mobility_strength
+ABS-054,Zercher carry,core_anti_extension,sagittal,compound,false,core_global,0.6,glutes|quads,0.25|0.15,spine_erectors,6,3,2,6,5,loaded_carry

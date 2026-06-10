@@ -1,0 +1,4214 @@
+{
+  "version": "v1.1.0",
+  "scoring_version": "v1.1.0",
+  "axes": [
+    "sleep",
+    "nutrition",
+    "stress",
+    "training",
+    "recovery",
+    "adherence"
+  ],
+  "questions": [
+    {
+      "question_id": "Q_PROFIL_01",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.35,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.07,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_PROFIL_02",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.35,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.07,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_PROFIL_03",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.35,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.07,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_PROFIL_04",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.35,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.07,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_PROFIL_05",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_PROFIL_06",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_PROFIL_07",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_PROFIL_08",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_PROFIL_09",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_PROFIL_10",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_PROFIL_11",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.35,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.07,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_PROFIL_12",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.35,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.07,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_PROFIL_13",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.35,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.07,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_PROFIL_14",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_PROFIL_15",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_01",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.8,
+          "direction": "positive"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.2,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_02",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.8,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_03",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.8,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_04",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_05",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_01a",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_01b",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_01c",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_01d",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.8,
+          "direction": "positive"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.2,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_01e",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_01f",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_01g",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_01h",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_01i",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_01j",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_16",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_17",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_18",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_19",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_20",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_21",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_22",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_23",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_24",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_25",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_26",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.8,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_27",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.8,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_28",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.8,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_29",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_30",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.8,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_31",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_32",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.8,
+          "direction": "negative"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.2,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_33",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_34",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_35",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_36",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_37",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_38",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_39",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_MET_40",
+      "impacts": [
+        {
+          "axis": "nutrition",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "adherence",
+          "weight": 0.163,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.741,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_02",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.741,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_03",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.741,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_04",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.741,
+          "direction": "negative"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_05",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_06",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_07",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_08",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.741,
+          "direction": "negative"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_09",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01a",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01b",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01c",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01d",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01e",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.741,
+          "direction": "negative"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01f",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01g",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01h",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01i",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01j",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01k",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01l",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01m",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01n",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01o",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_01p",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.741,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_30",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_31",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_32",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.741,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_33",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_34",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_35",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_36",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_37",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_38",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_39",
+      "impacts": [
+        {
+          "axis": "stress",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_10",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.741,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_11",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.741,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_12",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_13",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.741,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_14",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_15",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_16",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_17",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_18",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_10a",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_10b",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_10c",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_10d",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_10e",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_10f",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_10g",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_10h",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_10i",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_10j",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_10k",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_41",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_42",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_43",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_44",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_45",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_46",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_47",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_48",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_49",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_50",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_60",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_61",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_62",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_63",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_64",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_65",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_66",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_REC_67",
+      "impacts": [
+        {
+          "axis": "sleep",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_01",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_01a",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_01b",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_01c",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_01d",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_01e",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_01f",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_01g",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_01h",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_01i",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_01j",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_01k",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_01l",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_01m",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_15",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_16",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_17",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_18",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_19",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_20",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_21",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_22",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_23",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_24",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_25",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_26",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_27",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_28",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_29",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_30",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_31",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_32",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_53",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_54",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_55",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_56",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_57",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_46",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_47",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_48",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_49",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_50",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_51",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_52",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_52a",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_52b",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_52c",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_36",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_37",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_38",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_39",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_40",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "negative"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_41",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_42",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_43",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_44",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_45",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_58",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_59",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_60",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "negative"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_61",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_62",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_63",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_64",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ADH_65",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_01",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_02",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_03",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_04",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_05",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_06",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_07",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_08",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_09",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_10",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_15",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_16",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_17",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_18",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_19",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_20",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_21",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_22",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_23",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_24",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_25",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_26",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.833,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.167,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_27",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_28",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_29",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_30",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_31",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_32",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_33",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_ENV_34",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.13,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_01",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.741,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_02",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.741,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_03",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_04",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.741,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_05",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_06",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_07",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.741,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_08",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_09",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_10",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_11",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_12",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_13",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_14",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_15",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_16",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_17",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_18",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_19",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_20",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_21",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_22",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_23",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.741,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_24",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.741,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.259,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_25",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_26",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_27",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "positive"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "positive"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_28",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_29",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "neutral"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_STM_30",
+      "impacts": [
+        {
+          "axis": "training",
+          "weight": 0.65,
+          "direction": "negative"
+        },
+        {
+          "axis": "recovery",
+          "weight": 0.227,
+          "direction": "negative"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_01",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_02",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_03",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_04",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_05",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_06",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_07",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_08",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_09",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_10",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_11",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_12",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_13",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_14",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_15",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_16",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_17",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_18",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_19",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    },
+    {
+      "question_id": "Q_NEURO_20",
+      "impacts": [
+        {
+          "axis": "adherence",
+          "weight": 0.55,
+          "direction": "neutral"
+        },
+        {
+          "axis": "stress",
+          "weight": 0.25,
+          "direction": "neutral"
+        },
+        {
+          "axis": "training",
+          "weight": 0.2,
+          "direction": "neutral"
+        }
+      ]
+    }
+  ],
+  "notes": {
+    "source": "VIRTUS Smart fit ADAPTIVE QUESTIONNAIRE SYSTEM CSV modules (253) + neurotype add-on (20)",
+    "total_questions": 273,
+    "method": "Heuristic direction + role-based weights; refine later by manual calibration."
+  }
+}

@@ -1,0 +1,204 @@
+.
+├── _OLD_REFERENCE
+│   ├── AUDIT_REPORT.md
+│   └── sections
+├── app
+│   ├── [lang]
+│   │   ├── analyse-ipt
+│   │   ├── cgv
+│   │   ├── confidentialite
+│   │   ├── genesis-backup
+│   │   ├── layout.tsx
+│   │   ├── mentions-legales
+│   │   ├── outils
+│   │   └── page.tsx
+│   ├── api
+│   │   ├── analyze
+│   │   ├── calculate-ipt
+│   │   ├── emails
+│   │   ├── genesis
+│   │   ├── genesis-chat
+│   │   ├── mini-scan
+│   │   └── stripe
+│   ├── error.tsx
+│   ├── fonts
+│   │   ├── Azonix.otf
+│   │   ├── Outfit-Black.ttf
+│   │   ├── Outfit-Bold.ttf
+│   │   ├── Outfit-ExtraBold.ttf
+│   │   ├── Outfit-ExtraLight.ttf
+│   │   ├── Outfit-Light.ttf
+│   │   ├── Outfit-Medium.ttf
+│   │   ├── Outfit-Regular.ttf
+│   │   ├── Outfit-SemiBold.ttf
+│   │   ├── Outfit-Thin.ttf
+│   │   ├── Outfit-VariableFont_wght.ttf
+│   │   └── Ramabhadra-Regular.ttf
+│   ├── globals.css
+│   ├── globals.css.backup
+│   ├── hooks
+│   └── typography.css
+├── AUDIT_COHERENCE.md
+├── cleanup.sh
+├── components
+│   ├── CalendlyButton.tsx
+│   ├── canvas
+│   │   └── IPTVisualization.tsx
+│   ├── CycleSyncCalculator.tsx
+│   ├── genesis
+│   │   ├── IPTQuestionnaire.tsx
+│   │   └── ProgressIndicator.tsx
+│   ├── HRZonesCalculator.tsx
+│   ├── layout
+│   │   ├── footer.tsx
+│   │   ├── header-medisync.tsx
+│   │   └── header.tsx
+│   ├── MacroCalculator.tsx
+│   ├── OneRMCalculator.tsx
+│   ├── outils
+│   │   ├── 1rm
+│   │   ├── carb-cycling
+│   │   ├── hr-zones
+│   │   ├── hydratation
+│   │   ├── macros
+│   │   └── page.tsx
+│   ├── PhaseCard.tsx
+│   ├── PhaseCircle.tsx
+│   ├── PhaseTimeline.tsx
+│   ├── sections
+│   │   ├── about-medisync.tsx
+│   │   ├── ai-block.tsx
+│   │   ├── analyze-medisync.tsx
+│   │   ├── Authority.tsx
+│   │   ├── BentoInsights.tsx
+│   │   ├── case-studies.tsx
+│   │   ├── closing-hero.tsx
+│   │   ├── Comparison.tsx
+│   │   ├── CTA.tsx
+│   │   ├── CTANew.tsx
+│   │   ├── Differentiator.tsx
+│   │   ├── EliteHero.tsx
+│   │   ├── FailureAnalysis.tsx
+│   │   ├── faq-accordion.tsx
+│   │   ├── faq-section.tsx
+│   │   ├── faq.tsx
+│   │   ├── features-arc.tsx
+│   │   ├── footer-medisync.tsx
+│   │   ├── ForensicCaseStudies.tsx
+│   │   ├── GenesisHero.tsx
+│   │   ├── GenesisRadarChart.tsx
+│   │   ├── hero-genesis.tsx
+│   │   ├── hero-medisync.tsx
+│   │   ├── Hero.tsx
+│   │   ├── HeroNew.tsx
+│   │   ├── ICP.tsx
+│   │   ├── instruments.tsx
+│   │   ├── intelligent-guidance.tsx
+│   │   ├── IPTDefinition.tsx
+│   │   ├── IPTPillarsInfographic.tsx
+│   │   ├── IPTRadarChart.tsx
+│   │   ├── IPTSimulator.tsx
+│   │   ├── journey-section.tsx
+│   │   ├── NeurotypesVisualizer.tsx
+│   │   ├── phone-mockup.tsx
+│   │   ├── Pillars.tsx
+│   │   ├── predictive-card.tsx
+│   │   ├── root-causes.tsx
+│   │   ├── ScientificTruthBanner.tsx
+│   │   ├── scores-section.tsx
+│   │   ├── Simulation.tsx
+│   │   ├── Stats.tsx
+│   │   ├── StryvLabHero.tsx
+│   │   ├── StryvLabToolsHub.tsx
+│   │   └── testimonials-carousel.tsx
+│   ├── three
+│   │   └── Signature3D.tsx
+│   ├── ui
+│   │   ├── Accordion.tsx
+│   │   ├── BackButton.tsx
+│   │   ├── Button.tsx
+│   │   ├── Card.tsx
+│   │   ├── Dropdown.tsx
+│   │   ├── glass-card.tsx
+│   │   ├── index.ts
+│   │   ├── LanguageSwitcher.tsx
+│   │   ├── Panel.tsx
+│   │   ├── PanelWithHeader.tsx
+│   │   ├── SectionHeader.tsx
+│   │   ├── StartOverlay.tsx
+│   │   └── ToolCTA.tsx
+│   └── WaterIntakeCalculator.tsx
+├── CONSISTENCY_CHECK.md
+├── data
+│   └── genesis_questions.json
+├── DEPLOYMENT_GUIDE.md
+├── DESIGN_SYSTEM_GENESIS.json
+├── DESIGN_SYSTEM_README.md
+├── DESIGN_SYSTEM_TOKENS.json
+├── docs
+├── ENV_CHECKLIST.md
+├── env.production.example
+├── ERROR_REPORT.md
+├── FINAL_AUDIT.md
+├── GEN1
+├── GEN3
+├── genesis-lab.zip
+├── genesis-lab@1.0.0
+├── Icon\015
+├── INSTALL_SYSTEMIA.md
+├── lib
+│   ├── calculators
+│   │   ├── BodyFatCalculator.tsx
+│   │   ├── CarbCyclingCalculator.tsx
+│   │   ├── HRZonesCalculator.tsx
+│   │   ├── MacroCalculator.tsx
+│   │   ├── OneRMCalculator.tsx
+│   │   └── WaterIntakeCalculator.tsx
+│   ├── context
+│   │   └── LanguageContext.tsx
+│   ├── genesis
+│   │   └── scoring-engine.ts
+│   ├── genesis 2
+│   ├── i18n
+│   │   └── translations.ts
+│   ├── navigation-constants.ts
+│   └── utils.ts
+├── middleware.ts
+├── mkdir -p lib:i18n
+│   └── translations.ts
+├── next
+├── NEXT_STEPS.md
+├── next-env.d.ts
+├── next.config.js
+├── OPTIMIZATION_REPORT.md
+├── output_i18n.txt
+├── package-lock.json
+├── package.json
+├── postcss.config.js
+├── project_snapshot.txt
+├── public
+│   └── videos
+│       └── hero.mp4
+├── PUBLIER_EN_LIGNE.md
+├── QUICK_DEPLOY.md
+├── README.md
+├── RESPONSIVE_AUDIT_REPORT.md
+├── RESPONSIVE_FIXES_QUICK_REFERENCE.md
+├── scripts
+├── structure_complete.txt
+├── supabase
+├── tailwind.config.ts
+├── test-import.ts
+├── tsconfig.json
+├── tsconfig.tsbuildinfo
+├── types
+│   ├── 02_types.ts
+│   └── genesis.ts
+├── update_calculators.py
+├── utils
+│   ├── cyclePhases.js
+│   ├── cycleSyncCalculator.js
+│   └── macroCalculator.js
+└── VERIFICATION_FINALE.md
+
+51 directories, 151 files

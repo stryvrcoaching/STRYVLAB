@@ -1,0 +1,17 @@
+[
+  {
+    "id": "todo",
+    "title": "Priorité",
+    "status": "todo"
+  },
+  {
+    "id": "in_progress",
+    "title": "En cours",
+    "status": "in_progress"
+  },
+  {
+    "id": "done",
+    "title": "Terminé",
+    "status": "done"
+  }
+]

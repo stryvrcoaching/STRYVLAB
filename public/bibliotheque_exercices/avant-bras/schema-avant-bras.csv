@@ -1,0 +1,9 @@
+exercise_id,name,pattern,plane,mechanic,unilateral,primary_muscle,primary_activation,secondary_muscles,secondary_activations,stabilizers,joint_stress_spine,joint_stress_knee,joint_stress_shoulder,global_instability,coordination_demand,constraint_profile
+FOR-001,Flexion poignet cable assis,wrist_flexion,sagittal,isolation,false,wrist_flexors,0.85,finger_flexors,0.15,forearm_stabilizers,1,1,1,1,2,cable_wrist_flexion
+FOR-002,Pronation supination haltere sur banc,forearm_rotation,transverse,isolation,true,pronators_supinators,0.75,brachioradialis|wrist_stabilizers,0.15|0.1,shoulder_stabilizers,1,1,1,1,3,rotation_control
+FOR-003,Farmer walk halteres,loaded_carry,sagittal,compound,false,grip_flexors,0.65,forearm_flexors|traps|core,0.15|0.1|0.1,core|shoulders,5,3,3,6,5,heavy_grip_carry
+FOR-004,Curl pronation elastique,elbow_flexion,sagittal,isolation,false,brachioradialis,0.6,biceps_brachii|brachialis,0.2|0.2,forearms,2,1,1,3,3,pronated_grip
+FOR-005,Curl marteau pupitre,elbow_flexion,sagittal,isolation,false,brachialis,0.7,brachioradialis|biceps_brachii,0.2|0.1,none,2,1,1,1,1,neutral_grip
+FOR-006,Curl marteau debout,elbow_flexion,sagittal,compound,false,brachialis,0.65,brachioradialis|biceps_brachii,0.2|0.15,core,3,1,2,3,3,neutral_grip
+FOR-007,Curl inverse barre,elbow_flexion,sagittal,isolation,false,brachioradialis,0.7,brachialis|biceps_brachii,0.2|0.1,forearms,2,1,1,2,2,reverse_grip
+FOR-008,Curl zottman,elbow_flexion,sagittal,compound,false,brachioradialis,0.55,biceps_brachii|brachialis|wrist_extensors,0.2|0.15|0.1,forearms,3,1,2,4,4,rotation_control
