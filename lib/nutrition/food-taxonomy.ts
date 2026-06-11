@@ -274,7 +274,49 @@ function isFruitFamilyHint(item: FoodItem): boolean {
 
 function isSweetSauce(item: FoodItem): boolean {
   const name = normalizeText(item.name_fr)
-  return SWEET_SAUCE_TERMS.some((term) => name.includes(normalizeText(term))) && !SWEET_SNACK_BLOCKERS.some((term) => name.includes(normalizeText(term)))
+
+  if (hasAnyText(item.name_fr, [
+    "barre",
+    "biscuit",
+    "beignet",
+    "brioche",
+    "brownie",
+    "céréales",
+    "cereales",
+    "chocolat au lait",
+    "chocolat noir",
+    "chocolat blanc",
+    "cookie",
+    "gaufre",
+    "muffin",
+    "pétales",
+    "petales",
+    "pain au chocolat",
+    "pâtisserie",
+    "patisserie",
+    "tarte",
+    "rocher",
+    "sablé",
+    "sable"
+  ])) {
+    return false
+  }
+
+  return hasAnyText(item.name_fr, [
+    "ketchup",
+    "sauce barbecue",
+    "sauce bbq",
+    "sauce au chocolat",
+    "sirop",
+    "sirop d'agave",
+    "sirop d'érable",
+    "sirop d'erable",
+    "coulis",
+    "nappage",
+    "caramel liquide",
+    "miel",
+    "confiture"
+  ])
 }
 
 function isCompositeMeal(item: FoodItem): boolean {
@@ -283,7 +325,30 @@ function isCompositeMeal(item: FoodItem): boolean {
 
 function isSweetProduct(item: FoodItem): boolean {
   const name = normalizeText(item.name_fr)
-  return SWEET_PRODUCT_TERMS.some((term) => name.includes(normalizeText(term))) && !SWEET_SNACK_BLOCKERS.some((term) => name.includes(normalizeText(term)))
+
+  if (item.category_l2 === "snacks-sales" || item.category_l2 === "boissons" || item.category_l2 === "sauces") {
+    return false
+  }
+
+  if (hasAnyText(item.name_fr, [
+    "apéritif",
+    "aperitif",
+    "salé",
+    "sale",
+    "crackers",
+    "chips",
+    "eau minérale",
+    "eau minerale",
+    "boisson à l'eau",
+    "boisson a l'eau",
+    "boisson préparée",
+    "boisson preparee"
+  ])) {
+    return false
+  }
+
+  return SWEET_PRODUCT_TERMS.some((term) => name.includes(normalizeText(term)))
+    && !SWEET_SNACK_BLOCKERS.some((term) => name.includes(normalizeText(term)))
 }
 
 function isSpecificProtein(item: FoodItem): boolean {
@@ -300,6 +365,68 @@ function isSpecificProtein(item: FoodItem): boolean {
 function isEggFood(item: FoodItem): boolean {
   const name = normalizeText(item.name_fr)
   return /\boeufs?\b/.test(name) || name.includes("blanc d'oeuf") || name.includes("blanc d œuf")
+}
+
+function isFreshFruitFood(item: FoodItem): boolean {
+  return item.category_l1 === "fruits"
+    && isFruitFamilyHint(item)
+    && !nameHasAny(item, FRUIT_BLOCKERS)
+    && !hasAnyText(item.name_fr, [
+      "sec",
+      "sèche",
+      "seche",
+      "séchée",
+      "sechee",
+      "secs",
+      "sèches",
+      "seches",
+      "moelleux",
+      "réhydraté",
+      "rehydrate",
+      "compote",
+      "coulis",
+      "chips",
+      "confit",
+      "appertisé",
+      "appertise",
+      "sirop"
+    ])
+}
+
+function isDriedFruitFood(item: FoodItem): boolean {
+  const name = normalizeText(item.name_fr)
+
+  if (item.category_l1 !== "fruits") return false
+  if (hasAnyText(item.name_fr, ["compote", "coulis", "chips", "sirop", "appertisé", "appertise"])) return false
+  if (hasAnyText(item.name_fr, ["cru", "crue", "pulpe, cru", "pulpe, crue"])) {
+    return hasAnyText(item.name_fr, ["datte", "pruneau"])
+  }
+
+  return (
+    /\bsecs?\b/.test(name) ||
+    /\bseches?\b/.test(name) ||
+    name.includes("sechee") ||
+    name.includes("séché") ||
+    name.includes("seche") ||
+    hasAnyText(item.name_fr, [
+      "abricot sec",
+      "abricots secs",
+      "figue sèche",
+      "figue seche",
+      "figues sèches",
+      "figues seches",
+      "raisin sec",
+      "raisins secs",
+      "datte",
+      "dattes",
+      "pruneau",
+      "pruneaux",
+      "cranberry séchée",
+      "cranberry sechee",
+      "canneberge séchée",
+      "canneberge sechee"
+    ])
+  )
 }
 
 export function matchesVisibleLeaf(item: FoodItem, leaf: VisibleLeafKey): boolean {
@@ -374,17 +501,60 @@ export function matchesVisibleLeaf(item: FoodItem, leaf: VisibleLeafKey): boolea
     case "pasta":
       return item.category_l1 === "carbs" && nameHasAny(item, ["pâtes", "pates", "spaghetti", "penne", "macaroni", "tagliatelle", "gnocchi", "nouille", "nouilles"]) && !nameHasAny(item, ["pate d'amande", "pâte d'amande", "beurre de cacahuete", "beurre de cacahuète", "pate a tartiner", "pâte à tartiner", "pate brisee", "pâte brisée", "pate sablée", "pâte sablée", "pate filo", "pâte filo", "pate phyllo", "pâte phyllo", "pate de foie", "pâte de fruits", "pâte à pizza", "pate a pizza", "pâte feuilletée", "pate feuilletee"]) && !isCompositeMeal(item) && !hasAnyText(item.name_fr, ["courge spaghetti", "gnocchi à la pomme de terre", "gnocchi a la pomme de terre"])
     case "bread":
-      return item.category_l1 === "carbs" && nameHasAny(item, ["pain", "baguette", "biscotte", "toast", "wrap", "tortilla", "bagel"]) && !isCompositeMeal(item)
+      return item.category_l1 === "carbs"
+        && nameHasAny(item, ["pain", "baguette", "biscotte", "toast", "wrap", "tortilla", "bagel", "pita"])
+        && !hasAnyText(item.name_fr, [
+          "chips",
+          "tortilla chips",
+          "fruit à pain",
+          "fruit a pain",
+          "farine",
+          "pour pains",
+          "pour pain"
+        ])
+        && !isCompositeMeal(item)
     case "cereals":
-      return item.category_l1 === "carbs" && (nameHasAny(item, ["cereale", "céréale", "cereal", "flocon", "muesli", "granola", "porridge", "avoine", "petales", "pétales"]) || item.category_l2 === "cereales") && !nameHasAny(item, CEREAL_BLOCKERS) && !isCompositeMeal(item)
+      return item.category_l1 === "carbs"
+        && (nameHasAny(item, [
+          "cereale",
+          "céréale",
+          "cereal",
+          "flocon",
+          "muesli",
+          "granola",
+          "porridge",
+          "avoine",
+          "petales",
+          "pétales",
+          "quinoa",
+          "boulgour",
+          "semoule",
+          "couscous",
+          "polenta",
+          "sarrasin",
+          "orge",
+          "seigle",
+          "sorgho",
+          "millet",
+          "maïs",
+          "mais"
+        ]) || item.category_l2 === "cereales")
+        && !nameHasAny(item, CEREAL_BLOCKERS)
+        && !matchesVisibleLeaf(item, "rice")
+        && !matchesVisibleLeaf(item, "pasta")
+        && !matchesVisibleLeaf(item, "bread")
+        && !matchesVisibleLeaf(item, "potatoes")
+        && !matchesVisibleLeaf(item, "legumes")
+        && !hasAnyText(item.name_fr, ["vermicelle de riz", "vermicelle de soja"])
+        && !isCompositeMeal(item)
     case "potatoes":
       return item.category_l1 === "carbs" && nameHasAny(item, ["pomme de terre", "patate", "frite", "puree","purée", "gratin dauphinois"]) && !hasAnyText(item.name_fr, ["plantain", "gnocchi"]) && !isCompositeMeal(item)
     case "legumes":
       return item.category_l1 === "carbs" && nameHasAny(item, ["lentille", "pois chiche", "pois cassé", "pois casse", "haricot", "fève", "feve", "soja", "lupin", "flageolet"]) && !isCompositeMeal(item) && !hasAnyText(item.name_fr, ["haricot beurre", "courge doubeurre", "butternut"])
     case "fresh-fruits":
-      return item.category_l1 === "fruits" && isFruitFamilyHint(item) && !nameHasAny(item, FRUIT_BLOCKERS) && !isCompositeMeal(item)
+      return isFreshFruitFood(item)
     case "dried-fruits":
-      return item.category_l1 === "fruits" && hasAnyText(item.name_fr, ["raisin sec", "abricot sec", "figue seche", "dattes", "pruneau", "cranberry", "canneberge"]) && !isCompositeMeal(item)
+      return isDriedFruitFood(item)
     case "sweet-products":
       return (item.category_l1 === "carbs" || item.category_l1 === "extras") && isSweetProduct(item)
     case "sweet-sauces":
@@ -412,27 +582,101 @@ export function matchesVisibleLeaf(item: FoodItem, leaf: VisibleLeafKey): boolea
     case "other-vegetables":
       return item.category_l1 === "vegetables"
     case "water":
-      return item.category_l1 === "drinks" && item.category_l2 === "eau"
+      return item.category_l1 === "drinks"
+        && item.category_l2 === "eau"
+        && !hasAnyText(item.name_fr, ["eau de coco", "bouillon"])
     case "hot-drinks":
-      return item.category_l1 === "drinks" && nameHasAny(item, ["cafe", "café", "the", "thé", "tisane", "infusion", "chicoree", "chicorée", "matcha", "rooibos"])
+      return item.category_l1 === "drinks"
+        && item.category_l2 === "chauds"
+        && nameHasAny(item, ["cafe", "café", "the", "thé", "tisane", "infusion", "chicoree", "chicorée", "matcha", "macha", "rooibos", "cappuccino"])
+        && !hasAnyText(item.name_fr, [
+          "jus",
+          "cythère",
+          "cythere",
+          "salade",
+          "chicorée rouge",
+          "chicoree rouge",
+          "chicorée verte",
+          "chicoree verte",
+          "crue",
+          "cru",
+          "liégeois",
+          "liegeois",
+          "viennois",
+          "dessert",
+          "glace",
+          "crème dessert",
+          "creme dessert"
+        ])
     case "juices-smoothies":
-      return item.category_l1 === "drinks" && nameHasAny(item, ["jus", "nectar", "smoothie", "jus de", "jus d"])
+      return item.category_l1 === "drinks"
+        && item.category_l2 === "jus-smoothies"
+        && nameHasAny(item, ["jus", "nectar", "smoothie"])
+        && !hasAnyText(item.name_fr, ["boisson gazeuse", "ananas au jus", "appertisé", "appertise", "boisson au soja", "boisson lactée", "boisson lactee", "lait"])
     case "sodas":
-      return (item.category_l1 === "drinks" && item.category_l2 === "boissons") || nameHasAny(item, ["coca", "cola", "fanta", "sprite", "soda", "ice tea"])
+      return (item.category_l1 === "drinks" || item.category_l2 === "boissons")
+        && item.category_l2 !== "alcools"
+        && hasAnyText(item.name_fr, ["boisson gazeuse", "soda", "cola", "coca", "fanta", "sprite", "limonade", "tonic", "ice tea"])
+        && !hasAnyText(item.name_fr, [
+          "panaché",
+          "panache",
+          "alcool",
+          "bière",
+          "biere",
+          "chocolat",
+          "barre",
+          "biscuit",
+          "gâteau",
+          "gateau",
+          "poudre",
+          "lait chocolaté",
+          "lait chocolate"
+        ])
     case "plant-milks":
-      return item.category_l1 === "drinks" && nameHasAny(item, ["lait d'avoine", "lait de soja", "lait d'amande", "lait vegetal", "lait végétal"])
+      return item.category_l1 === "drinks"
+        && (
+          item.category_l2 === "laits-vegetaux"
+          || nameHasAny(item, ["lait d'avoine", "lait de soja", "lait d'amande", "lait de riz", "lait de coco", "lait vegetal", "lait végétal"])
+        )
+        && !hasAnyText(item.name_fr, [
+          "boisson plate aux fruits",
+          "jus",
+          "nectar",
+          "smoothie",
+          "dessert",
+          "crème",
+          "creme"
+        ])
     case "sports-drinks":
-      return item.category_l1 === "drinks" && nameHasAny(item, ["boisson energetique", "boisson energétique", "boisson isotonique", "isotonique", "gatorade", "powerade"])
+      return (item.category_l1 === "drinks" || item.category_l2 === "boissons")
+        && nameHasAny(item, ["boisson isotonique", "isotonique", "boisson energetique", "boisson énergisante", "gatorade", "powerade", "electrolyte", "électrolyte"])
+        && !hasAnyText(item.name_fr, ["alcool", "bière", "biere", "vin"])
     case "alcohol":
-      return item.category_l1 === "drinks" && nameHasAny(item, ["vin", "biere", "bière", "cidre", "vodka", "whisky", "rhum", "gin", "tequila", "alcool"])
+      return item.category_l1 === "drinks"
+        && item.category_l2 === "alcools"
+        && nameHasAny(item, ["vin", "biere", "bière", "cidre", "vodka", "whisky", "rhum", "gin", "tequila", "alcool", "apéritif", "aperitif", "saké", "sake"])
+        && !hasAnyText(item.name_fr, ["sans alcool", "faiblement alcoolisée", "faiblement alcoolisee"])
     case "whey":
-      return (item.category_l2 === "complements" || item.category_l1 === "proteins") && nameHasAny(item, ["whey", "isolate", "caseine", "caséine", "protein", "protéine"])
+      return item.category_l2 === "complements"
+        && nameHasAny(item, ["whey", "isolate", "isolat", "caseine", "caséine", "protein powder", "protéine", "proteine", "poudre protéinée", "poudre proteinee"])
+        && !hasAnyText(item.name_fr, ["texturée", "texturee", "réhydratée", "rehydratee", "encas", "spécialité laitière", "specialite laitiere"])
     case "gainers-bars":
-      return (item.category_l2 === "complements" || item.category_l1 === "extras" || item.category_l1 === "proteins") && nameHasAny(item, ["gainer", "barre", "protein bar", "barre prote", "meal replacement"])
+      return (
+          item.category_l2 === "complements"
+          && nameHasAny(item, ["gainer", "mass gainer", "barre protéinée", "barre prote", "protein bar", "meal replacement", "substitut de repas"])
+        )
+        || (
+          item.category_l2 === "snacks-sucres"
+          && nameHasAny(item, ["barre protéinée", "barre prote", "protein bar"])
+        )
     case "performance":
-      return item.category_l2 === "complements" && nameHasAny(item, ["creatine", "créatine", "bcaa", "eaa", "pre-workout", "maltodextrine", "electrolyte", "électrolyte"])
+      return item.category_l2 === "complements"
+        && nameHasAny(item, ["creatine", "créatine", "bcaa", "eaa", "pre-workout", "maltodextrine", "electrolyte", "électrolyte", "glutamine"])
     case "other-supplements":
       return item.category_l2 === "complements"
+        && !matchesVisibleLeaf(item, "whey")
+        && !matchesVisibleLeaf(item, "gainers-bars")
+        && !matchesVisibleLeaf(item, "performance")
     default:
       return false
   }
@@ -548,19 +792,23 @@ function getVisibleLeafSortScore(item: FoodItem, leaf: VisibleLeafKey): number {
 
     case "bread":
       if (hasAnyText(item.name_fr, [
-        "pain complet",
         "pain blanc",
+        "pain complet",
+        "pain de campagne",
+        "pain de seigle",
+        "pain aux céréales",
+        "pain aux cereales",
+        "pain, baguette",
+        "baguette"
+      ])) score -= 45
+      if (hasAnyText(item.name_fr, [
         "pain de mie",
-        "baguette",
         "biscotte",
         "wrap",
         "tortilla",
         "pita",
-        "bagel",
-        "pain au seigle",
-        "pain aux céréales",
-        "pain aux cereales",
-      ])) score -= 30
+        "bagel"
+      ])) score -= 20
       if (hasAnyText(item.name_fr, [
         "sandwich",
         "croque",
@@ -569,7 +817,13 @@ function getVisibleLeafSortScore(item: FoodItem, leaf: VisibleLeafKey): number {
         "préemballé",
         "preemballe",
         "garni",
-      ])) score += 45
+        "brioché",
+        "brioche",
+        "chips",
+        "farine",
+        "fruit à pain",
+        "fruit a pain"
+      ])) score += 55
       break
 
     case "cereals":
@@ -577,26 +831,43 @@ function getVisibleLeafSortScore(item: FoodItem, leaf: VisibleLeafKey): number {
         "flocon d'avoine",
         "flocons d'avoine",
         "avoine",
-        "muesli",
+        "muesli nature",
+        "muesli floconneux",
         "porridge",
-        "céréales",
-        "cereales",
-        "son d'avoine",
-        "son de blé",
-        "son de ble",
-      ])) score -= 25
+        "quinoa",
+        "boulgour",
+        "semoule",
+        "couscous",
+        "polenta",
+        "sarrasin",
+        "orge",
+        "seigle"
+      ])) score -= 40
+      if (hasAnyText(item.name_fr, [
+        "céréales pour petit déjeuner",
+        "cereales pour petit dejeuner",
+        "special k",
+        "soufflé",
+        "souffle",
+        "pétales",
+        "petales"
+      ])) score += 15
       if (hasAnyText(item.name_fr, [
         "chocolaté",
         "chocolate",
+        "chocolat",
         "fourré",
         "fourre",
         "sucré",
         "sucre",
+        "miel",
+        "glacé",
+        "glace",
         "barre",
         "biscuit",
         "gâteau",
-        "gateau",
-      ])) score += 35
+        "gateau"
+      ])) score += 45
       break
 
     case "potatoes":
@@ -796,6 +1067,35 @@ function getVisibleLeafSortScore(item: FoodItem, leaf: VisibleLeafKey): number {
     case "fatty-sauces":
       if (hasAnyText(item.name_fr, ["mayonnaise", "vinaigrette", "pesto", "tahini", "sauce"])) score -= 15
       if (hasAnyText(item.name_fr, ["allégée", "allegee", "préparée", "preparee"])) score += 10
+      break
+
+
+
+    case "whey":
+      if (hasAnyText(item.name_fr, ["whey isolat", "whey isolate", "whey hydrolysée", "whey hydrolysee", "whey concentrée", "whey concentree", "whey protéine", "whey proteine"])) score -= 45
+      if (hasAnyText(item.name_fr, ["protimuscle native whey"])) score -= 35
+      if (hasAnyText(item.name_fr, ["caséine", "caseine"])) score -= 15
+      if (hasAnyText(item.name_fr, ["protéine de pois", "proteine de pois", "protéine de riz", "proteine de riz", "isolat végétal", "isolat vegetal", "poudre protéinée", "poudre proteinee"])) score += 10
+      break
+
+    case "gainers-bars":
+      if (hasAnyText(item.name_fr, ["mass gainer", "gainer"])) score -= 35
+      if (hasAnyText(item.name_fr, ["barre protéinée", "barre prote", "protein bar"])) score -= 25
+      break
+
+    case "performance":
+      if (hasAnyText(item.name_fr, ["créatine", "creatine"])) score -= 35
+      if (hasAnyText(item.name_fr, ["bcaa", "eaa", "glutamine"])) score -= 25
+      break
+
+    case "hot-drinks":
+      if (hasAnyText(item.name_fr, ["café noir", "cafe noir", "café expresso", "cafe expresso", "café allongé", "cafe allonge", "thé noir", "the noir", "thé vert", "the vert", "tisane", "infusion"])) score -= 35
+      if (hasAnyText(item.name_fr, ["poudre soluble", "cappuccino au chocolat", "sucrée", "sucree"])) score += 25
+      break
+
+    case "plant-milks":
+      if (hasAnyText(item.name_fr, ["non sucré", "non sucre", "nature"])) score -= 25
+      if (hasAnyText(item.name_fr, ["sucrée", "sucree", "aromatisée", "aromatisee", "jus de fruits"])) score += 25
       break
 
 
