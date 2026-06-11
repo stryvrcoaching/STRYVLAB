@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import PublicTdeeWizard from '@/components/nutrition/public-tdee/PublicTdeeWizard';
 
 export const metadata: Metadata = {
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <PublicTdeeWizard />;
+  return (
+    <Suspense fallback={null}>
+      <PublicTdeeWizard />
+    </Suspense>
+  );
 }
