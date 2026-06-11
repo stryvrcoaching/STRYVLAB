@@ -324,13 +324,13 @@ export function matchesVisibleLeaf(item: FoodItem, leaf: VisibleLeafKey): boolea
     case "rice":
       return item.category_l1 === "carbs" && nameHasAny(item, ["riz", "rice", "galette de riz", "galette de riz soufflé", "pate sans gluten a base de riz", "pâtes sans gluten à base de riz"]) && !hasWordPrefixText(item.name_fr, ["chorizo"])
     case "pasta":
-      return item.category_l1 === "carbs" && nameHasAny(item, ["pate", "pâtes", "spaghetti", "penne", "macaroni", "tagliatelle", "gnocchi"]) && !nameHasAny(item, ["pate d'amande", "pâte d'amande", "beurre de cacahuete", "beurre de cacahuète", "pate a tartiner", "pâte à tartiner", "pate brisee", "pâte brisée", "pate sablée", "pâte sablée", "pate filo", "pâte filo", "pate phyllo", "pâte phyllo", "pate de foie", "pâté"]) && !isCompositeMeal(item) && !hasAnyText(item.name_fr, ["courge spaghetti", "gnocchi à la pomme de terre", "gnocchi a la pomme de terre", "pâte feuilletée", "pate feuilletee"])
+      return item.category_l1 === "carbs" && nameHasAny(item, ["pâtes", "pates", "spaghetti", "penne", "macaroni", "tagliatelle", "gnocchi", "nouille", "nouilles"]) && !nameHasAny(item, ["pate d'amande", "pâte d'amande", "beurre de cacahuete", "beurre de cacahuète", "pate a tartiner", "pâte à tartiner", "pate brisee", "pâte brisée", "pate sablée", "pâte sablée", "pate filo", "pâte filo", "pate phyllo", "pâte phyllo", "pate de foie", "pâte de fruits", "pâte à pizza", "pate a pizza", "pâte feuilletée", "pate feuilletee"]) && !isCompositeMeal(item) && !hasAnyText(item.name_fr, ["courge spaghetti", "gnocchi à la pomme de terre", "gnocchi a la pomme de terre"])
     case "bread":
       return item.category_l1 === "carbs" && nameHasAny(item, ["pain", "baguette", "biscotte", "toast", "wrap", "tortilla", "bagel"]) && !isCompositeMeal(item)
     case "cereals":
       return item.category_l1 === "carbs" && (nameHasAny(item, ["cereale", "céréale", "cereal", "flocon", "muesli", "granola", "porridge", "avoine", "petales", "pétales"]) || item.category_l2 === "cereales") && !nameHasAny(item, CEREAL_BLOCKERS) && !isCompositeMeal(item)
     case "potatoes":
-      return item.category_l1 === "carbs" && nameHasAny(item, ["pomme de terre", "patate", "frite", "puree", "purée", "gratin dauphinois"]) && !isCompositeMeal(item)
+      return item.category_l1 === "carbs" && nameHasAny(item, ["pomme de terre", "patate", "frite", "puree","purée", "gratin dauphinois"]) && !hasAnyText(item.name_fr, ["plantain", "gnocchi"]) && !isCompositeMeal(item)
     case "legumes":
       return item.category_l1 === "carbs" && nameHasAny(item, ["lentille", "pois chiche", "pois cassé", "pois casse", "haricot", "fève", "feve", "soja", "lupin", "flageolet"]) && !isCompositeMeal(item) && !hasAnyText(item.name_fr, ["haricot beurre", "courge doubeurre", "butternut"])
     case "fresh-fruits":
@@ -344,7 +344,7 @@ export function matchesVisibleLeaf(item: FoodItem, leaf: VisibleLeafKey): boolea
     case "oils":
       return item.category_l1 === "fats" && nameHasAny(item, ["huile", "olives", "olive oil"]) && !nameHasAny(item, OIL_BLOCKERS) && !hasAnyText(item.name_fr, ["à l'huile", "a l'huile", "a l huile", "à l huile"]) && !isCompositeMeal(item) && !hasAnyText(item.name_fr, ["tomate, séchée, à l'huile", "hareng fumé, à l'huile"])
     case "nuts-seeds":
-      return item.category_l1 === "fats" && nameHasAny(item, ["noix", "graine", "amande", "noisette", "pistache", "cacahuete", "cacahuète", "chia", "lin", "sésame", "sesame"]) && !isCompositeMeal(item)
+      return item.category_l1 === "fats" && !hasAnyText(item.name_fr, ["huile", "matière grasse", "matiere grasse", "margarine", "crème", "creme", "culinaire", "beurre de", "beurre d'", "pâte d'arachide", "pate d'arachide", "purée", "puree"]) && (nameHasAny(item, ["noix", "graine", "amande", "noisette", "pistache", "cacahuete", "cacahuète", "chia", "sésame", "sesame", "tournesol"]) || hasWordText(item.name_fr, ["lin"])) && !isCompositeMeal(item)
     case "avocado-olives":
       return item.category_l1 === "fats" && nameHasAny(item, ["avocat", "olive"]) && !isCompositeMeal(item)
     case "butter-spreads":
@@ -496,6 +496,260 @@ function getVisibleLeafSortScore(item: FoodItem, leaf: VisibleLeafKey): number {
       if (hasAnyText(item.name_fr, ["foie", "coeur", "cœur", "rognon", "abat", "graisse", "peau"])) score += 45
       if (hasAnyText(item.name_fr, ["pané", "pane", "nuggets", "rillettes", "saucisse", "jambon", "salami", "chorizo"])) score += 35
       break
+
+
+    case "bread":
+      if (hasAnyText(item.name_fr, [
+        "pain complet",
+        "pain blanc",
+        "pain de mie",
+        "baguette",
+        "biscotte",
+        "wrap",
+        "tortilla",
+        "pita",
+        "bagel",
+        "pain au seigle",
+        "pain aux céréales",
+        "pain aux cereales",
+      ])) score -= 30
+      if (hasAnyText(item.name_fr, [
+        "sandwich",
+        "croque",
+        "burger",
+        "panini",
+        "préemballé",
+        "preemballe",
+        "garni",
+      ])) score += 45
+      break
+
+    case "cereals":
+      if (hasAnyText(item.name_fr, [
+        "flocon d'avoine",
+        "flocons d'avoine",
+        "avoine",
+        "muesli",
+        "porridge",
+        "céréales",
+        "cereales",
+        "son d'avoine",
+        "son de blé",
+        "son de ble",
+      ])) score -= 25
+      if (hasAnyText(item.name_fr, [
+        "chocolaté",
+        "chocolate",
+        "fourré",
+        "fourre",
+        "sucré",
+        "sucre",
+        "barre",
+        "biscuit",
+        "gâteau",
+        "gateau",
+      ])) score += 35
+      break
+
+    case "potatoes":
+      if (hasAnyText(item.name_fr, [
+        "pomme de terre",
+        "pommes de terre",
+        "patate douce",
+        "pomme de terre, bouillie",
+        "pomme de terre, vapeur",
+        "pomme de terre, cuite",
+      ])) score -= 30
+      if (hasAnyText(item.name_fr, [
+        "frite",
+        "chips",
+        "gratin",
+        "dauphinois",
+        "rissolée",
+        "rissolee",
+        "prefrite",
+        "préfrites",
+        "purée préparée",
+        "puree preparee",
+      ])) score += 40
+      break
+
+    case "legumes":
+      if (hasAnyText(item.name_fr, [
+        "lentille",
+        "pois chiche",
+        "pois cassé",
+        "pois casse",
+        "haricot blanc",
+        "haricot rouge",
+        "flageolet",
+        "fève",
+        "feve",
+        "lupin",
+      ])) score -= 30
+      if (hasAnyText(item.name_fr, [
+        "sauce",
+        "cuisiné",
+        "cuisine",
+        "préparé",
+        "prepare",
+        "cassoulet",
+        "houmous",
+      ])) score += 35
+      break
+
+    case "dairy-protein":
+      if (hasAnyText(item.name_fr, [
+        "skyr",
+        "fromage blanc 0%",
+        "fromage blanc nature",
+        "fromage blanc entier",
+        "yaourt grec nature",
+        "yaourt à la grecque, nature",
+        "yaourt nature",
+        "yaourt, lait fermenté ou spécialité laitière, nature",
+        "lait demi-écrémé",
+        "lait écrémé",
+        "lait entier",
+        "lait fermenté à boire, nature",
+        "petit-suisse",
+        "petit suisse",
+        "quark",
+      ])) score -= 45
+      if (hasAnyText(item.name_fr, [
+        "lait demi",
+        "lait entier",
+        "lait écrémé",
+        "lait ecreme",
+        "lait fermenté",
+        "lait fermente",
+      ])) score -= 25
+      if (!hasAnyText(item.name_fr, ["fromage blanc"]) && hasAnyText(item.name_fr, [
+        "fromage à pâte",
+        "fromage a pate",
+        "fromage bleu",
+        "fromage de chèvre",
+        "fromage de chevre",
+        "camembert",
+        "maasdam",
+        "coulommiers",
+        "croûte",
+        "croute",
+      ])) score += 35
+      if (hasAnyText(item.name_fr, [
+        "sucré",
+        "sucre",
+        "aromatisé",
+        "aromatise",
+        "aux fruits",
+        "dessert",
+        "crème",
+        "creme",
+        "gâteau",
+        "gateau",
+        "glace",
+        "sauce",
+        "tzatziki",
+      ])) score += 35
+      break
+
+    case "plant-protein":
+      if (hasAnyText(item.name_fr, [
+        "tofu",
+        "tempeh",
+        "seitan",
+        "edamame",
+        "protéine végétale",
+        "proteine vegetale",
+      ])) score -= 30
+      if (hasAnyText(item.name_fr, [
+        "préparé",
+        "prepare",
+        "pané",
+        "pane",
+        "burger",
+        "galette",
+        "nuggets",
+      ])) score += 35
+      break
+
+    case "oils":
+      if (hasAnyText(item.name_fr, [
+        "huile d'olive",
+        "huile de colza",
+        "huile de tournesol",
+        "huile de noix",
+        "huile de lin",
+        "huile d'avocat",
+      ])) score -= 35
+      if (hasAnyText(item.name_fr, [
+        "sauce",
+        "vinaigrette",
+        "mayonnaise",
+        "préparée",
+        "preparee",
+      ])) score += 45
+      break
+
+    case "nuts-seeds":
+      if (hasAnyText(item.name_fr, [
+        "amande",
+        "noix",
+        "noisette",
+        "pistache",
+        "cacahuète",
+        "cacahuete",
+        "graine de chia",
+        "graine de lin",
+        "graine de courge",
+        "tournesol",
+        "sésame",
+        "sesame",
+        "soja, graine",
+      ])) score -= 30
+      if (hasAnyText(item.name_fr, [
+        "mélange apéritif",
+        "melange aperitif",
+        "salé",
+        "sale",
+        "grillé",
+        "grille",
+        "caramélisé",
+        "caramelise",
+        "enrobé",
+        "enrobe",
+        "chocolat",
+      ])) score += 30
+      break
+
+    case "avocado-olives":
+      if (hasAnyText(item.name_fr, ["avocat", "olive"])) score -= 25
+      if (hasAnyText(item.name_fr, ["tapenade", "préparé", "prepare", "farci", "farcies"])) score += 35
+      break
+
+    case "butter-spreads":
+      if (hasAnyText(item.name_fr, ["beurre doux", "beurre demi-sel", "beurre", "margarine"])) score -= 25
+      if (hasAnyText(item.name_fr, ["allégé", "allege", "pâte à tartiner", "pate a tartiner"])) score += 30
+      break
+
+    case "nut-butters":
+      if (hasAnyText(item.name_fr, [
+        "beurre de cacahuète",
+        "beurre de cacahuete",
+        "purée d'amande",
+        "puree d'amande",
+        "purée de noisette",
+        "puree de noisette",
+        "tahini",
+      ])) score -= 30
+      if (hasAnyText(item.name_fr, ["sucré", "sucre", "chocolat", "pâte à tartiner", "pate a tartiner"])) score += 35
+      break
+
+    case "fatty-sauces":
+      if (hasAnyText(item.name_fr, ["mayonnaise", "vinaigrette", "pesto", "tahini", "sauce"])) score -= 15
+      if (hasAnyText(item.name_fr, ["allégée", "allegee", "préparée", "preparee"])) score += 10
+      break
+
 
     default:
       break

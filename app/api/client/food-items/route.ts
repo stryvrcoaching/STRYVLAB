@@ -221,7 +221,7 @@ export async function GET(req: NextRequest) {
         id: item.id,
         name_fr: item.name_fr,
         name: resolveLocalizedName(item, lang),
-        category_l1: recommendFoodCategory(itemForRecommend),
+        category_l1: item.category_l1,
         category_l2: item.category_l2,
         item_key: item.item_key,
         kcal_per_100g: item.kcal_per_100g,
