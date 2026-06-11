@@ -218,7 +218,7 @@ function NutritionLogContentImpl({
     'plant-protein': t('food.sub.vegetales'),
     charcuterie: 'Charcuterie',
     'other-proteins': 'Autres protéines',
-    rice: 'Riz DEBUG PROD',
+    rice: 'Riz',
     pasta: 'Pâtes',
     bread: t('food.sub.pain'),
     cereals: t('food.sub.cereales'),
