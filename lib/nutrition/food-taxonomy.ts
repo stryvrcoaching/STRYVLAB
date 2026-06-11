@@ -572,15 +572,193 @@ export function matchesVisibleLeaf(item: FoodItem, leaf: VisibleLeafKey): boolea
     case "fatty-sauces":
       return (item.category_l1 === "fats" || item.category_l1 === "extras") && (item.category_l2 === "sauces" || nameHasAny(item, ["mayonnaise", "pesto", "vinaigrette", "tahini", "sauce"])) && !isCompositeMeal(item)
     case "leafy":
-      return item.category_l1 === "vegetables" && item.category_l2 === "feuilles"
+      return item.category_l1 === "vegetables"
+        && nameHasAny(item, [
+          "salade",
+          "laitue",
+          "batavia",
+          "mâche",
+          "mache",
+          "roquette",
+          "épinard",
+          "epinard",
+          "cresson",
+          "endive",
+          "scarole",
+          "mesclun",
+          "jeunes pousses",
+          "pissenlit",
+          "oseille",
+          "blette",
+          "chou frisé",
+          "chou frise",
+          "kale"
+        ])
+        && !hasAnyText(item.name_fr, [
+          "betterave",
+          "betterave rouge",
+          "cébette",
+          "cebette",
+          "oignon",
+          "oignon nouveau",
+          "oignon frais",
+          "laitue de mer",
+          "salade de pâtes",
+          "salade de pates",
+          "salade végétale",
+          "salade vegetale",
+          "macédoine",
+          "macedoine",
+          "avec sauce",
+          "préemballée",
+          "preemballee"
+        ])
+        && !isCompositeMeal(item)
     case "cruciferous":
-      return item.category_l1 === "vegetables" && item.category_l2 === "cruciferes"
+      return item.category_l1 === "vegetables"
+        && nameHasAny(item, [
+          "brocoli",
+          "chou",
+          "chou-fleur",
+          "chou fleur",
+          "bruxelles",
+          "romanesco",
+          "pak-choi",
+          "pak choi",
+          "bok choy",
+          "chou-rave",
+          "chou rave",
+          "brèdes chou",
+          "bredes chou"
+        ])
+        && !hasAnyText(item.name_fr, [
+          "chayote",
+          "christophine",
+          "chouchou",
+          "sechium edule",
+          "salade",
+          "soupe",
+          "potage",
+          "mélange",
+          "melange",
+          "préemballée",
+          "preemballee"
+        ])
+        && !isCompositeMeal(item)
     case "roots":
-      return item.category_l1 === "vegetables" && nameHasAny(item, ["carotte", "betterave", "navet", "radis", "panais"])
+      return item.category_l1 === "vegetables"
+        && nameHasAny(item, [
+          "carotte",
+          "betterave",
+          "navet",
+          "radis",
+          "panais",
+          "rutabaga",
+          "salsifis",
+          "scorsonère",
+          "scorsonere",
+          "céleri-rave",
+          "celeri-rave",
+          "céleri rave",
+          "celeri rave"
+        ])
+        && !hasAnyText(item.name_fr, [
+          "petits pois et carottes",
+          "printanière",
+          "printaniere",
+          "macédoine",
+          "macedoine",
+          "mélange",
+          "melange",
+          "soupe",
+          "potage",
+          "salade",
+          "avec sauce"
+        ])
+        && !isCompositeMeal(item)
     case "mediterranean":
-      return item.category_l1 === "vegetables" && nameHasAny(item, ["courgette", "aubergine", "poivron", "tomate", "concombre"])
+      return item.category_l1 === "vegetables"
+        && nameHasAny(item, [
+          "tomate",
+          "courgette",
+          "aubergine",
+          "poivron",
+          "concombre",
+          "piment"
+        ])
+        && !hasAnyText(item.name_fr, [
+          "ravioli",
+          "raviolis",
+          "sauce",
+          "pizza",
+          "tarte",
+          "salade",
+          "ratatouille",
+          "préemballée",
+          "preemballee",
+          "à l'huile",
+          "a l'huile"
+        ])
+        && !isCompositeMeal(item)
     case "other-vegetables":
       return item.category_l1 === "vegetables"
+        && !matchesVisibleLeaf(item, "leafy")
+        && !matchesVisibleLeaf(item, "cruciferous")
+        && !matchesVisibleLeaf(item, "roots")
+        && !matchesVisibleLeaf(item, "mediterranean")
+        && !hasAnyText(item.name_fr, [
+          "avocat",
+          "banane",
+          "plantain",
+          "pomme de terre",
+          "patate douce",
+          "fruit à pain",
+          "fruit a pain",
+          "igname",
+          "dachine",
+          "kamanioc",
+          "brick",
+          "cake salé",
+          "cake sale",
+          "chips",
+          "ravioli",
+          "raviolis",
+          "lasagne",
+          "lasagnes",
+          "cannelloni",
+          "galette",
+          "pavé",
+          "pave",
+          "couscous de légumes",
+          "couscous de legumes",
+          "légumes pour couscous",
+          "legumes pour couscous",
+          "petit pot",
+          "plat légumes",
+          "plat legumes",
+          "salade de pâtes",
+          "salade de pates",
+          "salade végétale",
+          "salade vegetale",
+          "avec poisson",
+          "avec viande",
+          "avec féculent",
+          "avec feculent",
+          "avec sauce",
+          "préemballée",
+          "preemballee",
+          "risotto",
+          "riz blanc",
+          "sauce",
+          "spiruline",
+          "papaye",
+          "ti nain",
+          "tomate, séchée, à l'huile",
+          "tomate, sechee, a l'huile",
+          "tomate, séchée, a l'huile",
+          "tomate, sechee, à l'huile"
+        ])
+        && !isCompositeMeal(item)
     case "water":
       return item.category_l1 === "drinks"
         && item.category_l2 === "eau"
@@ -1096,6 +1274,34 @@ function getVisibleLeafSortScore(item: FoodItem, leaf: VisibleLeafKey): number {
     case "plant-milks":
       if (hasAnyText(item.name_fr, ["non sucré", "non sucre", "nature"])) score -= 25
       if (hasAnyText(item.name_fr, ["sucrée", "sucree", "aromatisée", "aromatisee", "jus de fruits"])) score += 25
+      break
+
+
+
+    case "leafy":
+      if (hasAnyText(item.name_fr, ["salade verte", "laitue", "batavia", "mâche", "mache", "roquette", "épinard", "epinard", "mesclun", "jeunes pousses"])) score -= 35
+      if (hasAnyText(item.name_fr, ["purée", "puree", "appertisé", "appertise", "surgelé", "surgele", "cuit"])) score += 12
+      break
+
+    case "cruciferous":
+      if (hasAnyText(item.name_fr, ["brocoli", "chou-fleur", "chou fleur", "chou de bruxelles", "chou blanc", "chou rouge", "chou vert", "romanesco"])) score -= 35
+      if (hasAnyText(item.name_fr, ["purée", "puree", "appertisé", "appertise", "surgelé", "surgele"])) score += 10
+      break
+
+    case "roots":
+      if (hasAnyText(item.name_fr, ["carotte", "betterave", "navet", "radis", "panais", "céleri-rave", "celeri-rave", "salsifis"])) score -= 35
+      if (hasAnyText(item.name_fr, ["purée cuisinée", "puree cuisinee", "déshydratée", "deshydratee"])) score += 25
+      break
+
+    case "mediterranean":
+      if (hasAnyText(item.name_fr, ["tomate, crue", "tomate cerise", "courgette", "aubergine", "poivron", "concombre"])) score -= 35
+      if (hasAnyText(item.name_fr, ["concentré", "concentre", "coulis", "purée", "puree", "séchée", "sechee"])) score += 25
+      break
+
+    case "other-vegetables":
+      if (hasAnyText(item.name_fr, ["champignon", "haricot vert", "poireau", "oignon", "ail", "artichaut", "asperge", "courge", "potiron", "potimarron", "céleri branche", "celeri branche", "fenouil"])) score -= 40
+      if (hasAnyText(item.name_fr, ["algue", "agar", "kombu", "wakamé", "wakame", "nori", "dulse", "fucus", "goémon", "goemon", "séchée", "sechee", "poudre", "herbes de provence", "romarin", "thym", "sauge", "spiruline", "risotto", "riz blanc", "sauce"])) score += 60
+      if (hasAnyText(item.name_fr, ["préemballé", "preemballe", "plat", "galette", "pavé", "pave", "lasagne", "ravioli", "couscous"])) score += 80
       break
 
 
