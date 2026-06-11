@@ -292,9 +292,14 @@ function isSpecificProtein(item: FoodItem): boolean {
     nameHasAny(item, ["boeuf", "bœuf", "veau", "agneau", "mouton", "porc", "jambon", "lard", "bacon", "saucisse", "chorizo", "saucisson", "pancetta", "bresaola"]) ||
     nameHasAny(item, ["poisson", "saumon", "thon", "sardine", "maquereau", "truite", "brochet", "cabillaud", "morue", "merlan", "hareng", "anchois", "anguille", "brème", "breme"]) || hasWordPrefixText(item.name_fr, ["bar"]) ||
     nameHasAny(item, ["crabe", "araignee de mer", "araignée de mer", "homard", "langouste", "crevette", "moule", "huitre", "huître", "calamar", "seiche"]) ||
-    nameHasAny(item, ["oeuf", "œuf", "blanc d'oeuf", "blanc d'œuf"]) ||
+    isEggFood(item) ||
     nameHasAny(item, ["fromage", "yaourt", "skyr", "lait", "whey", "protéine", "protein"])
   )
+}
+
+function isEggFood(item: FoodItem): boolean {
+  const name = normalizeText(item.name_fr)
+  return /\boeufs?\b/.test(name) || name.includes("blanc d'oeuf") || name.includes("blanc d œuf")
 }
 
 export function matchesVisibleLeaf(item: FoodItem, leaf: VisibleLeafKey): boolean {
@@ -302,17 +307,17 @@ export function matchesVisibleLeaf(item: FoodItem, leaf: VisibleLeafKey): boolea
     case "chicken":
       return item.category_l1 === "proteins" && nameHasAny(item, ["poulet", "chicken", "volaille", "poularde"]) && !isCompositeMeal(item)
     case "beef":
-      return item.category_l1 === "proteins" && nameHasAny(item, ["boeuf", "bœuf", "steak", "veau", "hach", "entrecote", "entrecôte", "rumsteck", "bavette", "bourguignon", "braise"]) && !isCompositeMeal(item)
+      return item.category_l1 === "proteins" && nameHasAny(item, ["boeuf", "bœuf", "veau"]) && !hasAnyText(item.name_fr, ["cheval", "lapin", "agneau", "mouton", "porc", "volaille", "dinde", "poulet", "tomate"]) && !isCompositeMeal(item)
     case "pork":
-      return item.category_l1 === "proteins" && nameHasAny(item, ["porc", "jambon", "lard", "bacon", "saucisse", "filet mignon", "rôti de porc", "roti de porc"]) && !isCompositeMeal(item)
+      return item.category_l1 === "proteins" && nameHasAny(item, ["porc", "jambon", "bacon", "lardon", "lardons", "filet mignon", "rôti de porc", "roti de porc", "saucisse de toulouse", "andouille"]) && !hasAnyText(item.name_fr, ["pélardon", "pelardon", "fromage", "chèvre", "chevre", "boeuf", "bœuf", "mouton", "agneau", "volaille", "dinde", "poulet", "oeuf", "œuf"]) && !isCompositeMeal(item)
     case "turkey":
       return item.category_l1 === "proteins" && nameHasAny(item, ["dinde", "turkey"]) && !isCompositeMeal(item)
     case "fish":
       return item.category_l1 === "proteins" && (hasAnyText(item.name_fr, ["poisson", "saumon", "thon", "sardine", "maquereau", "truite", "brochet", "cabillaud", "morue", "merlan", "hareng", "anchois", "anguille", "brème", "breme", "filet de poisson"]) || hasWordPrefixText(item.name_fr, ["bar"])) && !isCompositeMeal(item)
     case "seafood":
-      return item.category_l1 === "proteins" && nameHasAny(item, ["crevette", "moule", "calamar", "seiche", "saint-jacques", "crabe", "homard", "langouste", "huitre", "huître", "araignee de mer", "araignée de mer"]) && !isCompositeMeal(item)
+      return item.category_l1 === "proteins" && nameHasAny(item, ["crevette", "calamar", "seiche", "saint-jacques", "crabe", "homard", "langouste", "huitre", "huître", "araignee de mer", "araignée de mer"]) && !hasAnyText(item.name_fr, ["semoule", "gâteau", "gateau"]) && !isCompositeMeal(item)
     case "eggs":
-      return item.category_l1 === "proteins" && nameHasAny(item, ["oeuf", "œuf", "blanc d'oeuf", "blanc d'œuf", "omelette", "œufs", "oeufs"]) && !isCompositeMeal(item)
+      return item.category_l1 === "proteins" && isEggFood(item) && !hasAnyText(item.name_fr, ["boeuf", "bœuf", "merguez", "saucisse", "salami", "rognon", "tripes", "langue", "coeur de boeuf", "cœur de bœuf", "tarte", "biscuit"]) && !isCompositeMeal(item)
     case "dairy-protein":
       return item.category_l1 === "proteins" && nameHasAny(item, ["fromage", "yaourt", "skyr", "lait", "petit-suisse", "petit suisse", "quark"])
     case "plant-protein":
@@ -320,7 +325,50 @@ export function matchesVisibleLeaf(item: FoodItem, leaf: VisibleLeafKey): boolea
     case "charcuterie":
       return item.category_l1 === "proteins" && nameHasAny(item, ["jambon", "salami", "saucisson", "chorizo", "charcut", "bresaola", "pancetta"])
     case "other-proteins":
-      return item.category_l1 === "proteins" && !isSpecificProtein(item) && !isCompositeMeal(item)
+      return item.category_l1 === "proteins"
+        && !isCompositeMeal(item)
+        && !["laitiers", "complements", "poissons", "oeufs", "vegetales"].includes(item.category_l2 ?? "")
+        && !hasAnyText(item.name_fr, [
+          "fromage",
+          "brie",
+          "camembert",
+          "comté",
+          "comte",
+          "gouda",
+          "cheddar",
+          "emmental",
+          "feta",
+          "chèvre",
+          "chevre",
+          "skyr",
+          "yaourt",
+          "lait",
+          "petit-suisse",
+          "petit suisse",
+          "whey",
+          "caseine",
+          "caséine",
+          "creatine",
+          "créatine",
+          "bcaa",
+          "collagene",
+          "collagène",
+          "dessert",
+          "crème",
+          "creme",
+          "gâteau",
+          "gateau"
+        ])
+        && !matchesVisibleLeaf(item, "chicken")
+        && !matchesVisibleLeaf(item, "beef")
+        && !matchesVisibleLeaf(item, "pork")
+        && !matchesVisibleLeaf(item, "turkey")
+        && !matchesVisibleLeaf(item, "fish")
+        && !matchesVisibleLeaf(item, "seafood")
+        && !matchesVisibleLeaf(item, "eggs")
+        && !matchesVisibleLeaf(item, "charcuterie")
+        && !matchesVisibleLeaf(item, "dairy-protein")
+        && !matchesVisibleLeaf(item, "plant-protein")
     case "rice":
       return item.category_l1 === "carbs" && nameHasAny(item, ["riz", "rice", "galette de riz", "galette de riz soufflé", "pate sans gluten a base de riz", "pâtes sans gluten à base de riz"]) && !hasWordPrefixText(item.name_fr, ["chorizo"])
     case "pasta":
