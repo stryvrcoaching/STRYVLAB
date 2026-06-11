@@ -24,17 +24,9 @@ import { computeActionableRemaining } from "@/lib/nutrition/actionable-remaining
 import { getRemainingNutritionTargets } from "@/lib/nutrition/remaining-targets"
 import RemainingNutritionSummary from "@/components/client/nutrition/RemainingNutritionSummary"
 import type { NutritionMacros } from "@/components/client/smart/SmartNutritionWidget"
+import { matchesVisibleLeaf, type VisibleCategoryKey, type VisibleLeafKey } from "@/lib/nutrition/food-taxonomy"
 
 // ─── Icônes catégories ───────────────────────────────────────
-type VisibleCategoryKey = "proteins" | "carbs" | "fats" | "vegetables" | "drinks" | "supplements"
-type VisibleLeafKey =
-  | "chicken" | "beef" | "pork" | "turkey" | "fish" | "seafood" | "eggs" | "dairy-protein" | "plant-protein" | "charcuterie" | "other-proteins"
-  | "rice" | "pasta" | "bread" | "cereals" | "potatoes" | "legumes" | "fresh-fruits" | "dried-fruits" | "sweet-products" | "sweet-sauces"
-  | "oils" | "nuts-seeds" | "avocado-olives" | "butter-spreads" | "nut-butters" | "fatty-sauces"
-  | "leafy" | "cruciferous" | "roots" | "mediterranean" | "other-vegetables"
-  | "water" | "hot-drinks" | "juices-smoothies" | "sodas" | "plant-milks" | "sports-drinks" | "alcohol"
-  | "whey" | "gainers-bars" | "performance" | "other-supplements"
-
 const CATEGORY_ICONS: Record<VisibleCategoryKey, string> = {
   proteins: "🥩",
   carbs: "🌾",
@@ -79,129 +71,18 @@ const VISIBLE_LEAVES_BY_CATEGORY: Record<VisibleCategoryKey, VisibleLeafKey[]> =
   supplements: ["whey", "gainers-bars", "performance", "other-supplements"],
 }
 
+const CATEGORY_FETCH_SCOPE: Record<VisibleCategoryKey, string[]> = {
+  proteins: ["proteins", "extras"],
+  carbs: ["carbs", "fruits", "extras"],
+  fats: ["fats", "extras"],
+  vegetables: ["vegetables"],
+  drinks: ["drinks", "extras"],
+  supplements: ["proteins", "extras"],
+}
 type Layer = "category" | "subcategory" | "item" | "quantity"
 export type NutritionLogLayer = Layer
 type MealSource = "manual" | "voice" | "text" | "composer" | "auto_adjusted" | "flash_estimate"
 type SmartComposeSurface = "explore" | "library"
-
-// Infer category from macro ratios — better than always "extras" for advisor accuracy
-function inferCategoryFromMacros(entry: { protein_g?: number; carbs_g?: number; fat_g?: number }): CategoryL1 {
-  const p = (entry.protein_g ?? 0) * 4
-  const c = (entry.carbs_g ?? 0) * 4
-  const f = (entry.fat_g ?? 0) * 9
-  const total = p + c + f
-  if (total === 0) return 'extras'
-  if (p >= c && p >= f) return 'proteins'
-  if (c >= p && c >= f) return 'carbs'
-  return 'fats'
-}
-
-function normalizeFoodText(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/œ/g, "oe")
-    .replace(/æ/g, "ae")
-}
-
-function nameHasAny(item: FoodItem, keywords: string[]): boolean {
-  const name = normalizeFoodText(item.name_fr)
-  return keywords.some((keyword) => name.includes(keyword))
-}
-
-function matchesVisibleLeaf(item: FoodItem, leaf: VisibleLeafKey): boolean {
-  switch (leaf) {
-    case "chicken":
-      return item.category_l1 === "proteins" && item.category_l2 === "viandes" && nameHasAny(item, ["poulet", "chicken"])
-    case "beef":
-      return item.category_l1 === "proteins" && item.category_l2 === "viandes" && nameHasAny(item, ["boeuf", "bœuf", "steak", "veau", "hach", "entrecote", "rumsteck"])
-    case "pork":
-      return item.category_l1 === "proteins" && item.category_l2 === "viandes" && nameHasAny(item, ["porc", "jambon", "lard", "bacon", "saucisse", "filet mignon"])
-    case "turkey":
-      return item.category_l1 === "proteins" && item.category_l2 === "viandes" && nameHasAny(item, ["dinde", "turkey"])
-    case "fish":
-      return item.category_l1 === "proteins" && item.category_l2 === "poissons"
-    case "seafood":
-      return item.category_l1 === "proteins" && (item.category_l2 === "poissons" || item.category_l2 === "viandes") && nameHasAny(item, ["crevette", "moule", "calamar", "seiche", "saint-jacques", "crabe", "homard", "langouste", "huitre", "huître"])
-    case "eggs":
-      return item.category_l1 === "proteins" && item.category_l2 === "oeufs"
-    case "dairy-protein":
-      return item.category_l1 === "proteins" && item.category_l2 === "laitiers"
-    case "plant-protein":
-      return item.category_l1 === "proteins" && item.category_l2 === "vegetales"
-    case "charcuterie":
-      return item.category_l1 === "proteins" && nameHasAny(item, ["jambon", "salami", "saucisson", "chorizo", "charcut", "bresaola", "pancetta"])
-    case "other-proteins":
-      return item.category_l1 === "proteins"
-    case "rice":
-      return item.category_l1 === "carbs" && nameHasAny(item, ["riz", "rice"])
-    case "pasta":
-      return item.category_l1 === "carbs" && nameHasAny(item, ["pate", "pâtes", "spaghetti", "penne", "macaroni", "tagliatelle", "gnocchi"])
-    case "bread":
-      return item.category_l1 === "carbs" && item.category_l2 === "pain"
-    case "cereals":
-      return item.category_l1 === "carbs" && item.category_l2 === "cereales"
-    case "potatoes":
-      return item.category_l1 === "carbs" && item.category_l2 === "fecules" && nameHasAny(item, ["pomme de terre", "patate", "frite", "puree", "purée"])
-    case "legumes":
-      return item.category_l1 === "carbs" && item.category_l2 === "legumineuses"
-    case "fresh-fruits":
-      return item.category_l1 === "fruits" && item.category_l2 === "frais"
-    case "dried-fruits":
-      return item.category_l1 === "fruits" && item.category_l2 === "secs"
-    case "sweet-products":
-      return (item.category_l1 === "carbs" || item.category_l1 === "extras") && nameHasAny(item, ["sucre", "miel", "confiture", "chocolat", "biscuit", "cookie", "gateau", "gâteau", "bonbon", "compote", "cereal", "granola"])
-    case "sweet-sauces":
-      return (item.category_l1 === "extras" || item.category_l1 === "carbs") && (item.category_l2 === "sauces" || nameHasAny(item, ["sirop", "coulis", "ketchup", "bbq", "barbecue", "sauce"]))
-    case "oils":
-      return item.category_l1 === "fats" && item.category_l2 === "huiles"
-    case "nuts-seeds":
-      return item.category_l1 === "fats" && item.category_l2 === "noix-graines"
-    case "avocado-olives":
-      return item.category_l1 === "fats" && nameHasAny(item, ["avocat", "olive"])
-    case "butter-spreads":
-      return item.category_l1 === "fats" && nameHasAny(item, ["beurre", "margarine"])
-    case "nut-butters":
-      return (item.category_l1 === "fats" || item.category_l1 === "extras") && nameHasAny(item, ["cacahuete", "amande", "noisette", "pistache", "beurre de", "puree", "purée"])
-    case "fatty-sauces":
-      return (item.category_l1 === "fats" || item.category_l1 === "extras") && (item.category_l2 === "sauces" || nameHasAny(item, ["mayonnaise", "pesto", "vinaigrette", "tahini", "sauce"]))
-    case "leafy":
-      return item.category_l1 === "vegetables" && item.category_l2 === "feuilles"
-    case "cruciferous":
-      return item.category_l1 === "vegetables" && item.category_l2 === "cruciferes"
-    case "roots":
-      return item.category_l1 === "vegetables" && nameHasAny(item, ["carotte", "betterave", "navet", "radis", "panais"])
-    case "mediterranean":
-      return item.category_l1 === "vegetables" && nameHasAny(item, ["courgette", "aubergine", "poivron", "tomate", "concombre"])
-    case "other-vegetables":
-      return item.category_l1 === "vegetables"
-    case "water":
-      return item.category_l1 === "drinks" && item.category_l2 === "eau"
-    case "hot-drinks":
-      return item.category_l1 === "drinks" && item.category_l2 === "chauds"
-    case "juices-smoothies":
-      return item.category_l1 === "drinks" && item.category_l2 === "jus-smoothies"
-    case "sodas":
-      return (item.category_l1 === "drinks" && item.category_l2 === "boissons") || nameHasAny(item, ["coca", "cola", "fanta", "sprite", "soda", "ice tea"])
-    case "plant-milks":
-      return item.category_l1 === "drinks" && item.category_l2 === "laits-vegetaux"
-    case "sports-drinks":
-      return item.category_l1 === "drinks" && item.category_l2 === "sports-drinks"
-    case "alcohol":
-      return item.category_l1 === "drinks" && item.category_l2 === "alcools"
-    case "whey":
-      return (item.category_l2 === "complements" || item.category_l1 === "proteins") && nameHasAny(item, ["whey", "isolate", "caseine", "caséine", "protein", "protéine"])
-    case "gainers-bars":
-      return (item.category_l2 === "complements" || item.category_l1 === "extras" || item.category_l1 === "proteins") && nameHasAny(item, ["gainer", "barre", "protein bar", "barre prote", "meal replacement"])
-    case "performance":
-      return item.category_l2 === "complements" && nameHasAny(item, ["creatine", "créatine", "bcaa", "eaa", "pre-workout", "maltodextrine", "electrolyte", "électrolyte"])
-    case "other-supplements":
-      return item.category_l2 === "complements"
-    default:
-      return false
-  }
-}
 
 const slideVariants = {
   enter: (dir: number) => ({ x: dir > 0 ? "100%" : "-100%", opacity: 0 }),
@@ -337,7 +218,7 @@ function NutritionLogContentImpl({
     'plant-protein': t('food.sub.vegetales'),
     charcuterie: 'Charcuterie',
     'other-proteins': 'Autres protéines',
-    rice: 'Riz',
+    rice: 'Riz DEBUG PROD',
     pasta: 'Pâtes',
     bread: t('food.sub.pain'),
     cereals: t('food.sub.cereales'),
@@ -534,13 +415,40 @@ function NutritionLogContentImpl({
   const fetchItems = useCallback(async (sub: VisibleLeafKey | null, q: string) => {
     if (!selectedCategory || !sub) return
     setLoadingItems(true)
-    const params = new URLSearchParams({ limit: "1000" })
-    if (q) params.set("q", q)
-    const res = await fetch(`/api/client/food-items?${params}`)
-    const json = await res.json()
-    const allItems = (json.data ?? []) as FoodItem[]
-    setItems(allItems.filter((item) => matchesVisibleLeaf(item, sub)))
-    setLoadingItems(false)
+
+    try {
+      const pageSize = 1000
+      const allItems: FoodItem[] = []
+      let offset = 0
+
+      while (true) {
+        const params = new URLSearchParams({
+          limit: String(pageSize),
+          offset: String(offset),
+          categories: CATEGORY_FETCH_SCOPE[selectedCategory].join(","),
+        })
+
+        if (q) params.set("q", q)
+
+        const res = await fetch(`/api/client/food-items?${params}`)
+        const json = await res.json()
+        const pageItems = (json.data ?? []) as FoodItem[]
+
+        allItems.push(...pageItems)
+
+        if (pageItems.length < pageSize) break
+        offset += pageSize
+
+        // Safety guard: current catalog is around 3100 foods.
+        if (offset > 6000) break
+      }
+
+      setItems(allItems.filter((item) => matchesVisibleLeaf(item, sub)))
+    } catch {
+      setItems([])
+    } finally {
+      setLoadingItems(false)
+    }
   }, [selectedCategory])
 
   useEffect(() => {

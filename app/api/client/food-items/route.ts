@@ -111,10 +111,15 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const category = searchParams.get("category")
+  const categoriesParam = searchParams.get("categories")
+  const categories = categoriesParam
+    ? categoriesParam.split(",").map((value) => value.trim()).filter(Boolean)
+    : null
   const subcategory = searchParams.get("subcategory")
   const q = searchParams.get("q")?.trim()
   const normalizedQuery = q ? normalizeSearchText(q) : ""
-  const limit = Math.min(parseInt(searchParams.get("limit") ?? "50"), 300)
+  const limit = Math.min(parseInt(searchParams.get("limit") ?? "50"), 1000)
+  const offset = Math.max(parseInt(searchParams.get("offset") ?? "0"), 0)
   const mineOnly = searchParams.get("mine") === "true"
   const lang = (searchParams.get("lang") ?? req.headers.get("x-client-lang") ?? "fr") as "fr" | "en" | "es"
 
@@ -133,7 +138,7 @@ export async function GET(req: NextRequest) {
       food_item_translations!food_item_translations_food_item_id_fkey(lang, name)
     `)
     .order("name_fr")
-    .limit(q ? limit : (category ? 1000 : limit))
+    .range(offset, offset + limit - 1)
 
   if (mineOnly) {
     query = query.eq("client_id", clientId)
@@ -141,7 +146,11 @@ export async function GET(req: NextRequest) {
     query = query.or(allowedScopeClause)
   }
 
-  if (category) query = query.eq("category_l1", category)
+  if (categories?.length) {
+    query = query.in("category_l1", categories)
+  } else if (category) {
+    query = query.eq("category_l1", category)
+  }
   if (subcategory) query = query.eq("category_l2", subcategory)
 
   // Filtrage DB : recherche par PRÉFIXE de token (ilike 'token%') pour un comportement
