@@ -24,7 +24,7 @@ import { computeActionableRemaining } from "@/lib/nutrition/actionable-remaining
 import { getRemainingNutritionTargets } from "@/lib/nutrition/remaining-targets"
 import RemainingNutritionSummary from "@/components/client/nutrition/RemainingNutritionSummary"
 import type { NutritionMacros } from "@/components/client/smart/SmartNutritionWidget"
-import { matchesVisibleLeaf, type VisibleCategoryKey, type VisibleLeafKey } from "@/lib/nutrition/food-taxonomy"
+import { matchesVisibleLeaf, sortVisibleLeafItems, type VisibleCategoryKey, type VisibleLeafKey } from "@/lib/nutrition/food-taxonomy"
 
 // ─── Icônes catégories ───────────────────────────────────────
 const CATEGORY_ICONS: Record<VisibleCategoryKey, string> = {
@@ -443,7 +443,7 @@ function NutritionLogContentImpl({
         if (offset > 6000) break
       }
 
-      setItems(allItems.filter((item) => matchesVisibleLeaf(item, sub)))
+      setItems(sortVisibleLeafItems(allItems.filter((item) => matchesVisibleLeaf(item, sub)), sub))
     } catch {
       setItems([])
     } finally {
