@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Mic, Pencil, Plus, Sparkles } from 'lucide-react'
-import { shiftIsoDate } from '@/lib/utils/date'
+import { Apple, ChevronDown, ChevronUp, Coffee, Mic, Moon, Pencil, Plus, Sparkles, Sun } from 'lucide-react'
 import SmartNutritionHero from '@/components/client/smart/SmartNutritionHero'
 import SmartNutritionPrepList, { type SmartNutritionPrep } from '@/components/client/smart/SmartNutritionPrepList'
 import { NutritionLogContent, type NutritionLogContentHandle, type NutritionLogLayer } from '@/app/client/nutrition/log/NutritionLogContent'
@@ -28,6 +27,12 @@ type DraftTotals = { calories: number; protein: number; carbs: number; fat: numb
 type PrepSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack'
 
 const ZERO_DRAFTS: DraftTotals = { calories: 0, protein: 0, carbs: 0, fat: 0, count: 0 }
+const SLOT_META: Array<{ key: PrepSlot; icon: typeof Coffee }> = [
+  { key: 'breakfast', icon: Coffee },
+  { key: 'lunch', icon: Sun },
+  { key: 'dinner', icon: Moon },
+  { key: 'snack', icon: Apple },
+]
 
 export default function ComposeClientPage({ consumed, target, date, todayDate, initialPreps, gender, bodyWeightKg }: ComposeClientPageProps) {
   const { t } = useClientT()
@@ -116,28 +121,18 @@ export default function ComposeClientPage({ consumed, target, date, todayDate, i
     () => scenarioOptions.find((scenario) => scenario.key === activeScenarioKey) ?? scenarioOptions[0] ?? { key: 'default', label: "Scénario principal" },
     [activeScenarioKey, scenarioOptions],
   )
-  const maxComposeDate = useMemo(() => shiftIsoDate(todayDate, 3), [todayDate])
   const isFutureDate = date > todayDate
-  const canGoPrevDay = date > todayDate
-  const canGoNextDay = date < maxComposeDate
   const activeScenarioLabel = activeScenario.label === "Aujourd'hui" ? "Scénario principal" : activeScenario.label
   const headerIsCompact = headerCollapsed || contentLayer !== 'category'
   const shouldShowScenarioControls = initialPreps.length > 0 || scenarioOptions.length > 1
 
   const hasDrafts = draftTotals.count > 0
 
-  const goToComposeDate = useCallback((nextDate: string) => {
-    if (hasDrafts) return
-    router.push(`/client/nutrition/compose?date=${nextDate}`)
-  }, [router, hasDrafts])
-
   const composeDateLabel = useMemo(() => {
-    if (date === todayDate) return t('compose.today')
-    if (date === shiftIsoDate(todayDate, 1)) return t('compose.tomorrow')
-    if (date === shiftIsoDate(todayDate, 2)) return t('compose.dayPlus2')
-    if (date === shiftIsoDate(todayDate, 3)) return t('compose.dayPlus3')
-    return date
-  }, [date, todayDate, t])
+    const [year, month, day] = date.split('-').map(Number)
+    return new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+      .format(new Date(Date.UTC(year, month - 1, day)))
+  }, [date])
 
   const simulation = computeSimulationState({
     consumed,
@@ -260,45 +255,30 @@ export default function ComposeClientPage({ consumed, target, date, todayDate, i
         style={{ paddingTop: 'max(12px, env(safe-area-inset-top, 12px))' }}
       >
         <div className="pb-1.5">
-          <div className="flex items-center justify-between rounded-2xl bg-white/[0.04] border border-white/[0.05] px-2 py-2">
-            <button
-              onClick={() => canGoPrevDay && !hasDrafts && goToComposeDate(shiftIsoDate(date, -1))}
-              disabled={!canGoPrevDay || hasDrafts}
-              title={hasDrafts ? t('compose.saveDayFirst') : undefined}
-              className="h-9 w-9 rounded-xl bg-white/[0.04] text-white/60 flex items-center justify-center disabled:opacity-25 active:scale-[0.97] transition-all"
-            >
-              <ChevronLeft size={15} />
-            </button>
-            <div className="text-center min-w-0 flex-1">
-              <p className="text-[9px] uppercase tracking-[0.16em] text-white/24 font-bold">{t('compose.simulatedDay')}</p>
-              <p className="mt-1 text-[13px] font-barlow-condensed font-bold uppercase tracking-[0.12em] text-white truncate">
-                {composeDateLabel}
+          <div className="flex items-center justify-between rounded-2xl border border-[#818cf8]/15 bg-[#0f0f15] px-3 py-3">
+            <div className="min-w-0">
+              <p className="text-[15px] font-barlow-condensed font-bold uppercase tracking-[0.12em] text-[#818cf8]">
+                Je compose
+              </p>
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#818cf8]/55">
+                Planification · {composeDateLabel}
               </p>
               {hasDrafts && (
-                <p className="text-[9px] uppercase tracking-[0.1em] text-[#818cf8]/70 mt-0.5">{t('compose.saveDayFirst')}</p>
+                <p className="mt-1 text-[9px] uppercase tracking-[0.1em] text-[#818cf8]/70">{t('compose.saveDayFirst')}</p>
               )}
             </div>
-            {/* Mic button — opens voice/text log, same as standard log page */}
             <button
               onClick={() => logRef.current?.openVoice?.('voice')}
-              className="h-9 w-9 rounded-xl bg-[#818cf8]/12 text-[#818cf8] flex items-center justify-center active:scale-[0.97] transition-all mr-1"
+              className="h-9 w-9 rounded-xl bg-[#818cf8]/10 text-[#818cf8] flex items-center justify-center active:scale-[0.97] transition-all"
               aria-label="Dicter ou saisir un repas par texte"
             >
               <Mic size={16} />
-            </button>
-            <button
-              onClick={() => canGoNextDay && !hasDrafts && goToComposeDate(shiftIsoDate(date, 1))}
-              disabled={!canGoNextDay || hasDrafts}
-              title={hasDrafts ? t('compose.saveDayFirst') : undefined}
-              className="h-9 w-9 rounded-xl bg-[#818cf8]/12 text-[#818cf8] flex items-center justify-center disabled:opacity-25 active:scale-[0.97] transition-all"
-            >
-              <ChevronRight size={15} />
             </button>
           </div>
         </div>
 
         {/* Hero */}
-        <div className={`px-3 transition-all duration-200 ${headerIsCompact ? 'pb-1.5' : 'pb-1'}`}>
+        <div className={`px-3 transition-all duration-200 ${headerIsCompact ? 'pb-2' : 'pb-2'}`}>
           <SmartNutritionHero
             date={date}
             consumed={effectiveConsumed}
@@ -339,25 +319,21 @@ export default function ComposeClientPage({ consumed, target, date, todayDate, i
         {/* Slot selector — always visible in category layer */}
         {contentLayer === 'category' && !headerIsCompact && (
           <div className="px-3 pb-2">
-            <div className="flex items-center gap-1.5">
-              <p className="text-[9px] uppercase tracking-[0.14em] text-white/28 font-bold shrink-0">
-                {t('compose.slot.label')}
-              </p>
-              <div className="flex gap-1 flex-1 overflow-x-auto">
-                {(['breakfast', 'lunch', 'dinner', 'snack'] as PrepSlot[]).map(slot => (
+            <div className="flex gap-2 rounded-2xl border border-[#818cf8]/10 bg-[#0f0f15] px-2.5 py-2.5 overflow-x-auto">
+              {SLOT_META.map(({ key, icon: Icon }) => (
                   <button
-                    key={slot}
-                    onClick={() => setSelectedSlot(slot)}
-                    className={`shrink-0 h-7 px-3 rounded-full text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.1em] transition-all active:scale-[0.97] ${
-                      selectedSlot === slot
-                        ? 'bg-[#818cf8]/20 text-[#818cf8]'
-                        : 'bg-white/[0.04] text-white/36'
+                    key={key}
+                    onClick={() => setSelectedSlot(key)}
+                    className={`flex-1 shrink-0 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-barlow-condensed font-bold uppercase tracking-wide transition-all active:scale-[0.97] ${
+                      selectedSlot === key
+                        ? 'bg-[#818cf8]/20 text-[#818cf8] border border-[#818cf8]/35'
+                        : 'bg-[#818cf8]/5 text-white/35'
                     }`}
                   >
-                    {SLOT_LABELS[slot]}
+                    <Icon size={12} />
+                    {SLOT_LABELS[key]}
                   </button>
                 ))}
-              </div>
             </div>
           </div>
         )}

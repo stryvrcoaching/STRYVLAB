@@ -26,20 +26,31 @@ import RemainingNutritionSummary from "@/components/client/nutrition/RemainingNu
 import type { NutritionMacros } from "@/components/client/smart/SmartNutritionWidget"
 
 // ─── Icônes catégories ───────────────────────────────────────
-const CATEGORY_ICONS: Record<CategoryL1, string> = {
-  proteins: "🥩", carbs: "🌾", vegetables: "🥦", fruits: "🍎",
-  fats: "🥑", drinks: "💧", extras: "🍿",
+type VisibleCategoryKey = "proteins" | "carbs" | "fats" | "vegetables" | "drinks" | "supplements"
+type VisibleLeafKey =
+  | "chicken" | "beef" | "pork" | "turkey" | "fish" | "seafood" | "eggs" | "dairy-protein" | "plant-protein" | "charcuterie" | "other-proteins"
+  | "rice" | "pasta" | "bread" | "cereals" | "potatoes" | "legumes" | "fresh-fruits" | "dried-fruits" | "sweet-products" | "sweet-sauces"
+  | "oils" | "nuts-seeds" | "avocado-olives" | "butter-spreads" | "nut-butters" | "fatty-sauces"
+  | "leafy" | "cruciferous" | "roots" | "mediterranean" | "other-vegetables"
+  | "water" | "hot-drinks" | "juices-smoothies" | "sodas" | "plant-milks" | "sports-drinks" | "alcohol"
+  | "whey" | "gainers-bars" | "performance" | "other-supplements"
+
+const CATEGORY_ICONS: Record<VisibleCategoryKey, string> = {
+  proteins: "🥩",
+  carbs: "🌾",
+  fats: "🥑",
+  vegetables: "🥦",
+  drinks: "💧",
+  supplements: "💪",
 }
 
-const SUBCATEGORY_ICONS: Record<string, string> = {
-  viandes: "🥩", poissons: "🐟", oeufs: "🥚", laitiers: "🥛",
-  vegetales: "🌿", complements: "💪", cereales: "🌾", fecules: "🥔",
-  pain: "🍞", legumineuses: "🫘", feuilles: "🥬", cruciferes: "🥦",
-  "autres-legumes": "🥕", frais: "🍓", secs: "🍇", huiles: "🫒",
-  "noix-graines": "🌰", "autres-lipides": "🥑", sauces: "🫙",
-  boissons: "🥤", eau: "💧", chauds: "☕", "jus-smoothies": "🍹",
-  "laits-vegetaux": "🥛", "sports-drinks": "⚡", alcools: "🍷",
-  "snacks-sales": "🍿", "snacks-sucres": "🍫", "fast-food": "🍔", divers: "🧀",
+const LEAF_ICONS: Record<VisibleLeafKey, string> = {
+  chicken: "🐔", beef: "🐄", pork: "🐖", turkey: "🦃", fish: "🐟", seafood: "🦐", eggs: "🥚", "dairy-protein": "🥛", "plant-protein": "🌿", charcuterie: "🥓", "other-proteins": "🍖",
+  rice: "🍚", pasta: "🍝", bread: "🍞", cereals: "🥣", potatoes: "🥔", legumes: "🫘", "fresh-fruits": "🍎", "dried-fruits": "🍇", "sweet-products": "🍯", "sweet-sauces": "🫙",
+  oils: "🫒", "nuts-seeds": "🌰", "avocado-olives": "🥑", "butter-spreads": "🧈", "nut-butters": "🥜", "fatty-sauces": "🍶",
+  leafy: "🥬", cruciferous: "🥦", roots: "🥕", mediterranean: "🍆", "other-vegetables": "🥗",
+  water: "💧", "hot-drinks": "☕", "juices-smoothies": "🍹", sodas: "🥤", "plant-milks": "🥛", "sports-drinks": "⚡", alcohol: "🍷",
+  whey: "🥤", "gainers-bars": "🍫", performance: "💥", "other-supplements": "💊",
 }
 
 const PORTION_ICON_BY_KEY: Record<string, string> = {
@@ -59,6 +70,15 @@ const SUBCATEGORIES: Record<CategoryL1, string[]> = {
   extras: ["sauces", "boissons", "snacks-sales", "snacks-sucres", "fast-food", "divers"],
 }
 
+const VISIBLE_LEAVES_BY_CATEGORY: Record<VisibleCategoryKey, VisibleLeafKey[]> = {
+  proteins: ["chicken", "beef", "pork", "turkey", "fish", "seafood", "eggs", "dairy-protein", "plant-protein", "charcuterie", "other-proteins"],
+  carbs: ["rice", "pasta", "bread", "cereals", "potatoes", "legumes", "fresh-fruits", "dried-fruits", "sweet-products", "sweet-sauces"],
+  fats: ["oils", "nuts-seeds", "avocado-olives", "butter-spreads", "nut-butters", "fatty-sauces"],
+  vegetables: ["leafy", "cruciferous", "roots", "mediterranean", "other-vegetables"],
+  drinks: ["water", "hot-drinks", "juices-smoothies", "sodas", "plant-milks", "sports-drinks", "alcohol"],
+  supplements: ["whey", "gainers-bars", "performance", "other-supplements"],
+}
+
 type Layer = "category" | "subcategory" | "item" | "quantity"
 export type NutritionLogLayer = Layer
 type MealSource = "manual" | "voice" | "text" | "composer" | "auto_adjusted" | "flash_estimate"
@@ -74,6 +94,113 @@ function inferCategoryFromMacros(entry: { protein_g?: number; carbs_g?: number; 
   if (p >= c && p >= f) return 'proteins'
   if (c >= p && c >= f) return 'carbs'
   return 'fats'
+}
+
+function normalizeFoodText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/œ/g, "oe")
+    .replace(/æ/g, "ae")
+}
+
+function nameHasAny(item: FoodItem, keywords: string[]): boolean {
+  const name = normalizeFoodText(item.name_fr)
+  return keywords.some((keyword) => name.includes(keyword))
+}
+
+function matchesVisibleLeaf(item: FoodItem, leaf: VisibleLeafKey): boolean {
+  switch (leaf) {
+    case "chicken":
+      return item.category_l1 === "proteins" && item.category_l2 === "viandes" && nameHasAny(item, ["poulet", "chicken"])
+    case "beef":
+      return item.category_l1 === "proteins" && item.category_l2 === "viandes" && nameHasAny(item, ["boeuf", "bœuf", "steak", "veau", "hach", "entrecote", "rumsteck"])
+    case "pork":
+      return item.category_l1 === "proteins" && item.category_l2 === "viandes" && nameHasAny(item, ["porc", "jambon", "lard", "bacon", "saucisse", "filet mignon"])
+    case "turkey":
+      return item.category_l1 === "proteins" && item.category_l2 === "viandes" && nameHasAny(item, ["dinde", "turkey"])
+    case "fish":
+      return item.category_l1 === "proteins" && item.category_l2 === "poissons"
+    case "seafood":
+      return item.category_l1 === "proteins" && (item.category_l2 === "poissons" || item.category_l2 === "viandes") && nameHasAny(item, ["crevette", "moule", "calamar", "seiche", "saint-jacques", "crabe", "homard", "langouste", "huitre", "huître"])
+    case "eggs":
+      return item.category_l1 === "proteins" && item.category_l2 === "oeufs"
+    case "dairy-protein":
+      return item.category_l1 === "proteins" && item.category_l2 === "laitiers"
+    case "plant-protein":
+      return item.category_l1 === "proteins" && item.category_l2 === "vegetales"
+    case "charcuterie":
+      return item.category_l1 === "proteins" && nameHasAny(item, ["jambon", "salami", "saucisson", "chorizo", "charcut", "bresaola", "pancetta"])
+    case "other-proteins":
+      return item.category_l1 === "proteins"
+    case "rice":
+      return item.category_l1 === "carbs" && nameHasAny(item, ["riz", "rice"])
+    case "pasta":
+      return item.category_l1 === "carbs" && nameHasAny(item, ["pate", "pâtes", "spaghetti", "penne", "macaroni", "tagliatelle", "gnocchi"])
+    case "bread":
+      return item.category_l1 === "carbs" && item.category_l2 === "pain"
+    case "cereals":
+      return item.category_l1 === "carbs" && item.category_l2 === "cereales"
+    case "potatoes":
+      return item.category_l1 === "carbs" && item.category_l2 === "fecules" && nameHasAny(item, ["pomme de terre", "patate", "frite", "puree", "purée"])
+    case "legumes":
+      return item.category_l1 === "carbs" && item.category_l2 === "legumineuses"
+    case "fresh-fruits":
+      return item.category_l1 === "fruits" && item.category_l2 === "frais"
+    case "dried-fruits":
+      return item.category_l1 === "fruits" && item.category_l2 === "secs"
+    case "sweet-products":
+      return (item.category_l1 === "carbs" || item.category_l1 === "extras") && nameHasAny(item, ["sucre", "miel", "confiture", "chocolat", "biscuit", "cookie", "gateau", "gâteau", "bonbon", "compote", "cereal", "granola"])
+    case "sweet-sauces":
+      return (item.category_l1 === "extras" || item.category_l1 === "carbs") && (item.category_l2 === "sauces" || nameHasAny(item, ["sirop", "coulis", "ketchup", "bbq", "barbecue", "sauce"]))
+    case "oils":
+      return item.category_l1 === "fats" && item.category_l2 === "huiles"
+    case "nuts-seeds":
+      return item.category_l1 === "fats" && item.category_l2 === "noix-graines"
+    case "avocado-olives":
+      return item.category_l1 === "fats" && nameHasAny(item, ["avocat", "olive"])
+    case "butter-spreads":
+      return item.category_l1 === "fats" && nameHasAny(item, ["beurre", "margarine"])
+    case "nut-butters":
+      return (item.category_l1 === "fats" || item.category_l1 === "extras") && nameHasAny(item, ["cacahuete", "amande", "noisette", "pistache", "beurre de", "puree", "purée"])
+    case "fatty-sauces":
+      return (item.category_l1 === "fats" || item.category_l1 === "extras") && (item.category_l2 === "sauces" || nameHasAny(item, ["mayonnaise", "pesto", "vinaigrette", "tahini", "sauce"]))
+    case "leafy":
+      return item.category_l1 === "vegetables" && item.category_l2 === "feuilles"
+    case "cruciferous":
+      return item.category_l1 === "vegetables" && item.category_l2 === "cruciferes"
+    case "roots":
+      return item.category_l1 === "vegetables" && nameHasAny(item, ["carotte", "betterave", "navet", "radis", "panais"])
+    case "mediterranean":
+      return item.category_l1 === "vegetables" && nameHasAny(item, ["courgette", "aubergine", "poivron", "tomate", "concombre"])
+    case "other-vegetables":
+      return item.category_l1 === "vegetables"
+    case "water":
+      return item.category_l1 === "drinks" && item.category_l2 === "eau"
+    case "hot-drinks":
+      return item.category_l1 === "drinks" && item.category_l2 === "chauds"
+    case "juices-smoothies":
+      return item.category_l1 === "drinks" && item.category_l2 === "jus-smoothies"
+    case "sodas":
+      return (item.category_l1 === "drinks" && item.category_l2 === "boissons") || nameHasAny(item, ["coca", "cola", "fanta", "sprite", "soda", "ice tea"])
+    case "plant-milks":
+      return item.category_l1 === "drinks" && item.category_l2 === "laits-vegetaux"
+    case "sports-drinks":
+      return item.category_l1 === "drinks" && item.category_l2 === "sports-drinks"
+    case "alcohol":
+      return item.category_l1 === "drinks" && item.category_l2 === "alcools"
+    case "whey":
+      return (item.category_l2 === "complements" || item.category_l1 === "proteins") && nameHasAny(item, ["whey", "isolate", "caseine", "caséine", "protein", "protéine"])
+    case "gainers-bars":
+      return (item.category_l2 === "complements" || item.category_l1 === "extras" || item.category_l1 === "proteins") && nameHasAny(item, ["gainer", "barre", "protein bar", "barre prote", "meal replacement"])
+    case "performance":
+      return item.category_l2 === "complements" && nameHasAny(item, ["creatine", "créatine", "bcaa", "eaa", "pre-workout", "maltodextrine", "electrolyte", "électrolyte"])
+    case "other-supplements":
+      return item.category_l2 === "complements"
+    default:
+      return false
+  }
 }
 
 const slideVariants = {
@@ -189,28 +316,59 @@ function NutritionLogContentImpl({
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const CATEGORY_LABELS_T: Record<CategoryL1, string> = {
-    proteins: t('food.cat.proteins'), carbs: t('food.cat.carbs'),
-    vegetables: t('food.cat.vegetables'), fruits: t('food.cat.fruits'),
-    fats: t('food.cat.fats'), drinks: t('food.cat.drinks'), extras: t('food.cat.extras'),
+  const CATEGORY_LABELS_T: Record<VisibleCategoryKey, string> = {
+    proteins: t('food.cat.proteins'),
+    carbs: t('food.cat.carbs'),
+    fats: t('food.cat.fats'),
+    vegetables: t('food.cat.vegetables'),
+    drinks: t('food.cat.drinks'),
+    supplements: t('food.sub.complements'),
   }
 
-  const SUBCATEGORY_LABELS_T: Record<string, string> = {
-    viandes: t('food.sub.viandes'), poissons: t('food.sub.poissons'),
-    oeufs: t('food.sub.oeufs'), laitiers: t('food.sub.laitiers'),
-    vegetales: t('food.sub.vegetales'), complements: t('food.sub.complements'),
-    cereales: t('food.sub.cereales'), fecules: t('food.sub.fecules'),
-    pain: t('food.sub.pain'), legumineuses: t('food.sub.legumineuses'),
-    feuilles: t('food.sub.feuilles'), cruciferes: t('food.sub.cruciferes'),
-    'autres-legumes': t('food.sub.autres-legumes'), frais: t('food.sub.frais'),
-    secs: t('food.sub.secs'), huiles: t('food.sub.huiles'),
-    'noix-graines': t('food.sub.noix-graines'), 'autres-lipides': t('food.sub.autres-lipides'),
-    sauces: t('food.sub.sauces'), boissons: t('food.sub.boissons'),
-    divers: t('food.sub.divers'), 'snacks-sales': t('food.sub.snacks-sales'),
-    'snacks-sucres': t('food.sub.snacks-sucres'), 'fast-food': t('food.sub.fast-food'),
-    eau: t('food.sub.eau'), chauds: t('food.sub.chauds'),
-    'jus-smoothies': t('food.sub.jus-smoothies'), 'laits-vegetaux': t('food.sub.laits-vegetaux'),
-    'sports-drinks': t('food.sub.sports-drinks'), alcools: t('food.sub.alcools'),
+  const SUBCATEGORY_LABELS_T: Record<VisibleLeafKey, string> = {
+    chicken: 'Poulet',
+    beef: 'Boeuf',
+    pork: 'Porc',
+    turkey: 'Dinde',
+    fish: t('food.sub.poissons'),
+    seafood: 'Fruits de mer',
+    eggs: t('food.sub.oeufs'),
+    'dairy-protein': t('food.sub.laitiers'),
+    'plant-protein': t('food.sub.vegetales'),
+    charcuterie: 'Charcuterie',
+    'other-proteins': 'Autres protéines',
+    rice: 'Riz',
+    pasta: 'Pâtes',
+    bread: t('food.sub.pain'),
+    cereals: t('food.sub.cereales'),
+    potatoes: 'Pommes de terre',
+    legumes: t('food.sub.legumineuses'),
+    'fresh-fruits': t('food.sub.frais'),
+    'dried-fruits': t('food.sub.secs'),
+    'sweet-products': 'Produits sucrés',
+    'sweet-sauces': 'Sauces sucrées',
+    oils: t('food.sub.huiles'),
+    'nuts-seeds': t('food.sub.noix-graines'),
+    'avocado-olives': 'Avocat & olives',
+    'butter-spreads': 'Beurres & tartinables',
+    'nut-butters': "Purées d'oléagineux",
+    'fatty-sauces': 'Sauces grasses',
+    leafy: t('food.sub.feuilles'),
+    cruciferous: t('food.sub.cruciferes'),
+    roots: 'Légumes racines',
+    mediterranean: 'Légumes méditerranéens',
+    'other-vegetables': t('food.sub.autres-legumes'),
+    water: t('food.sub.eau'),
+    'hot-drinks': t('food.sub.chauds'),
+    'juices-smoothies': t('food.sub.jus-smoothies'),
+    sodas: 'Sodas',
+    'plant-milks': t('food.sub.laits-vegetaux'),
+    'sports-drinks': t('food.sub.sports-drinks'),
+    alcohol: t('food.sub.alcools'),
+    whey: 'Whey & protéines',
+    'gainers-bars': 'Gainers & barres',
+    performance: 'Créatine & performance',
+    'other-supplements': 'Autres compléments',
   }
 
   const existingMealId = mealIdProp ?? searchParams.get("meal_id")
@@ -224,14 +382,15 @@ function NutritionLogContentImpl({
 
   const [layer, setLayer] = useState<Layer>("category")
   const [direction, setDirection] = useState(1)
-  const [selectedCategory, setSelectedCategory] = useState<CategoryL1 | null>(null)
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<VisibleCategoryKey | null>(null)
+  const [selectedSubcategory, setSelectedSubcategory] = useState<VisibleLeafKey | null>(null)
   const [selectedItem, setSelectedItem] = useState<FoodItem | null>(null)
   const [items, setItems] = useState<FoodItem[]>([])
   const [loadingItems, setLoadingItems] = useState(false)
   const [searchQ, setSearchQ] = useState("")
   const [qMode, setQMode] = useState<"grams" | "portion">("grams")
   const [quantityG, setQuantityG] = useState<number>(100)
+  const [quantityInput, setQuantityInput] = useState("100")
   const [selectedPortion, setSelectedPortion] = useState<number>(0)
   const [portionMult, setPortionMult] = useState<number>(1)
   const [scalingProfile, setScalingProfile] = useState<PortionScalingProfile | null>(null)
@@ -307,16 +466,41 @@ function NutritionLogContentImpl({
   }, [])
 
   function goTo(next: Layer, dir: number) { setDirection(dir); setLayer(next) }
-  function selectCategory(cat: CategoryL1) { setSelectedCategory(cat); setSelectedSubcategory(null); goTo("subcategory", 1) }
-  function selectSubcategory(sub: string) { setSelectedSubcategory(sub); setSearchQ(""); goTo("item", 1) }
+  function selectCategory(cat: VisibleCategoryKey) { setSelectedCategory(cat); setSelectedSubcategory(null); goTo("subcategory", 1) }
+  function selectSubcategory(sub: VisibleLeafKey) { setSelectedSubcategory(sub); setSearchQ(""); goTo("item", 1) }
+  function applyQuantity(next: number) {
+    const safe = Math.max(0, Math.round(next))
+    setQuantityG(safe)
+    setQuantityInput(String(safe))
+  }
+
+  function handleQuantityInputChange(value: string) {
+    if (value === "") {
+      setQuantityInput("")
+      setQuantityG(0)
+      return
+    }
+    if (!/^\d+$/.test(value)) return
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed)) return
+    setQuantityInput(value)
+    setQuantityG(Math.max(0, parsed))
+  }
+
+  function handleQuantityInputBlur() {
+    if (quantityInput.trim() === "") {
+      setQuantityInput("0")
+    }
+  }
+
   function selectItem(item: FoodItem) {
     setSelectedItem(item)
     const suggested = advisorRemaining ? suggestQuantityForItem(item, advisorRemaining) : null
     if (composerMode === "guide" && suggested) {
-      setQuantityG(suggested.grams)
+      applyQuantity(suggested.grams)
       setDidAutoAdjust(true)
     } else {
-      setQuantityG(100)
+      applyQuantity(100)
       setDidAutoAdjust(false)
     }
     setSelectedPortion(0)
@@ -347,15 +531,15 @@ function NutritionLogContentImpl({
     }
   }, [])
 
-  const fetchItems = useCallback(async (sub: string | null, q: string) => {
-    if (!selectedCategory) return
+  const fetchItems = useCallback(async (sub: VisibleLeafKey | null, q: string) => {
+    if (!selectedCategory || !sub) return
     setLoadingItems(true)
-    const params = new URLSearchParams({ category: selectedCategory, limit: "300" })
-    if (sub) params.set("subcategory", sub)
+    const params = new URLSearchParams({ limit: "1000" })
     if (q) params.set("q", q)
     const res = await fetch(`/api/client/food-items?${params}`)
     const json = await res.json()
-    setItems(json.data ?? [])
+    const allItems = (json.data ?? []) as FoodItem[]
+    setItems(allItems.filter((item) => matchesVisibleLeaf(item, sub)))
     setLoadingItems(false)
   }, [selectedCategory])
 
@@ -374,12 +558,12 @@ function NutritionLogContentImpl({
 
   function applyPortion(idx: number, mult: number = portionMult) {
     setSelectedPortion(idx)
-    setQuantityG(getScaledPortionG(PORTION_SIZES[idx], scalingProfile, mult))
+    applyQuantity(getScaledPortionG(PORTION_SIZES[idx], scalingProfile, mult))
   }
 
   function applyMultiplier(mult: number) {
     setPortionMult(mult)
-    if (qMode === "portion") setQuantityG(getScaledPortionG(PORTION_SIZES[selectedPortion], scalingProfile, mult))
+    if (qMode === "portion") applyQuantity(getScaledPortionG(PORTION_SIZES[selectedPortion], scalingProfile, mult))
   }
 
   function addToMeal() {
@@ -642,21 +826,21 @@ function NutritionLogContentImpl({
   const layerTitle =
     layer === "category" ? t('log.title') :
     layer === "subcategory" ? (CATEGORY_LABELS_T[selectedCategory!] ?? "") :
-    layer === "item" ? (SUBCATEGORY_LABELS_T[selectedSubcategory ?? ""] ?? "") :
+    layer === "item" ? (selectedSubcategory ? (SUBCATEGORY_LABELS_T[selectedSubcategory] ?? "") : "") :
     selectedItem?.name_fr ?? ""
 
   const topBarH = 56
-  const showSearchFirst = entryMode === "search"
+  const showSearchFirst = false
   const showCategoriesFirst = entryMode === "categories"
   const isTrackSearchOnly = composerMode === "standard" && entryMode === "search"
   const isTrackFavoritesOnly = composerMode === "standard" && entryMode === "favorites"
   const isTrackCategoriesOnly = composerMode === "standard" && entryMode === "categories"
   const isSmartPrepMode = composerMode !== "standard"
   const showFavoritesBlock = favorites.length > 0 && (entryMode === "default" || isTrackFavoritesOnly)
-  const showSearchBlock = !isTrackFavoritesOnly && !isTrackCategoriesOnly
+  const showSearchBlock = layer === "item" && !!selectedSubcategory
   const showCategoryBlock = !isTrackFavoritesOnly && !isTrackSearchOnly
   const showPersonalFoodTools = !isTrackFavoritesOnly && !isTrackSearchOnly
-  const showSmartSearchBlock = isSmartPrepMode ? true : showSearchBlock
+  const showSmartSearchBlock = false
   // In smart mode: always show both explore (categories) and library (favorites + personal tools)
   const showSmartExploreBlock = isSmartPrepMode ? true : showCategoryBlock
   const showSmartLibraryBlock = isSmartPrepMode ? true : showFavoritesBlock || showPersonalFoodTools
@@ -823,7 +1007,7 @@ function NutritionLogContentImpl({
                 {showSmartExploreBlock && (
                   isSmartPrepMode ? (
                     <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 mb-2">
-                      {(Object.entries(CATEGORY_LABELS_T) as [CategoryL1, string][]).map(([cat, label]) => (
+                      {(Object.entries(CATEGORY_LABELS_T) as [VisibleCategoryKey, string][]).map(([cat, label]) => (
                         <button
                           key={cat}
                           onClick={() => selectCategory(cat)}
@@ -839,8 +1023,8 @@ function NutritionLogContentImpl({
                       <p className="text-[10px] uppercase tracking-[0.16em] font-semibold mb-4 text-white/30">
                         {showCategoriesFirst ? "Choix par categories" : t('log.chooseCategory')}
                       </p>
-                      <div className="grid grid-cols-3 gap-2">
-                        {(Object.entries(CATEGORY_LABELS_T) as [CategoryL1, string][]).map(([cat, label]) => (
+                      <div className="grid grid-cols-2 gap-2">
+                        {(Object.entries(CATEGORY_LABELS_T) as [VisibleCategoryKey, string][]).map(([cat, label]) => (
                           <button
                             key={cat}
                             onClick={() => selectCategory(cat)}
@@ -947,14 +1131,14 @@ function NutritionLogContentImpl({
             {layer === "subcategory" && selectedCategory && (
               <div className="p-4">
                 <div className={`rounded-2xl overflow-hidden ${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.04]'}`}>
-                  {SUBCATEGORIES[selectedCategory].map((sub) => (
+                  {VISIBLE_LEAVES_BY_CATEGORY[selectedCategory].map((sub) => (
                     <button
                       key={sub}
                       onClick={() => selectSubcategory(sub)}
                       className={`w-full flex items-center justify-between px-4 py-3.5 active:scale-[0.99] transition-all ${isSmartPrepMode ? 'hover:bg-[#818cf8]/10' : 'hover:bg-white/[0.04]'}`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-xl">{SUBCATEGORY_ICONS[sub] ?? "•"}</span>
+                        <span className="text-xl">{LEAF_ICONS[sub] ?? "•"}</span>
                         <span className="text-[13px] font-medium text-white">{SUBCATEGORY_LABELS_T[sub] ?? sub}</span>
                       </div>
                       <ChevronLeft size={14} className="text-white/30 rotate-180" />
@@ -967,10 +1151,23 @@ function NutritionLogContentImpl({
             {/* Layer 3: Items */}
             {layer === "item" && (
               <div className="p-4">
-                <div className={`rounded-xl mb-3 flex items-center px-3 ${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.04]'}`}>
-                  <Search size={14} className={`${isSmartPrepMode ? 'text-[#818cf8]' : 'text-white/30'} shrink-0`} />
-                  <input type="text" placeholder={t('log.searchPlaceholder2')} value={searchQ} onChange={e => setSearchQ(e.target.value)} className="w-full h-10 pl-2 pr-3 bg-transparent text-[13px] text-white placeholder:text-white/20 outline-none" />
-                </div>
+                {showSearchBlock && (
+                  <div className="mb-3 space-y-2">
+                    <div className={`rounded-xl flex items-center px-3 ${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.04]'}`}>
+                      <Search size={14} className={`${isSmartPrepMode ? 'text-[#818cf8]' : 'text-white/30'} shrink-0`} />
+                      <input
+                        type="text"
+                        placeholder={t('log.searchPlaceholder2')}
+                        value={searchQ}
+                        onChange={e => setSearchQ(e.target.value)}
+                        className="w-full h-10 pl-2 pr-3 bg-transparent text-[13px] text-white placeholder:text-white/20 outline-none"
+                      />
+                    </div>
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-white/28 font-semibold px-1">
+                      Recherche dans {selectedSubcategory ? (SUBCATEGORY_LABELS_T[selectedSubcategory] ?? selectedSubcategory) : ''}
+                    </p>
+                  </div>
+                )}
                 {loadingItems ? (
                   <div className={`space-y-1 rounded-2xl overflow-hidden p-2 ${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.04]'}`}>{[1, 2, 3, 4].map(i => <div key={i} className={`h-12 rounded-xl animate-pulse ${isSmartPrepMode ? 'bg-[#818cf8]/10' : 'bg-white/[0.06]'}`} />)}</div>
                 ) : items.length === 0 ? (
@@ -1049,7 +1246,7 @@ function NutritionLogContentImpl({
                       {quantitySuggestion && quantityG !== quantitySuggestion.grams && (
                         <button
                           onClick={() => {
-                            setQuantityG(quantitySuggestion.grams)
+                            applyQuantity(quantitySuggestion.grams)
                             setDidAutoAdjust(true)
                           }}
                           className="h-9 rounded-xl bg-white/[0.06] px-3 text-[11px] font-bold uppercase tracking-[0.1em] text-white active:scale-[0.98] transition-all"
@@ -1125,7 +1322,7 @@ function NutritionLogContentImpl({
                       </div>
                       <button
                         onClick={() => {
-                          setQuantityG(quantitySuggestion.grams)
+                          applyQuantity(quantitySuggestion.grams)
                           setDidAutoAdjust(true)
                         }}
                         className="w-full h-10 rounded-xl bg-[#f2f2f2] text-[#080808] text-[11px] font-bold uppercase tracking-[0.1em] active:scale-[0.98] transition-all"
@@ -1162,7 +1359,7 @@ function NutritionLogContentImpl({
                       <div className="grid grid-cols-4 gap-2 text-center">
                         <button
                           onClick={() => {
-                            setQuantityG(quantitySuggestion.grams)
+                            applyQuantity(quantitySuggestion.grams)
                             setDidAutoAdjust(true)
                           }}
                           className="col-span-2 h-10 rounded-xl bg-[#f2f2f2] text-[#080808] text-[11px] font-bold uppercase tracking-[0.1em] active:scale-[0.98] transition-all"
@@ -1256,21 +1453,21 @@ function NutritionLogContentImpl({
                         <p className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-semibold mb-2">Quantite en grammes</p>
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => setQuantityG(v => Math.max(0, v - 5))}
+                            onClick={() => applyQuantity(quantityG - 5)}
                             className="h-10 w-10 rounded-xl bg-white/[0.06] text-white/70 flex items-center justify-center"
                           >
                             <Minus size={14} />
                           </button>
                           <input
-                            type="number"
-                            min={0}
-                            step={5}
-                            value={quantityG}
-                            onChange={e => setQuantityG(Math.max(0, Number(e.target.value || 0)))}
+                            type="text"
+                            inputMode="numeric"
+                            value={quantityInput}
+                            onChange={e => handleQuantityInputChange(e.target.value)}
+                            onBlur={handleQuantityInputBlur}
                             className={`flex-1 h-10 rounded-xl text-center text-[16px] font-bold text-white outline-none ${isSmartPrepMode ? 'bg-[#818cf8]/10' : 'bg-white/[0.06]'}`}
                           />
                           <button
-                            onClick={() => setQuantityG(v => v + 5)}
+                            onClick={() => applyQuantity(quantityG + 5)}
                             className="h-10 w-10 rounded-xl bg-white/[0.06] text-white/70 flex items-center justify-center"
                           >
                             <Plus size={14} />

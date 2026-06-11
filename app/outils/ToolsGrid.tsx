@@ -38,6 +38,17 @@ const TOOLS = [
     keywords: ["manger", "diète", "régime", "protéines", "glucides", "lipides", "calories", "poids", "maigrir", "muscler"],
   },
   {
+    id: "tdeeExpert",
+    href: "tdee",
+    status: "active" as const,
+    icon: Activity,
+    type: "Nutrition",
+    title: "TDEE Expert",
+    description: "Wizard public hybride pour planifier déficit, maintenance ou surplus par type de jour.",
+    code: "CALC_02",
+    keywords: ["tdee", "bmr", "neat", "eat", "tef", "maintenance", "déficit", "surplus", "calor", "wizard"],
+  },
+  {
     id: "bodyFat",
     href: "body-fat",
     status: "active" as const,
