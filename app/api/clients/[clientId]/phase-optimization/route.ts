@@ -659,22 +659,6 @@ export async function GET(req: NextRequest, { params }: Params) {
       : undefined,
   };
 
-  let weeksRemaining: number | null = null;
-  if (targetDate) {
-    const targetTime = new Date(targetDate).getTime();
-    const nowTime = new Date(evaluationDate).getTime();
-    if (!isNaN(targetTime)) {
-      weeksRemaining = (targetTime - nowTime) / (1000 * 3600 * 24 * 7);
-    }
-  }
-
-  const currentWeight = weightSeries.length > 0 ? weightSeries[weightSeries.length - 1].value : 0;
-  const decision = computeOptimalPhase({
-    currentWeight,
-    targetWeight: targetWeight || currentWeight,
-    weeksRemaining,
-    cnsOverload: derivedSignals.cnsOverload || false
-  });
   const coachDecision = buildCoachDecision(
     result,
     derivedSignals,
@@ -698,11 +682,5 @@ export async function GET(req: NextRequest, { params }: Params) {
     metricCards,
     insights,
     coachDecision,
-    enginePrescription: {
-      optimalPhase: decision.phase,
-      recommendedIntensity: decision.intensity,
-      vetoActive: decision.vetoTriggered,
-      clinicalReasoning: decision.reasoning
-    }
   });
 }
