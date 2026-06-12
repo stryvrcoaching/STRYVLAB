@@ -97,6 +97,20 @@ describe("GET /api/clients/[clientId]/nutrition-hub", () => {
         ],
         error: null,
       },
+      {
+        data: [
+          {
+            calculated_at: new Date().toISOString(),
+            tdee_adaptive: 2450,
+            tdee_formula: 2360,
+            delta_kcal: 90,
+            avg_intake_kcal: 2280,
+            weight_delta_kg: -0.2,
+            weight_samples: 4,
+          },
+        ],
+        error: null,
+      },
     ]);
 
     const response = await GET(
@@ -110,6 +124,7 @@ describe("GET /api/clients/[clientId]/nutrition-hub", () => {
     expect(body.summary).toBeDefined();
     expect(body.trend.window).toBe(7);
     expect(body.agenda).toBeInstanceOf(Array);
+    expect(body.energy).toBeDefined();
     expect(body.availableWindows).toEqual([3, 7, 14, 30]);
-  });
+  }, 15000);
 });

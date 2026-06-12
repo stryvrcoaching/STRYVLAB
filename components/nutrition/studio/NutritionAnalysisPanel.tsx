@@ -10,6 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { NUTRITION_UI_COLORS } from "@/lib/nutrition/ui-colors";
+import NutritionEnergyAnalytics from "@/components/clients/nutrition-hub/NutritionEnergyAnalytics";
 import NutritionRealityMiniDay from "./NutritionRealityMiniDay";
 import type { NutritionRealityView } from "./useNutritionReality";
 
@@ -354,6 +355,27 @@ export default function NutritionAnalysisPanel({
                 accent={NUTRITION_UI_COLORS.water}
               />
             </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">
+            Bloc énergie
+          </p>
+          <div className="mt-4">
+            {view.energy ? (
+              <NutritionEnergyAnalytics points={view.trendPoints} energy={view.energy} />
+            ) : (
+              <div className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.03] p-4">
+                <p className="text-[11px] font-semibold text-white">
+                  Analyse énergie indisponible
+                </p>
+                <p className="mt-1 text-[10px] leading-relaxed text-white/50">
+                  La dépense énergétique devient visible quand le hub renvoie le TDEE et
+                  l’historique associé.
+                </p>
+              </div>
+            )}
           </div>
         </section>
 

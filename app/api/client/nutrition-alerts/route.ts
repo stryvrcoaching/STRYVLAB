@@ -73,17 +73,18 @@ export async function GET(_req: NextRequest) {
 
   const { data: water } = await svc()
     .from('client_water_logs')
-    .select('amount_ml')
+    .select('amount_ml, caffeine_mg')
     .eq('client_id', cc.id)
     .gte('logged_at', physiologicalStart.toISOString())
     .lte('logged_at', physiologicalEnd.toISOString())
 
   const water_ml = (water ?? []).reduce((s, w) => s + Number(w.amount_ml ?? 0), 0)
+  const caffeine_mg = (water ?? []).reduce((s, w) => s + Number(w.caffeine_mg ?? 0), 0)
   const hasLunchLog = (meals ?? []).some(m => m.meal_type === 'lunch')
   const currentHour = new Date().getHours()
 
   const alerts = computeNutritionAlerts({
-    consumed: { ...consumed, water_ml },
+    consumed: { ...consumed, water_ml, caffeine_mg },
     target,
     currentHour,
     hasLunchLog,

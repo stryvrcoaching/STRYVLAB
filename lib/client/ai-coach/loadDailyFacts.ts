@@ -51,7 +51,7 @@ export async function loadDailyCoachContext(
   ] = await Promise.all([
     db.from('nutrition_meals').select('total_calories, total_protein_g').eq('client_id', clientId).eq('physiological_date', date),
     db.from('meal_logs').select('estimated_macros').eq('client_id', clientId).gte('logged_at', start.toISOString()).lt('logged_at', new Date(end.getTime() + 1).toISOString()).eq('ai_status', 'done'),
-    db.from('client_water_logs').select('amount_ml').eq('client_id', clientId).gte('logged_at', start.toISOString()).lte('logged_at', end.toISOString()),
+    db.from('client_water_logs').select('amount_ml, caffeine_mg').eq('client_id', clientId).gte('logged_at', start.toISOString()).lte('logged_at', end.toISOString()),
     db.from('nutrition_protocols').select('schedule_start_date, nutrition_protocol_days(position, calories, protein_g, hydration_ml, name, carb_cycle_type), nutrition_protocol_schedule_slots(week_index, dow, protocol_day_position)').eq('client_id', clientId).eq('status', 'shared').order('updated_at', { ascending: false }).limit(1).maybeSingle(),
     db.from('program_sessions').select('id, name, day_of_week, days_of_week, programs!inner(status, client_id)').eq('programs.client_id', clientId).eq('programs.status', 'active'),
     db.from('client_session_logs').select('id').eq('client_id', clientId).not('completed_at', 'is', null).gte('completed_at', start.toISOString()).lte('completed_at', end.toISOString()).limit(1),
@@ -75,6 +75,7 @@ export async function loadDailyCoachContext(
     (composerMeals ?? []).reduce((s: number, m: any) => s + Number(m.total_protein_g ?? 0), 0) +
     (legacyMeals ?? []).reduce((s: number, m: any) => s + Number((m.estimated_macros as any)?.protein_g ?? 0), 0)
   const hydrationMl = (waterRows ?? []).reduce((s: number, w: any) => s + Number(w.amount_ml ?? 0), 0)
+  const caffeineMg = (waterRows ?? []).reduce((s: number, w: any) => s + Number(w.caffeine_mg ?? 0), 0)
 
   // ── Day kind / session ────────────────────────────────────────────────────────
   const dayOverride = await fetchClientDayOverride(db, clientId, date)
@@ -143,6 +144,7 @@ export async function loadDailyCoachContext(
     proteinTarget,
     hydrationMl,
     hydrationTargetMl,
+    caffeineMg,
     steps: steps ?? null,
     checkin: submittedCheckin ?? {},
   })

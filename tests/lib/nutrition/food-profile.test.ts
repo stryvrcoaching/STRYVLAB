@@ -55,4 +55,19 @@ describe('food metabolic profile', () => {
     expect(recommendFoodCategory(chicken)).toBe('proteins')
     expect(buildFoodMetabolicProfile(chicken).maxPortionG).toBe(180)
   })
+
+  it('keeps extras as extras unless the item is an explicit special case', () => {
+    const ketchup = mkFood({
+      name_fr: 'Ketchup',
+      category_l1: 'extras',
+      category_l2: 'sauces',
+      kcal_per_100g: 101,
+      protein_per_100g: 1,
+      carbs_per_100g: 23,
+      fat_per_100g: 0.3,
+    })
+
+    expect(recommendFoodCategory(ketchup)).toBe('extras')
+    expect(buildFoodMetabolicProfile(ketchup).family).toBe('sauce')
+  })
 })

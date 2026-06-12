@@ -6,6 +6,7 @@ import { computePhysiologicalDate } from "@/lib/nutrition/physiological-date"
 import { calcEntryMacros } from "@/lib/nutrition/food-items"
 import { computeMacroEnergy } from "@/lib/nutrition/energy"
 import { resolveClientTimezone } from "@/lib/client/checkin/resolveClientTimezone"
+import { estimateCaffeineMg, inferDrinkTypeFromFoodItem } from "@/lib/client/nutrition/drinks"
 
 function service() {
   return createServiceClient(
@@ -49,7 +50,11 @@ export async function POST(req: NextRequest) {
   const today = computePhysiologicalDate(loggedAt, timezone)
 
   // Fetch food item
-  const { data: item } = await db.from("food_items").select("id, kcal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fiber_per_100g").eq("id", food_item_id).single()
+  const { data: item } = await db
+    .from("food_items")
+    .select("id, name_fr, category_l1, category_l2, kcal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fiber_per_100g")
+    .eq("id", food_item_id)
+    .single()
   if (!item) return NextResponse.json({ error: "Food item not found" }, { status: 404 })
 
   const macros = calcEntryMacros(
@@ -122,9 +127,16 @@ export async function POST(req: NextRequest) {
   })
 
   // Sync client_water_logs — source lue par home page et nutrition page
+  const drinkType = inferDrinkTypeFromFoodItem({
+    name_fr: item.name_fr ?? "",
+    category_l1: item.category_l1 ?? "drinks",
+    category_l2: item.category_l2 ?? null,
+  })
   await db.from("client_water_logs").insert({
     client_id: clientId,
     amount_ml: quantity_g,
+    drink_type: drinkType,
+    caffeine_mg: estimateCaffeineMg(drinkType, quantity_g),
     logged_at: loggedAt.toISOString(),
   })
 

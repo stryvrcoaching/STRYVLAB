@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { NUTRITION_UI_COLORS } from "@/lib/nutrition/ui-colors";
+import NutritionEnergyAnalytics from "./NutritionEnergyAnalytics";
 import NutritionMetricSpotlight from "./NutritionMetricSpotlight";
 
 type TrendPoint = {
@@ -39,6 +40,21 @@ type TooltipRow = {
 };
 
 type NutritionTrendVariant = "summary" | "macros" | "hydration";
+
+type EnergyData = {
+  protocolTdee: number | null;
+  protocolTdeeAt: string | null;
+  tdeeDataSource: string | null;
+  tdeeHistory: Array<{
+    calculated_at: string;
+    tdee_adaptive: number;
+    tdee_formula: number;
+    delta_kcal: number;
+    avg_intake_kcal: number;
+    weight_delta_kg: number;
+    weight_samples: number;
+  }>;
+} | null;
 
 const COLORS = {
   calories: NUTRITION_UI_COLORS.calories,
@@ -565,10 +581,12 @@ function HydrationCards({
 
 export default function NutritionTrendGrid({
   points,
+  energy,
   rightRail,
   variant = "summary",
 }: {
   points: TrendPoint[];
+  energy?: EnergyData;
   rightRail?: ReactNode;
   variant?: NutritionTrendVariant;
 }) {
@@ -593,9 +611,12 @@ export default function NutritionTrendGrid({
   }
 
   return (
-    <section className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
-      <SummaryCards data={data} trainingDays={trainingDays} offDays={offDays} />
-      {rightRail ? <div className="space-y-4">{rightRail}</div> : null}
+    <section className="space-y-4">
+      {energy ? <NutritionEnergyAnalytics points={points} energy={energy} /> : null}
+      <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
+        <SummaryCards data={data} trainingDays={trainingDays} offDays={offDays} />
+        {rightRail ? <div className="space-y-4">{rightRail}</div> : null}
+      </div>
     </section>
   );
 }

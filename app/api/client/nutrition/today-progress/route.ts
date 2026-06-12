@@ -32,7 +32,7 @@ export async function GET(_req: NextRequest) {
   const today = computePhysiologicalDate(new Date(), timezone)
   const { start: physiologicalStart, end: physiologicalEnd } = utcRangeForPhysiologicalDate(today, timezone)
 
-  const [{ data: protocol }, { data: composerMeals }, { data: legacyMeals }] = await Promise.all([
+  const [{ data: protocol }, { data: composerMeals }, { data: legacyMeals }, { data: waterLogs }] = await Promise.all([
     db.from('nutrition_protocols')
       .select('id, schedule_start_date, nutrition_protocol_days(*), nutrition_protocol_schedule_slots(week_index, dow, protocol_day_position)')
       .eq('client_id', cc.id)
@@ -52,6 +52,11 @@ export async function GET(_req: NextRequest) {
       .gte('logged_at', physiologicalStart.toISOString())
       .lt('logged_at', new Date(physiologicalEnd.getTime() + 1).toISOString())
       .eq('ai_status', 'done'),
+    db.from('client_water_logs')
+      .select('amount_ml, caffeine_mg')
+      .eq('client_id', cc.id)
+      .gte('logged_at', physiologicalStart.toISOString())
+      .lte('logged_at', physiologicalEnd.toISOString()),
   ])
 
   const fromComposer = (composerMeals ?? []).reduce(
@@ -91,6 +96,8 @@ export async function GET(_req: NextRequest) {
     protein_g: fromComposer.protein_g + fromLegacy.protein_g,
     carbs_g:   fromComposer.carbs_g   + fromLegacy.carbs_g,
     fat_g:     fromComposer.fat_g     + fromLegacy.fat_g,
+    water_ml: (waterLogs ?? []).reduce((s, w: any) => s + Number(w.amount_ml ?? 0), 0),
+    caffeine_mg: (waterLogs ?? []).reduce((s, w: any) => s + Number(w.caffeine_mg ?? 0), 0),
   }
 
   const days = (protocol as any)?.nutrition_protocol_days ?? []

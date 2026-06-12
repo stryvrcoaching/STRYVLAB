@@ -6,8 +6,10 @@ import { X, Drop, ForkKnife, Lightning } from "@phosphor-icons/react";
 import dynamic from "next/dynamic";
 import type { CycleState } from "@/lib/cycle/cycleEngine";
 import type { NutritionMacros } from "@/components/client/smart/SmartNutritionWidget";
+import { CaffeineGlyph } from "@/components/client/CaffeineGlyph";
 
 const QuickWaterModal   = dynamic(() => import("@/components/client/QuickWaterModal"),           { ssr: false });
+const QuickCaffeineModal = dynamic(() => import("@/components/client/QuickCaffeineModal"),       { ssr: false });
 const FreeActivitySheet = dynamic(() => import("@/components/client/smart/FreeActivitySheet"),   { ssr: false });
 const LogPeriodSheet    = dynamic(() => import("@/components/client/cycle/LogPeriodSheet"),      { ssr: false });
 const MealLogSheet      = dynamic(() => import("@/components/client/smart/MealLogSheet"),        { ssr: false });
@@ -23,7 +25,7 @@ type BalanceContext = {
   target: NutritionMacros
 }
 
-type SubSheet = "water" | "activity" | "cycle" | "meal" | "meal-voice" | null;
+type SubSheet = "water" | "caffeine" | "activity" | "cycle" | "meal" | "meal-voice" | null;
 
 const BASE_ACTIONS = [
   {
@@ -31,6 +33,12 @@ const BASE_ACTIONS = [
     Icon: Drop,
     label: "Eau",
     sub: "Logger ma consommation d'eau",
+  },
+  {
+    key: "caffeine" as const,
+    Icon: Drop,
+    label: "Café & thé",
+    sub: "Espresso, normal, lungo",
   },
   {
     key: "meal" as const,
@@ -82,6 +90,7 @@ export default function QuickLogSheet({ open, onClose }: Props) {
 
   function handleAction(key: string) {
     if (key === "water")    { setSub("water"); return; }
+    if (key === "caffeine") { setSub("caffeine"); return; }
     if (key === "activity") { setSub("activity"); return; }
     if (key === "cycle")    { setSub("cycle"); return; }
     // "meal" → ouvrir directement MealLogSheet standard, pas de sélecteur intermédiaire
@@ -137,25 +146,48 @@ export default function QuickLogSheet({ open, onClose }: Props) {
 
               {/* Actions */}
               <div className="px-4 pb-4 flex flex-col gap-2">
-                {actions.map(({ key, Icon, label, sub: subLabel }) => (
-                  <button
-                    key={key}
-                    onClick={() => handleAction(key)}
-                    className="flex items-center gap-4 px-4 h-[60px] rounded-xl bg-white/[0.03] active:bg-white/[0.06] transition-colors text-left"
-                  >
-                    <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-white/[0.06]">
-                      <Icon size={18} className="text-white/70" />
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-[14px] font-barlow font-semibold text-[#e0e0e0] leading-tight">
-                        {label}
-                      </span>
-                      <span className="text-[11px] font-barlow text-white/40 leading-tight truncate">
-                        {subLabel}
-                      </span>
-                    </div>
-                  </button>
-                ))}
+                <div className="grid grid-cols-2 gap-2">
+                  {actions.filter(action => action.key === "water" || action.key === "caffeine").map(({ key, Icon, label, sub: subLabel }) => (
+                    <button
+                      key={key}
+                      onClick={() => handleAction(key)}
+                      className="flex items-center gap-3 px-3 h-[64px] rounded-xl bg-white/[0.03] active:bg-white/[0.06] transition-colors text-left"
+                    >
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-white/[0.06]">
+                        {key === "caffeine" ? <CaffeineGlyph drinkType="coffee" active size="sm" color="#111111" /> : <Icon size={18} className="text-white/70" />}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[13px] font-barlow font-semibold text-[#e0e0e0] leading-tight">
+                          {label}
+                        </span>
+                        <span className="text-[10px] font-barlow text-white/40 leading-tight truncate">
+                          {subLabel}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-col gap-2">
+                  {actions.filter(action => action.key !== "water" && action.key !== "caffeine").map(({ key, Icon, label, sub: subLabel }) => (
+                    <button
+                      key={key}
+                      onClick={() => handleAction(key)}
+                      className="flex items-center gap-4 px-4 h-[60px] rounded-xl bg-white/[0.03] active:bg-white/[0.06] transition-colors text-left"
+                    >
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-white/[0.06]">
+                        <Icon size={18} className="text-white/70" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[14px] font-barlow font-semibold text-[#e0e0e0] leading-tight">
+                          {label}
+                        </span>
+                        <span className="text-[11px] font-barlow text-white/40 leading-tight truncate">
+                          {subLabel}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </motion.div>
           </>
@@ -165,6 +197,10 @@ export default function QuickLogSheet({ open, onClose }: Props) {
       {/* Sub-sheets */}
       <QuickWaterModal
         open={sub === "water"}
+        onClose={() => { setSub(null); onClose(); }}
+      />
+      <QuickCaffeineModal
+        open={sub === "caffeine"}
         onClose={() => { setSub(null); onClose(); }}
       />
       <FreeActivitySheet

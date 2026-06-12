@@ -14,6 +14,7 @@ export type NutritionMacros = {
   carbs_g: number
   fat_g: number
   water_ml: number
+  caffeine_mg?: number
 }
 
 export type SmartNutritionWidgetProps = {
@@ -166,6 +167,13 @@ export default function SmartNutritionWidget({ consumed, target, proteinStreakDa
             <Plus size={16} strokeWidth={2.5} />
           </button>
         </div>
+
+        {consumed.caffeine_mg != null && consumed.caffeine_mg > 0 && (
+          <div className="mt-2 flex items-center justify-between rounded-xl bg-white/[0.03] px-3 py-2 text-[10px]">
+            <span className="text-white/40 uppercase tracking-[0.1em] font-bold">Caféine / théine</span>
+            <span className="text-white font-bold tabular-nums">{Math.round(consumed.caffeine_mg)} mg</span>
+          </div>
+        )}
 
         {/* Régularité protéines */}
         {proteinStreakDays !== undefined && target.protein_g > 0 && (

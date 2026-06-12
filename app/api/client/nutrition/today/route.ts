@@ -80,18 +80,19 @@ export async function GET(req: NextRequest) {
 
   const { data: water } = await svc()
     .from('client_water_logs')
-    .select('amount_ml, logged_at')
+    .select('amount_ml, caffeine_mg, logged_at')
     .eq('client_id', cc.id)
     .gte('logged_at', physiologicalStart.toISOString())
     .lte('logged_at', physiologicalEnd.toISOString())
 
   const water_ml = (water ?? []).reduce((s, w) => s + Number(w.amount_ml ?? 0), 0)
+  const caffeine_mg = (water ?? []).reduce((s, w) => s + Number(w.caffeine_mg ?? 0), 0)
 
   return NextResponse.json({
     date,
     dayOverride,
     target,
-    consumed: { ...consumed, water_ml },
+    consumed: { ...consumed, water_ml, caffeine_mg },
     meals: meals ?? [],
     water_logs: water ?? [],
   })

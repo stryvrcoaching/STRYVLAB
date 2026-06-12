@@ -21,6 +21,7 @@ export type DailyFactsInput = {
   proteinTarget: number
   hydrationMl: number
   hydrationTargetMl: number
+  caffeineMg?: number
   steps: number | null
   checkin: CheckinSignals
 }
@@ -32,6 +33,7 @@ export type DailyFacts = {
     kcalLogged: number; kcalTarget: number; deltaKcal: number; pctKcal: number
     proteinLogged: number; proteinTarget: number; proteinShort: boolean
     status: NutritionStatus
+    caffeineMg?: number
   }
   hydration: { ml: number; targetMl: number; pct: number }
   steps: number | null
@@ -67,6 +69,7 @@ export function computeDailyFacts(input: DailyFactsInput): DailyFacts {
       proteinTarget: Math.round(input.proteinTarget),
       proteinShort,
       status: nutritionStatus(deltaKcal),
+      caffeineMg: input.caffeineMg != null ? Math.round(input.caffeineMg) : undefined,
     },
     hydration: { ml: input.hydrationMl, targetMl: input.hydrationTargetMl, pct: pct(input.hydrationMl, input.hydrationTargetMl) },
     steps: input.steps,

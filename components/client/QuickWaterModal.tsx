@@ -35,7 +35,9 @@ export default function QuickWaterModal({ open, onClose, onLogged, onDeleted, da
 
   useEffect(() => {
     if (!open) return
-    const url = date ? `/api/client/water?date=${date}` : '/api/client/water'
+    const url = new URL('/api/client/water', window.location.origin)
+    if (date) url.searchParams.set('date', date)
+    url.searchParams.set('kind', 'water')
     fetch(url)
       .then(r => r.json())
       .then(d => setLogs(d.logs ?? []))

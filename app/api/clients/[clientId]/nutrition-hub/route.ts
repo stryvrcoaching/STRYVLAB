@@ -116,12 +116,16 @@ export async function GET(
     timezone,
   );
 
-  const [{ data: protocol, error: protocolError }, { data: meals, error: mealsError }, { data: waterLogs, error: waterError }] =
-    await Promise.all([
+  const [
+    { data: protocol, error: protocolError },
+    { data: meals, error: mealsError },
+    { data: waterLogs, error: waterError },
+    { data: tdeeHistory, error: tdeeError },
+  ] = await Promise.all([
       db
         .from("nutrition_protocols")
         .select(
-          "schedule_start_date, nutrition_protocol_days(position, name, calories, protein_g, carbs_g, fat_g, hydration_ml, carb_cycle_type), nutrition_protocol_schedule_slots(week_index, dow, protocol_day_position)",
+          "schedule_start_date, tdee_adaptive, tdee_adaptive_at, tdee_data_source, nutrition_protocol_days(position, name, calories, protein_g, carbs_g, fat_g, hydration_ml, carb_cycle_type), nutrition_protocol_schedule_slots(week_index, dow, protocol_day_position)",
         )
         .eq("client_id", clientId)
         .eq("status", "shared")
@@ -142,15 +146,24 @@ export async function GET(
         .eq("client_id", clientId)
         .gte("logged_at", earliestRange.start.toISOString())
         .lte("logged_at", latestRange.end.toISOString()),
+      db
+        .from("nutrition_tdee_history")
+        .select(
+          "calculated_at, tdee_adaptive, tdee_formula, delta_kcal, avg_intake_kcal, weight_delta_kg, weight_samples",
+        )
+        .eq("client_id", clientId)
+        .gte("calculated_at", earliestRange.start.toISOString())
+        .order("calculated_at", { ascending: true }),
     ]);
 
-  if (protocolError || mealsError || waterError) {
+  if (protocolError || mealsError || waterError || tdeeError) {
     return NextResponse.json(
       {
         error:
           protocolError?.message ||
           mealsError?.message ||
           waterError?.message ||
+          tdeeError?.message ||
           "Failed to load nutrition hub data",
       },
       { status: 500 },
@@ -356,6 +369,20 @@ export async function GET(
     },
     insights: buildNutritionHubInsights(insightInputs),
     agenda,
+    energy: {
+      protocolTdee: (protocol as any)?.tdee_adaptive ?? null,
+      protocolTdeeAt: (protocol as any)?.tdee_adaptive_at ?? null,
+      tdeeDataSource: (protocol as any)?.tdee_data_source ?? null,
+      tdeeHistory: ((tdeeHistory ?? []) as any[]).map((point) => ({
+        calculated_at: point.calculated_at,
+        tdee_adaptive: Number(point.tdee_adaptive ?? 0),
+        tdee_formula: Number(point.tdee_formula ?? 0),
+        delta_kcal: Number(point.delta_kcal ?? 0),
+        avg_intake_kcal: Number(point.avg_intake_kcal ?? 0),
+        weight_delta_kg: Number(point.weight_delta_kg ?? 0),
+        weight_samples: Number(point.weight_samples ?? 0),
+      })),
+    },
     dataQuality,
     availableWindows: [3, 7, 14, 30],
   });

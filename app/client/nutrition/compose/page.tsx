@@ -71,7 +71,7 @@ export default async function ClientNutritionComposePage({
 
     svc()
       .from('client_water_logs')
-      .select('amount_ml')
+      .select('amount_ml, caffeine_mg')
       .eq('client_id', clientId)
       .gte('logged_at', start)
       .lt('logged_at', end),
@@ -142,6 +142,7 @@ export default async function ClientNutritionComposePage({
     carbs_g: meals.reduce((s, m) => s + Number(m.total_carbs_g ?? 0), 0),
     fat_g: meals.reduce((s, m) => s + Number(m.total_fat_g ?? 0), 0),
     water_ml: waterEntries.reduce((s, w) => s + Number((w as any).amount_ml ?? 0), 0),
+    caffeine_mg: waterEntries.reduce((s, w) => s + Number((w as any).caffeine_mg ?? 0), 0),
   }
 
   return (

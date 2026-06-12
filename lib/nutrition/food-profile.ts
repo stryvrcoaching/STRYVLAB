@@ -94,13 +94,25 @@ export function recommendFoodCategory(item: FoodItem): CategoryL1 {
   if (normalizedName.includes('beurre de cacahu') || normalizedName.includes('peanut butter')) {
     return 'fats'
   }
+  if (
+    normalizedName.includes('whey') ||
+    normalizedName.includes('isolate') ||
+    normalizedName.includes('caseine') ||
+    normalizedName.includes('caséine') ||
+    normalizedName.includes('protein powder') ||
+    normalizedName.includes('protéine')
+  ) {
+    return 'proteins'
+  }
 
-  const dominant = getDominantMacroProfile(item)
-  if (dominant === 'protein') return 'proteins'
-  if (dominant === 'carbs') return 'carbs'
-  if (dominant === 'fat') return 'fats'
+  if (item.category_l1 !== 'extras') {
+    const dominant = getDominantMacroProfile(item)
+    if (dominant === 'protein') return 'proteins'
+    if (dominant === 'carbs') return 'carbs'
+    if (dominant === 'fat') return 'fats'
+  }
 
-  return item.category_l1 === 'extras' ? 'extras' : item.category_l1
+  return item.category_l1
 }
 
 export function inferFoodPortionFamily(item: FoodItem): FoodPortionFamily {
@@ -116,7 +128,17 @@ export function inferFoodPortionFamily(item: FoodItem): FoodPortionFamily {
     name.includes('tahini')
   ) return 'nut_butter'
   if (subcategory.includes('noix') || subcategory.includes('graines') || name.includes('amande') || name.includes('noix')) return 'nuts_seeds'
-  if (subcategory.includes('sauce') || item.category_l1 === 'extras') return 'sauce'
+  if (
+    subcategory.includes('sauce') ||
+    name.includes('sirop') ||
+    name.includes('coulis') ||
+    name.includes('ketchup') ||
+    name.includes('barbecue') ||
+    name.includes('bbq') ||
+    name.includes('vinaigrette') ||
+    name.includes('mayonnaise') ||
+    name.includes('pesto')
+  ) return 'sauce'
   if (item.category_l1 === 'vegetables') return 'vegetable'
   if (item.category_l1 === 'fruits') return 'fruit'
   if (item.category_l1 === 'drinks') return 'drink'

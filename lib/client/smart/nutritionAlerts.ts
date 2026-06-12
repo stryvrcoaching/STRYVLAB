@@ -20,6 +20,7 @@ export type NutritionConsumed = {
   carbs_g: number
   fat_g: number
   water_ml: number
+  caffeine_mg?: number
 }
 
 export type NutritionInput = {

@@ -9,6 +9,7 @@ import {
   PHYSIOLOGICAL_DAY_CUTOFF_HOUR,
   PHYSIOLOGICAL_DAY_CUTOFF_MINUTE,
 } from "@/lib/nutrition/physiological-date"
+import { estimateCaffeineMg, type DrinkType, type DrinkLogKind } from "@/lib/client/nutrition/drinks"
 
 function service() {
   return createServiceClient(
@@ -24,6 +25,8 @@ async function resolveClientId(userId: string): Promise<string | null> {
 
 const schema = z.object({
   amount_ml: z.number().positive().max(5000),
+  caffeine_mg: z.number().int().min(0).max(2000).optional(),
+  drink_type: z.enum(["water", "espresso", "coffee", "lungo", "tea"]).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 })
 
@@ -53,15 +56,24 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const timezone = await resolveClientTimezone(service(), clientId)
   const date = searchParams.get('date') ?? computePhysiologicalDate(new Date(), timezone)
+  const kind = searchParams.get("kind") as DrinkLogKind | null
   const { start: physiologicalStart, end: physiologicalEnd } = utcRangeForPhysiologicalDate(date, timezone)
 
-  const { data, error } = await service()
+  let query = service()
     .from("client_water_logs")
-    .select("id, amount_ml, logged_at")
+    .select("id, amount_ml, caffeine_mg, drink_type, logged_at")
     .eq("client_id", clientId)
     .gte("logged_at", physiologicalStart.toISOString())
     .lte("logged_at", physiologicalEnd.toISOString())
     .order("logged_at", { ascending: true })
+
+  if (kind === "water") {
+    query = query.or("drink_type.is.null,drink_type.eq.water")
+  } else if (kind === "caffeine") {
+    query = query.in("drink_type", ["espresso", "coffee", "lungo", "tea"])
+  }
+
+  const { data, error } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -85,12 +97,16 @@ export async function POST(req: NextRequest) {
   const reference = new Date()
   const targetDate = body.data.date ?? computePhysiologicalDate(reference, timezone)
   const loggedAt = resolveLoggedAtForPhysiologicalDate(targetDate, timezone, reference)
+  const drinkType: DrinkType = body.data.drink_type ?? "water"
+  const caffeineMg = body.data.caffeine_mg ?? estimateCaffeineMg(drinkType, amount_ml)
 
   const { data, error } = await db.from("client_water_logs").insert({
     client_id: clientId,
     amount_ml,
+    drink_type: drinkType,
+    caffeine_mg: caffeineMg,
     logged_at: loggedAt.toISOString(),
-  }).select("id, amount_ml, logged_at").single()
+  }).select("id, amount_ml, caffeine_mg, drink_type, logged_at").single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

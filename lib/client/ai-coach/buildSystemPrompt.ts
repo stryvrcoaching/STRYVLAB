@@ -94,7 +94,7 @@ export async function buildSystemPrompt(clientId: string): Promise<string> {
       .lt('logged_at', nextPhysioStart)
       .eq('ai_status', 'done'),
     db.from('client_water_logs')
-      .select('amount_ml')
+      .select('amount_ml, caffeine_mg')
       .eq('client_id', clientId)
       .gte('logged_at', dayStart)
       .lte('logged_at', dayEnd),
@@ -239,6 +239,7 @@ export async function buildSystemPrompt(clientId: string): Promise<string> {
   // ── Water ─────────────────────────────────────────────────────────────────
   const water        = waterResult.status === 'fulfilled' ? (waterResult.value.data ?? []) : []
   const totalWaterMl = water.reduce((s, w) => s + Number(w.amount_ml ?? 0), 0)
+  const totalCaffeineMg = water.reduce((s, w) => s + Number(w.caffeine_mg ?? 0), 0)
 
   // ── Session (completed today) ─────────────────────────────────────────────
   const session     = sessionResult.status === 'fulfilled' ? sessionResult.value.data : null
@@ -440,6 +441,7 @@ SIGNAUX CLIENT (pour ta compréhension, ne répète pas tout bêtement) :
 - Restrictions : ${restrictionsLine}
 - Nutrition du jour : ${signals.caloriesPct}% des calories atteintes, ${signals.proteinPct}% des protéines.${prepLine ? `\n- Plan Smart Nutrition : ${prepLine}` : ''}
 - Hydratation : ${signals.hydrationPct}% de l'objectif atteint.
+- Caféine / théine du jour : ${totalCaffeineMg}mg.
 - ${weightSignal}
 - Séance : ${session ? "Séance complétée aujourd'hui." : "Pas de séance complétée aujourd'hui."}
 

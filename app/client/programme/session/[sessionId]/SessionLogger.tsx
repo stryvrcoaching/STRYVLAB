@@ -733,7 +733,19 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
 
       const next = prev.map(s => {
         if (s.exercise_id !== exId || s.set_number !== setNum || s.side !== side) return s
-        const nowCompleted = !s.completed
+        // Editing an already validated set must preserve its completed state.
+        // Otherwise the row drops back into the pending list and looks "blank".
+        if (wasCompleted) {
+          return {
+            ...s,
+            completed: true,
+            ...(reps !== undefined ? { actual_reps: reps } : {}),
+            ...(weight !== undefined ? { actual_weight_kg: weight } : {}),
+            ...(rir !== undefined ? { rir_actual: rir } : {}),
+          }
+        }
+
+        const nowCompleted = true
         if (nowCompleted) {
           const alreadyTracking = pendingRestSet?.exId === exId && pendingRestSet?.setNum === setNum && pendingRestSet?.side === side
           if (!alreadyTracking) {

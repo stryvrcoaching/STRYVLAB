@@ -94,7 +94,7 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
 
     svc()
       .from('client_water_logs')
-      .select('amount_ml, logged_at')
+      .select('amount_ml, caffeine_mg, logged_at')
       .eq('client_id', clientId)
       .gte('logged_at', physiologicalStart.toISOString())
       .lte('logged_at', physiologicalEnd.toISOString()),
@@ -291,12 +291,13 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
     { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 },
   )
   const water_ml = water.reduce((s, w) => s + Number(w.amount_ml ?? 0), 0)
-  const consumed: NutritionMacros = { ...consumedBase, water_ml }
+  const caffeine_mg = water.reduce((s, w) => s + Number(w.caffeine_mg ?? 0), 0)
+  const consumed: NutritionMacros = { ...consumedBase, water_ml, caffeine_mg }
 
   // ── IA alerts (pure fn, no HTTP) ──────────────────────────────────────────
   const hasLunchLog = meals.some(m => m.meal_type === 'lunch')
   const rawAlerts = computeNutritionAlerts({
-    consumed: { ...consumedBase, water_ml },
+    consumed: { ...consumedBase, water_ml, caffeine_mg },
     target,
     currentHour: new Date().getHours(),
     hasLunchLog,

@@ -38,6 +38,20 @@ export type NutritionRealityPayload = {
       };
     }>;
   };
+  energy: {
+    protocolTdee: number | null;
+    protocolTdeeAt: string | null;
+    tdeeDataSource: string | null;
+    tdeeHistory: Array<{
+      calculated_at: string;
+      tdee_adaptive: number;
+      tdee_formula: number;
+      delta_kcal: number;
+      avg_intake_kcal: number;
+      weight_delta_kg: number;
+      weight_samples: number;
+    }>;
+  } | null;
   insights: Array<{
     id: string;
     severity: "good" | "watch" | "alert";
@@ -76,6 +90,7 @@ export type NutritionRealityPayload = {
 export type NutritionRealityView = {
   summary: NutritionRealityPayload["summary"];
   trendPoints: NutritionRealityPayload["trend"]["points"];
+  energy: NutritionRealityPayload["energy"];
   topInsights: NutritionRealityPayload["insights"];
   recentDays: NutritionRealityPayload["agenda"];
   availableWindows: Array<3 | 7>;
@@ -87,6 +102,7 @@ export function deriveNutritionRealityView(
   return {
     summary: payload.summary,
     trendPoints: payload.trend.points,
+    energy: payload.energy,
     topInsights: payload.insights.slice(0, 3),
     recentDays: payload.agenda.slice(-3).reverse(),
     availableWindows: payload.availableWindows.filter(
