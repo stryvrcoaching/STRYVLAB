@@ -55,8 +55,8 @@ export async function GET(
 
 const updateDaySchema = z.object({
   id: z.string().uuid().optional(),
-  name: z.string().min(1).max(200),
-  position: z.number().int().min(0),
+  name: z.string().min(1).max(200).optional(),
+  position: z.number().int().min(0).optional(),
   calories: z.number().nullable().optional(),
   protein_g: z.number().nullable().optional(),
   carbs_g: z.number().nullable().optional(),
@@ -100,7 +100,7 @@ export async function PATCH(
 
   const db = serviceClient()
 
-  if (body.data.name !== undefined || body.data.notes !== undefined || body.data.schedule_start_date !== undefined || body.data.cycle_sync_enabled !== undefined || body.data.tdee_auto_enabled !== undefined) {
+  if (body.data.name !== undefined || body.data.notes !== undefined || body.data.schedule_start_date !== undefined || body.data.cycle_sync_enabled !== undefined || body.data.tdee_auto_enabled !== undefined || body.data.tdee_adaptive_active !== undefined || body.data.tdee_reference !== undefined) {
     const updates: Record<string, unknown> = {}
     if (body.data.name !== undefined) updates.name = body.data.name
     if (body.data.notes !== undefined) updates.notes = body.data.notes
@@ -112,23 +112,60 @@ export async function PATCH(
     await db.from('nutrition_protocols').update(updates).eq('id', protocolId)
   }
 
-  if (body.data.days !== undefined) {
-    await db.from('nutrition_protocol_days').delete().eq('protocol_id', protocolId)
-    const daysToInsert = body.data.days.map(d => ({
-      protocol_id: protocolId,
-      name: d.name,
-      position: d.position,
-      calories: d.calories ?? null,
-      protein_g: d.protein_g ?? null,
-      carbs_g: d.carbs_g ?? null,
-      fat_g: d.fat_g ?? null,
-      hydration_ml: d.hydration_ml ?? null,
-      carb_cycle_type: d.carb_cycle_type ?? null,
-      cycle_sync_phase: d.cycle_sync_phase ?? null,
-      recommendations: d.recommendations ?? null,
-    }))
-    await db.from('nutrition_protocol_days').insert(daysToInsert)
-  }
+    if (body.data.days !== undefined) {
+      const allDaysHaveIds =
+        body.data.days.length > 0 && body.data.days.every((d) => Boolean(d.id))
+
+      if (allDaysHaveIds) {
+        for (const d of body.data.days) {
+          const updates: Record<string, unknown> = {}
+
+          if (d.name !== undefined) updates.name = d.name
+          if (d.position !== undefined) updates.position = d.position
+          if (d.calories !== undefined) updates.calories = d.calories
+          if (d.protein_g !== undefined) updates.protein_g = d.protein_g
+          if (d.carbs_g !== undefined) updates.carbs_g = d.carbs_g
+          if (d.fat_g !== undefined) updates.fat_g = d.fat_g
+          if (d.hydration_ml !== undefined) updates.hydration_ml = d.hydration_ml
+          if (d.carb_cycle_type !== undefined) updates.carb_cycle_type = d.carb_cycle_type
+          if (d.cycle_sync_phase !== undefined) updates.cycle_sync_phase = d.cycle_sync_phase
+          if (d.recommendations !== undefined) updates.recommendations = d.recommendations
+
+          if (Object.keys(updates).length > 0) {
+            await db
+              .from('nutrition_protocol_days')
+              .update(updates)
+              .eq('protocol_id', protocolId)
+              .eq('id', d.id)
+          }
+        }
+      } else {
+        const invalidDay = body.data.days.find((d) => !d.name || d.position === undefined)
+
+        if (invalidDay) {
+          return NextResponse.json(
+            { error: 'Each protocol day requires name and position when replacing days.' },
+            { status: 400 },
+          )
+        }
+
+        await db.from('nutrition_protocol_days').delete().eq('protocol_id', protocolId)
+        const daysToInsert = body.data.days.map(d => ({
+          protocol_id: protocolId,
+          name: d.name!,
+          position: d.position!,
+          calories: d.calories ?? null,
+          protein_g: d.protein_g ?? null,
+          carbs_g: d.carbs_g ?? null,
+          fat_g: d.fat_g ?? null,
+          hydration_ml: d.hydration_ml ?? null,
+          carb_cycle_type: d.carb_cycle_type ?? null,
+          cycle_sync_phase: d.cycle_sync_phase ?? null,
+          recommendations: d.recommendations ?? null,
+        }))
+        await db.from('nutrition_protocol_days').insert(daysToInsert)
+      }
+    }
 
   if (body.data.schedule_slots !== undefined) {
     await db.from('nutrition_protocol_schedule_slots').delete().eq('protocol_id', protocolId)

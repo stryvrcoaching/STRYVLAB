@@ -41,7 +41,7 @@ export function buildScheduleSlots(
   const slots: { week_index: number; dow: number; protocol_day_position: number }[] = []
   for (let dow = 1; dow <= 7; dow++) {
     slots.push({
-      week_index: 0,
+      week_index: 1,
       dow,
       protocol_day_position: trainingDows.has(dow) ? trainingDayPosition : restDayPosition,
     })
