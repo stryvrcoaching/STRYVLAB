@@ -226,6 +226,13 @@ export default function NutritionHub({ clientId }: { clientId: string }) {
     [data],
   );
 
+  const focusDayRow = useMemo(() => {
+    if (!data?.agenda?.length) return null;
+    const pastDays = data.agenda.filter((row) => !row.isToday);
+    if (!pastDays.length) return null;
+    return [...pastDays].sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
+  }, [data]);
+
   if (loading) {
     return <NutritionHubSkeleton />;
   }
@@ -395,11 +402,7 @@ export default function NutritionHub({ clientId }: { clientId: string }) {
           </section>
 
           <NutritionFocusDayCard
-            row={useMemo(() => {
-              const pastDays = data.agenda.filter((row) => !row.isToday);
-              if (!pastDays.length) return null;
-              return [...pastDays].sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
-            }, [data.agenda])}
+              row={focusDayRow}
             rationale="La journée la plus récente hors aujourd’hui sert de point d’audit rapide."
           />
 
