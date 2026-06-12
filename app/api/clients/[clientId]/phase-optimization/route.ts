@@ -4,7 +4,6 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { buildDerivedSignals } from "@/lib/coach/phaseEngine/signals";
 import { computePhaseOptimization } from "@/lib/coach/phaseEngine/engine";
-import { computeOptimalPhase } from "@/lib/coach/phaseEngine/decision";
 import { ENGINE_VERSION } from "@/lib/coach/phaseEngine/engine";
 import {
   snapshotFromResult,
