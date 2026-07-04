@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { closeNutritionProtocolAssignment } from '@/lib/assignments/clientAssignments'
 
 function serviceClient() {
   return createServiceClient(
@@ -33,6 +34,13 @@ export async function POST(
     .update({ status: 'draft' })
     .eq('id', protocolId)
     .eq('client_id', clientId)
+
+  await closeNutritionProtocolAssignment(db, {
+    clientId,
+    protocolId,
+    endedBy: user.id,
+    reason: 'unshare',
+  })
 
   // Remove metric annotation created when this protocol was shared
   await db

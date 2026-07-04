@@ -20,6 +20,42 @@ async function verifyOwnership(db: ReturnType<typeof serviceClient>, clientId: s
   return !!data
 }
 
+function normalizeAnnotations(rows: any[]) {
+  const sorted = [...rows].sort((a, b) =>
+    a.event_date.localeCompare(b.event_date) || String(a.id).localeCompare(String(b.id))
+  )
+
+  const seenKeys = new Set<string>()
+  const firstNutritionDateByProtocol = new Map<string, string>()
+
+  const normalized: any[] = []
+  for (let row of sorted) {
+    const dedupeKey = `${row.source_id ?? row.id}:${row.event_type}:${row.event_date}:${row.label}:${row.body ?? ''}`
+    if (seenKeys.has(dedupeKey)) continue
+    seenKeys.add(dedupeKey)
+
+    if (row.event_type === 'nutrition' && row.source_id && typeof row.label === 'string') {
+      const firstDate = firstNutritionDateByProtocol.get(row.source_id)
+      if (!firstDate) {
+        firstNutritionDateByProtocol.set(row.source_id, row.event_date)
+      } else if (row.label.startsWith('Protocole nutritionnel : ')) {
+        row = {
+          ...row,
+          label: row.label.replace(
+            'Protocole nutritionnel : ',
+            'Mise a jour du protocole nutritionnel : ',
+          ),
+          body: row.body ?? 'Protocole partage mis a jour',
+        }
+      }
+    }
+
+    normalized.push(row)
+  }
+
+  return normalized
+}
+
 const createSchema = z.object({
   event_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   label: z.string().min(1).max(200),
@@ -49,7 +85,7 @@ export async function GET(
     .order('event_date', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  return NextResponse.json(normalizeAnnotations(data ?? []))
 }
 
 export async function POST(

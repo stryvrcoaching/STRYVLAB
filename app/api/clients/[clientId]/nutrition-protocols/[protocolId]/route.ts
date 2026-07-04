@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { upsertProtocolUpdatedAnnotation } from '@/lib/nutrition/protocolAnnotations'
+import { closeNutritionProtocolAssignment } from '@/lib/assignments/clientAssignments'
 
 function serviceClient() {
   return createServiceClient(
@@ -62,9 +64,50 @@ const updateDaySchema = z.object({
   carbs_g: z.number().nullable().optional(),
   fat_g: z.number().nullable().optional(),
   hydration_ml: z.number().int().nullable().optional(),
+  role: z.enum(['training', 'rest', 'neutral']).optional(),
   carb_cycle_type: z.enum(['high', 'medium', 'low']).nullable().optional(),
   cycle_sync_phase: z.enum(['follicular', 'ovulatory', 'luteal', 'menstrual']).nullable().optional(),
   recommendations: z.string().nullable().optional(),
+  meal_plan: z.array(z.object({
+    id: z.string().min(1).max(120),
+    title: z.string().min(1).max(80),
+    items: z.array(z.object({
+      id: z.string().min(1).max(120),
+      quantity_g: z.number().positive().max(10000),
+      food: z.object({
+        id: z.string().uuid(),
+        name_fr: z.string().min(1).max(240),
+        category_l1: z.enum(['proteins', 'carbs', 'vegetables', 'fruits', 'fats', 'drinks', 'extras']),
+        category_l2: z.string().nullable(),
+        item_key: z.string().min(1).max(240),
+        kcal_per_100g: z.number().min(0).max(1000),
+        protein_per_100g: z.number().min(0).max(100),
+        carbs_per_100g: z.number().min(0).max(100),
+        fat_per_100g: z.number().min(0).max(100),
+        fiber_per_100g: z.number().min(0).max(100),
+        source: z.string().min(1).max(80),
+        is_verified: z.boolean(),
+      }),
+      alternatives: z.array(z.object({
+        id: z.string().min(1).max(120),
+        quantity_g: z.number().positive().max(10000),
+        food: z.object({
+          id: z.string().uuid(),
+          name_fr: z.string().min(1).max(240),
+          category_l1: z.enum(['proteins', 'carbs', 'vegetables', 'fruits', 'fats', 'drinks', 'extras']),
+          category_l2: z.string().nullable(),
+          item_key: z.string().min(1).max(240),
+          kcal_per_100g: z.number().min(0).max(1000),
+          protein_per_100g: z.number().min(0).max(100),
+          carbs_per_100g: z.number().min(0).max(100),
+          fat_per_100g: z.number().min(0).max(100),
+          fiber_per_100g: z.number().min(0).max(100),
+          source: z.string().min(1).max(80),
+          is_verified: z.boolean(),
+        }),
+      })).max(5),
+    })).max(80),
+  })).max(12).optional(),
 })
 
 const updateSchema = z.object({
@@ -99,6 +142,16 @@ export async function PATCH(
   if (!body.success) return NextResponse.json({ error: body.error }, { status: 400 })
 
   const db = serviceClient()
+  const shouldLogProtocolUpdate =
+    existing.status === 'shared' &&
+    (
+      body.data.name !== undefined ||
+      body.data.notes !== undefined ||
+      body.data.schedule_start_date !== undefined ||
+      body.data.cycle_sync_enabled !== undefined ||
+      body.data.days !== undefined ||
+      body.data.schedule_slots !== undefined
+    )
 
   if (body.data.name !== undefined || body.data.notes !== undefined || body.data.schedule_start_date !== undefined || body.data.cycle_sync_enabled !== undefined || body.data.tdee_auto_enabled !== undefined || body.data.tdee_adaptive_active !== undefined || body.data.tdee_reference !== undefined) {
     const updates: Record<string, unknown> = {}
@@ -127,9 +180,11 @@ export async function PATCH(
           if (d.carbs_g !== undefined) updates.carbs_g = d.carbs_g
           if (d.fat_g !== undefined) updates.fat_g = d.fat_g
           if (d.hydration_ml !== undefined) updates.hydration_ml = d.hydration_ml
+          if (d.role !== undefined) updates.role = d.role
           if (d.carb_cycle_type !== undefined) updates.carb_cycle_type = d.carb_cycle_type
           if (d.cycle_sync_phase !== undefined) updates.cycle_sync_phase = d.cycle_sync_phase
           if (d.recommendations !== undefined) updates.recommendations = d.recommendations
+          if (d.meal_plan !== undefined) updates.meal_plan = d.meal_plan
 
           if (Object.keys(updates).length > 0) {
             await db
@@ -159,9 +214,11 @@ export async function PATCH(
           carbs_g: d.carbs_g ?? null,
           fat_g: d.fat_g ?? null,
           hydration_ml: d.hydration_ml ?? null,
+          role: d.role ?? 'neutral',
           carb_cycle_type: d.carb_cycle_type ?? null,
           cycle_sync_phase: d.cycle_sync_phase ?? null,
           recommendations: d.recommendations ?? null,
+          meal_plan: d.meal_plan ?? [],
         }))
         await db.from('nutrition_protocol_days').insert(daysToInsert)
       }
@@ -178,6 +235,15 @@ export async function PATCH(
       }))
       await db.from('nutrition_protocol_schedule_slots').insert(slotsToInsert)
     }
+  }
+
+  if (shouldLogProtocolUpdate) {
+    await upsertProtocolUpdatedAnnotation(db, {
+      clientId,
+      coachId: user.id,
+      protocolId,
+      protocolName: body.data.name ?? existing.name,
+    })
   }
 
   const updated = await resolveProtocol(user.id, clientId, protocolId)
@@ -204,6 +270,13 @@ export async function DELETE(
     .delete()
     .eq('source_id', protocolId)
     .eq('client_id', clientId)
+
+  await closeNutritionProtocolAssignment(db, {
+    clientId,
+    protocolId,
+    endedBy: user.id,
+    reason: 'delete',
+  })
 
   await db.from('nutrition_protocols').delete().eq('id', protocolId)
 

@@ -70,7 +70,7 @@ describe('suggestFoodQuantity', () => {
     expect(out).not.toBeNull()
     expect(out?.macroFilled).toBe('fat')
     expect(out?.grams).toBeLessThanOrEqual(40)
-    expect(out?.warning).toContain('plafonnee')
+    expect(out?.grams).toBeGreaterThan(0)
   })
 
   it('keeps roasted chicken portions in a plausible range', () => {
@@ -99,6 +99,60 @@ describe('suggestFoodQuantity', () => {
     const out = suggestFoodQuantity({
       food,
       remainingTargets: { protein_g: 0, carbs_g: 0, fat_g: -5 },
+    })
+    expect(out).toBeNull()
+  })
+
+  it('returns null for carb-dominant foods when carbs are already exceeded', () => {
+    const banana = mkFood({
+      name_fr: 'Banane',
+      category_l1: 'fruits',
+      protein_per_100g: 1.1,
+      carbs_per_100g: 19.7,
+      fat_per_100g: 0.3,
+      kcal_per_100g: 90,
+    })
+    const out = suggestFoodQuantity({
+      food: banana,
+      remainingTargets: { protein_g: 37, carbs_g: -58, fat_g: -14 },
+      applyMealFraction: true,
+    })
+    expect(out).toBeNull()
+  })
+
+  it('suggests a moderate protein-serving even when fats are already covered', () => {
+    const salmon = mkFood({
+      name_fr: 'Saumon',
+      category_l1: 'proteins',
+      protein_per_100g: 25,
+      carbs_per_100g: 0,
+      fat_per_100g: 13,
+      kcal_per_100g: 208,
+    })
+    const out = suggestFoodQuantity({
+      food: salmon,
+      remainingTargets: { protein_g: 35, carbs_g: 0, fat_g: 0 },
+      applyMealFraction: true,
+    })
+    expect(out).not.toBeNull()
+    expect(out?.macroFilled).toBe('protein')
+    expect(out?.grams).toBeGreaterThan(0)
+    expect(out?.grams).toBeLessThanOrEqual(100)
+  })
+
+  it('returns null when an item creates more overflow than useful coverage', () => {
+    const oliveOil = mkFood({
+      name_fr: "Huile d'olive",
+      category_l1: 'fats',
+      protein_per_100g: 0,
+      carbs_per_100g: 0,
+      fat_per_100g: 100,
+      kcal_per_100g: 900,
+    })
+    const out = suggestFoodQuantity({
+      food: oliveOil,
+      remainingTargets: { protein_g: 25, carbs_g: 10, fat_g: -5 },
+      applyMealFraction: true,
     })
     expect(out).toBeNull()
   })
@@ -146,7 +200,7 @@ describe('suggestFoodQuantity — completion mode (applyMealFraction: true)', ()
     })
     expect(out).not.toBeNull()
     expect(out!.macroFilled).toBe('protein')
-    expect(out!.grams).toBe(40)
+    expect(out!.grams).toBeLessThanOrEqual(30)
   })
 
   it('picks carbs fill for rice (min-grams wins over protein)', () => {

@@ -3,6 +3,7 @@ import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { detectPerformanceTrend } from '@/lib/programs/intelligence/performance'
 import type { SessionObservation } from '@/lib/programs/intelligence/performance'
+import { getExerciseHistoryKeys, resolveCanonicalExerciseName } from '@/lib/training/exerciseHistoryKey'
 
 function service() {
   return createServiceClient(
@@ -34,6 +35,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   }
 
   const exerciseName = decodeURIComponent(params.exerciseName)
+  const requestedKeys = new Set(getExerciseHistoryKeys(exerciseName))
 
   // Get last 10 completed session logs, then filter by exercise presence
   const { data: sessionLogs } = await db
@@ -52,17 +54,21 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   const { data: setLogs } = await db
     .from('client_set_logs')
-    .select('session_log_id, actual_reps, actual_weight_kg, completed, rir_actual')
-    .eq('exercise_name', exerciseName)
+    .select('session_log_id, exercise_name, actual_reps, actual_weight_kg, completed, rir_actual')
     .in('session_log_id', sessionIds)
 
-  if (!setLogs || setLogs.length === 0) {
+  const relevantSetLogs = (setLogs ?? []).filter((set) =>
+    typeof set.exercise_name === 'string' &&
+    getExerciseHistoryKeys(set.exercise_name).some((key) => requestedKeys.has(key)),
+  )
+
+  if (relevantSetLogs.length === 0) {
     return NextResponse.json({ trend: null, suggestion: null, sessionCount: 0 })
   }
 
   // Group sets by session
   const setsBySession: Record<string, typeof setLogs> = {}
-  for (const set of setLogs) {
+  for (const set of relevantSetLogs) {
     if (!setsBySession[set.session_log_id]) {
       setsBySession[set.session_log_id] = []
     }
@@ -85,5 +91,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   const result = detectPerformanceTrend(observations)
 
-  return NextResponse.json(result)
+  return NextResponse.json({
+    ...result,
+    exerciseName: resolveCanonicalExerciseName(exerciseName),
+  })
 }

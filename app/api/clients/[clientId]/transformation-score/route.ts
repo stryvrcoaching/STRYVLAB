@@ -20,6 +20,7 @@ import {
   type SessionPerf,
   type SetLogEntry,
 } from '@/lib/performance/analyzer'
+import { resolveCanonicalExerciseKey, resolveCanonicalExerciseName } from '@/lib/training/exerciseHistoryKey'
 
 function service() {
   return createServiceClient(
@@ -75,7 +76,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       .order('date', { ascending: true }),
 
     db.from('client_session_logs')
-      .select('id, completed_at, client_set_logs(exercise_id, set_number, actual_reps, completed, rir_actual)')
+      .select('id, completed_at, client_set_logs(exercise_id, exercise_name, set_number, actual_reps, completed, rir_actual)')
       .eq('client_id', params.clientId)
       .not('completed_at', 'is', null)
       .gte('completed_at', periodStart),
@@ -162,10 +163,10 @@ export async function GET(req: NextRequest, { params }: Params) {
     session_log_id: session.id,
     logged_at: session.completed_at as string,
     sets: ((session.client_set_logs ?? []) as any[])
-      .filter((set: any) => Boolean(set.exercise_id))
+      .filter((set: any) => Boolean(set.exercise_id || set.exercise_name))
       .map((set: any): SetLogEntry => ({
-        exercise_id: set.exercise_id,
-        exercise_name: set.exercise_id,
+        exercise_id: set.exercise_id ?? resolveCanonicalExerciseKey(set.exercise_name ?? ''),
+        exercise_name: resolveCanonicalExerciseName(set.exercise_name ?? set.exercise_id ?? 'Exercice'),
         set_number: set.set_number ?? 1,
         actual_reps: set.actual_reps ?? null,
         completed: set.completed === true,

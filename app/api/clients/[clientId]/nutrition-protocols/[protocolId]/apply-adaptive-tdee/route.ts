@@ -11,6 +11,31 @@ function svc() {
   )
 }
 
+async function upsertSameDayTdeeHistory(db: ReturnType<typeof svc>, payload: Record<string, unknown>) {
+  const calculatedAt = String(payload.calculated_at)
+  const dayStart = `${calculatedAt.slice(0, 10)}T00:00:00.000Z`
+  const dayEnd = `${calculatedAt.slice(0, 10)}T23:59:59.999Z`
+
+  const { data: existing } = await db
+    .from('nutrition_tdee_history')
+    .select('id')
+    .eq('protocol_id', payload.protocol_id)
+    .eq('client_id', payload.client_id)
+    .eq('protocol_updated', false)
+    .gte('calculated_at', dayStart)
+    .lte('calculated_at', dayEnd)
+    .order('calculated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if ((existing as any)?.id) {
+    await db.from('nutrition_tdee_history').update(payload).eq('id', (existing as any).id)
+    return
+  }
+
+  await db.from('nutrition_tdee_history').insert(payload)
+}
+
 /**
  * POST — Calculate adaptive TDEE only. Does NOT modify the protocol.
  * Returns the new TDEE + a preview of what each protocol day would become.
@@ -45,7 +70,7 @@ export async function POST(
 
   // Collect weight samples anchored to protocol start date when possible
   const { samples: weightSamples, windowDays, anchoredToProtocol, tooShort } =
-    await collectWeightSamples(db, clientId, 14, 4, protocolName)
+    await collectWeightSamples(db, clientId, 14, 4, protocolName, protocolId)
 
   if (tooShort) {
     return NextResponse.json({
@@ -72,7 +97,7 @@ export async function POST(
     return d.toISOString().slice(0, 10)
   })()
 
-  const [{ avgIntakeKcal, caloriesSource, trackedDays }, { gender, cyclePhases, cycleConfidence }] =
+  const [{ avgIntakeKcal, caloriesSource, trackedDays, excludedCurrentDay }, { gender, cyclePhases, cycleConfidence }] =
     await Promise.all([
       collectAvgIntake(db, clientId, windowDays, tdeeReference),
       collectClientSignals(db, clientId, cutoffDate),
@@ -84,6 +109,7 @@ export async function POST(
     caloriesSource,
     windowDays,
     trackedDays,
+    excludedCurrentDay,
     gender: gender as any,
     cyclePhases,
     cycleConfidence,
@@ -101,16 +127,18 @@ export async function POST(
     }, { status: 422 })
   }
 
+  const calculatedAt = new Date().toISOString()
+
   // Persist the new TDEE value on the protocol — but do NOT rescale days yet.
   await db.from('nutrition_protocols').update({
     tdee_adaptive:    result.tdeeAdaptive,
-    tdee_adaptive_at: new Date().toISOString(),
+    tdee_adaptive_at: calculatedAt,
     tdee_data_source: caloriesSource === 'protocol' ? 'formula_proxy' : 'weight_delta',
   }).eq('id', protocolId)
 
   // Record in history (protocol_updated = false — coach hasn't confirmed yet)
   const deltaKcal = result.tdeeAdaptive - tdeeReference
-  await db.from('nutrition_tdee_history').insert({
+  await upsertSameDayTdeeHistory(db, {
     protocol_id:        protocolId,
     client_id:          clientId,
     tdee_formula:       tdeeReference,
@@ -124,6 +152,7 @@ export async function POST(
     confidence:         result.confidence,
     confidence_score:   result.confidenceScore,
     confidence_reasons: result.confidenceReasons,
+    calculated_at:      calculatedAt,
   })
 
   // Build preview: what each day would become after rescaling
@@ -161,6 +190,7 @@ export async function POST(
     caloriesSource,
     trackedDays,
     preview,
+    tdeeAdaptiveAt: calculatedAt,
     // Coach must call POST /apply to confirm
     requiresConfirmation: true,
   })

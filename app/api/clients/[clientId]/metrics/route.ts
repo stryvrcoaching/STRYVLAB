@@ -155,7 +155,7 @@ export async function POST(
       coach_id: user.id,
       client_id: params.clientId,
       template_id: templateId,
-      template_snapshot: { blocks: [{ id: 'csv_import_block', module: 'biometrics' }] },
+      template_snapshot: [{ id: 'csv_import_block', module: 'biometrics', label: 'Mesures', order: 0, fields: [] }],
       status: 'completed',
       filled_by: 'coach',
       submitted_at: submittedAt,

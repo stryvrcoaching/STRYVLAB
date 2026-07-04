@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { buildDerivedSignals } from "@/lib/coach/phaseEngine/signals";
+import {
+  buildDerivedSignals,
+  hasPhaseInterpretationSignals,
+} from "@/lib/coach/phaseEngine/signals";
 import { computePhaseOptimization } from "@/lib/coach/phaseEngine/engine";
 import { ENGINE_VERSION } from "@/lib/coach/phaseEngine/engine";
 import {
@@ -581,10 +584,14 @@ export async function GET(req: NextRequest, { params }: Params) {
     locale,
   });
 
+  const { insufficientData: _insufficient, ...derivedSignals } = signals;
   const storedOverride = parseStoredPhaseOverride(clientData.phase_override);
   const result = applyManualOverride(engineResult, storedOverride, locale);
+  const analysisReady =
+    result.analysisState === "ready" &&
+    hasPhaseInterpretationSignals(derivedSignals);
 
-  if (!date) {
+  if (!date && analysisReady) {
     const snap = snapshotFromResult(engineResult);
     await db.from("phase_optimization_history").upsert(
       {
@@ -632,8 +639,6 @@ export async function GET(req: NextRequest, { params }: Params) {
         ? Math.round(sleepQualityNorm * 100)
         : null;
 
-  const { insufficientData: _insufficient, ...derivedSignals } = signals;
-
   const metricCards = buildPhaseFooterMetricCards(
     derivedSignals,
     { weightSeries, bodyFatSeries, windowDays },
@@ -659,13 +664,15 @@ export async function GET(req: NextRequest, { params }: Params) {
       : undefined,
   };
 
-  const coachDecision = buildCoachDecision(
-    result,
-    derivedSignals,
-    rawInput,
-    locale,
-    historyTrail,
-  );
+  const coachDecision = analysisReady
+    ? buildCoachDecision(
+        result,
+        derivedSignals,
+        rawInput,
+        locale,
+        historyTrail,
+      )
+    : undefined;
 
   return NextResponse.json({
     ...result,

@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { analyzeExercisePerformance } from '@/lib/performance/analyzer'
 import { generateRecommendations } from '@/lib/performance/recommendations'
 import type { SessionPerf, SetLogEntry, OverloadEvent } from '@/lib/performance/analyzer'
+import { resolveCanonicalExerciseKey, resolveCanonicalExerciseName } from '@/lib/training/exerciseHistoryKey'
 
 function service() {
   return createServiceClient(
@@ -19,6 +20,27 @@ function service() {
 const querySchema = z.object({
   weeks: z.coerce.number().int().min(1).max(52).default(8),
 })
+
+function isMissingSchemaFieldError(error: { code?: string | null; message?: string | null } | null | undefined) {
+  const message = String(error?.message ?? '').toLowerCase()
+  return (
+    error?.code === '42703' ||
+    error?.code === '42P01' ||
+    message.includes('schema cache') ||
+    message.includes('could not find the') ||
+    message.includes('column') ||
+    message.includes('does not exist')
+  )
+}
+
+function isMissingOptionalTableError(error: { code?: string | null; message?: string | null } | null | undefined) {
+  const message = String(error?.message ?? '').toLowerCase()
+  return (
+    error?.code === '42P01' ||
+    message.includes('could not find the table') ||
+    message.includes('does not exist')
+  )
+}
 
 type Params = { params: { clientId: string } }
 
@@ -82,12 +104,43 @@ export async function GET(req: NextRequest, { params }: Params) {
   }
 
   // Fetch progression_events dans la période
-  const { data: progressionEvents, error: progressionError } = await db
+  let progressionEvents: Array<{
+    exercise_id: string
+    exercise_name?: string | null
+    exercise_key?: string | null
+    created_at: string
+    trigger_type: string
+    new_weight_kg?: number | null
+  }> | null = null
+
+  let progressionError: { code?: string | null; message?: string | null } | null = null
+
+  const progressionQuery = await db
     .from('progression_events')
-    .select('exercise_id, exercise_name:exercise_id, created_at, trigger_type, new_weight_kg')
+    .select('exercise_id, exercise_name, exercise_key, created_at, trigger_type, new_weight_kg')
     .eq('client_id', params.clientId)
     .gte('created_at', periodStartIso)
     .order('created_at', { ascending: true })
+
+  progressionEvents = progressionQuery.data as typeof progressionEvents
+  progressionError = progressionQuery.error
+
+  if (progressionError && isMissingSchemaFieldError(progressionError)) {
+    const legacyProgressionQuery = await db
+      .from('progression_events')
+      .select('exercise_id, created_at, trigger_type, new_weight_kg')
+      .eq('client_id', params.clientId)
+      .gte('created_at', periodStartIso)
+      .order('created_at', { ascending: true })
+
+    progressionEvents = (legacyProgressionQuery.data as typeof progressionEvents) ?? []
+    progressionError = legacyProgressionQuery.error
+  }
+
+  if (progressionError && isMissingOptionalTableError(progressionError)) {
+    progressionEvents = []
+    progressionError = null
+  }
 
   if (progressionError) {
     console.error('[performance-summary] progression_events error', progressionError)
@@ -95,22 +148,29 @@ export async function GET(req: NextRequest, { params }: Params) {
   }
 
   // Fetch programme actif (le plus récent non archivé)
-  const { data: activeProgram } = await db
+  const { data: activeProgram, error: activeProgramError } = await db
     .from('programs')
     .select(`
       id,
-      program_exercises (
+      program_sessions (
         id,
-        name,
-        sets,
-        current_weight_kg
+        program_exercises (
+          id,
+          name,
+          sets,
+          current_weight_kg
+        )
       )
     `)
     .eq('client_id', params.clientId)
     .neq('status', 'archived')
     .order('created_at', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
+
+  if (activeProgramError) {
+    console.error('[performance-summary] active_program error', activeProgramError)
+  }
 
   // Construire les SessionPerf
   const sessions: SessionPerf[] = (sessionLogs ?? []).map(log => {
@@ -123,8 +183,8 @@ export async function GET(req: NextRequest, { params }: Params) {
       rir_actual: number | null
     }>
     const sets: SetLogEntry[] = rawSets.map(s => ({
-      exercise_id: s.exercise_id,
-      exercise_name: s.exercise_name,
+      exercise_id: resolveCanonicalExerciseKey(s.exercise_name ?? s.exercise_id),
+      exercise_name: resolveCanonicalExerciseName(s.exercise_name ?? s.exercise_id),
       set_number: s.set_number,
       actual_reps: s.actual_reps,
       completed: s.completed,
@@ -137,13 +197,11 @@ export async function GET(req: NextRequest, { params }: Params) {
     }
   })
 
-  // Construire les OverloadEvent
-  // progression_events n'a pas de colonne exercise_name, on utilise l'exercise_id comme fallback
   const overloadEvents: OverloadEvent[] = (progressionEvents ?? [])
     .filter(ev => ev.trigger_type === 'overload' || ev.trigger_type === 'maintain')
     .map(ev => ({
-      exercise_id: ev.exercise_id,
-      exercise_name: ev.exercise_id, // sera enrichi en UI via le nom dans les sets
+      exercise_id: ev.exercise_key ?? resolveCanonicalExerciseKey(ev.exercise_name ?? ev.exercise_id),
+      exercise_name: resolveCanonicalExerciseName(ev.exercise_name ?? ev.exercise_id),
       created_at: ev.created_at,
       trigger_type: ev.trigger_type as 'overload' | 'maintain',
     }))
@@ -160,12 +218,16 @@ export async function GET(req: NextRequest, { params }: Params) {
   }
 
   const programExercises: RawProgramExercise[] = activeProgram
-    ? (activeProgram.program_exercises ?? []).map((pe: RawProgramExercise) => ({
-        id: pe.id,
-        name: pe.name,
-        sets: pe.sets,
-        current_weight_kg: pe.current_weight_kg,
-      }))
+    ? (((activeProgram as any).program_sessions ?? []) as Array<{
+        program_exercises?: RawProgramExercise[] | null
+      }>)
+        .flatMap((session) => session.program_exercises ?? [])
+        .map((pe) => ({
+          id: pe.id,
+          name: pe.name,
+          sets: pe.sets,
+          current_weight_kg: pe.current_weight_kg,
+        }))
     : []
 
   const recommendations = generateRecommendations(analysis, { exercises: programExercises })

@@ -20,6 +20,7 @@ import {
   type NutritionHubDayKind,
   type NutritionHubInsightInput,
 } from "@/lib/coach/nutritionHub";
+import { fetchActiveSmoothingPlanForCoach } from "@/lib/nutrition/smoothing/fetch";
 
 const querySchema = z.object({
   window: z.enum(["3", "7", "14", "30"]).default("7"),
@@ -121,6 +122,7 @@ export async function GET(
     { data: meals, error: mealsError },
     { data: waterLogs, error: waterError },
     { data: tdeeHistory, error: tdeeError },
+    activeSmoothingPlan,
   ] = await Promise.all([
       db
         .from("nutrition_protocols")
@@ -154,6 +156,7 @@ export async function GET(
         .eq("client_id", clientId)
         .gte("calculated_at", earliestRange.start.toISOString())
         .order("calculated_at", { ascending: true }),
+      fetchActiveSmoothingPlanForCoach(db as any, user.id, clientId),
     ]);
 
   if (protocolError || mealsError || waterError || tdeeError) {
@@ -174,6 +177,21 @@ export async function GET(
     []) as ProtocolDayRecord[];
   const scheduleSlots = ((protocol as any)?.nutrition_protocol_schedule_slots ??
     []) as ScheduleSlotRecord[];
+  const smoothingDays = [...(activeSmoothingPlan?.days ?? [])].sort((a, b) =>
+    a.date.localeCompare(b.date),
+  );
+  const smoothingByDate = new Map(
+    smoothingDays.map((day) => [day.date, day] as const),
+  );
+  const remainingSmoothingByDate = new Map<string, number>();
+  let remainingSmoothingKcal = smoothingDays.reduce(
+    (sum, day) => sum + Number(day.kcal_delta ?? 0),
+    0,
+  );
+  for (const day of smoothingDays) {
+    remainingSmoothingByDate.set(day.date, remainingSmoothingKcal);
+    remainingSmoothingKcal -= Number(day.kcal_delta ?? 0);
+  }
 
   const mealsByDate = new Map<
     string,
@@ -337,6 +355,20 @@ export async function GET(
         hydration_ml: Math.round(hydration_ml),
       },
       target,
+      smoothing: (() => {
+        const day = smoothingByDate.get(dateKey);
+        if (!day || !activeSmoothingPlan) return null;
+        return {
+          planId: activeSmoothingPlan.id,
+          sourceDate: activeSmoothingPlan.source_date,
+          direction: activeSmoothingPlan.direction,
+          kcalDelta: Number(day.kcal_delta ?? 0),
+          remainingKcal: Number(remainingSmoothingByDate.get(dateKey) ?? day.kcal_delta ?? 0),
+          dayStatus: day.status,
+          coachNote: activeSmoothingPlan.coach_note,
+          coachLastAction: activeSmoothingPlan.coach_last_action,
+        };
+      })(),
     };
   });
 
@@ -385,5 +417,28 @@ export async function GET(
     },
     dataQuality,
     availableWindows: [3, 7, 14, 30],
+    activeSmoothingPlan: activeSmoothingPlan
+      ? {
+          id: activeSmoothingPlan.id,
+          sourceDate: activeSmoothingPlan.source_date,
+          sourceTargetKcal: activeSmoothingPlan.source_target_kcal,
+          sourceConsumedKcal: activeSmoothingPlan.source_consumed_kcal,
+          direction: activeSmoothingPlan.direction,
+          durationDays: activeSmoothingPlan.duration_days,
+          smoothableDeltaKcal: activeSmoothingPlan.smoothable_delta_kcal,
+          strategy: activeSmoothingPlan.strategy,
+          status: activeSmoothingPlan.status,
+          createdBy: activeSmoothingPlan.created_by,
+          coachNote: activeSmoothingPlan.coach_note,
+          coachNoteUpdatedAt: activeSmoothingPlan.coach_note_updated_at,
+          coachLastAction: activeSmoothingPlan.coach_last_action,
+          days: smoothingDays.map((day) => ({
+            date: day.date,
+            kcalDelta: Number(day.kcal_delta ?? 0),
+            status: day.status,
+            remainingKcal: Number(remainingSmoothingByDate.get(day.date) ?? 0),
+          })),
+        }
+      : null,
   });
 }

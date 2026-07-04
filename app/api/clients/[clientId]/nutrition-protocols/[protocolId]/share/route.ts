@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { ensureProtocolSharedAnnotation } from '@/lib/nutrition/protocolAnnotations'
+import { activateNutritionProtocolAssignment, closeNutritionProtocolAssignment } from '@/lib/assignments/clientAssignments'
 
 function serviceClient() {
   return createServiceClient(
@@ -36,6 +38,13 @@ export async function POST(
     .single()
   if (!protocol) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  const { data: currentlyShared } = await db
+    .from('nutrition_protocols')
+    .select('id')
+    .eq('client_id', clientId)
+    .eq('status', 'shared')
+    .neq('id', protocolId)
+
   // Archive any previously shared protocol for this client
   await db
     .from('nutrition_protocols')
@@ -44,25 +53,35 @@ export async function POST(
     .eq('status', 'shared')
     .neq('id', protocolId)
 
+  for (const row of currentlyShared ?? []) {
+    await closeNutritionProtocolAssignment(db, {
+      clientId,
+      protocolId: (row as any).id,
+      endedBy: user.id,
+      reason: 'replace',
+    })
+  }
+
   // Set this protocol as shared
   await db
     .from('nutrition_protocols')
     .update({ status: 'shared' })
     .eq('id', protocolId)
 
-  // Create metric annotation (source_id = protocolId for cleanup on delete/unshare)
-  const today = new Date().toISOString().split('T')[0]
-  await db
-    .from('metric_annotations')
-    .insert({
-      client_id: clientId,
-      coach_id: user.id,
-      event_type: 'nutrition',
-      event_date: today,
-      label: `Protocole nutritionnel : ${protocol.name}`,
-      body: `Protocole partagé avec le client`,
-      source_id: protocolId,
-    })
+  const annotationId = await ensureProtocolSharedAnnotation(db, {
+    clientId,
+    coachId: user.id,
+    protocolId,
+    protocolName: protocol.name,
+  })
+
+  await activateNutritionProtocolAssignment(db, {
+    clientId,
+    coachId: user.id,
+    protocolId,
+    startedBy: user.id,
+    sourceAnnotationId: annotationId ?? null,
+  })
 
   return NextResponse.json({ success: true })
 }

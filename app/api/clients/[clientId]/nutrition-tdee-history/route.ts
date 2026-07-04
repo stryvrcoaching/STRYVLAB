@@ -33,9 +33,17 @@ export async function GET(
     .select('*')
     .eq('client_id', params.clientId)
     .order('calculated_at', { ascending: false })
-    .limit(5)
+    .limit(30)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json(data ?? [])
+  const deduped = new Map<string, any>()
+  for (const entry of data ?? []) {
+    const key = `${entry.protocol_id}:${String(entry.calculated_at).slice(0, 10)}`
+    if (!deduped.has(key)) {
+      deduped.set(key, entry)
+    }
+  }
+
+  return NextResponse.json(Array.from(deduped.values()).slice(0, 5))
 }

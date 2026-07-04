@@ -3,6 +3,7 @@ import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { isMeaningfulSession } from '@/lib/training/sessionLogUtils'
 import { estimateOneRM } from '@/lib/training/oneRepMax'
+import { resolveCanonicalExerciseKey, resolveCanonicalExerciseName } from '@/lib/training/exerciseHistoryKey'
 
 function service() {
   return createServiceClient(
@@ -58,6 +59,9 @@ function prettifyPattern(pattern: string | null | undefined) {
     knee_flexion: 'Flexion genou',
     knee_extension: 'Extension genou',
     calf_raise: 'Mollets',
+    wrist_flexion: 'Flexion poignet',
+    wrist_extension: 'Extension poignet',
+    forearm_rotation: 'Rotation avant-bras',
     elbow_flexion: 'Flexion coude',
     elbow_extension: 'Extension coude',
     lateral_raise: 'Élévation latérale',
@@ -197,6 +201,9 @@ export async function GET(req: NextRequest, { params }: { params: { clientId: st
 
   const programExerciseById = new Map(programExercises.map((exercise) => [exercise.id, exercise]))
   const programExerciseByName = new Map(programExercises.map((exercise) => [normalizeText(exercise.name), exercise]))
+  const programExerciseByCanonicalKey = new Map(
+    programExercises.map((exercise) => [resolveCanonicalExerciseKey(exercise.name), exercise] as const),
+  )
   const activeProgramSessionIds = new Set(programSessions.map((session: any) => session.id))
 
   const isEffective = (set: {
@@ -311,11 +318,14 @@ export async function GET(req: NextRequest, { params }: { params: { clientId: st
       const restActual = (set as any).rest_sec_actual as number | null
       const resolvedExercise =
         ((set as any).exercise_id && programExerciseById.get((set as any).exercise_id)) ??
+        programExerciseByCanonicalKey.get(resolveCanonicalExerciseKey((set as any).exercise_name ?? '')) ??
         programExerciseByName.get(normalizeText((set as any).exercise_name ?? '')) ??
         null
 
-      const resolvedKey = resolvedExercise?.id ?? (set as any).exercise_id ?? normalizeText((set as any).exercise_name ?? '')
-      const resolvedName = resolvedExercise?.name ?? (set as any).exercise_name ?? 'Exercice'
+      const resolvedKey = resolvedExercise?.id
+        ?? ((set as any).exercise_id && programExerciseById.has((set as any).exercise_id) ? (set as any).exercise_id : null)
+        ?? resolveCanonicalExerciseKey((set as any).exercise_name ?? '')
+      const resolvedName = resolvedExercise?.name ?? resolveCanonicalExerciseName((set as any).exercise_name ?? 'Exercice')
       const setMuscles = ((set as any).primary_muscles ?? []) as string[]
       const muscles =
         setMuscles.length > 0
@@ -543,6 +553,7 @@ export async function GET(req: NextRequest, { params }: { params: { clientId: st
       .map((set: any) => {
         const exercise =
           (set.exercise_id && programExerciseById.get(set.exercise_id)) ??
+          programExerciseByCanonicalKey.get(resolveCanonicalExerciseKey(set.exercise_name ?? '')) ??
           programExerciseByName.get(normalizeText(set.exercise_name ?? ''))
         return exercise?.id ?? null
       })

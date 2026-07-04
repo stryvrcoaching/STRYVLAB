@@ -15,6 +15,7 @@ import {
   getLatestValueInWindow,
 } from "@/lib/client/checkin/rollingSignals";
 import { computePhysiologicalDateInTimezone } from "@/lib/client/checkin/timeWindows";
+import { hasTemplateBlock } from "@/lib/assessments/templateSnapshot";
 import {
   DEFAULT_REALTIME_WINDOW_DAYS,
   canUseRealtimeSignal,
@@ -35,6 +36,70 @@ function avg(samples: number[]): number | null {
   );
 }
 
+function roundTo1(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function buildAnchoredWindow(anchorDate: string, days: number) {
+  const endExclusive = new Date(`${anchorDate}T00:00:00.000Z`);
+  endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
+
+  const startInclusive = new Date(endExclusive);
+  startInclusive.setUTCDate(startInclusive.getUTCDate() - days);
+
+  return {
+    startInclusive,
+    endExclusive,
+  };
+}
+
+function estimateTrainingCaloriesWeekly(params: {
+  weightKg: number | null;
+  weeklyFrequency: number | null;
+  avgSessionDurationMin: number | null;
+  avgEffectiveSets: number | null;
+  avgRestSec: number | null;
+}) {
+  const {
+    weightKg,
+    weeklyFrequency,
+    avgSessionDurationMin,
+    avgEffectiveSets,
+    avgRestSec,
+  } = params;
+  if (
+    weightKg == null ||
+    weeklyFrequency == null ||
+    avgSessionDurationMin == null ||
+    weeklyFrequency <= 0 ||
+    avgSessionDurationMin <= 0
+  ) {
+    return null;
+  }
+
+  let met = 4.8;
+  if (avgEffectiveSets != null) {
+    if (avgEffectiveSets >= 24) met += 0.7;
+    else if (avgEffectiveSets >= 18) met += 0.45;
+    else if (avgEffectiveSets >= 12) met += 0.2;
+  }
+  if (avgRestSec != null) {
+    if (avgRestSec <= 60) met += 0.4;
+    else if (avgRestSec <= 90) met += 0.2;
+    else if (avgRestSec >= 180) met -= 0.15;
+  }
+  if (avgSessionDurationMin >= 90) met += 0.2;
+
+  const boundedMet = clamp(met, 4.5, 6.2);
+  return Math.round(
+    (boundedMet * weightKg * avgSessionDurationMin / 60) * weeklyFrequency,
+  );
+}
+
 const OCCUPATION_MULTIPLIER_MAP: Record<string, number> = {
   "Sédentaire (bureau)": 1.0,
   "Légèrement actif": 1.05,
@@ -47,12 +112,29 @@ const nutritionDataPatchSchema = z.object({
   weight_kg: z.number().positive().optional(),
   height_cm: z.number().positive().optional(),
   body_fat_pct: z.number().min(0).max(100).optional(),
+  body_fat_source: z.enum(["measured", "estimated"]).optional(),
+  body_fat_source_method: z.string().min(1).optional(),
   lean_mass_kg: z.number().positive().optional(),
+  lean_mass_source: z.enum(["measured", "estimated"]).optional(),
+  lean_mass_source_method: z.string().min(1).optional(),
   muscle_mass_kg: z.number().positive().optional(),
+  muscle_mass_source: z.enum(["measured", "estimated"]).optional(),
+  muscle_mass_source_method: z.string().min(1).optional(),
   bmr_kcal_measured: z.number().positive().optional(),
   bmr_source: z.enum(["measured", "estimated", "calculated"]).optional(),
   visceral_fat_level: z.number().min(0).optional(),
+  weekly_frequency: z.number().min(0).max(14).optional(),
+  session_duration_min: z.number().min(0).max(240).optional(),
+  training_calories_weekly: z.number().min(0).optional(),
   daily_steps: z.number().min(0).optional(),
+  cardio_frequency: z.number().min(0).max(14).optional(),
+  cardio_duration_min: z.number().min(0).max(240).optional(),
+  sleep_duration_h: z.number().min(0).max(24).optional(),
+  sleep_quality: z.number().min(0).max(10).optional(),
+  stress_level: z.number().min(0).max(10).optional(),
+  caffeine_daily_mg: z.number().min(0).optional(),
+  alcohol_weekly: z.number().min(0).optional(),
+  work_hours_per_week: z.number().min(0).max(168).optional(),
 });
 
 export async function GET(
@@ -98,12 +180,9 @@ export async function GET(
     .in("status", ["completed", "in_progress"])
     .order("submitted_at", { ascending: false });
 
-  const allSubmissions = (rawSubmissions ?? []).filter((submission: any) => {
-    const blocks = Array.isArray(submission?.template_snapshot?.blocks)
-      ? submission.template_snapshot.blocks
-      : [];
-    return !blocks.some((block: any) => block?.id === "checkin_realtime_block");
-  });
+  const allSubmissions = (rawSubmissions ?? []).filter(
+    (submission: any) => !hasTemplateBlock(submission?.template_snapshot, "checkin_realtime_block"),
+  );
 
   // Determine which submission to fetch data from
   let selectedSubmissionId = mode === "bilan" ? requestedSubmissionId : null;
@@ -205,6 +284,9 @@ export async function GET(
     weight_kg: null as number | null,
     body_fat_pct: null as number | null,
     height_cm: null as number | null,
+    waist_cm: null as number | null,
+    neck_cm: null as number | null,
+    hips_cm: null as number | null,
     muscle_mass_kg: null as number | null,
     lean_mass_kg: null as number | null,
     bmr_kcal_measured: null as number | null,
@@ -227,20 +309,26 @@ export async function GET(
   };
 
   // Track data source (selected submission vs fallback vs manual)
-  const dataSource: Record<string, 'selected' | 'fallback' | 'manual'> = {
+  const dataSource: Record<string, 'selected' | 'fallback' | 'manual' | 'estimated'> = {
     weight_kg: 'fallback',
     body_fat_pct: 'fallback',
     height_cm: 'fallback',
+    waist_cm: 'fallback',
+    neck_cm: 'fallback',
+    hips_cm: 'fallback',
     muscle_mass_kg: 'fallback',
     lean_mass_kg: 'fallback',
     bmr_kcal_measured: 'fallback',
     visceral_fat_level: 'fallback',
+    weekly_frequency: 'fallback',
     session_duration_min: 'fallback',
     training_calories: 'fallback',
-    training_frequency: 'fallback',
     daily_steps: 'fallback',
     cardio_frequency: 'fallback',
     cardio_duration_min: 'fallback',
+    sleep_duration_h: 'fallback',
+    sleep_quality: 'fallback',
+    stress_level: 'fallback',
     caffeine_daily_mg: 'fallback',
     alcohol_weekly: 'fallback',
     work_hours_per_week: 'fallback',
@@ -250,6 +338,9 @@ export async function GET(
     "weight_kg",
     "body_fat_pct",
     "height_cm",
+    "waist_cm",
+    "neck_cm",
+    "hips_cm",
     "muscle_mass_kg",
     "lean_mass_kg",
     "bmr_kcal_measured",
@@ -402,12 +493,56 @@ export async function GET(
       "muscle_mass_kg",
       "bmr_kcal_measured",
       "visceral_fat_level",
+      "weekly_frequency",
+      "session_duration_min",
+      "training_calories_weekly",
       "daily_steps",
+      "cardio_frequency",
+      "cardio_duration_min",
+      "sleep_duration_h",
+      "sleep_quality",
+      "stress_level",
+      "caffeine_daily_mg",
+      "alcohol_weekly",
+      "work_hours_per_week",
     ]) {
       const value = (manualData as Record<string, unknown>)[field];
       if (value !== null && value !== undefined) {
-        (entry as Record<string, unknown>)[field] = value;
-        dataSource[field] = 'manual';
+        const entryField =
+          field === "weekly_frequency"
+            ? "training_frequency"
+            : field === "training_calories_weekly"
+              ? "training_calories"
+              : field === "sleep_duration_h"
+                ? "sleep_h_samples"
+                : field === "sleep_quality"
+                  ? "sleep_q_samples"
+                  : field === "stress_level"
+                ? "stress_samples"
+                    : field;
+        const sourceField =
+          field === "training_calories_weekly" ? "training_calories" : field;
+        if (entryField === "sleep_h_samples") {
+          entry.sleep_h_samples = [Number(value)];
+        } else if (entryField === "sleep_q_samples") {
+          entry.sleep_q_samples = [Number(value)];
+        } else if (entryField === "stress_samples") {
+          entry.stress_samples = [Number(value)];
+        } else {
+          (entry as Record<string, unknown>)[entryField] = value;
+        }
+        if (
+          (field === "body_fat_pct" &&
+            (manualData as Record<string, unknown>).body_fat_source === "estimated") ||
+          (field === "lean_mass_kg" &&
+            (manualData as Record<string, unknown>).lean_mass_source === "estimated") ||
+          (field === "muscle_mass_kg" &&
+            (manualData as Record<string, unknown>).muscle_mass_source === "estimated")
+        ) {
+          dataSource[sourceField] = 'estimated';
+        } else {
+          dataSource[sourceField] = 'manual';
+        }
       }
     }
   }
@@ -424,7 +559,7 @@ export async function GET(
         anchorDate,
         weightWindowDays,
       );
-      if (weightLatest != null) {
+      if (weightLatest != null && dataSource.weight_kg !== "manual") {
         entry.weight_kg = weightLatest;
         dataSource.weight_kg = "selected";
       }
@@ -440,7 +575,7 @@ export async function GET(
         anchorDate,
         stepsWindowDays,
       );
-      if (stepsAvg != null) {
+      if (stepsAvg != null && dataSource.daily_steps !== "manual") {
         entry.daily_steps = stepsAvg;
         dataSource.daily_steps = 'selected';
       }
@@ -459,8 +594,9 @@ export async function GET(
         anchorDate,
         sleepDurationWindowDays,
       );
-      if (recentSleepH != null) {
+      if (recentSleepH != null && dataSource.sleep_duration_h !== "manual") {
         entry.sleep_h_samples = [recentSleepH];
+        dataSource.sleep_duration_h = "selected";
       }
     }
 
@@ -477,8 +613,9 @@ export async function GET(
         anchorDate,
         sleepQualityWindowDays,
       );
-      if (recentSleepQ != null) {
+      if (recentSleepQ != null && dataSource.sleep_quality !== "manual") {
         entry.sleep_q_samples = [recentSleepQ];
+        dataSource.sleep_quality = "selected";
       }
     }
 
@@ -507,8 +644,9 @@ export async function GET(
         anchorDate,
         stressWindowDays,
       );
-      if (recentStress != null) {
+      if (recentStress != null && dataSource.stress_level !== "manual") {
         entry.stress_samples = [recentStress];
+        dataSource.stress_level = "selected";
       }
     }
   }
@@ -527,6 +665,166 @@ export async function GET(
   }
 
   // Manual overrides have been moved above the real-time overlays.
+
+  const { startInclusive, endExclusive } = buildAnchoredWindow(anchorDate, 28);
+  const { startInclusive: caffeineStartInclusive } = buildAnchoredWindow(
+    anchorDate,
+    7,
+  );
+
+  const [
+    { data: clientPrograms },
+    { data: recentSessionLogs },
+    { data: recentActivityLogs },
+    { data: recentCaffeineLogs },
+  ] = await Promise.all([
+    db
+      .from("programs")
+      .select(
+        `
+        id, name, goal, status, session_mode, is_client_visible, created_at,
+        program_sessions (
+          id, name, day_of_week, days_of_week, position,
+          program_exercises (
+            id, name, sets, reps, rep_min, rep_max, rest_sec, rir, target_rir,
+            tempo, movement_pattern, is_unilateral, is_compound
+          )
+        )
+      `,
+      )
+      .eq("client_id", clientId)
+      .eq("coach_id", user.id)
+      .order("created_at", { ascending: false }),
+    db
+      .from("client_session_logs")
+      .select(
+        `
+        id, logged_at, completed_at, duration_min,
+        client_set_logs ( completed, actual_reps, rest_sec_actual )
+      `,
+      )
+      .eq("client_id", clientId)
+      .gte("logged_at", startInclusive.toISOString())
+      .lt("logged_at", endExclusive.toISOString())
+      .order("logged_at", { ascending: false }),
+    db
+      .from("client_activity_logs")
+      .select("id, started_at, duration_min")
+      .eq("client_id", clientId)
+      .gte("started_at", startInclusive.toISOString())
+      .lt("started_at", endExclusive.toISOString())
+      .order("started_at", { ascending: false }),
+    db
+      .from("client_water_logs")
+      .select("logged_at, caffeine_mg")
+      .eq("client_id", clientId)
+      .gte("logged_at", caffeineStartInclusive.toISOString())
+      .lt("logged_at", endExclusive.toISOString())
+      .order("logged_at", { ascending: false }),
+  ]);
+
+  const activeProgram = pickActiveProgramForSchedule(clientPrograms ?? []);
+  const trainingWeekSchedule = buildTrainingWeekSchedule(
+    activeProgram ? normalizeProgramForSchedule(activeProgram as any) : null,
+  );
+
+  if (dataSource.weekly_frequency !== "manual") {
+    const scheduledTrainingDays = trainingWeekSchedule.days.filter(
+      (day) => day.kind === "training",
+    ).length;
+    if (scheduledTrainingDays > 0) {
+      entry.training_frequency = scheduledTrainingDays;
+      dataSource.weekly_frequency = "selected";
+    }
+  }
+
+  const meaningfulSessionLogs = ((recentSessionLogs ?? []) as any[]).filter(
+    (log) =>
+      !!log.completed_at ||
+      ((log.client_set_logs ?? []) as any[]).some(
+        (set) => !!set.completed || set.actual_reps != null,
+      ),
+  );
+  const durationSamples = meaningfulSessionLogs
+    .map((log) => Number(log.duration_min))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const avgSessionDurationMin =
+    durationSamples.length > 0
+      ? roundTo1(
+          durationSamples.reduce((sum, value) => sum + value, 0)
+            / durationSamples.length,
+        )
+      : null;
+
+  const effectiveSetCounts = meaningfulSessionLogs
+    .map((log) =>
+      ((log.client_set_logs ?? []) as any[]).filter(
+        (set) => !!set.completed || set.actual_reps != null,
+      ).length,
+    )
+    .filter((count) => count > 0);
+  const avgEffectiveSets =
+    effectiveSetCounts.length > 0
+      ? roundTo1(
+          effectiveSetCounts.reduce((sum, value) => sum + value, 0)
+            / effectiveSetCounts.length,
+        )
+      : null;
+
+  const restValues = meaningfulSessionLogs.flatMap((log) =>
+    ((log.client_set_logs ?? []) as any[])
+      .map((set) => Number(set.rest_sec_actual))
+      .filter((value) => Number.isFinite(value) && value > 0),
+  );
+  const avgRestSec =
+    restValues.length > 0
+      ? roundTo1(restValues.reduce((sum, value) => sum + value, 0) / restValues.length)
+      : null;
+
+  if (dataSource.session_duration_min !== "manual" && avgSessionDurationMin != null) {
+    entry.session_duration_min = avgSessionDurationMin;
+    dataSource.session_duration_min = "selected";
+  }
+
+  const trainingCaloriesEstimate = estimateTrainingCaloriesWeekly({
+    weightKg: entry.weight_kg,
+    weeklyFrequency: entry.training_frequency ?? client.weekly_frequency ?? null,
+    avgSessionDurationMin,
+    avgEffectiveSets,
+    avgRestSec,
+  });
+  if (dataSource.training_calories !== "manual" && trainingCaloriesEstimate != null) {
+    entry.training_calories = trainingCaloriesEstimate;
+    dataSource.training_calories = "selected";
+  }
+
+  const activityLogs = (recentActivityLogs ?? []) as Array<{
+    id: string;
+    started_at: string;
+    duration_min: number;
+  }>;
+  if (dataSource.cardio_frequency !== "manual" && activityLogs.length > 0) {
+    entry.cardio_frequency = roundTo1((activityLogs.length / 28) * 7);
+    dataSource.cardio_frequency = "selected";
+  }
+  if (dataSource.cardio_duration_min !== "manual" && activityLogs.length > 0) {
+    entry.cardio_duration_min = roundTo1(
+      activityLogs.reduce((sum, log) => sum + Number(log.duration_min ?? 0), 0)
+        / activityLogs.length,
+    );
+    dataSource.cardio_duration_min = "selected";
+  }
+
+  if (dataSource.caffeine_daily_mg !== "manual") {
+    const caffeineTotalMg = ((recentCaffeineLogs ?? []) as any[]).reduce(
+      (sum, log) => sum + Number(log.caffeine_mg ?? 0),
+      0,
+    );
+    if (caffeineTotalMg > 0) {
+      entry.caffeine_daily_mg = roundTo1(caffeineTotalMg / 7);
+      dataSource.caffeine_daily_mg = "selected";
+    }
+  }
 
   let age: number | null = null;
   if (client.date_of_birth) {
@@ -556,7 +854,7 @@ export async function GET(
 
   // Validate weekly_frequency bounds (1-7 days/week)
   let validWeeklyFrequency =
-    client.weekly_frequency ?? entry.training_frequency;
+    entry.training_frequency ?? client.weekly_frequency;
   if (
     validWeeklyFrequency != null &&
     (validWeeklyFrequency < 1 || validWeeklyFrequency > 7)
@@ -571,6 +869,9 @@ export async function GET(
     age,
     height_cm: entry.height_cm,
     weight_kg: entry.weight_kg,
+    waist_cm: entry.waist_cm,
+    neck_cm: entry.neck_cm,
+    hips_cm: entry.hips_cm,
     body_fat_pct: entry.body_fat_pct,
     muscle_mass_kg: entry.muscle_mass_kg,
     lean_mass_kg: entry.lean_mass_kg,
@@ -599,34 +900,6 @@ export async function GET(
       : null,
   };
 
-  if (mode === "realtime") {
-    result.body_fat_pct = null;
-    result.lean_mass_kg = null;
-    result.muscle_mass_kg = null;
-    result.visceral_fat_level = null;
-    result.bmr_kcal_measured = null;
-  }
-
-  // Active training programme → week schedule for Nutrition Studio
-  const { data: clientPrograms } = await db
-    .from("programs")
-    .select(
-      `
-      id, name, status, session_mode, is_client_visible, created_at,
-      program_sessions (
-        id, name, day_of_week, days_of_week, position,
-        program_exercises ( id, name )
-      )
-    `,
-    )
-    .eq("client_id", clientId)
-    .eq("coach_id", user.id)
-    .order("created_at", { ascending: false });
-
-  const activeProgram = pickActiveProgramForSchedule(clientPrograms ?? []);
-  const trainingWeekSchedule = buildTrainingWeekSchedule(
-    activeProgram ? normalizeProgramForSchedule(activeProgram as any) : null,
-  );
   const anchorJsDay = new Date(`${anchorDate}T12:00:00Z`).getUTCDay()
   const anchorDow = anchorJsDay === 0 ? 7 : anchorJsDay
   const anchorScheduleEntry = trainingWeekSchedule.days.find((d) => d.dow === anchorDow) ?? null
