@@ -25,6 +25,7 @@ import { cn } from "@/app/lib/utils";
 import type { ClientLang } from "@/lib/i18n/clientTranslations";
 import type { ClientNotificationItem } from "@/lib/client/inbox";
 import type { ChatTodayStripData } from "@/lib/client/chat/today-strip";
+import { Flame as PhosphorFlame, Footprints as PhosphorFootprints, Barbell as PhosphorBarbell } from "@phosphor-icons/react";
 
 type AssessmentSummary = {
   id: string;
@@ -355,7 +356,21 @@ export default function ClientDashboard({
     }
 
     const target = scrollParent ?? document.documentElement;
-    const onScroll = () => setHeroCollapsed(target.scrollTop > 24);
+    let lastScrollTop = target.scrollTop;
+
+    const onScroll = () => {
+      const currentScroll = target.scrollTop;
+      if (currentScroll <= 10) {
+        setHeroCollapsed(false);
+      } else if (currentScroll > lastScrollTop) {
+        // Scroll down -> collapse today strip
+        setHeroCollapsed(true);
+      } else if (currentScroll < lastScrollTop) {
+        // Scroll up -> expand today strip
+        setHeroCollapsed(false);
+      }
+      lastScrollTop = Math.max(0, currentScroll);
+    };
 
     onScroll();
     target.addEventListener("scroll", onScroll, { passive: true });
@@ -363,7 +378,7 @@ export default function ClientDashboard({
   }, []);
 
   const plannedSessions = useMemo(() => todayStrip?.sessions ?? [], [todayStrip]);
-  const pendingCheckins = todayStrip?.checkin.pendingCount ?? 0;
+  const pendingCheckins = todayStrip?.checkin?.pendingCount ?? 0;
   const unreadCount = notifications.filter((n) => !n.read_at).length;
   const coachSignals = notifications.filter(
     (n) => n.type === "coach_note" || n.type === "coach_feedback",
@@ -463,10 +478,10 @@ export default function ClientDashboard({
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const heroName = clientFirstName?.trim() || copy.greetingFallback;
-  const caloriesLogged = todayStrip?.calories.logged ?? 0;
-  const caloriesTarget = todayStrip?.calories.target ?? 0;
-  const waterLogged = todayStrip?.water.logged ?? 0;
-  const waterTarget = todayStrip?.water.target ?? 0;
+  const caloriesLogged = todayStrip?.calories?.logged ?? 0;
+  const caloriesTarget = todayStrip?.calories?.target ?? 0;
+  const waterLogged = todayStrip?.water?.logged ?? 0;
+  const waterTarget = todayStrip?.water?.target ?? 0;
   const notifBadge = unreadCount + pendingCheckins;
 
   return (
@@ -492,20 +507,15 @@ export default function ClientDashboard({
       <div ref={rootRef} className="premium-dashboard-bg text-white">
         <div className="premium-dashboard-content">
 
-          {/* ── STICKY HEADER — works inside ConditionalClientShell's scroll <main> ── */}
-          <div ref={heroRef} className="sticky top-0 z-30">
-            <div className="bg-[#09090a] w-full rounded-b-[32px]">
+          {/* ── FIXED HEADER — stays locked at the top of the screen ── */}
+          <div ref={heroRef} className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-xl z-30">
+            <div className="bg-[#0d0d0d] w-full rounded-b-[32px] border-b border-white/[0.04]">
               <div
                 className="mx-auto w-full max-w-xl px-4"
                 style={{ paddingTop: "max(env(safe-area-inset-top), 16px)" }}
               >
                 {/* Hero card: identity + date */}
-                <div
-                  className={cn(
-                    "flex items-center justify-between gap-4 pt-2 transition-all duration-300 ease-out",
-                    heroCollapsed ? "pb-3" : "pb-4",
-                  )}
-                >
+                <div className="flex items-center justify-between gap-4 pt-2 pb-4">
                   <div className="flex items-center gap-3.5 min-w-0">
                     <ClientAvatar
                       firstName={clientFirstName}
@@ -520,14 +530,8 @@ export default function ClientDashboard({
                       <h1 className="text-[24px] font-semibold leading-none tracking-[-0.04em] text-white mt-0.5">
                         {heroName}
                       </h1>
-                      {/* Date — fades out when collapsed */}
-                      <div
-                        className="overflow-hidden transition-all duration-300 ease-out"
-                        style={{
-                          maxHeight: heroCollapsed ? 0 : 32,
-                          opacity: heroCollapsed ? 0 : 1,
-                        }}
-                      >
+                      {/* Date */}
+                      <div className="overflow-hidden">
                         <div className="flex items-center gap-2 mt-1">
                           <p className="text-[13px] font-medium text-white/60">
                             {formatLongDate(lang)}
@@ -539,8 +543,7 @@ export default function ClientDashboard({
                   
                   {/* Phase Actuelle à droite */}
                   {clientPhase && (
-                    <div className="flex flex-col items-end text-right transition-all duration-300 ease-out"
-                         style={{ opacity: heroCollapsed ? 0 : 1 }}>
+                    <div className="flex flex-col items-end text-right">
                       <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-white/30 mb-0.5">
                         Phase
                       </p>
@@ -580,7 +583,7 @@ export default function ClientDashboard({
           </div>
 
           {/* ── BODY ── */}
-          <main className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pb-28 pt-4">
+          <main className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pb-28" style={{ paddingTop: "calc(max(env(safe-area-inset-top), 16px) + 132px)" }}>
 
             {/* ── Action alert buttons ── */}
             {priorityItems.length > 0 && (
@@ -596,7 +599,7 @@ export default function ClientDashboard({
 
             {/* ── Weekly Calories Balance Widget ── */}
             {(() => {
-              const calTarget = todayStrip?.calories.target ?? 0;
+              const calTarget = todayStrip?.calories?.target ?? 0;
               const hasCalData = weeklyCalorieAvg != null && calTarget > 0;
               
               let calStatusLabel = "En attente";
@@ -636,7 +639,7 @@ export default function ClientDashboard({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-white/[0.03]">
-                        <Flame size={14} className="text-white/60" />
+                        <PhosphorFlame size={15} weight="fill" style={{ color: "#5dba87" }} />
                       </div>
                       <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
                         Balance énergétique
@@ -674,7 +677,7 @@ export default function ClientDashboard({
                   <SurfaceCard className="bg-[#09090a] border border-white/[0.04] p-4 flex flex-col justify-between h-[135px]">
                     <div>
                       <div className="flex items-center gap-2">
-                        <Footprints size={14} className="text-white/50" />
+                        <PhosphorFootprints size={15} weight="fill" style={{ color: "#5dba87" }} />
                         <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/50">
                           Pas moyen
                         </p>
@@ -707,7 +710,7 @@ export default function ClientDashboard({
               <SurfaceCard className="bg-[#09090a] border border-white/[0.04] p-4 flex flex-col justify-between h-[135px]">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Dumbbell size={14} className="text-white/50" />
+                    <PhosphorBarbell size={15} weight="fill" style={{ color: "#5dba87" }} />
                     <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/50">
                       Volume 7j
                     </p>
