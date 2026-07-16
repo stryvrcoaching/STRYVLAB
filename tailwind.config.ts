@@ -9,10 +9,8 @@ const config: Config = {
 
   theme: {
     extend: {
-      // ─── CURSOR DASHBOARD (réf. capture) ─────────────────────────────────
-      // Fond #0E0E0E · cartes #161616 · bordures #2A2A2A · accent vert #1F8A65
       colors: {
-        // ── DS v4.0 client gray scale ──────────────────────────
+        // ── Client PWA ────────────────────────────────────────
         "c-bg":         "#080808",
         "c-surface-1":  "#111111",
         "c-surface-2":  "#1a1a1a",
@@ -52,6 +50,7 @@ const config: Config = {
       },
 
       borderRadius: {
+        // ── Platform radius scale ───────────────────────────
         card: "12px",
         "card-lg": "16px",
         "card-sm": "8px",
@@ -68,6 +67,7 @@ const config: Config = {
       },
 
       boxShadow: {
+        // ── Platform shadows ────────────────────────────────
         card: "0 1px 0 rgba(255,255,255,0.04) inset",
         elevated: "0 8px 24px rgba(0,0,0,0.45)",
         modal: "0 16px 48px rgba(0,0,0,0.55)",

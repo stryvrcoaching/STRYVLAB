@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, CheckCircle2, Loader2 } from "lucide-react";
 import { BlockConfig, ResponseMap } from "@/types/assessment";
 import { evaluateCondition } from "@/lib/assessments/condition";
 import MetricField from "./MetricField";
+import PointsEarnedOverlay from "@/components/client/PointsEarnedOverlay";
 
 interface Props {
   submissionId: string;
@@ -33,6 +34,7 @@ export default function AssessmentForm({
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [pointsEarned, setPointsEarned] = useState(0);
   const [error, setError] = useState("");
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -269,10 +271,12 @@ export default function AssessmentForm({
         setError(d.error || "Erreur lors de la soumission");
         return;
       }
+      const result = await res.json().catch(() => null);
       if (isCoach && onSaved) {
         onSaved();
         return;
       }
+      setPointsEarned(Number(result?.points_earned ?? 0));
       setSubmitted(true);
     } catch {
       setError("Erreur réseau");
@@ -284,7 +288,9 @@ export default function AssessmentForm({
   if (submitted) {
     return (
       <div className="min-h-screen bg-[#080808] font-sans flex items-center justify-center p-6">
+        {!isCoach && <PointsEarnedOverlay open={pointsEarned > 0} points={pointsEarned} />}
         <div className="bg-[#111111] rounded-2xl p-10 text-center max-w-sm w-full">
+          <Image src="/logo/logo-stryvr-silver.png" alt="STRYVR" width={40} height={40} className="mx-auto mb-5 h-10 w-10 object-contain" />
           <CheckCircle2 size={56} className="text-[#f2f2f2] mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-white mb-2">
             Bilan soumis !

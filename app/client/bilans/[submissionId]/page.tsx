@@ -5,6 +5,11 @@ import { resolveClientFromUser } from "@/lib/client/resolve-client";
 import ClientTopBar from "@/components/client/ClientTopBar";
 import { CheckCircle2, Clock } from "lucide-react";
 import FeedbackThread from "@/components/client/smart/FeedbackThread";
+import { ct, type ClientLang } from "@/lib/i18n/clientTranslations";
+import {
+  extractTemplateBlocks,
+  extractTemplateName,
+} from "@/lib/assessments/templateSnapshot";
 
 export default async function BilanDetailPage({
   params,
@@ -23,6 +28,11 @@ export default async function BilanDetailPage({
 
   const client = await resolveClientFromUser(user.id, user.email, service);
   if (!client) notFound();
+
+  const prefsRes = await service.from("client_preferences").select("language").eq("client_id", client.id).maybeSingle();
+  const rawLang = (prefsRes as any)?.data?.language;
+  const lang: ClientLang = ["fr", "en", "es"].includes(rawLang) ? (rawLang as ClientLang) : "fr";
+  const dateLocale = lang === "fr" ? "fr-FR" : lang === "es" ? "es-ES" : "en-GB";
 
   const { data: submissionData, error } = await service
     .from("assessment_submissions")
@@ -45,9 +55,9 @@ export default async function BilanDetailPage({
       r.value_text ?? r.value_number ?? r.value_json ?? r.storage_path;
   }
 
-  const blocks: any[] = submissionData.template_snapshot?.blocks ?? [];
-  const templateName = submissionData.template_snapshot?.name ?? "Bilan";
-  const date = new Date(submissionData.created_at).toLocaleDateString("fr-FR", {
+  const blocks: any[] = extractTemplateBlocks(submissionData.template_snapshot as any);
+  const templateName = extractTemplateName(submissionData.template_snapshot as any);
+  const date = new Date(submissionData.created_at).toLocaleDateString(dateLocale, {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -56,12 +66,12 @@ export default async function BilanDetailPage({
   const statusBadge = submissionData.status === "completed" ? (
     <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#f2f2f2]/15 text-[#f2f2f2]">
       <CheckCircle2 size={11} />
-      Complété
+      {ct(lang, "bilans.status.completed")}
     </span>
   ) : (
     <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-400">
       <Clock size={11} />
-      En cours
+      {ct(lang, "bilans.status.in_progress")}
     </span>
   );
 
@@ -70,15 +80,15 @@ export default async function BilanDetailPage({
   );
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d] font-barlow">
+    <div className="min-h-dvh bg-[#0d0d0d] font-barlow overflow-x-hidden">
       <ClientTopBar
-        section="Bilans"
+        section={ct(lang, "nav.bilans")}
         title={templateName}
         backHref="/client/bilans"
         right={statusBadge}
       />
 
-      <main className="max-w-lg mx-auto px-4 py-5 flex flex-col gap-3">
+      <main className="max-w-lg mx-auto flex flex-col gap-3 px-4 pb-5 pt-[104px]">
 
         {/* Date */}
         <p className="text-[11px] text-white/30 px-1">{date}</p>
@@ -107,7 +117,7 @@ export default async function BilanDetailPage({
                     const val = blockResponses[field.key];
                     let display = String(val);
                     if (Array.isArray(val)) display = val.join(", ");
-                    if (field.input_type === "photo_upload") display = "📷 Photo uploadée";
+                    if (field.input_type === "photo_upload") display = ct(lang, "bilans.photoUploaded");
 
                     return (
                       <div
@@ -129,7 +139,7 @@ export default async function BilanDetailPage({
           })
         ) : (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <p className="text-[13px] text-white/30">Aucune réponse enregistrée.</p>
+            <p className="text-[13px] text-white/30">{ct(lang, "bilans.noResponses")}</p>
           </div>
         )}
 

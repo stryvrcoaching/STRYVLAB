@@ -35,7 +35,7 @@ export async function buildPrepEntries(entries: PrepEntryInput[]) {
   const { data: foodItems, error } = await db
     .from('food_items')
     .select(
-      'id, name_fr, category_l1, category_l2, item_key, kcal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fiber_per_100g, source, is_verified',
+      'id, name_fr, category_l1, category_l2, icon_key, item_key, kcal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fiber_per_100g, source, is_verified',
     )
     .in('id', foodItemIds)
 
@@ -52,6 +52,8 @@ export async function buildPrepEntries(entries: PrepEntryInput[]) {
       food_item_id: entry.food_item_id,
       name_fr: item.name_fr,
       category_l1: item.category_l1 as string,
+      category_l2: item.category_l2 as string | null,
+      icon_key: item.icon_key as string | null,
       quantity_g: entry.quantity_g,
       calories_kcal: macros.calories_kcal,
       protein_g: macros.protein_g,

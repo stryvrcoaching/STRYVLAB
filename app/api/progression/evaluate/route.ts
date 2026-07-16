@@ -22,6 +22,8 @@ import {
   parseRepsRange,
   type ExerciseProgressionInput,
 } from '@/lib/progression/double-progression'
+import type { SetPrescription } from '@/lib/programs/setPrescriptions'
+import { resolveCanonicalExerciseKey, resolveCanonicalExerciseName } from '@/lib/training/exerciseHistoryKey'
 
 function service() {
   return createServiceClient(
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest) {
   // ── 2. Charger les exercices de la séance avec leur configuration progression ──
   const { data: exercises } = await db
     .from('program_exercises')
-    .select('id, name, sets, reps, rep_min, rep_max, target_rir, weight_increment_kg, current_weight_kg')
+    .select('id, name, sets, reps, rep_min, rep_max, target_rir, weight_increment_kg, current_weight_kg, set_prescriptions')
     .eq('session_id', programSessionId)
 
   if (!exercises || exercises.length === 0) {
@@ -93,7 +95,7 @@ export async function POST(req: NextRequest) {
   // ── 3. Charger les set_logs de la séance ──
   const { data: setLogs } = await db
     .from('client_set_logs')
-    .select('exercise_id, set_number, actual_reps, rir_actual, completed')
+    .select('exercise_id, set_number, set_type, actual_reps, rir_actual, completed')
     .eq('session_log_id', session_log_id)
 
   if (!setLogs || setLogs.length === 0) {
@@ -122,14 +124,25 @@ export async function POST(req: NextRequest) {
     // target_rir : fallback sur rir si target_rir non renseigné
     const target_rir = (ex.target_rir as number | null) ?? (ex as any).rir ?? 2
 
+    const prescriptions = Array.isArray((ex as any).set_prescriptions)
+      ? ((ex as any).set_prescriptions as SetPrescription[])
+      : []
+
     const exSets = setLogs
       .filter(s => s.exercise_id === ex.id)
-      .map(s => ({
-        set_number: s.set_number,
-        actual_reps: s.actual_reps ?? 0,
-        rir_actual: s.rir_actual ?? null,
-        completed: s.completed ?? false,
-      }))
+      .map(s => {
+        const prescription = prescriptions.find((entry) => entry.set_number === s.set_number)
+        const parsedPrescriptionReps = parseRepsRange(prescription?.reps ?? '')
+        return {
+          set_number: s.set_number,
+          set_type: s.set_type ?? prescription?.set_type ?? 'working',
+          actual_reps: s.actual_reps ?? 0,
+          rir_actual: s.rir_actual ?? null,
+          completed: s.completed ?? false,
+          target_rir: prescription?.rir ?? target_rir,
+          rep_max: parsedPrescriptionReps?.rep_max ?? rep_max,
+        }
+      })
 
     if (exSets.length === 0) continue
 
@@ -167,19 +180,32 @@ export async function POST(req: NextRequest) {
 
   // 6b. Insérer les progression_events (overload + maintain — pas insufficient_data)
   if (allResults.length > 0) {
-    const events = allResults.map(r => ({
-      exercise_id: r.exercise_id,
-      client_id: sessionLog.client_id,
-      session_log_id,
-      sets_completed: r.sets_evaluated,
-      reps_per_set: r.reps_per_set,
-      weight_kg: r.previous_weight_kg ?? 0,
-      rir_values: r.rir_values.map(v => v ?? -1), // -1 = non renseigné
-      trigger_type: r.trigger as 'overload' | 'maintain',
-      previous_weight_kg: r.previous_weight_kg,
-      new_weight_kg: r.new_weight_kg,
-      increment_applied: r.increment_applied,
-    }))
+    const inputsByExercise = new Map(inputs.map((input) => [input.exercise_id, input]))
+    const events = allResults.map(r => {
+      const input = inputsByExercise.get(r.exercise_id)
+      const eligibleSets = (input?.sets ?? []).filter((set) => (set.set_type ?? 'working') === 'working' && set.completed)
+      const exerciseName = resolveCanonicalExerciseName(r.exercise_name)
+
+      return {
+        exercise_id: r.exercise_id,
+        exercise_name: exerciseName,
+        exercise_key: resolveCanonicalExerciseKey(exerciseName),
+        client_id: sessionLog.client_id,
+        session_log_id,
+        sets_completed: r.sets_evaluated,
+        eligible_sets_count: eligibleSets.length,
+        reps_per_set: r.reps_per_set,
+        weight_kg: r.previous_weight_kg ?? 0,
+        rir_values: r.rir_values.map(v => v ?? -1), // -1 = non renseigné
+        set_types: eligibleSets.map((set) => set.set_type ?? 'working'),
+        target_rir_values: eligibleSets.map((set) => set.target_rir ?? input?.target_rir ?? -1),
+        rep_max_values: eligibleSets.map((set) => set.rep_max ?? input?.rep_max ?? -1),
+        trigger_type: r.trigger as 'overload' | 'maintain',
+        previous_weight_kg: r.previous_weight_kg,
+        new_weight_kg: r.new_weight_kg,
+        increment_applied: r.increment_applied,
+      }
+    })
 
     await db.from('progression_events').insert(events)
   }

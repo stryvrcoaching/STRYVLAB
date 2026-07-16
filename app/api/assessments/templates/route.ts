@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { CreateTemplatePayload } from '@/types/assessment'
+import { SYSTEM_ASSESSMENT_TEMPLATE_NAMES } from '@/lib/assessments/templateSnapshot'
 
 function serviceClient() {
   return createServiceClient(
@@ -22,7 +23,6 @@ export async function GET() {
     .from('assessment_templates')
     .select('*')
     .eq('coach_id', user.id)
-    .neq('name', '__csv_import__')
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -30,7 +30,9 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ templates: data })
+  return NextResponse.json({
+    templates: (data ?? []).filter((template) => !SYSTEM_ASSESSMENT_TEMPLATE_NAMES.has(template.name)),
+  })
 }
 
 // POST /api/assessments/templates — crée un nouveau template

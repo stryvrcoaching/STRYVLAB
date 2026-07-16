@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
         coach_id: coachId,
         client_id: (client as any).id,
         template_id: templateId,
-        template_snapshot: { blocks: [{ id: "client_live_block", module: "biometrics" }] },
+        template_snapshot: [{ id: "client_live_block", module: "biometrics", label: "Client live metrics", order: 0, fields: [] }],
         status: "completed",
         filled_by: "client",
         submitted_at: submittedAt,
@@ -131,4 +131,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, submissionId }, { status: 201 });
 }
-

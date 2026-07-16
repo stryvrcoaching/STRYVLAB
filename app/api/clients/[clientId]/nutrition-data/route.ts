@@ -21,6 +21,9 @@ import {
   canUseRealtimeSignal,
   getNutritionSignalWindowDays,
 } from "@/lib/nutrition/dataGovernance";
+import { computeRobustAverageRestSec } from "@/lib/training/restMetrics";
+import { fetchClientTdeeState, hasCurrentTdeeSkip } from "@/lib/nutrition/tdee-state";
+import { resolveProtocolStartDate } from "@/lib/nutrition/weightSamples";
 
 function serviceClient() {
   return createServiceClient(
@@ -170,6 +173,7 @@ export async function GET(
   const mode =
     searchParams.get("mode") === "realtime" ? "realtime" : "bilan";
   const requestedSubmissionId = searchParams.get("submissionId");
+  const requestedProtocolId = searchParams.get("protocolId");
 
   // Fetch all submissions for the bilan selector (no limit)
   const { data: rawSubmissions } = await db
@@ -685,10 +689,11 @@ export async function GET(
         id, name, goal, status, session_mode, is_client_visible, created_at,
         program_sessions (
           id, name, day_of_week, days_of_week, position,
-          program_exercises (
-            id, name, sets, reps, rep_min, rep_max, rest_sec, rir, target_rir,
-            tempo, movement_pattern, is_unilateral, is_compound
-          )
+            program_exercises (
+              id, name, sets, reps, rep_min, rep_max, rest_sec, rir, target_rir,
+              tempo, movement_pattern, is_unilateral, is_compound,
+              execution_type, target_hr_zone
+            )
         )
       `,
       )
@@ -727,6 +732,68 @@ export async function GET(
   const trainingWeekSchedule = buildTrainingWeekSchedule(
     activeProgram ? normalizeProgramForSchedule(activeProgram as any) : null,
   );
+
+  const plannedCardioExercises = (activeProgram?.program_sessions ?? [])
+    .flatMap((session: any) => session.program_exercises ?? [])
+    .filter((exercise: any) => exercise.execution_type && exercise.execution_type !== "reps_rir");
+  const plannedCardioSessions = (activeProgram?.program_sessions ?? []).filter((session: any) =>
+    (session.program_exercises ?? []).some((exercise: any) => exercise.execution_type && exercise.execution_type !== "reps_rir"),
+  );
+  const plannedCardioMinutes = plannedCardioExercises.reduce((total: number, exercise: any) => {
+    if (exercise.execution_type !== "time_rpe") return total;
+    const raw = String(exercise.reps ?? "");
+    const match = raw.match(/\d+(?:[.,]\d+)?/);
+    return total + (match ? Number(match[0].replace(",", ".")) : 0);
+  }, 0);
+  const plannedCardioTypes = Array.from(new Set(
+    plannedCardioExercises
+      .map((exercise: any) => String(exercise.target_hr_zone ?? "").trim())
+      .filter(Boolean),
+  ));
+  const plannedCardioRpeValues = plannedCardioExercises
+    .map((exercise: any) => Number(exercise.target_rir ?? exercise.rir))
+    .filter((value: number) => Number.isFinite(value) && value >= 1 && value <= 10);
+  const plannedTraining = {
+    weeklyFrequency: trainingWeekSchedule.days.filter((day) => day.kind === "training").length || null,
+    cardioFrequency: plannedCardioSessions.length || null,
+    cardioDurationMin: plannedCardioSessions.length > 0
+      ? Math.round((plannedCardioMinutes / plannedCardioSessions.length) * 10) / 10
+      : null,
+    cardioTypes: plannedCardioTypes,
+    cardioRpe: plannedCardioRpeValues.length > 0
+      ? Math.round((plannedCardioRpeValues.reduce((sum: number, value: number) => sum + value, 0) / plannedCardioRpeValues.length) * 10) / 10
+      : null,
+  };
+  const plannedStrengthExercises = (activeProgram?.program_sessions ?? [])
+    .flatMap((session: any) => session.program_exercises ?? [])
+    .filter((exercise: any) => !exercise.execution_type || exercise.execution_type === "reps_rir");
+  const plannedStrengthFrequency = (activeProgram?.program_sessions ?? []).filter((session: any) =>
+    (session.program_exercises ?? []).some((exercise: any) => !exercise.execution_type || exercise.execution_type === "reps_rir"),
+  ).length;
+  const parseRepNumbers = (value: unknown) => (String(value ?? "").match(/\d+(?:[.,]\d+)?/g) ?? []).map((item) => Number(item.replace(",", ".")));
+  const averagePlannedReps = (value: unknown) => {
+    const numbers = parseRepNumbers(value);
+    if (numbers.length === 0) return 0;
+    return numbers.length > 1 ? (numbers[0] + numbers[1]) / 2 : numbers[0];
+  };
+  const plannedSetsWeekly = plannedStrengthExercises.reduce((sum: number, exercise: any) => sum + Math.max(0, Number(exercise.sets ?? 0)), 0);
+  const plannedRepsWeekly = plannedStrengthExercises.reduce((sum: number, exercise: any) => sum + Math.max(0, Number(exercise.sets ?? 0) * averagePlannedReps(exercise.reps)), 0);
+  const plannedRestMinutesWeekly = plannedStrengthExercises.reduce((sum: number, exercise: any) => sum + Math.max(0, Number(exercise.sets ?? 0) - 1) * Math.max(0, Number(exercise.rest_sec ?? 0)) / 60, 0);
+  const plannedTrainingRirValues = plannedStrengthExercises
+    .map((exercise: any) => Number(exercise.target_rir ?? exercise.rir))
+    .filter((value: number) => Number.isFinite(value) && value >= 0 && value <= 5);
+  const plannedStrengthWorkMinutes = plannedRepsWeekly * 3 / 60;
+  plannedTraining.sessionDurationMin = trainingWeekSchedule.days.filter((day) => day.kind === "training").length > 0
+    ? (plannedCardioMinutes + plannedStrengthWorkMinutes + plannedRestMinutesWeekly) / (trainingWeekSchedule.days.filter((day) => day.kind === "training").length)
+    : null;
+  plannedTraining.trainingTypes = plannedStrengthExercises.length > 0 ? ["Musculation / Powerlifting"] : [];
+  plannedTraining.strengthFrequency = plannedStrengthFrequency || null;
+  plannedTraining.trainingRir = plannedTrainingRirValues.length > 0
+    ? plannedTrainingRirValues.reduce((sum: number, value: number) => sum + value, 0) / plannedTrainingRirValues.length
+    : null;
+  plannedTraining.setsWeekly = plannedSetsWeekly;
+  plannedTraining.repsWeekly = plannedRepsWeekly;
+  plannedTraining.restMinutesWeekly = plannedRestMinutesWeekly;
 
   if (dataSource.weekly_frequency !== "manual") {
     const scheduledTrainingDays = trainingWeekSchedule.days.filter(
@@ -776,10 +843,7 @@ export async function GET(
       .map((set) => Number(set.rest_sec_actual))
       .filter((value) => Number.isFinite(value) && value > 0),
   );
-  const avgRestSec =
-    restValues.length > 0
-      ? roundTo1(restValues.reduce((sum, value) => sum + value, 0) / restValues.length)
-      : null;
+  const avgRestSec = computeRobustAverageRestSec(restValues);
 
   if (dataSource.session_duration_min !== "manual" && avgSessionDurationMin != null) {
     entry.session_duration_min = avgSessionDurationMin;
@@ -909,15 +973,30 @@ export async function GET(
     overrideKind: dayOverride?.kind ?? null,
   })
 
-  // Fetch adaptive TDEE from active shared protocol
-  const { data: activeProtocol } = await db
-    .from("nutrition_protocols")
-    .select("tdee_adaptive, tdee_adaptive_at, tdee_data_source")
-    .eq("client_id", clientId)
-    .eq("status", "shared")
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const [clientTdeeState, activeProtocol, tdeeProtocolStartDate] = await Promise.all([
+    fetchClientTdeeState(db as any, clientId),
+    requestedProtocolId
+      ? db
+          .from("nutrition_protocols")
+          .select("name, tdee_reference, tdee_snapshot_source, tdee_snapshot_used_at")
+          .eq("id", requestedProtocolId)
+          .eq("client_id", clientId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    requestedProtocolId
+      ? resolveProtocolStartDate(db as any, clientId, "", requestedProtocolId)
+      : Promise.resolve(null),
+  ]);
+  const resolvedTdeeProtocolStartDate =
+    tdeeProtocolStartDate ??
+    (requestedProtocolId
+      ? await resolveProtocolStartDate(
+          db as any,
+          clientId,
+          String((activeProtocol as any)?.name ?? ""),
+          requestedProtocolId,
+        )
+      : null);
 
   return NextResponse.json({
     client: result,
@@ -925,9 +1004,27 @@ export async function GET(
     anchorDate,
     realtimeWindowDays,
     dataSource,
-    tdeeAdaptive: (activeProtocol as any)?.tdee_adaptive ?? null,
-    tdeeAdaptiveAt: (activeProtocol as any)?.tdee_adaptive_at ?? null,
-    tdeeDataSource: (activeProtocol as any)?.tdee_data_source ?? null,
+    tdeeAdaptive: clientTdeeState?.current_tdee ?? null,
+    tdeeAdaptiveAt: clientTdeeState?.current_tdee_at ?? null,
+    tdeeAdaptiveLower: clientTdeeState?.current_tdee_lower ?? null,
+    tdeeAdaptiveUpper: clientTdeeState?.current_tdee_upper ?? null,
+    tdeeObserved: clientTdeeState?.latest_observed_tdee ?? null,
+    tdeeObservedLower: clientTdeeState?.latest_observed_lower ?? null,
+    tdeeObservedUpper: clientTdeeState?.latest_observed_upper ?? null,
+    tdeeActionableStreak: clientTdeeState?.actionable_streak ?? 0,
+    tdeeDataSource: clientTdeeState?.source ?? null,
+    tdeeStabilityStatus: clientTdeeState?.stability_status ?? null,
+    tdeeEstimationStatus: clientTdeeState?.estimation_status ?? 'collecting',
+    tdeeDataQualityScore: clientTdeeState?.data_quality_score ?? null,
+    tdeeDataQualityReasons: clientTdeeState?.data_quality_reasons ?? [],
+    tdeeLastSkipReason: hasCurrentTdeeSkip(clientTdeeState)
+      ? clientTdeeState?.last_skip_reason ?? null
+      : null,
+    tdeeLastSuccessAt: clientTdeeState?.last_success_at ?? null,
+    tdeeProtocolStartDate: resolvedTdeeProtocolStartDate,
+    tdeeProtocolSnapshot: (activeProtocol as any)?.tdee_reference ?? null,
+    tdeeProtocolSnapshotAt: (activeProtocol as any)?.tdee_snapshot_used_at ?? null,
+    tdeeProtocolSnapshotSource: (activeProtocol as any)?.tdee_snapshot_source ?? null,
     allSubmissions: (allSubmissions || []).map((s: any) => ({
       id: s.id,
       date: new Date(
@@ -942,6 +1039,7 @@ export async function GET(
     })),
     selectedSubmissionId: selectedSubmissionId || null,
     trainingWeekSchedule,
+    plannedTraining,
     dayOverride,
     effectiveDayKind,
   });

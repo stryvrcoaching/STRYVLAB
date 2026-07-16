@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { QuestionCard } from '@/components/genesis/QuestionCard';
 import { Loader2 } from 'lucide-react';
@@ -45,13 +45,7 @@ export default function QuestionnairePage() {
     loadQuestions();
   }, []);
 
-  useEffect(() => {
-    if (Object.keys(responses).length > 0 && Object.keys(responses).length % 5 === 0) {
-      saveProgress();
-    }
-  }, [responses]);
-
-  const saveProgress = async () => {
+  const saveProgress = useCallback(async () => {
     try {
       await fetch('/api/genesis/save-progress', {
         method: 'POST',
@@ -65,7 +59,13 @@ export default function QuestionnairePage() {
     } catch (error) {
       console.error('Error saving progress:', error);
     }
-  };
+  }, [currentIndex, responses, sessionId]);
+
+  useEffect(() => {
+    if (Object.keys(responses).length > 0 && Object.keys(responses).length % 5 === 0) {
+      saveProgress();
+    }
+  }, [responses, saveProgress]);
 
   const handleAnswer = (questionId: string, value: any) => {
     setResponses(prev => ({ ...prev, [questionId]: value }));

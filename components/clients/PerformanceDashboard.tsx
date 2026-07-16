@@ -291,7 +291,7 @@ export default function PerformanceDashboard({
     if (!selectedExercise && perfData.exercises?.[0])
       setSelectedExercise(perfData.exercises[0].name);
     setLoading(false);
-  }, [clientId, period, selectedExercise, refreshKey]);
+  }, [clientId, period, selectedExercise]);
 
   useEffect(() => {
     fetchData();

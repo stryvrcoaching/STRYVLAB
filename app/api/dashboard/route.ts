@@ -3,13 +3,20 @@ import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabase() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Supabase server environment variables are missing.');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey);
+}
 
 export async function GET(req: NextRequest) {
   try {
+    const supabase = getSupabase();
     // Vérifier authentification
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
@@ -33,12 +40,12 @@ export async function GET(req: NextRequest) {
     const authUserId = user.id;
     const email = user.email!;
 
-    // Récupérer profil
+    // Récupérer profil coach
     const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('first_name, last_name')
-      .eq('id', authUserId)
-      .single();
+      .from('coach_profiles')
+      .select('full_name')
+      .eq('coach_id', authUserId)
+      .maybeSingle();
 
     // Récupérer accès dashboard
     const { data: access } = await supabase
@@ -89,8 +96,8 @@ export async function GET(req: NextRequest) {
     const dashboardData = {
       user: {
         email,
-        firstName: profile?.first_name || null,
-        lastName: profile?.last_name || null,
+        firstName: profile?.full_name?.trim().split(/\s+/)[0] || null,
+        lastName: profile?.full_name?.trim().split(/\s+/).slice(1).join(' ') || null,
       },
       access: {
         hasIptReport: access?.has_ipt_report || false,

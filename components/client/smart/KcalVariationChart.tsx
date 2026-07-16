@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo } from 'react'
 import { NUTRITION_UI_COLORS } from '@/lib/nutrition/ui-colors'
 import { useChartScrubber } from '@/hooks/useChartScrubber'
+import { useClientT } from '@/components/client/ClientI18nProvider'
+import { clientLocale } from '@/lib/i18n/clientTranslations'
 
 type DayPoint = { date: string; consumed: number; target: number }
 type DeltaPoint = { date: string; delta: number; consumed: number }
@@ -16,12 +18,15 @@ const PAD = { top: 10, right: 8, bottom: 20, left: 36 }
 const INNER_W = W - PAD.left - PAD.right
 const INNER_H = H - PAD.top - PAD.bottom
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   const d = new Date(iso + 'T00:00:00')
-  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(d)
+  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(d)
 }
 
 export default function KcalVariationChart({ days }: Props) {
+  const { lang, t } = useClientT()
+  const locale = clientLocale(lang)
+  const daySuffix = lang === 'es' ? 'd' : lang === 'en' ? 'd' : 'j'
   const [trend, setTrend] = useState<DayPoint[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -71,22 +76,22 @@ export default function KcalVariationChart({ days }: Props) {
     <div className="bg-[#161616] rounded-2xl p-4">
       <div className="mb-3">
         <p className="font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[11px] text-white/50 mb-0.5">
-          Variation kcal / jour
+          {t('nutrition.kcalVariation.title')}
         </p>
         {activePoint ? (
           <div className="flex items-baseline gap-1.5">
-            <span className="text-[13px] font-bold text-white/50 tabular-nums">{formatDate(activePoint.date)}</span>
+            <span className="text-[13px] font-bold text-white/50 tabular-nums">{formatDate(activePoint.date, locale)}</span>
             <span className={`text-[18px] font-black tabular-nums leading-none ${activePoint.delta >= 0 ? 'text-[#ffd15e]' : 'text-[#5dba87]'}`}>
               {activePoint.delta >= 0 ? '+' : ''}{Math.round(activePoint.delta)}
             </span>
-            <span className="text-[10px] text-white/40">kcal · {Math.round(activePoint.consumed).toLocaleString('fr-FR')} total</span>
+            <span className="text-[10px] text-white/40">kcal · {Math.round(activePoint.consumed).toLocaleString(locale)} {t('nutrition.kcalVariation.total')}</span>
           </div>
         ) : (
           <div className="flex items-baseline gap-2">
             <span className={`text-[22px] font-black tabular-nums leading-none ${avgDelta >= 0 ? 'text-[#ffd15e]' : 'text-[#5dba87]'}`}>
               {avgDelta >= 0 ? '+' : ''}{Math.round(avgDelta)}
             </span>
-            <span className="text-[10px] text-white/40">kcal moy. J vs J-1</span>
+            <span className="text-[10px] text-white/40">{t('nutrition.kcalVariation.avgDayToDay')}</span>
           </div>
         )}
       </div>
@@ -144,10 +149,10 @@ export default function KcalVariationChart({ days }: Props) {
           {activeIndex === null && deltas.length >= 2 && (
             <>
               <text x={PAD.left} y={H - 2} textAnchor="start" fontSize="7" fill="rgba(255,255,255,0.25)">
-                {formatDate(deltas[0].date)}
+                {formatDate(deltas[0].date, locale)}
               </text>
               <text x={W - PAD.right} y={H - 2} textAnchor="end" fontSize="7" fill="rgba(255,255,255,0.25)">
-                {formatDate(deltas[deltas.length - 1].date)}
+                {formatDate(deltas[deltas.length - 1].date, locale)}
               </text>
             </>
           )}
@@ -156,15 +161,15 @@ export default function KcalVariationChart({ days }: Props) {
 
       <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/[0.06] mt-2">
         <div>
-          <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">Hausses</p>
-          <p className="text-[12px] font-black text-[#ffd15e] tabular-nums">{positives.length}j</p>
+          <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">{t('nutrition.kcalVariation.increases')}</p>
+          <p className="text-[12px] font-black text-[#ffd15e] tabular-nums">{positives.length}{daySuffix}</p>
         </div>
         <div>
-          <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">Baisses</p>
-          <p className="text-[12px] font-black text-[#5dba87] tabular-nums">{negatives.length}j</p>
+          <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">{t('nutrition.kcalVariation.decreases')}</p>
+          <p className="text-[12px] font-black text-[#5dba87] tabular-nums">{negatives.length}{daySuffix}</p>
         </div>
         <div>
-          <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">Max écart</p>
+          <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">{t('nutrition.kcalVariation.maxGap')}</p>
           <p className="text-[12px] font-black text-white tabular-nums">
             {Math.round(Math.max(...deltas.map(d => Math.abs(d.delta))))} kcal
           </p>

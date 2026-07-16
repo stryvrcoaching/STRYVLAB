@@ -36,10 +36,13 @@ export const MUSCLE_TO_VOLUME_GROUP: Record<string, string> = {
   calves: "mollets",
   gastrocnemien: "mollets",
   soleaire: "mollets",
+  solea: "mollets",
+  mollet: "mollets",
   // Haut push — Pectoraux haut
   pectoralis_major_upper: "pectoraux_haut",
   pectoralis_major_clavicular: "pectoraux_haut",
   grand_pectoral_sup: "pectoraux_haut",
+  grand_pectoral_superieur: "pectoraux_haut",
   upper_chest: "pectoraux_haut",
   // Haut push — Pectoraux bas
   pectoralis_major: "pectoraux_bas",
@@ -48,6 +51,7 @@ export const MUSCLE_TO_VOLUME_GROUP: Record<string, string> = {
   pectoralis_minor: "pectoraux_bas",
   grand_pectoral: "pectoraux_bas",
   grand_pectoral_inf: "pectoraux_bas",
+  grand_pectoral_inferieur: "pectoraux_bas",
   petit_pectoral: "pectoraux_bas",
   pec_major: "pectoraux_bas",
   // Haut push — Épaules antérieur
@@ -102,11 +106,14 @@ export const MUSCLE_TO_VOLUME_GROUP: Record<string, string> = {
   erector_spinae: "dos_lombaires",
   lower_back: "dos_lombaires",
   erecteurs_rachis: "dos_lombaires",
+  erecteurs_spinaux: "dos_lombaires",
   // Haut pull — Biceps
   biceps_brachii: "biceps",
   brachialis: "biceps",
   biceps: "biceps",
   brachial_anterieur: "biceps",
+  biceps_brachial: "biceps",
+  brachial: "biceps",
   // Avant-bras (dissocié des biceps)
   brachioradialis: "avant_bras",
   brachio_radial: "avant_bras",
@@ -213,6 +220,31 @@ export const VOLUME_SEGMENTS: {
   },
 ];
 
+export const VOLUME_FOCUS_GROUPS: {
+  key: string;
+  label: string;
+  groups: string[];
+}[] = [
+  { key: 'pectoraux', label: 'Pectoraux', groups: ['pectoraux_haut', 'pectoraux_bas'] },
+  { key: 'dos', label: 'Dos', groups: ['dos_grand_dorsal', 'dos_trapezes', 'dos_lombaires'] },
+  { key: 'epaules', label: 'Épaules', groups: ['epaules_ant', 'epaules_lat', 'epaules_post'] },
+  { key: 'biceps', label: 'Biceps', groups: ['biceps'] },
+  { key: 'triceps', label: 'Triceps', groups: ['triceps'] },
+  { key: 'quadriceps', label: 'Quadriceps', groups: ['quadriceps'] },
+  { key: 'ischio', label: 'Ischio-jambiers', groups: ['ischio'] },
+  { key: 'fessiers', label: 'Fessiers', groups: ['fessiers_grand', 'fessiers_moyen', 'fessiers_petit'] },
+  { key: 'mollets', label: 'Mollets', groups: ['mollets'] },
+  { key: 'abdos', label: 'Abdos', groups: ['abdos'] },
+  { key: 'avant_bras', label: 'Avant-bras', groups: ['avant_bras'] },
+];
+
+export const VOLUME_FOCUS_LABELS = {
+  priority: 'Priorité',
+  progression: 'Progression',
+  maintenance: 'Maintien',
+  off: 'Hors objectif',
+} as const;
+
 // MEV/MAV/MRV targets per sub-group for intermediate hypertrophy (Israetel/RP Strength base)
 // Format: [MEV, MAV, MRV] in sets/week
 const BASE_TARGETS: Record<string, [number, number, number]> = {
@@ -273,4 +305,27 @@ export function getVolumeTargets(
     Math.round(base[1] * factor),
     Math.round(base[2] * factor),
   ];
+}
+
+/**
+ * Broad objectives use the most conservative existing threshold among their
+ * anatomical sub-groups. This avoids asking a coach to bring every fascicle
+ * independently to MAV while retaining the current target catalogue.
+ */
+export function getVolumeFocusTargets(
+  groups: string[],
+  goal: string,
+  level: string,
+): [number, number, number] {
+  return groups.reduce<[number, number, number]>(
+    (current, group) => {
+      const targets = getVolumeTargets(group, goal, level)
+      return [
+        Math.max(current[0], targets[0]),
+        Math.max(current[1], targets[1]),
+        Math.max(current[2], targets[2]),
+      ]
+    },
+    [0, 0, 0],
+  )
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { recommendNextSet } from '@/lib/training/setRecommendation'
+import { recommendNextSet, estimateLoadFromOneRM } from '@/lib/training/setRecommendation'
 
 describe('recommendNextSet', () => {
   it('returns null for invalid input (zero weight)', () => {
@@ -68,7 +68,7 @@ describe('recommendNextSet', () => {
       weight_increment_kg: 0.2,
     })
     expect(result).not.toBeNull()
-    expect(result!.weight_kg).toBe(27.2)      // 27 + incrément 0.2
+    expect(result!.weight_kg).toBe(27.8)      // 27 + safety clamp (+4 * 0.2 = +0.8)
     expect(result!.reps).toBe(8)              // retour à rep_min
     expect(result!.phase).toBe('intra_session')
   })
@@ -88,8 +88,8 @@ describe('recommendNextSet', () => {
       weight_increment_kg: 2.5,
     })
     expect(result).not.toBeNull()
-    expect(result!.weight_kg).toBe(82.5)      // 80 + 2.5
-    expect(result!.reps).toBe(8)              // retour à rep_min
+    expect(result!.weight_kg).toBe(87.5)      // 1RM load (80 + 7.5, within +10 safety clamp)
+    expect(result!.reps).toBe(10)             // inZone but too easy → keep reps (10), increase weight
   })
 
   it('Path B — client proche échec (RIR < target-1) → maintenir charge', () => {
@@ -125,7 +125,7 @@ describe('recommendNextSet', () => {
       weight_increment_kg: 2.5,
     })
     expect(result).not.toBeNull()
-    expect(result!.weight_kg).toBe(97.5)     // 100 - 2.5
+    expect(result!.weight_kg).toBe(90)        // 100 - safety clamp (-4 * 2.5 = -10)
   })
 
   // ── Path A — double progression avec historique S-1 ──
@@ -318,5 +318,228 @@ describe('recommendNextSet', () => {
     expect(result!.reps).toBe(10)
     expect(result!.phase).toBe('intra_session')
     expect(result!.confidence).toBe('low')
+  })
+
+  it('Path B — under rep_min AND RIR <= 1 → trigger failure recovery and drop weight', () => {
+    // Client did 7 reps @ 52 kg (below zone 8-12) with RIR 1 (exhausted)
+    // Should drop weight from 52 to 50 kg (52 - 2.5 = 49.5, rounded to 50 kg)
+    const result = recommendNextSet({
+      actual_weight_kg: 52,
+      actual_reps: 7,
+      rir_actual: 1,
+      goal: 'hypertrophy',
+      level: 'intermediate',
+      planned_reps: 10,
+      set_number: 2,
+      rep_min: 8,
+      rep_max: 12,
+      target_rir: 2,
+      weight_increment_kg: 2.5,
+      prev_set_weight_kg: 52,
+    })
+    expect(result).not.toBeNull()
+    expect(result!.weight_kg).toBe(47.5)     // 1RM load drop (within clamp 52 - 10 = 42)
+    expect(result!.reps).toBe(10)
+    expect(result!.phase).toBe('failure_recovery')
+  })
+
+  it('Path B — under rep_min but RIR > 1 → maintain weight and never round up weight', () => {
+    // Client did 7 reps @ 52 kg (below zone 8-12) with RIR 2
+    // RIR 2 > 1 means they did not fail. Maintain weight but do NOT round up to 52.5 kg.
+    // Instead round down to 50 kg because they did not hit the rep range.
+    const result = recommendNextSet({
+      actual_weight_kg: 52,
+      actual_reps: 7,
+      rir_actual: 2,
+      goal: 'hypertrophy',
+      level: 'intermediate',
+      planned_reps: 10,
+      set_number: 2,
+      rep_min: 8,
+      rep_max: 12,
+      target_rir: 2,
+      weight_increment_kg: 2.5,
+      prev_set_weight_kg: 52,
+    })
+    expect(result).not.toBeNull()
+    expect(result!.weight_kg).toBe(52)
+    expect(result!.reps).toBe(10)
+    expect(result!.phase).toBe('intra_session')
+  })
+
+  // ── Phase 2 — 1RM-based autorégulation ──
+
+  it('Phase 2 — estimateLoadFromOneRM: 100kg×13reps@RIR2 → e1RM→charge pour 8reps@RIR2', () => {
+    // e1RM = 100 × (1 + (13+2)/30) = 100 × 1.5 = 150 kg
+    // w_target pour 8+2=10 reps à failure = 150 / (1 + 10/30) = 150 / 1.333 ≈ 112.5 kg
+    // Clamped at 100 + 4 * 2.5 = 110 kg
+    const est = estimateLoadFromOneRM(100, 13, 2, 8, 2, 2.5)
+    expect(est).not.toBeNull()
+    expect(est!.weight_kg).toBe(110)
+    expect(est!.e1rm).toBeCloseTo(150, 0)
+    expect(est!.delta_kg).toBeCloseTo(10, 1)
+  })
+
+  it('Phase 2 — aboveZone + rirTooHigh → 1RM load targeting rep_min @ target_rir', () => {
+    // Client fait 13 reps @ 100 kg avec RIR 2 (cible 8-12 @ RIR 2)
+    // → aboveZone=true, rirTooHigh=(2 > 2+2=4)=false → branche aboveZone simple
+    // 1RM → charge pour rep_min=8 @ rir=2 = ~112.5 kg
+    const result = recommendNextSet({
+      actual_weight_kg: 100,
+      actual_reps: 13,
+      rir_actual: 2,
+      goal: 'hypertrophy',
+      level: 'intermediate',
+      planned_reps: 10,
+      set_number: 1,
+      rep_min: 8,
+      rep_max: 12,
+      target_rir: 2,
+      weight_increment_kg: 2.5,
+    })
+    expect(result).not.toBeNull()
+    expect(result!.weight_kg).toBe(110)           // Clamped at 100 + 4 * 2.5
+    expect(result!.reps).toBe(8)                 // rep_min
+    expect(result!.used_one_rm_estimate).toBe(true)
+    expect(result!.phase).toBe('intra_session')
+  })
+
+  it('Phase 2 — aboveZone + rirTooHigh extrême → 1RM load', () => {
+    // Client fait 13 reps @ 100 kg avec RIR 5 (cible RIR 2, écart = 3 → rirTooHigh)
+    // → branche aboveZone && rirTooHigh
+    const result = recommendNextSet({
+      actual_weight_kg: 100,
+      actual_reps: 13,
+      rir_actual: 5,
+      goal: 'hypertrophy',
+      level: 'intermediate',
+      planned_reps: 10,
+      set_number: 1,
+      rep_min: 8,
+      rep_max: 12,
+      target_rir: 2,
+      weight_increment_kg: 2.5,
+    })
+    expect(result).not.toBeNull()
+    // e1RM = 100 × (1 + 18/30) = 160 kg; w pour 10 reps fail = 160/1.333 = 120 kg
+    // Mais clamped à MAX_RM_JUMP_INCREMENTS=4 × 2.5=10 → max 110 kg
+    expect(result!.weight_kg).toBe(110)           // clamped at +4 increments
+    expect(result!.used_one_rm_estimate).toBe(true)
+  })
+
+  it('Phase 2 — inZone + rirTooHigh → 1RM ajuste la charge, garde les mêmes reps', () => {
+    // Client fait 10 reps @ 80 kg avec RIR 6 (cible RIR 2, écart = 4 → rirTooHigh)
+    // → inZone=true, rirTooHigh=true
+    // e1RM = 80 × (1 + 16/30) = 80 × 1.533 = 122.7 kg
+    // w pour 10+2=12 reps fail = 122.7/1.4 = 87.6 → arrondi 87.5 kg
+    const result = recommendNextSet({
+      actual_weight_kg: 80,
+      actual_reps: 10,
+      rir_actual: 6,
+      goal: 'hypertrophy',
+      level: 'intermediate',
+      planned_reps: 10,
+      set_number: 1,
+      rep_min: 8,
+      rep_max: 12,
+      target_rir: 2,
+      weight_increment_kg: 2.5,
+    })
+    expect(result).not.toBeNull()
+    expect(result!.weight_kg).toBe(87.5)          // 1RM-derived, même nombre de reps
+    expect(result!.reps).toBe(10)                 // reps inchangées
+    expect(result!.used_one_rm_estimate).toBe(true)
+    expect(result!.phase).toBe('intra_session')
+  })
+
+  it('Phase 2 — failure_recovery utilise 1RM si possible pour descendre à la charge optimale', () => {
+    // Client fait 5 reps @ 100 kg avec RIR 0 (belowZone, failure)
+    // e1RM = 100 × (1 + 5/30) = 116.7 kg
+    // w pour 10+2=12 reps fail = 116.7/1.4 = 83.3 → arrondi 82.5 kg
+    // Mais safety: doit toujours être < actual_weight (100 kg) → 82.5 < 100 ✓
+    const result = recommendNextSet({
+      actual_weight_kg: 100,
+      actual_reps: 5,
+      rir_actual: 0,
+      goal: 'hypertrophy',
+      level: 'intermediate',
+      planned_reps: 10,
+      set_number: 2,
+      rep_min: 8,
+      rep_max: 12,
+      target_rir: 2,
+      weight_increment_kg: 2.5,
+    })
+    expect(result).not.toBeNull()
+    expect(result!.weight_kg).toBe(90)            // 1RM-derived drop clamped to 90kg (-10kg safety clamp)
+    expect(result!.reps).toBe(10)                 // planned_reps
+    expect(result!.phase).toBe('failure_recovery')
+    expect(result!.used_one_rm_estimate).toBe(true)
+    // Must always be strictly below actual_weight_kg
+    expect(result!.weight_kg).toBeLessThan(100)
+  })
+
+  it('Phase 2 — Epley domaine invalide (reps > 20) → fallback incrément fixe', () => {
+    // 25 reps → hors domaine Epley → fallback aboveZone: +1 incrément
+    const result = recommendNextSet({
+      actual_weight_kg: 40,
+      actual_reps: 25,    // > EPLEY_MAX_REPS=20
+      rir_actual: 1,
+      goal: 'endurance',
+      level: 'beginner',
+      planned_reps: 15,
+      set_number: 1,
+      rep_min: 12,
+      rep_max: 20,
+      target_rir: 2,
+      weight_increment_kg: 2.5,
+    })
+    expect(result).not.toBeNull()
+    expect(result!.used_one_rm_estimate).toBeFalsy()  // 1RM non utilisé
+    expect(result!.weight_kg).toBe(42.5)              // fallback +1 incrément
+    expect(result!.phase).toBe('intra_session')
+  })
+
+  it('Phase 2 — unilatéral: is_unilateral flag propagé dans output, aucune conversion', () => {
+    // Fentes: 20 kg/jambe × 12 reps (rep_max) @ RIR 2
+    // → inZone, bon RIR → maintenir charge + 1 rep
+    // Le moteur NE multiplie/divise PAS par 2 — travaille en charge-par-membre
+    const result = recommendNextSet({
+      actual_weight_kg: 20,   // per limb
+      actual_reps: 12,        // dans la zone [10-15]
+      rir_actual: 2,
+      goal: 'hypertrophy',
+      level: 'intermediate',
+      planned_reps: 12,
+      set_number: 1,
+      rep_min: 10,
+      rep_max: 15,
+      target_rir: 2,
+      weight_increment_kg: 2,
+      is_unilateral: true,
+    })
+    expect(result).not.toBeNull()
+    expect(result!.weight_kg).toBe(20)            // charge-par-membre inchangée
+    expect(result!.reps).toBe(13)                 // +1 rep
+    expect(result!.is_unilateral).toBe(true)      // flag propagé
+    expect(result!.phase).toBe('intra_session')
+  })
+
+  it("Phase 2 — unilatéral false ou absent → is_unilateral absent de l'output", () => {
+    const result = recommendNextSet({
+      actual_weight_kg: 80,
+      actual_reps: 10,
+      rir_actual: 2,
+      goal: 'hypertrophy',
+      level: 'intermediate',
+      planned_reps: 10,
+      set_number: 1,
+      rep_min: 8,
+      rep_max: 12,
+      target_rir: 2,
+      weight_increment_kg: 2.5,
+    })
+    expect(result).not.toBeNull()
+    expect(result!.is_unilateral).toBeUndefined()
   })
 })

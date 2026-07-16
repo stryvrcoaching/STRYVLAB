@@ -34,10 +34,10 @@ function getTheme(score: number, t: (k: string) => string) {
 }
 
 const DIMS = [
-  { key: 'sport'     as const, label: 'Sport',       color: 'var(--data-petrol)' },
-  { key: 'nutrition' as const, label: 'Nutrition',   color: 'var(--data-gold)' },
-  { key: 'hydration' as const, label: 'Hydratation', color: 'var(--data-copper)' },
-  { key: 'checkins'  as const, label: 'Check-ins',   color: '#808080' },
+  { key: 'sport'     as const, labelKey: 'smart.adherence.sport', color: 'var(--data-petrol)' },
+  { key: 'nutrition' as const, labelKey: 'smart.adherence.nutrition', color: 'var(--data-gold)' },
+  { key: 'hydration' as const, labelKey: 'smart.adherence.hydration', color: 'var(--data-copper)' },
+  { key: 'checkins'  as const, labelKey: 'smart.adherence.checkins', color: '#808080' },
 ]
 
 export default function AdherenceScoreCard({ score, scoreDelta, dimensions }: AdherenceResult) {
@@ -59,7 +59,9 @@ export default function AdherenceScoreCard({ score, scoreDelta, dimensions }: Ad
           className="absolute top-4 right-4 text-[10px] font-bold font-mono px-2 py-0.5 rounded-full"
           style={{ background: t.deltaBg, color: t.textPrimary }}
         >
-          {scoreDelta > 0 ? '+' : ''}{scoreDelta} vs hier
+          {translate('smart.adherence.delta', {
+            delta: `${scoreDelta > 0 ? '+' : ''}${scoreDelta}`,
+          })}
         </div>
       )}
 
@@ -126,7 +128,7 @@ export default function AdherenceScoreCard({ score, scoreDelta, dimensions }: Ad
                 className="font-barlow-condensed font-bold uppercase tracking-[0.08em] text-center leading-tight"
                 style={{ fontSize: 7, color: t.textSecondary }}
               >
-                {d.label}
+                {translate(d.labelKey as any)}
               </span>
             </div>
           )

@@ -16,6 +16,8 @@ import {
   Edit2,
   Trash2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   CheckCircle2,
   X,
@@ -60,23 +62,18 @@ import {
 import { Slider } from "@/components/ui/slider";
 import CsvImportButton from "./CsvImportButton";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  analyzeOverlayCorrelations,
+  type OverlayCorrelationResult,
+} from "@/lib/coach/metricsOverlay/correlation";
+import {
+  analyzeEventImpact,
+  type EventImpactReliability,
+} from "@/lib/coach/metricsOverlay/eventImpact";
+import { resolveOverlayDisplayMode } from "@/lib/coach/metricsOverlay/displayMode";
 
 // ─── Chart color palette (semantic mapping to STRYVR design tokens) ────────────
 // Only gray tones for charts - green only on hover/active states
-
-// ─── Chart config for shadcn charts ───────────────────────────────────────────
-function createChartConfig(selectedMetrics: string[]): ChartConfig {
-  const config: ChartConfig = {};
-  selectedMetrics.forEach((key) => {
-    const field = FIELD_MAP[key];
-    if (field) {
-      const color = getMetricColor(key);
-      config[key] = { label: field.label, color };
-      config[`__pct_${key}`] = { label: `${field.label} (%)`, color };
-    }
-  });
-  return config;
-}
 
 // ─── Field definitions ────────────────────────────────────────────────────────
 
@@ -373,6 +370,92 @@ interface MetricSeries {
   [fieldKey: string]: { date: string; value: number }[];
 }
 
+type OverlayMetricFamily =
+  | "body"
+  | "recovery"
+  | "nutrition"
+  | "performance"
+  | "correlation";
+
+interface OverlayMetricGroup {
+  key: string;
+  label: string;
+  description: string;
+  family: OverlayMetricFamily;
+  metrics: string[];
+}
+
+interface OverlayMetricMetadataEntry {
+  label: string;
+  family: OverlayMetricFamily;
+  mode: "observed" | "consumed" | "planned" | "derived";
+  unit: string;
+  color: string;
+  dashed: boolean;
+  correlationEligible: boolean;
+}
+
+const OVERLAY_FAMILY_LABELS: Record<OverlayMetricFamily, string> = {
+  body: "Corps",
+  recovery: "Récupération",
+  nutrition: "Nutrition",
+  performance: "Performance",
+  correlation: "Corrélations",
+};
+
+const OVERLAY_METRIC_FAMILY_ORDER: Array<
+  Exclude<OverlayMetricFamily, "correlation">
+> = ["body", "recovery", "nutrition", "performance"];
+
+const OVERLAY_METRIC_STORAGE_KEY = "stryvr_overlay_metric_families_v1";
+const OVERLAY_LIBRARY_STORAGE_KEY = "stryvr_overlay_metric_library_v1";
+const MAX_OVERLAY_VISIBLE_SERIES = 5;
+
+function fallbackOverlayMetadata(
+  fallbackSeries: MetricSeries,
+): Record<string, OverlayMetricMetadataEntry> {
+  return Object.fromEntries(
+    Object.keys(fallbackSeries)
+      .map((key) => {
+        const field = FIELD_MAP[key];
+        if (!field) return null;
+        return [
+          key,
+          {
+            label: field.label,
+            family:
+              field.category === "composition" || field.category === "measurements"
+                ? ("body" as const)
+                : ("recovery" as const),
+            mode: "observed" as const,
+            unit: field.unit,
+            color: getMetricColor(key),
+            dashed: false,
+            correlationEligible: true,
+          },
+        ];
+      })
+      .filter(Boolean) as Array<[string, OverlayMetricMetadataEntry]>,
+  );
+}
+
+function mergeOverlaySeries(
+  fallbackSeries: MetricSeries,
+  primarySeries: MetricSeries,
+): MetricSeries {
+  const merged = { ...fallbackSeries };
+
+  for (const [key, points] of Object.entries(primarySeries)) {
+    // Recovery data is preferred when it exists. An empty primary series must
+    // not erase a manual or CSV series that remains the only available source.
+    if (points.length > 0 || !(merged[key]?.length > 0)) {
+      merged[key] = points;
+    }
+  }
+
+  return merged;
+}
+
 // ─── Training phases & annotations ───────────────────────────────────────────
 
 type PhaseType = "bulk" | "cut" | "maintenance" | "peak" | "deload" | "custom";
@@ -446,6 +529,15 @@ const ANNOTATION_LABELS: Record<AnnotationType, string> = {
   note: "Note",
   lab_protocol: "Protocole Lab",
 };
+
+const ANNOTATION_TYPE_ORDER: AnnotationType[] = [
+  "program_change",
+  "nutrition",
+  "injury",
+  "travel",
+  "lab_protocol",
+  "note",
+];
 
 // ─── Scientific plateau thresholds ───────────────────────────────────────────
 // Sources: Schoenfeld 2010, Helms et al. 2014, Trexler et al. 2014, NSCA
@@ -557,19 +649,21 @@ const NORM_ZONES: Partial<
   },
   energy_level: {
     neutral: [
-      { label: "Faible", min: 0, max: 4, color: "rgba(239,68,68,0.10)" },
-      { label: "Modéré", min: 4, max: 7, color: "rgba(250,204,21,0.08)" },
-      { label: "Optimal", min: 7, max: 10, color: "rgba(31,138,101,0.12)" },
+      { label: "Faible", min: 1, max: 2, color: "rgba(239,68,68,0.10)" },
+      { label: "Modérée", min: 2, max: 3.5, color: "rgba(250,204,21,0.08)" },
+      { label: "Élevée", min: 3.5, max: 5, color: "rgba(31,138,101,0.12)" },
     ],
   },
   stress_level: {
     neutral: [
-      { label: "Faible", min: 0, max: 3, color: "rgba(31,138,101,0.12)" },
-      { label: "Modéré", min: 3, max: 7, color: "rgba(250,204,21,0.08)" },
-      { label: "Élevé", min: 7, max: 10, color: "rgba(239,68,68,0.10)" },
+      { label: "Faible", min: 1, max: 2, color: "rgba(31,138,101,0.12)" },
+      { label: "Modéré", min: 2, max: 3.5, color: "rgba(250,204,21,0.08)" },
+      { label: "Élevé", min: 3.5, max: 5, color: "rgba(239,68,68,0.10)" },
     ],
   },
 };
+
+const SUBJECTIVE_REFERENCE_METRICS = new Set(["energy_level", "stress_level"]);
 
 type ViewMode = "table" | "charts" | "overlay" | "norms";
 type ChartCategory = "composition" | "measurements" | "wellness";
@@ -610,6 +704,32 @@ function formatDateInput(d: string) {
 function getDelta(series: { date: string; value: number }[]) {
   if (series.length < 2) return null;
   return series[series.length - 1].value - series[0].value;
+}
+
+function getCorrelationReliabilityLabel(reliability: OverlayCorrelationResult["reliability"]) {
+  if (reliability === "high") return "Fiabilité élevée";
+  if (reliability === "medium") return "Fiabilité modérée";
+  return "Fiabilité faible";
+}
+
+function getCorrelationReliabilityClass(reliability: OverlayCorrelationResult["reliability"]) {
+  if (reliability === "high") return "bg-[#1f8a65]/12 text-[#65c7a4]";
+  if (reliability === "medium") return "bg-amber-400/10 text-amber-300/80";
+  return "bg-white/[0.05] text-white/40";
+}
+
+function getEventImpactReliabilityLabel(reliability: EventImpactReliability) {
+  if (reliability === "high") return "Fiabilité élevée";
+  if (reliability === "medium") return "Fiabilité modérée";
+  if (reliability === "low") return "Fiabilité limitée";
+  return "Données insuffisantes";
+}
+
+function getEventImpactReliabilityClass(reliability: EventImpactReliability) {
+  if (reliability === "high") return "bg-[#1f8a65]/12 text-[#65c7a4]";
+  if (reliability === "medium") return "bg-amber-400/10 text-amber-300/80";
+  if (reliability === "low") return "bg-white/[0.05] text-white/50";
+  return "bg-white/[0.035] text-white/35";
 }
 
 function fmtVal(v: number, unit: string) {
@@ -700,6 +820,7 @@ interface CustomTooltipProps {
   fieldLabel?: string;
   accentColor?: string;
   multiSeries?: boolean;
+  metadataMap?: Record<string, { label: string; unit: string }>;
 }
 
 function CustomTooltip({
@@ -710,6 +831,7 @@ function CustomTooltip({
   fieldLabel,
   accentColor,
   multiSeries,
+  metadataMap,
 }: CustomTooltipProps) {
   if (!active || !payload?.length) return null;
   const dateStr = label
@@ -731,6 +853,7 @@ function CustomTooltip({
         {payload.map((p, i) => {
           const fieldKey = typeof p.dataKey === "string" ? p.dataKey : "";
           const field = FIELD_MAP[fieldKey];
+          const meta = metadataMap?.[fieldKey];
           const v = p.value;
           return (
             <div key={i} className="flex items-center justify-between gap-4">
@@ -740,7 +863,7 @@ function CustomTooltip({
                   style={{ background: p.color }}
                 />
                 <span className="text-[9px] text-white/50">
-                  {field?.label ?? fieldKey}
+                  {meta?.label ?? field?.label ?? fieldKey}
                 </span>
               </div>
               <span
@@ -748,9 +871,9 @@ function CustomTooltip({
                 style={{ color: p.color }}
               >
                 {Number.isInteger(v) ? v : v.toFixed(1)}
-                {field?.unit ? (
+                {(meta?.unit || field?.unit) ? (
                   <span className="text-white/40 font-normal ml-0.5 text-[9px]">
-                    {field.unit}
+                    {meta?.unit ?? field?.unit}
                   </span>
                 ) : null}
               </span>
@@ -1350,9 +1473,17 @@ interface MultiTooltipProps {
   active?: boolean;
   payload?: Array<{ value: number; dataKey?: string; color?: string }>;
   label?: string;
+  metadataMap?: Record<string, { label: string; unit: string }>;
+  valueMode?: "indexed" | "absolute";
 }
 
-function MultiTooltip({ active, payload, label }: MultiTooltipProps) {
+function MultiTooltip({
+  active,
+  payload,
+  label,
+  metadataMap,
+  valueMode = "indexed",
+}: MultiTooltipProps) {
   if (!active || !payload?.length) return null;
   const dateStr = label
     ? new Date(label).toLocaleDateString("fr-FR", {
@@ -1373,18 +1504,20 @@ function MultiTooltip({ active, payload, label }: MultiTooltipProps) {
       <div className="mb-1 h-px bg-white/[0.07]" />
       {payload.map((p, i) => {
         const fieldKey =
-          typeof p.dataKey === "string" ? p.dataKey.replace("__pct_", "") : "";
+          typeof p.dataKey === "string"
+            ? p.dataKey.replace(/^__(pct|raw)_/, "")
+            : "";
         const f = FIELD_MAP[fieldKey];
-        if (!f) return null;
+        const labelText = metadataMap?.[fieldKey]?.label ?? f?.label ?? fieldKey;
         const color = p.color ?? "#1f8a65";
 
-        const pctVal = p.value;
+        const value = p.value;
         const isGood =
-          pctVal === 0
+          value === 0
             ? null
             : NEG_GOOD_FIELDS.includes(fieldKey)
-              ? pctVal < 0
-              : pctVal > 0;
+              ? value < 0
+              : value > 0;
         return (
           <div key={i} className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-1.5 min-w-0">
@@ -1393,21 +1526,24 @@ function MultiTooltip({ active, payload, label }: MultiTooltipProps) {
                 style={{ background: color }}
               />
               <span className="text-[9px] text-white/50 truncate">
-                {f.label}
+                {labelText}
               </span>
             </div>
             <div className="text-right shrink-0">
               <span
                 className={`text-xs font-bold tabular-nums ${
-                  pctVal === 0
+                  valueMode === "absolute"
+                    ? "text-white/80"
+                    : value === 0
                     ? "text-white/50"
                     : isGood
                       ? "text-[#1f8a65]"
                       : "text-red-400"
                 }`}
               >
-                {pctVal > 0 ? "+" : ""}
-                {pctVal.toFixed(1)}%
+                {valueMode === "absolute"
+                  ? fmtVal(value, metadataMap?.[fieldKey]?.unit ?? "")
+                  : `${value > 0 ? "+" : ""}${value.toFixed(1)}%`}
               </span>
             </div>
           </div>
@@ -1584,6 +1720,8 @@ function AnnotationLabelContent({
 function MultiSeriesChart({
   selectedMetrics,
   series,
+  overlayGroups,
+  overlayMetadata,
   rows,
   clientId,
   clientGender,
@@ -1592,11 +1730,14 @@ function MultiSeriesChart({
   onPhasesChange,
   onAnnotationsChange,
   onAnnotationClick,
+  focusedAnnotation,
   timeRangeDays,
   setTimeRangeDays,
 }: {
   selectedMetrics: string[];
   series: MetricSeries;
+  overlayGroups: OverlayMetricGroup[];
+  overlayMetadata: Record<string, OverlayMetricMetadataEntry>;
   rows: MetricRow[];
   clientId: string;
   clientGender?: string | null;
@@ -1605,25 +1746,224 @@ function MultiSeriesChart({
   onPhasesChange: (phases: TrainingPhase[]) => void;
   onAnnotationsChange: (annotations: MetricAnnotation[]) => void;
   onAnnotationClick?: (id: string) => void;
+  focusedAnnotation?: MetricAnnotation | null;
   timeRangeDays: TimeRangeDays;
   setTimeRangeDays: React.Dispatch<React.SetStateAction<TimeRangeDays>>;
 }) {
+  const getMetricMeta = useCallback(
+    (key: string) => {
+      const overlay = overlayMetadata[key];
+      if (overlay) return overlay;
+      const field = FIELD_MAP[key];
+      if (!field) return null;
+      return {
+        label: field.label,
+        family:
+          field.category === "composition" || field.category === "measurements"
+            ? ("body" as const)
+            : ("recovery" as const),
+        mode: "observed" as const,
+        unit: field.unit,
+        color: getMetricColor(key),
+        dashed: false,
+        correlationEligible: true,
+      };
+    },
+    [overlayMetadata],
+  );
+  const tooltipMetadataMap = useMemo(
+    () =>
+      Object.fromEntries(
+        selectedMetrics
+          .map((key) => {
+            const meta = getMetricMeta(key);
+            return meta ? [key, { label: meta.label, unit: meta.unit }] : null;
+          })
+          .filter(Boolean) as Array<[string, { label: string; unit: string }]>,
+      ),
+    [getMetricMeta, selectedMetrics],
+  );
+  const normalizeMetricDelta = useCallback(
+    (key: string, baseline: number, value: number) => {
+      const meta = getMetricMeta(key);
+      if (!Number.isFinite(baseline) || !Number.isFinite(value)) return null;
+
+      if (!meta) {
+        return baseline !== 0
+          ? ((value - baseline) / Math.abs(baseline)) * 100
+          : null;
+      }
+
+      if (meta.family === "body" || meta.family === "nutrition") {
+        return baseline !== 0
+          ? ((value - baseline) / Math.abs(baseline)) * 100
+          : null;
+      }
+
+      if (key === "performance_volume" || key === "performance_avg_load") {
+        return baseline !== 0
+          ? ((value - baseline) / Math.abs(baseline)) * 100
+          : null;
+      }
+
+      if (key === "performance_completion_rate") {
+        return value - baseline;
+      }
+
+      if (key === "performance_avg_rir" || key === "performance_avg_rpe") {
+        return ((value - baseline) / 10) * 100;
+      }
+
+      if (meta.unit === "/5") {
+        return ((value - baseline) / 4) * 100;
+      }
+
+      if (meta.unit === "/4") {
+        return ((value - baseline) / 3) * 100;
+      }
+
+      return baseline !== 0
+        ? ((value - baseline) / Math.abs(baseline)) * 100
+        : null;
+    },
+    [getMetricMeta],
+  );
+
   // ── Feature 1: Cross-group mixing — all metrics with data are available ──
-  const allMetricsWithData = FIELDS.filter(
-    (f) => (series[f.key]?.length ?? 0) > 0,
-  ).map((f) => f.key);
+  const allMetricsWithData = useMemo(
+    () =>
+      selectedMetrics.filter((key) => (series[key]?.length ?? 0) > 0),
+    [selectedMetrics, series],
+  );
+  const nutritionComparisonPairs = useMemo(() => {
+    const pairs = new Map<string, { label: string; consumed?: string; planned?: string }>();
+    allMetricsWithData.forEach((key) => {
+      const meta = getMetricMeta(key);
+      if (!meta || meta.family !== "nutrition") return;
+      const pairKey = key
+        .replace("_consumed_", "_")
+        .replace("_planned_", "_");
+      const pair = pairs.get(pairKey) ?? {
+        label: meta.label.replace(/\s+(consommée?s?|prévu(?:e)?s?)$/i, ""),
+      };
+      if (meta.mode === "consumed") pair.consumed = key;
+      if (meta.mode === "planned") pair.planned = key;
+      pairs.set(pairKey, pair);
+    });
+    return Array.from(pairs.entries()).map(([key, pair]) => ({ key, ...pair }));
+  }, [allMetricsWithData, getMetricMeta]);
   const [visibleSeries, setVisibleSeries] = useState<Set<string>>(
     () =>
       new Set(
-        OVERLAY_GROUPS[0].metrics.filter((m) => (series[m]?.length ?? 0) > 0),
+        (
+          overlayGroups.find((group) =>
+            (group.metrics ?? []).some((metric) => (series[metric]?.length ?? 0) > 0),
+          )?.metrics ?? []
+        ).filter((m) => (series[m]?.length ?? 0) > 0),
       ),
   );
+  const [openMetricFamilies, setOpenMetricFamilies] = useState<
+    Record<Exclude<OverlayMetricFamily, "correlation">, boolean>
+  >({
+    body: false,
+    recovery: false,
+    nutrition: true,
+    performance: false,
+  });
+  const [showMetricLibrary, setShowMetricLibrary] = useState(false);
+  const [metricSelectionNotice, setMetricSelectionNotice] = useState<string | null>(null);
 
-  const [chartHeight, setChartHeight] = useState(300);
-  const chartHeightRef = useRef(300);
+  const selectVisibleMetrics = useCallback((next: Set<string>) => {
+    if (next.size > MAX_OVERLAY_VISIBLE_SERIES) {
+      setMetricSelectionNotice(
+        `Pour garder le graphique lisible, sélectionnez jusqu’à ${MAX_OVERLAY_VISIBLE_SERIES} courbes.`,
+      );
+      return false;
+    }
+    setMetricSelectionNotice(null);
+    setVisibleSeries(next);
+    return true;
+  }, []);
+
+  const toggleVisibleMetric = useCallback((key: string) => {
+    const next = new Set(visibleSeries);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    selectVisibleMetrics(next);
+  }, [selectVisibleMetrics, visibleSeries]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(OVERLAY_METRIC_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<
+          Record<Exclude<OverlayMetricFamily, "correlation">, boolean>
+        >;
+        setOpenMetricFamilies((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch {}
+
+    try {
+      const raw = localStorage.getItem(OVERLAY_LIBRARY_STORAGE_KEY);
+      if (raw) setShowMetricLibrary(raw === "1");
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const firstGroupMetrics =
+      (
+        overlayGroups.find((group) =>
+          (group.metrics ?? []).some((metric) => (series[metric]?.length ?? 0) > 0),
+        )?.metrics ?? []
+      ).filter((metric) => (series[metric]?.length ?? 0) > 0);
+    if (firstGroupMetrics.length === 0) return;
+    setVisibleSeries((prev) => {
+      if (prev.size > 0) return prev;
+      return new Set(firstGroupMetrics);
+    });
+  }, [overlayGroups, series]);
+
+  useEffect(() => {
+    setFocusedMetrics((prev) => {
+      if (!prev) return prev;
+      const filtered = prev.filter((metric) => visibleSeries.has(metric));
+      return filtered.length > 0 ? filtered : null;
+    });
+  }, [visibleSeries]);
+
+  const renderedMetrics = useMemo(
+    () =>
+      selectedMetrics.filter(
+        (key) => visibleSeries.has(key) && (series[key]?.length ?? 0) > 0,
+      ),
+    [selectedMetrics, series, visibleSeries],
+  );
+
+  useEffect(() => {
+    const visibleFamilies = new Set(
+      Array.from(visibleSeries)
+        .map((metric) => getMetricMeta(metric)?.family)
+        .filter(
+          (family): family is Exclude<OverlayMetricFamily, "correlation"> =>
+            Boolean(family) && family !== "correlation",
+        ),
+    );
+
+    if (visibleFamilies.size === 0) return;
+
+    setOpenMetricFamilies((prev) => {
+      const next = { ...prev };
+      for (const family of visibleFamilies) next[family] = true;
+      return next;
+    });
+  }, [getMetricMeta, visibleSeries]);
+
+  const [chartHeight, setChartHeight] = useState(600);
+  const chartHeightRef = useRef(600);
   const chartDivRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [impactWindowDays, setImpactWindowDays] = useState<7 | 14 | 28>(14);
 
   // ── Fermer plein écran avec Escape ──
   useEffect(() => {
@@ -1634,9 +1974,6 @@ function MultiSeriesChart({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [isFullscreen]);
-
-  // ── Interpretation panel toggle (default collapsed) ──
-  const [showInterpretation, setShowInterpretation] = useState(false);
 
   // ── Context menu state ──
   // Step "choose" is skipped — annotation form is the default entry
@@ -1673,8 +2010,8 @@ function MultiSeriesChart({
     body: string;
   }>({ label: "", event_type: "note", event_date: "", body: "" });
 
-  // ── Legend focus (isolate a single curve) ──
-  const [focusedMetric, setFocusedMetric] = useState<string | null>(null);
+  // ── Legend/correlation focus ──
+  const [focusedMetrics, setFocusedMetrics] = useState<string[] | null>(null);
 
   // ── Annotation hover tooltip ──
   const [hoveredAnnotation, setHoveredAnnotation] = useState<{
@@ -1702,20 +2039,20 @@ function MultiSeriesChart({
 
   const baselineValues = useMemo(() => {
     const b: Record<string, number> = {};
-    selectedMetrics.forEach((k) => {
+    renderedMetrics.forEach((k) => {
       const s = series[k] ?? [];
       if (s.length > 0) b[k] = s[0].value;
     });
     return b;
-  }, [selectedMetrics, series]);
+  }, [renderedMetrics, series]);
 
   const dates = useMemo(() => {
     const dateSet = new Set<string>();
-    selectedMetrics.forEach((k) => {
+    renderedMetrics.forEach((k) => {
       (series[k] ?? []).forEach((d) => dateSet.add(d.date));
     });
     return Array.from(dateSet).sort();
-  }, [selectedMetrics, series]);
+  }, [renderedMetrics, series]);
 
   const lastDataDate = dates.length > 0 ? dates[dates.length - 1] : undefined;
 
@@ -1728,24 +2065,35 @@ function MultiSeriesChart({
     ].filter((d) => !dates.includes(d));
     const allDates = [...dates, ...annotationDates].sort();
 
+    // Pre-index series points by metric key and date for O(1) lookup
+    const seriesMaps = new Map<string, Map<string, number>>();
+    renderedMetrics.forEach((k) => {
+      const m = new Map<string, number>();
+      (series[k] ?? []).forEach((pt) => {
+        m.set(pt.date, pt.value);
+      });
+      seriesMaps.set(k, m);
+    });
+
     return allDates.map((date) => {
       const row: Record<string, number | string> = { date };
-      selectedMetrics.forEach((k) => {
-        const point = (series[k] ?? []).find((d) => d.date === date);
-        if (point) {
+      renderedMetrics.forEach((k) => {
+        const val = seriesMaps.get(k)?.get(date);
+        if (val !== undefined) {
           const baseline = baselineValues[k];
-          if (baseline !== undefined && baseline !== 0) {
-            row[`__pct_${k}`] =
-              ((point.value - baseline) / Math.abs(baseline)) * 100;
+          if (baseline !== undefined) {
+            const normalized = normalizeMetricDelta(k, baseline, val);
+            if (normalized != null) {
+              row[`__pct_${k}`] = normalized;
+            }
           }
-          // baseline === 0: leave key absent (null) — avoids division by zero and phantom zero points
         }
         // no point: leave key absent so connectNulls bridges over phantom dates
       });
       return row;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dates.join(","), selectedMetrics.join(","), baselineValues, annotations, phases]);
+  }, [dates.join(","), renderedMetrics.join(","), baselineValues, annotations, phases, normalizeMetricDelta]);
 
   const deltas = useMemo(() => {
     const d: Record<string, number | null> = {};
@@ -1758,31 +2106,56 @@ function MultiSeriesChart({
       }
       const baseline = s[0].value;
       const last = s[s.length - 1].value;
-      d[k] =
-        baseline !== 0 ? ((last - baseline) / Math.abs(baseline)) * 100 : null;
+      d[k] = normalizeMetricDelta(k, baseline, last);
     });
     return d;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allMetricsWithData.join(","), series]);
+  }, [allMetricsWithData.join(","), normalizeMetricDelta, series]);
 
   // ── Feature 3: Plateau detection per visible metric ──
   const plateausByMetric = useMemo(() => {
     const result: Record<string, ReturnType<typeof detectPlateaus>> = {};
-    selectedMetrics.forEach((k) => {
+    renderedMetrics.forEach((k) => {
       if (visibleSeries.has(k)) {
         result[k] = detectPlateaus(series[k] ?? [], k);
       }
     });
     return result;
-  }, [selectedMetrics, series, visibleSeries]);
+  }, [renderedMetrics, series, visibleSeries]);
 
   const metricsWithPlateau = Object.entries(plateausByMetric)
     .filter(([, p]) => p.length > 0)
     .map(([k]) => k);
 
-  // ── Feature 6: Single-metric absolute mode for norm zones ──
+  // ── Absolute mode: a single metric with clinical zones OR one planned/actual pair ──
+  const visibleMetricsWithData = useMemo(
+    () =>
+      Array.from(visibleSeries).filter(
+        (key) => (series[key]?.length ?? 0) > 0,
+      ),
+    [series, visibleSeries],
+  );
+  const displayMode = useMemo(
+    () =>
+      resolveOverlayDisplayMode(
+        visibleMetricsWithData.flatMap((key) => {
+          const meta = getMetricMeta(key);
+          if (!meta) return [];
+          return [{
+            key,
+            family: meta.family,
+            mode: meta.mode,
+            unit: meta.unit,
+            points: series[key] ?? [],
+          }];
+        }),
+      ),
+    [getMetricMeta, series, visibleMetricsWithData],
+  );
   const singleVisibleMetric =
-    visibleSeries.size === 1 ? Array.from(visibleSeries)[0] : null;
+    displayMode.kind === "single-absolute" ? displayMode.key : null;
+  const plannedActualPair =
+    displayMode.kind === "planned-actual" ? displayMode.pair : null;
   const normZoneEntry = singleVisibleMetric
     ? NORM_ZONES[singleVisibleMetric]
     : null;
@@ -1793,34 +2166,47 @@ function MultiSeriesChart({
         ? normZoneEntry.female
         : normZoneEntry.male))
     : undefined;
-  const useAbsoluteAxis = !!(singleVisibleMetric && activeNormZones);
+  const useAbsoluteAxis = displayMode.kind !== "indexed";
+  const absoluteMetricKeys = plannedActualPair?.keys ??
+    (singleVisibleMetric ? [singleVisibleMetric] : []);
+  const absoluteAxisUnit = plannedActualPair?.unit ??
+    (singleVisibleMetric ? getMetricMeta(singleVisibleMetric)?.unit ?? "" : "");
 
   const absoluteData = useMemo(() => {
-    if (!singleVisibleMetric) return [];
-    const dataPoints = (series[singleVisibleMetric] ?? []).map((d) => ({
-      date: d.date,
-      value: d.value,
-    }));
-    const existingDates = new Set(dataPoints.map((d) => d.date));
+    if (absoluteMetricKeys.length === 0) return [];
+    const datesWithData = new Set<string>();
+    const valuesByDate = new Map<string, Record<string, number | string>>();
+
+    absoluteMetricKeys.forEach((key) => {
+      (series[key] ?? []).forEach((point) => {
+        datesWithData.add(point.date);
+        const row = valuesByDate.get(point.date) ?? { date: point.date };
+        row[`__raw_${key}`] = point.value;
+        valuesByDate.set(point.date, row);
+      });
+    });
+
     // Inject all annotation/phase dates so xScale can position them
     const extraDates = [
       ...annotations.map((a) => a.event_date),
       ...phases.map((p) => p.date_start),
-    ].filter((d) => !existingDates.has(d));
+    ].filter((d) => !datesWithData.has(d));
     const combined = [
-      ...dataPoints,
-      ...extraDates.map((date) => ({ date, value: undefined as unknown as number })),
-    ].sort((a, b) => a.date.localeCompare(b.date));
+      ...valuesByDate.values(),
+      ...extraDates.map((date) => ({ date })),
+    ].sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
     return combined;
-  }, [singleVisibleMetric, series, annotations, phases]);
+  }, [absoluteMetricKeys, series, annotations, phases]);
 
-  const absMin =
-    absoluteData.length > 0 ? Math.min(...absoluteData.map((d) => d.value)) : 0;
-  const absMax =
-    absoluteData.length > 0
-      ? Math.max(...absoluteData.map((d) => d.value))
-      : 100;
+  const validAbsValues = absoluteData.flatMap((row) =>
+    absoluteMetricKeys
+      .map((key) => row[`__raw_${key}`])
+      .filter((value): value is number => typeof value === "number" && !isNaN(value)),
+  );
+
+  const absMin = validAbsValues.length > 0 ? Math.min(...validAbsValues) : 0;
+  const absMax = validAbsValues.length > 0 ? Math.max(...validAbsValues) : 100;
   const absPad = Math.max((absMax - absMin) * 0.15, 1);
   const absDomain: [number, number] = [
     Math.floor(absMin - absPad),
@@ -1828,7 +2214,7 @@ function MultiSeriesChart({
   ];
 
   // Pct mode Y domain
-  const dataKeys = selectedMetrics.map((k) => `__pct_${k}`);
+  const dataKeys = renderedMetrics.map((k) => `__pct_${k}`);
   const visibleDataKeys = dataKeys.filter((k) =>
     visibleSeries.has(k.replace("__pct_", "")),
   );
@@ -1847,7 +2233,7 @@ function MultiSeriesChart({
 
   // Active group detection
   const activeGroupKey =
-    OVERLAY_GROUPS.find((g) => {
+    overlayGroups.find((g) => {
       const withData = g.metrics.filter((m) => (series[m]?.length ?? 0) > 0);
       if (withData.length === 0) return false;
       return (
@@ -1856,9 +2242,87 @@ function MultiSeriesChart({
       );
     })?.key ?? null;
   const activeGroup =
-    OVERLAY_GROUPS.find((g) => g.key === activeGroupKey) ?? null;
+    overlayGroups.find((g) => g.key === activeGroupKey) ?? null;
 
-  const chartConfig = createChartConfig(selectedMetrics);
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        OVERLAY_METRIC_STORAGE_KEY,
+        JSON.stringify(openMetricFamilies),
+      );
+    } catch {}
+  }, [openMetricFamilies]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        OVERLAY_LIBRARY_STORAGE_KEY,
+        showMetricLibrary ? "1" : "0",
+      );
+    } catch {}
+  }, [showMetricLibrary]);
+
+  const chartConfig = useMemo(() => {
+    const config: ChartConfig = {};
+    selectedMetrics.forEach((key) => {
+      const meta = getMetricMeta(key);
+      if (!meta) return;
+      config[key] = { label: meta.label, color: meta.color };
+      config[`__pct_${key}`] = { label: `${meta.label} (%)`, color: meta.color };
+    });
+    return config;
+  }, [getMetricMeta, selectedMetrics]);
+
+  const correlationInsights = useMemo(() => {
+    const keys = Array.from(visibleSeries).filter(
+      (key) => getMetricMeta(key)?.correlationEligible,
+    );
+    const insights = analyzeOverlayCorrelations(
+      keys.flatMap((key) => {
+        const meta = getMetricMeta(key);
+        if (!meta) return [];
+        return [{ key, family: meta.family, points: series[key] ?? [] }];
+      }),
+      { minOverlap: 5, smoothingWindowDays: 7, maxLagDays: 7 },
+    );
+
+    const strongestPositive = insights.find(
+      (insight) => insight.direction === "positive",
+    ) ?? null;
+    const strongestNegative = insights.find(
+      (insight) => insight.direction === "inverse",
+    ) ?? null;
+    const rankedByStrength = [...insights].sort((left, right) => {
+      if (left.reliabilityScore !== right.reliabilityScore) {
+        return right.reliabilityScore - left.reliabilityScore;
+      }
+      return right.strength - left.strength;
+    });
+
+    return {
+      hasEnoughData: insights.length > 0,
+      all: insights,
+      rankedByStrength,
+      strongestPositive,
+      strongestNegative,
+    };
+  }, [getMetricMeta, series, visibleSeries]);
+
+  const eventImpact = useMemo(() => {
+    if (!focusedAnnotation) return [];
+    return analyzeEventImpact(
+      Array.from(visibleSeries).flatMap((key) =>
+        (series[key]?.length ?? 0) > 0 ? [{ key, points: series[key] }] : [],
+      ),
+      focusedAnnotation.event_date,
+      impactWindowDays,
+    ).sort((left, right) => {
+      const reliabilityOrder = { high: 3, medium: 2, low: 1, insufficient: 0 };
+      const reliabilityDelta = reliabilityOrder[right.reliability] - reliabilityOrder[left.reliability];
+      if (reliabilityDelta !== 0) return reliabilityDelta;
+      return Math.abs(right.relativeDelta ?? 0) - Math.abs(left.relativeDelta ?? 0);
+    });
+  }, [focusedAnnotation, impactWindowDays, series, visibleSeries]);
 
   // ── Context menu helpers ──
   function openContextMenu(
@@ -2061,240 +2525,277 @@ function MultiSeriesChart({
 
   const innerContent = (
     <div className="flex flex-col gap-4">
-      {/* ── Bloc 1 : Contrôles — groupes + sélection métriques ── */}
-      <div className="bg-[#181818] border-subtle rounded-2xl px-5 py-4">
-        {/* Description */}
-        <div className="mb-4 pb-4 border-b border-white/[0.05]">
-          <div className="flex items-center justify-between mb-1.5">
-            <p className="text-[9px] font-bold text-white/30 uppercase tracking-[0.18em]">
-              Vue superposée
-            </p>
+      {/* ── Commande compacte : le graphique reste le contenu principal ── */}
+      <div className="bg-[#181818] border-subtle rounded-2xl px-4 py-3">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Activity size={15} className="text-[#72d6ae]" />
+                <h3 className="text-[13px] font-semibold text-white/90">
+                  Journal d&apos;évolution
+                </h3>
+                {activeGroup && (
+                  <span className="rounded-full bg-[#1f8a65]/12 px-2 py-0.5 text-[9px] font-semibold text-[#72d6ae]">
+                    {activeGroup.label}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-[10px] leading-relaxed text-white/40">
+                {plannedActualPair
+                  ? "Comparaison directe en unités réelles : réalisé en trait plein, prévu en pointillé."
+                  : useAbsoluteAxis
+                  ? "Une métrique affichée sur son échelle réelle. Ajoutez une courbe pour comparer les évolutions."
+                  : "Courbes, phases et événements réunis sur la même chronologie coach."}
+              </p>
+            </div>
             <button
+              type="button"
               onClick={() => setIsFullscreen(true)}
-              className="flex items-center justify-center w-6 h-6 rounded-lg bg-white/[0.04] text-white/30 hover:bg-white/[0.08] hover:text-white/60 transition-all"
+              className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] text-white/45 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#72d6ae]/60"
+              aria-label="Afficher le journal en plein écran"
               title="Plein écran (F)"
             >
-              <Maximize2 size={11} />
+              <Maximize2 size={14} />
             </button>
           </div>
-          <p className="text-[12px] text-white/55 leading-relaxed">
-            {useAbsoluteAxis ? (
-              <>
-                Axe absolu activé — une seule métrique visible. Les zones de
-                référence scientifiques sont affichées.{" "}
-                <span className="text-white/80 font-semibold">
-                  Sélectionner plusieurs métriques
-                </span>{" "}
-                pour revenir en mode Δ%.
-              </>
-            ) : (
-              <>
-                Compare l&apos;évolution relative de plusieurs métriques. Chaque
-                courbe part de{" "}
-                <span className="text-white/80 font-semibold">0 %</span> au
-                premier point de la période filtrée. Δ calculé sur la{" "}
-                <span className="text-[#1f8a65]">
-                  fenêtre active uniquement
-                </span>
-                .
-              </>
-            )}
-          </p>
-        </div>
 
-        {/* ── Feature 3: Plateau alerts — compact collapsible ── */}
-        {metricsWithPlateau.length > 0 && (
-          <details className="mb-4 group rounded-xl bg-amber-500/[0.07] overflow-hidden">
-            <summary className="flex items-center gap-2 px-4 py-2.5 cursor-pointer list-none select-none">
-              <span className="text-amber-400 text-[12px]">⚡</span>
-              <p className="text-[11px] font-bold text-amber-400 flex-1">
-                Plateau détecté ·{" "}
-                <span className="font-normal text-amber-400/70">
-                  {metricsWithPlateau
-                    .map((k) => FIELD_MAP[k]?.label ?? k)
-                    .join(", ")}
-                </span>
+          <div className="border-t border-white/[0.06] pt-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+              <Layers size={12} className="text-white/35" />
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/35">
+                Présélection
               </p>
-              <ChevronDown
-                size={12}
-                className="text-amber-400/60 transition-transform group-open:rotate-180"
-              />
-            </summary>
-            <div className="px-4 pb-3 pt-1">
-              <p className="text-[11px] text-white/45 leading-relaxed">
-                Variation insuffisante selon les seuils evidence-based
-                (Schoenfeld 2010, Helms 2014). Un ajustement du protocole
-                d&apos;entraînement ou nutritionnel est recommandé.
-              </p>
-            </div>
-          </details>
-        )}
-
-        {/* ── Groupes ── */}
-        <div className="mb-4">
-          <p className="text-[9px] font-bold text-white/30 uppercase tracking-[0.18em] mb-2">
-            Groupes
-          </p>
-          <div className="flex flex-wrap gap-2 mb-3">
-            {OVERLAY_GROUPS.map((group) => {
-              const withData = group.metrics.filter(
-                (m) => (series[m]?.length ?? 0) > 0,
-              );
-              const isActive = activeGroupKey === group.key;
-              const hasData = withData.length > 0;
-              return (
-                <button
-                  key={group.key}
-                  disabled={!hasData}
-                  onClick={() => {
-                    setVisibleSeries(new Set(withData));
-                    setShowInterpretation(false);
-                  }}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
-                    isActive
-                      ? "bg-[#1f8a65]/20 text-white border-[0.3px] border-[#1f8a65]/40"
-                      : hasData
-                        ? "bg-white/[0.04] text-white/55 hover:bg-white/[0.08] hover:text-white border-[0.3px] border-white/[0.06]"
-                        : "bg-white/[0.02] text-white/15 cursor-not-allowed border-[0.3px] border-white/[0.04]"
-                  }`}
-                >
-                  {/* Micro-palette : 3 premiers points colorés du groupe */}
-                  <span className="flex items-center gap-0.5 shrink-0">
-                    {group.metrics.slice(0, 3).map((m) => (
-                      <span
-                        key={m}
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{
-                          backgroundColor: getMetricColor(m),
-                          opacity: isActive ? 1 : hasData ? 0.5 : 0.2,
-                        }}
-                      />
-                    ))}
-                  </span>
-                  {group.label}
-                </button>
-              );
-            })}
-          </div>
-          {activeGroup && (
-            <div className="rounded-xl bg-white/[0.03] px-4 py-3">
-              <button
-                onClick={() => setShowInterpretation((v) => !v)}
-                className="flex items-center justify-between w-full"
+              </div>
+              <select
+                value={activeGroupKey ?? ""}
+                aria-label="Choisir une présélection de métriques"
+                onChange={(event) => {
+                  const group = overlayGroups.find((item) => item.key === event.target.value);
+                  if (!group) return;
+                  selectVisibleMetrics(
+                    new Set(
+                      group.metrics.filter((metric) => (series[metric]?.length ?? 0) > 0),
+                    ),
+                  );
+                }}
+                className="min-h-9 max-w-full rounded-lg border border-white/[0.08] bg-white/[0.035] px-3 text-[10px] font-semibold text-white/70 outline-none transition-colors hover:border-white/[0.14] focus-visible:ring-2 focus-visible:ring-[#72d6ae]/60"
               >
-                <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.12em]">
-                  Comment interpréter
-                </p>
-                {showInterpretation ? (
-                  <ChevronUp size={13} className="text-white/30" />
-                ) : (
-                  <ChevronDown size={13} className="text-white/30" />
-                )}
-              </button>
-              {showInterpretation && (
-                <p className="text-[12px] text-white/55 leading-relaxed mt-2">
-                  {activeGroup.interpretation}
-                </p>
+                <option value="">Comparaison personnalisée</option>
+                {overlayGroups
+                  .filter((group) =>
+                    group.metrics.some((metric) => (series[metric]?.length ?? 0) > 0),
+                  )
+                  .map((group) => (
+                    <option key={group.key} value={group.key}>
+                      {group.label}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 border-t border-white/[0.06] pt-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-[9px] font-bold uppercase tracking-[0.14em] text-white/30">
+                Courbes
+              </span>
+              {Array.from(visibleSeries).slice(0, 4).map((metric) => {
+                const meta = getMetricMeta(metric);
+                if (!meta) return null;
+                return (
+                  <button
+                    key={`visible-${metric}`}
+                    type="button"
+                    onClick={() => toggleVisibleMetric(metric)}
+                    aria-label={`Masquer ${meta.label}`}
+                    className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white/[0.05] px-2.5 py-1 text-[10px] font-semibold text-white/65 transition-colors hover:bg-white/[0.09] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#72d6ae]/60"
+                  >
+                    <span
+                      className="size-1.5 rounded-full"
+                      style={{ backgroundColor: meta.color }}
+                    />
+                    {meta.label}
+                    <X size={10} className="text-white/30" aria-hidden="true" />
+                  </button>
+                );
+              })}
+              {visibleSeries.size === 0 && (
+                <span className="text-[10px] text-white/30">Aucune courbe sélectionnée</span>
+              )}
+              {visibleSeries.size > 4 && (
+                <span className="rounded-full bg-white/[0.04] px-2 py-1 text-[9px] font-semibold text-white/40">
+                  +{visibleSeries.size - 4}
+                </span>
               )}
             </div>
-          )}
-        </div>
-
-        {/* ── Feature 1: All metrics — cross-group mixing ── */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[9px] font-bold text-white/30 uppercase tracking-[0.18em]">
-              Métriques
-            </p>
-            <div className="flex items-center gap-1 bg-[#181818] border-subtle rounded-xl p-1">
-              <button
-                type="button"
-                aria-pressed={
-                  visibleSeries.size === allMetricsWithData.length &&
-                  allMetricsWithData.length > 0
-                }
-                onClick={() => setVisibleSeries(new Set(allMetricsWithData))}
-                className={`flex items-center justify-center px-3 py-1.5 rounded-lg transition-all text-[11px] font-semibold ${
-                  visibleSeries.size === allMetricsWithData.length &&
-                  allMetricsWithData.length > 0
-                    ? "bg-[#1f8a65] text-white"
-                    : "text-white/60 hover:bg-white/[0.08] hover:text-white"
-                }`}
-              >
-                Tout
-              </button>
-              <button
-                type="button"
-                aria-pressed={visibleSeries.size === 0}
-                onClick={() => setVisibleSeries(new Set())}
-                className={`flex items-center justify-center px-3 py-1.5 rounded-lg transition-all text-[11px] font-semibold ${
-                  visibleSeries.size === 0
-                    ? "bg-[#1f8a65] text-white"
-                    : "text-white/60 hover:bg-white/[0.08] hover:text-white"
-                }`}
-              >
-                Aucun
-              </button>
-            </div>
+            <button
+              type="button"
+              aria-expanded={showMetricLibrary}
+              aria-controls="overlay-metric-library"
+              onClick={() => setShowMetricLibrary((prev) => !prev)}
+              className="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-white/[0.055] px-3 text-[10px] font-semibold text-white/65 transition-colors hover:bg-white/[0.09] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#72d6ae]/60"
+            >
+              <SlidersHorizontal size={13} />
+              Personnaliser · {visibleSeries.size}
+              {showMetricLibrary ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
           </div>
-          {(["composition", "measurements", "wellness"] as const).map((cat) => {
-            const catFields = FIELDS.filter(
-              (f) => f.category === cat && allMetricsWithData.includes(f.key),
-            );
-            if (catFields.length === 0) return null;
-            const catLabels: Record<string, string> = {
-              composition: "Composition",
-              measurements: "Mensurations",
-              wellness: "Bien-être",
-            };
-            return (
-              <div key={cat} className="mb-2">
-                <p className="text-[9px] font-bold text-white/25 uppercase tracking-[0.18em] mb-1.5">
-                  {catLabels[cat]}
+
+          {showMetricLibrary && (
+            <div id="overlay-metric-library" className="space-y-2 border-t border-white/[0.06] pt-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[10px] text-white/40">
+                  Composez librement la comparaison, jusqu&apos;à {MAX_OVERLAY_VISIBLE_SERIES} courbes.
                 </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {catFields.map((f) => {
-                    const color = getMetricColor(f.key);
-                    const isVisible = visibleSeries.has(f.key);
-                    const hasPlateau =
-                      (plateausByMetric[f.key]?.length ?? 0) > 0;
-                    return (
-                      <button
-                        key={f.key}
-                        onClick={() => {
-                          const newSet = new Set(visibleSeries);
-                          if (isVisible) newSet.delete(f.key);
-                          else newSet.add(f.key);
-                          setVisibleSeries(newSet);
-                        }}
-                        className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all"
-                        style={
-                          isVisible
-                            ? { backgroundColor: `${color}22`, color }
-                            : {
-                                backgroundColor: "rgba(255,255,255,0.04)",
-                                color: "rgba(255,255,255,0.35)",
-                              }
-                        }
-                      >
-                        <span
-                          className="w-1.5 h-1.5 rounded-full shrink-0 transition-opacity"
-                          style={{
-                            backgroundColor: color,
-                            opacity: isVisible ? 1 : 0.35,
-                          }}
-                        />
-                        {f.label}
-                        {hasPlateau && isVisible && (
-                          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400" />
-                        )}
-                      </button>
-                    );
-                  })}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowMetricLibrary(false)}
+                    className="min-h-8 rounded-lg px-2.5 text-[10px] font-semibold text-white/50 transition-colors hover:bg-white/[0.06] hover:text-white"
+                  >
+                    Terminer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectVisibleMetrics(new Set())}
+                    className="min-h-8 rounded-lg px-2.5 text-[10px] font-semibold text-white/50 transition-colors hover:bg-white/[0.06] hover:text-white"
+                  >
+                    Masquer tout
+                  </button>
                 </div>
               </div>
-            );
-          })}
+              {metricSelectionNotice && (
+                <p role="status" className="rounded-lg bg-amber-400/[0.07] px-2.5 py-2 text-[10px] text-amber-200/80">
+                  {metricSelectionNotice}
+                </p>
+              )}
+              {OVERLAY_METRIC_FAMILY_ORDER.map((family) => {
+                const catFields = allMetricsWithData.filter(
+                  (key) => getMetricMeta(key)?.family === family,
+                );
+                if (catFields.length === 0) return null;
+                const visibleCount = catFields.filter((key) => visibleSeries.has(key)).length;
+                const isOpen = openMetricFamilies[family];
+                return (
+                  <div
+                    key={family}
+                    className="overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.02]"
+                  >
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      onClick={() =>
+                        setOpenMetricFamilies((prev) => ({
+                          ...prev,
+                          [family]: !prev[family],
+                        }))
+                      }
+                      className="flex min-h-11 w-full items-center justify-between gap-3 px-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#72d6ae]/60"
+                    >
+                      <span className="text-[11px] font-semibold text-white/70">
+                        {OVERLAY_FAMILY_LABELS[family]}
+                      </span>
+                      <span className="flex items-center gap-2 text-[10px] text-white/35">
+                        {visibleCount}/{catFields.length}
+                        {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                      </span>
+                    </button>
+                    {isOpen && (
+                      family === "nutrition" ? (
+                        <div className="grid grid-cols-1 gap-2 px-3 pb-3 sm:grid-cols-2 xl:grid-cols-3">
+                          {nutritionComparisonPairs.map((pair) => {
+                            const consumedMeta = pair.consumed
+                              ? getMetricMeta(pair.consumed)
+                              : null;
+                            const plannedMeta = pair.planned
+                              ? getMetricMeta(pair.planned)
+                              : null;
+                            return (
+                              <div
+                                key={pair.key}
+                                className="rounded-lg border border-white/[0.06] bg-black/[0.12] p-2"
+                              >
+                                <p className="mb-2 text-[10px] font-semibold text-white/70">
+                                  {pair.label}
+                                </p>
+                                <div className="grid grid-cols-2 gap-1">
+                                  {pair.consumed && consumedMeta && (() => {
+                                    const isVisible = visibleSeries.has(pair.consumed!);
+                                    return (
+                                      <button
+                                        type="button"
+                                        aria-pressed={isVisible}
+                                        onClick={() => toggleVisibleMetric(pair.consumed!)}
+                                        className={`min-h-9 rounded-md px-2 text-[9px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#72d6ae]/60 ${
+                                          isVisible
+                                            ? "bg-white/[0.10] text-white/85"
+                                            : "bg-white/[0.035] text-white/35 hover:bg-white/[0.06] hover:text-white/60"
+                                        }`}
+                                      >
+                                        <span className="mr-1 inline-block size-1.5 rounded-full" style={{ backgroundColor: consumedMeta.color }} />
+                                        Réalisé
+                                      </button>
+                                    );
+                                  })()}
+                                  {pair.planned && plannedMeta && (() => {
+                                    const isVisible = visibleSeries.has(pair.planned!);
+                                    return (
+                                      <button
+                                        type="button"
+                                        aria-pressed={isVisible}
+                                        onClick={() => toggleVisibleMetric(pair.planned!)}
+                                        className={`min-h-9 rounded-md px-2 text-[9px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#72d6ae]/60 ${
+                                          isVisible
+                                            ? "bg-white/[0.10] text-white/85"
+                                            : "bg-white/[0.035] text-white/35 hover:bg-white/[0.06] hover:text-white/60"
+                                        }`}
+                                      >
+                                        <span className="mr-1 inline-block size-1.5 rounded-full border border-white/40" style={{ backgroundColor: plannedMeta.color }} />
+                                        Prévu
+                                      </button>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-1.5 px-3 pb-3 sm:grid-cols-2 xl:grid-cols-3">
+                          {catFields.map((key) => {
+                            const meta = getMetricMeta(key);
+                            if (!meta) return null;
+                            const isVisible = visibleSeries.has(key);
+                            return (
+                              <button
+                                key={key}
+                                type="button"
+                                aria-pressed={isVisible}
+                                onClick={() => toggleVisibleMetric(key)}
+                                className={`flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-left text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#72d6ae]/60 ${
+                                  isVisible
+                                    ? "bg-white/[0.09] text-white/85"
+                                    : "bg-white/[0.035] text-white/35 hover:bg-white/[0.06] hover:text-white/60"
+                                }`}
+                              >
+                                <span
+                                  className="size-1.5 rounded-full"
+                                  style={{ backgroundColor: meta.color, opacity: isVisible ? 1 : 0.4 }}
+                                />
+                                {meta.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -2304,23 +2805,54 @@ function MultiSeriesChart({
       />
 
       {/* ── Bloc 2 : Graphique ── */}
-      <div className="bg-[#181818] border-subtle rounded-2xl overflow-hidden flex flex-col">
+      <div
+        className="bg-[#181818] border-subtle rounded-2xl overflow-hidden flex flex-col"
+        aria-label="Chronologie des métriques, phases et événements du client"
+      >
         {/* ── Header barre actions ── */}
-        <div className="flex items-center justify-between px-4 h-11 border-b border-white/[0.06] shrink-0">
-          <p className="text-[10px] text-white/30 leading-none">
-            Cliquez sur le graphique pour ancrer une note à une date précise
-          </p>
+        <div className="flex shrink-0 flex-col gap-2 border-b border-white/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Calendar size={13} className="text-[#72d6ae]" />
+              <p className="text-[11px] font-semibold text-white/75">
+                Chronologie coach
+              </p>
+              <span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[9px] text-white/40">
+                {phases.length} phase{phases.length > 1 ? "s" : ""}
+              </span>
+              <span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[9px] text-white/40">
+                {annotations.length} événement{annotations.length > 1 ? "s" : ""}
+              </span>
+              <span className={`rounded-full px-2 py-0.5 text-[9px] font-medium ${
+                plannedActualPair
+                  ? "bg-[#1f8a65]/12 text-[#72d6ae]"
+                  : useAbsoluteAxis
+                    ? "bg-white/[0.06] text-white/55"
+                    : "bg-white/[0.04] text-white/40"
+              }`}>
+                {plannedActualPair
+                  ? `Réel · ${absoluteAxisUnit || "même unité"}`
+                  : useAbsoluteAxis
+                    ? `Réel${absoluteAxisUnit ? ` · ${absoluteAxisUnit}` : ""}`
+                    : "Indexé · %"}
+              </span>
+            </div>
+            <p className="mt-1 text-[9px] text-white/30">
+              Cliquez ou sélectionnez une période pour contextualiser l&apos;historique.
+            </p>
+          </div>
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               const today = new Date().toISOString().split("T")[0];
               openContextMenu(e, today, null);
             }}
-            className="flex items-center gap-2 px-3 h-7 rounded-lg bg-white/[0.05] border-[0.3px] border-white/[0.08] hover:bg-white/[0.09] hover:border-white/[0.16] active:scale-[0.97] transition-all"
+            className="flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#1f8a65]/30 bg-[#1f8a65]/12 px-3 text-white/75 transition-colors hover:border-[#1f8a65]/50 hover:bg-[#1f8a65]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#72d6ae]/60"
           >
-            <PenLine size={12} className="text-[#1f8a65]" />
-            <span className="text-[10px] font-bold text-white/70 uppercase tracking-[0.10em]">
-              Ajouter une note
+            <PenLine size={13} className="text-[#72d6ae]" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em]">
+              Ajouter un événement
             </span>
           </button>
         </div>
@@ -2451,17 +2983,11 @@ function MultiSeriesChart({
                   width={42}
                   domain={absDomain}
                   tickFormatter={(v) =>
-                    `${v}${FIELD_MAP[singleVisibleMetric!]?.unit ? " " + FIELD_MAP[singleVisibleMetric!]!.unit : ""}`
+                    `${v}${absoluteAxisUnit ? " " + absoluteAxisUnit : ""}`
                   }
                 />
                 <ChartTooltip
-                  content={
-                    <CustomTooltip
-                      unit={FIELD_MAP[singleVisibleMetric!]?.unit}
-                      fieldLabel={FIELD_MAP[singleVisibleMetric!]?.label}
-                      accentColor={getMetricColor(singleVisibleMetric!)}
-                    />
-                  }
+                  content={<MultiTooltip metadataMap={tooltipMetadataMap} valueMode="absolute" />}
                   cursor={{
                     stroke: "rgba(255,255,255,0.15)",
                     strokeWidth: 1,
@@ -2475,17 +3001,24 @@ function MultiSeriesChart({
                   onLeave={() => setHoveredAnnotation(null)}
                   onClick={(id) => { annotationClickedRef.current = true; onAnnotationClick?.(id); }}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke={getMetricColor(singleVisibleMetric!)}
-                  strokeWidth={2}
-                  dot={false}
-                  connectNulls
-                  activeDot={{ r: 4, style: { cursor: "pointer" } }}
-                  isAnimationActive
-                  animationDuration={500}
-                />
+                {absoluteMetricKeys.map((key) => {
+                  const meta = getMetricMeta(key);
+                  return (
+                    <Line
+                      key={key}
+                      type={meta?.mode === "planned" ? "stepAfter" : "linear"}
+                      dataKey={`__raw_${key}`}
+                      stroke={meta?.color ?? getMetricColor(key)}
+                      strokeDasharray={meta?.dashed ? "6 4" : undefined}
+                      strokeWidth={2}
+                      dot={plannedActualPair ? { r: 2 } : false}
+                      connectNulls={false}
+                      activeDot={{ r: 4, style: { cursor: "pointer" } }}
+                      isAnimationActive
+                      animationDuration={500}
+                    />
+                  );
+                })}
               </LineChart>
             ) : (
               <LineChart
@@ -2576,7 +3109,7 @@ function MultiSeriesChart({
                   tickFormatter={(v) => `${v > 0 ? "+" : ""}${v.toFixed(0)}%`}
                 />
                 <ChartTooltip
-                  content={<MultiTooltip />}
+                  content={<MultiTooltip metadataMap={tooltipMetadataMap} />}
                   cursor={{
                     stroke: "rgba(255,255,255,0.15)",
                     strokeWidth: 1,
@@ -2592,7 +3125,7 @@ function MultiSeriesChart({
                 />
                 {selectedMetrics.map((k) => {
                   if (!visibleSeries.has(k)) return null;
-                  const color = getMetricColor(k);
+                  const color = getMetricMeta(k)?.color ?? getMetricColor(k);
                   const metricPlateaus = plateausByMetric[k] ?? [];
                   const plateauDateSet = new Set(
                     metricPlateaus.flatMap((p) => {
@@ -2602,15 +3135,26 @@ function MultiSeriesChart({
                     }),
                   );
                   const isFocused =
-                    focusedMetric === null || focusedMetric === k;
+                    focusedMetrics === null || focusedMetrics.includes(k);
                   return (
                     <Line
                       key={k}
-                      type="monotone"
+                      type={
+                        getMetricMeta(k)?.family === "nutrition"
+                          ? getMetricMeta(k)?.mode === "planned"
+                            ? "stepAfter"
+                            : "linear"
+                          : "monotone"
+                      }
                       dataKey={`__pct_${k}`}
                       stroke={color}
+                      strokeDasharray={getMetricMeta(k)?.dashed ? "6 4" : undefined}
                       strokeWidth={
-                        isFocused ? (focusedMetric === k ? 3 : 2) : 2
+                        isFocused
+                          ? focusedMetrics?.includes(k)
+                            ? 3
+                            : 2
+                          : 2
                       }
                       strokeOpacity={isFocused ? 1 : 0.12}
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2629,7 +3173,7 @@ function MultiSeriesChart({
                           />
                         );
                       }}
-                      connectNulls
+                      connectNulls={getMetricMeta(k)?.family !== "nutrition"}
                       activeDot={{ r: 4, style: { cursor: "pointer" } }}
                       isAnimationActive
                       animationDuration={500}
@@ -2690,7 +3234,7 @@ function MultiSeriesChart({
             const el = chartDivRef.current;
 
             const onMove = (ev: MouseEvent) => {
-              const next = Math.max(160, Math.min(700, startH + ev.clientY - startY));
+              const next = Math.max(320, Math.min(1000, startH + ev.clientY - startY));
               chartHeightRef.current = next;
               if (el) el.style.height = `${next}px`;
             };
@@ -2714,43 +3258,361 @@ function MultiSeriesChart({
       {/* ── Bloc 3 : Légende Δ% + zones normatives ── */}
       {(visibleSeries.size > 0 || (useAbsoluteAxis && activeNormZones)) && (
         <div className="bg-[#181818] border-subtle rounded-2xl px-5 py-4">
+          {metricsWithPlateau.length > 0 && (
+            <details className="group mb-4 overflow-hidden rounded-xl border border-amber-400/10 bg-amber-400/[0.05]">
+              <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-300/50">
+                <AlertCircle size={13} className="shrink-0 text-amber-300/75" />
+                <span className="flex-1 text-[10px] font-semibold text-amber-200/75">
+                  Stabilité à vérifier · {metricsWithPlateau
+                    .map((key) => getMetricMeta(key)?.label ?? key)
+                    .join(", ")}
+                </span>
+                <ChevronDown
+                  size={12}
+                  className="text-amber-200/45 transition-transform group-open:rotate-180"
+                />
+              </summary>
+              <p className="px-3 pb-3 text-[10px] leading-relaxed text-white/40">
+                Les derniers relevés évoluent peu. Vérifiez la durée, la
+                régularité des mesures et les événements de la chronologie avant
+                d&apos;ajuster le protocole.
+              </p>
+            </details>
+          )}
+          {focusedAnnotation && (
+            <section
+              aria-label={`Lecture avant et après l’événement ${focusedAnnotation.label}`}
+              className="mb-4 rounded-xl border border-[#1f8a65]/20 bg-[#1f8a65]/[0.055] px-4 py-3"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#65c7a4]">
+                    Lecture autour de l’événement
+                  </p>
+                  <p className="mt-1 text-[12px] font-semibold text-white/80">
+                    {focusedAnnotation.label}
+                    <span className="ml-2 font-normal text-white/35">
+                      · {formatDate(focusedAnnotation.event_date)}
+                    </span>
+                  </p>
+                </div>
+                <div className="flex rounded-lg bg-black/20 p-0.5" aria-label="Fenêtre de comparaison">
+                  {([7, 14, 28] as const).map((days) => (
+                    <button
+                      key={days}
+                      type="button"
+                      aria-pressed={impactWindowDays === days}
+                      onClick={() => setImpactWindowDays(days)}
+                      className={`min-h-8 rounded-md px-2.5 text-[10px] font-semibold transition-colors ${
+                        impactWindowDays === days
+                          ? "bg-white/[0.10] text-white"
+                          : "text-white/40 hover:text-white/70"
+                      }`}
+                    >
+                      ± {days} j
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {eventImpact.some((result) => result.reliability !== "insufficient") ? (
+                <div className="mt-3 grid grid-cols-1 gap-1.5 md:grid-cols-2">
+                  {eventImpact
+                    .filter((result) => result.reliability !== "insufficient")
+                    .slice(0, 4)
+                    .map((result) => {
+                      const meta = getMetricMeta(result.key);
+                      const Arrow = result.direction === "up"
+                        ? TrendingUp
+                        : result.direction === "down"
+                          ? TrendingDown
+                          : Minus;
+                      const directionClass = result.direction === "up"
+                        ? "text-[#65c7a4]"
+                        : result.direction === "down"
+                          ? "text-red-300"
+                          : "text-white/50";
+                      return (
+                        <div key={result.key} className="rounded-lg bg-black/[0.18] px-3 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="min-w-0 truncate text-[10px] font-semibold text-white/75">
+                              {meta?.label ?? result.key}
+                            </p>
+                            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold ${getEventImpactReliabilityClass(result.reliability)}`}>
+                              {getEventImpactReliabilityLabel(result.reliability)}
+                            </span>
+                          </div>
+                          <div className="mt-1.5 flex items-center gap-1.5 text-[10px] tabular-nums">
+                            <span className="text-white/45">
+                              {fmtVal(result.beforeAverage ?? 0, meta?.unit ?? "")}
+                            </span>
+                            <span className="text-white/25">→</span>
+                            <span className="text-white/80">
+                              {fmtVal(result.afterAverage ?? 0, meta?.unit ?? "")}
+                            </span>
+                            <span className={`ml-auto flex items-center gap-0.5 font-bold ${directionClass}`}>
+                              <Arrow size={11} strokeWidth={2.5} />
+                              {result.relativeDelta != null
+                                ? `${result.relativeDelta > 0 ? "+" : ""}${(result.relativeDelta * 100).toFixed(1)}%`
+                                : "—"}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-[9px] text-white/30">
+                            {result.beforeCount} avant · {result.afterCount} après
+                            {result.limitations[0] ? ` · ${result.limitations[0]}` : ""}
+                          </p>
+                        </div>
+                      );
+                    })}
+                </div>
+              ) : (
+                <p className="mt-3 text-[10px] leading-relaxed text-white/40">
+                  Pas encore assez de mesures comparables de part et d&apos;autre de cet événement. La lecture sera disponible à partir de 2 relevés avant et 2 après.
+                </p>
+              )}
+              <p className="mt-3 text-[9px] leading-relaxed text-white/30">
+                Comparaison descriptive de moyennes avant/après : elle aide à relire le contexte, sans attribuer un effet à l’événement.
+              </p>
+            </section>
+          )}
+          {!useAbsoluteAxis && (
+            <div className="mb-4 rounded-xl bg-white/[0.03] px-4 py-3">
+              <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.12em] mb-2">
+                Lecture corrélation
+              </p>
+              {correlationInsights.hasEnoughData ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={!correlationInsights.strongestPositive}
+                    aria-label="Isoler les deux métriques du principal signal positif"
+                    onClick={() =>
+                      correlationInsights.strongestPositive
+                        ? setFocusedMetrics([
+                            correlationInsights.strongestPositive.leftKey,
+                            correlationInsights.strongestPositive.rightKey,
+                          ])
+                        : undefined
+                    }
+                    className="rounded-lg bg-white/[0.03] px-3 py-2.5 text-left hover:bg-white/[0.05] transition-colors disabled:cursor-default disabled:hover:bg-white/[0.03]"
+                  >
+                    <p className="text-[9px] font-bold text-[#1f8a65] uppercase tracking-[0.12em] mb-1">
+                      Signal positif à explorer
+                    </p>
+                    {correlationInsights.strongestPositive ? (
+                      <div>
+                        <p className="text-[11px] text-white/65 leading-relaxed">
+                          <span className="text-white/85 font-semibold">
+                            {getMetricMeta(correlationInsights.strongestPositive.leftKey)?.label}
+                          </span>{" "}
+                          et{" "}
+                          <span className="text-white/85 font-semibold">
+                            {getMetricMeta(correlationInsights.strongestPositive.rightKey)?.label}
+                          </span>{" "}
+                          évoluent dans la même direction.
+                          <span className="text-[#65c7a4] font-semibold"> r={correlationInsights.strongestPositive.coefficient.toFixed(2)}</span>
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[9px]">
+                          <span className={`rounded-full px-2 py-1 font-semibold ${getCorrelationReliabilityClass(correlationInsights.strongestPositive.reliability)}`}>
+                            {getCorrelationReliabilityLabel(correlationInsights.strongestPositive.reliability)}
+                          </span>
+                          <span className="text-white/35">
+                            {correlationInsights.strongestPositive.overlapCount} observations · {Math.round(correlationInsights.strongestPositive.coverage * 100)}% couvert
+                          </span>
+                          {correlationInsights.strongestPositive.bestLagDays > 0 && (
+                            <span className="rounded-full bg-white/[0.05] px-2 py-1 text-white/45">
+                              {getMetricMeta(correlationInsights.strongestPositive.leadingKey ?? "")?.label} précède de {correlationInsights.strongestPositive.bestLagDays} j
+                            </span>
+                          )}
+                        </div>
+                        {correlationInsights.strongestPositive.limitations[0] && (
+                          <p className="mt-1.5 text-[9px] text-white/30 leading-relaxed">
+                            {correlationInsights.strongestPositive.limitations[0]}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-white/35">
+                        Aucune corrélation positive exploitable sur la fenêtre.
+                      </p>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!correlationInsights.strongestNegative}
+                    aria-label="Isoler les deux métriques du principal signal inverse"
+                    onClick={() =>
+                      correlationInsights.strongestNegative
+                        ? setFocusedMetrics([
+                            correlationInsights.strongestNegative.leftKey,
+                            correlationInsights.strongestNegative.rightKey,
+                          ])
+                        : undefined
+                    }
+                    className="rounded-lg bg-white/[0.03] px-3 py-2.5 text-left hover:bg-white/[0.05] transition-colors disabled:cursor-default disabled:hover:bg-white/[0.03]"
+                  >
+                    <p className="text-[9px] font-bold text-red-400 uppercase tracking-[0.12em] mb-1">
+                      Signal inverse à explorer
+                    </p>
+                    {correlationInsights.strongestNegative ? (
+                      <div>
+                        <p className="text-[11px] text-white/65 leading-relaxed">
+                          <span className="text-white/85 font-semibold">
+                            {getMetricMeta(correlationInsights.strongestNegative.leftKey)?.label}
+                          </span>{" "}
+                          et{" "}
+                          <span className="text-white/85 font-semibold">
+                            {getMetricMeta(correlationInsights.strongestNegative.rightKey)?.label}
+                          </span>{" "}
+                          évoluent en sens opposé.
+                          <span className="text-red-400 font-semibold"> r={correlationInsights.strongestNegative.coefficient.toFixed(2)}</span>
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[9px]">
+                          <span className={`rounded-full px-2 py-1 font-semibold ${getCorrelationReliabilityClass(correlationInsights.strongestNegative.reliability)}`}>
+                            {getCorrelationReliabilityLabel(correlationInsights.strongestNegative.reliability)}
+                          </span>
+                          <span className="text-white/35">
+                            {correlationInsights.strongestNegative.overlapCount} observations · {Math.round(correlationInsights.strongestNegative.coverage * 100)}% couvert
+                          </span>
+                          {correlationInsights.strongestNegative.bestLagDays > 0 && (
+                            <span className="rounded-full bg-white/[0.05] px-2 py-1 text-white/45">
+                              {getMetricMeta(correlationInsights.strongestNegative.leadingKey ?? "")?.label} précède de {correlationInsights.strongestNegative.bestLagDays} j
+                            </span>
+                          )}
+                        </div>
+                        {correlationInsights.strongestNegative.limitations[0] && (
+                          <p className="mt-1.5 text-[9px] text-white/30 leading-relaxed">
+                            {correlationInsights.strongestNegative.limitations[0]}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-white/35">
+                        Aucune corrélation inverse exploitable sur la fenêtre.
+                      </p>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <p className="text-[11px] text-white/35">
+                  Pas assez de points communs entre les courbes visibles pour
+                  dégager un signal d&apos;alignement.
+                </p>
+              )}
+
+              <p className="mt-3 text-[10px] text-white/30 leading-relaxed">
+                Indice exploratoire calculé sur des moyennes mobiles de 7 jours,
+                avec recherche d&apos;un décalage de 0 à 7 jours. Une association
+                statistique ne prouve pas une causalité.
+              </p>
+
+              {correlationInsights.rankedByStrength.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-[9px] font-bold text-white/35 uppercase tracking-[0.12em] mb-2">
+                    Signaux classés par fiabilité
+                  </p>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {correlationInsights.rankedByStrength.slice(0, 8).map((insight) => {
+                      const leftMeta = getMetricMeta(insight.leftKey);
+                      const rightMeta = getMetricMeta(insight.rightKey);
+                      const positive = insight.direction === "positive";
+                      const inverse = insight.direction === "inverse";
+                      return (
+                        <button
+                          key={insight.key}
+                          type="button"
+                          aria-label={`Isoler ${leftMeta?.label ?? insight.leftKey} et ${rightMeta?.label ?? insight.rightKey}`}
+                          title={insight.limitations.join(" ") || "Association statistique exploratoire"}
+                          onClick={() =>
+                            setFocusedMetrics([insight.leftKey, insight.rightKey])
+                          }
+                          className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.025] px-3 py-2 text-left hover:bg-white/[0.05] transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-[10px] text-white/70 truncate">
+                              <span className="font-semibold text-white/85">
+                                {leftMeta?.label}
+                              </span>
+                              {" / "}
+                              <span className="font-semibold text-white/85">
+                                {rightMeta?.label}
+                              </span>
+                            </p>
+                            <p className="text-[9px] text-white/30">
+                              {positive ? "Même direction" : inverse ? "Sens opposé" : "Signal faible"} · {insight.overlapCount} obs. · {Math.round(insight.coverage * 100)}% couvert
+                              {insight.bestLagDays > 0 ? ` · décalage ${insight.bestLagDays} j` : ""}
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <div
+                              className={`text-[10px] font-bold tabular-nums ${
+                                positive ? "text-[#65c7a4]" : inverse ? "text-red-400" : "text-white/45"
+                              }`}
+                            >
+                              r={insight.coefficient.toFixed(2)}
+                            </div>
+                            <div className="mt-0.5 text-[8px] text-white/30">
+                              {getCorrelationReliabilityLabel(insight.reliability).replace("Fiabilité ", "")}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Feature 4: Delta legend on filtered window */}
           {visibleSeries.size > 0 && (
             <div
               className={`flex flex-wrap gap-2 ${useAbsoluteAxis && activeNormZones ? "mb-4 pb-4 border-b border-white/[0.05]" : ""}`}
             >
               {Array.from(visibleSeries).map((k) => {
-                const f = FIELD_MAP[k];
+                const f = getMetricMeta(k);
                 const delta = deltas[k];
-                const color = getMetricColor(k);
+                const color = f?.color ?? getMetricColor(k);
                 const isNegGood = NEG_GOOD_FIELDS.includes(k);
                 if (!f) return null;
                 return (
                   <button
                     key={k}
                     onClick={() =>
-                      setFocusedMetric(focusedMetric === k ? null : k)
+                      setFocusedMetrics(
+                        focusedMetrics?.length === 1 && focusedMetrics.includes(k)
+                          ? null
+                          : [k],
+                      )
                     }
                     className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
-                      focusedMetric === k
+                      focusedMetrics?.length === 1 && focusedMetrics.includes(k)
                         ? "bg-white/[0.08] ring-1 ring-white/[0.12]"
-                        : focusedMetric !== null
+                        : focusedMetrics !== null
                           ? "bg-white/[0.015] opacity-40"
                           : "bg-white/[0.03] hover:bg-white/[0.06]"
                     }`}
                     title={
-                      focusedMetric === k
+                      focusedMetrics?.length === 1 && focusedMetrics.includes(k)
                         ? "Cliquez pour afficher toutes les courbes"
                         : "Cliquez pour isoler cette courbe"
                     }
                   >
                     <div
                       className="w-2 h-2 rounded-full shrink-0"
-                      style={{ background: color }}
+                      style={{
+                        background: color,
+                        opacity: f.mode === "planned" ? 0.65 : 1,
+                      }}
                     />
                     <span className="text-[10px] text-white/55 font-medium">
                       {f.label}
                     </span>
+                    {f.mode === "planned" && (
+                      <span className="text-[9px] font-bold text-white/35 uppercase tracking-[0.08em]">
+                        prévu
+                      </span>
+                    )}
                     {delta != null &&
                       (() => {
                         const isGood = isNegGood ? delta < 0 : delta > 0;
@@ -2778,15 +3640,15 @@ function MultiSeriesChart({
                       })()}
                     {(plateausByMetric[k]?.length ?? 0) > 0 && (
                       <span className="flex items-center gap-0.5 text-[9px] font-bold text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded-md">
-                        ⚡ PLATEAU
+                        ⚡ À VÉRIFIER
                       </span>
                     )}
                   </button>
                 );
               })}
-              {focusedMetric !== null && (
+              {focusedMetrics !== null && (
                 <button
-                  onClick={() => setFocusedMetric(null)}
+                  onClick={() => setFocusedMetrics(null)}
                   className="flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-bold text-white/35 hover:text-white/60 bg-white/[0.02] hover:bg-white/[0.05] transition-all"
                 >
                   <X size={9} />
@@ -2800,7 +3662,9 @@ function MultiSeriesChart({
           {useAbsoluteAxis && activeNormZones && (
             <div>
               <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.12em] mb-2">
-                Zones de référence — {FIELD_MAP[singleVisibleMetric!]?.label}
+                {SUBJECTIVE_REFERENCE_METRICS.has(singleVisibleMetric!)
+                  ? "Repères de lecture"
+                  : "Zones de référence"} — {getMetricMeta(singleVisibleMetric!)?.label}
               </p>
               <div className="flex flex-wrap gap-2 mb-1">
                 {activeNormZones.map((z) => (
@@ -2814,14 +3678,16 @@ function MultiSeriesChart({
                     <span className="text-[10px] text-white/50">
                       {z.label}{" "}
                       <span className="text-white/25">
-                        {z.min}–{z.max} {FIELD_MAP[singleVisibleMetric!]?.unit}
+                        {z.min}–{z.max} {getMetricMeta(singleVisibleMetric!)?.unit}
                       </span>
                     </span>
                   </div>
                 ))}
               </div>
               <p className="text-[9px] text-white/25">
-                Sources : ACSM, WHO, ACE Body Fat Standards
+                {SUBJECTIVE_REFERENCE_METRICS.has(singleVisibleMetric!)
+                  ? "Échelle déclarative du check-in : 1 à 5."
+                  : "Sources : ACSM, WHO, ACE Body Fat Standards"}
               </p>
             </div>
           )}
@@ -4247,7 +5113,7 @@ export default function MetricsSection({ clientId, clientGender, clientDateOfBir
   const [rows, setRows] = useState<MetricRow[]>([]);
   const [series, setSeries] = useState<MetricSeries>({});
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [viewMode, setViewMode] = useState<ViewMode>("charts");
   const [chartCategory, setChartCategory] =
     useState<ChartCategory>("composition");
 
@@ -4295,11 +5161,19 @@ export default function MetricsSection({ clientId, clientGender, clientDateOfBir
   const [timeRangeDays, setTimeRangeDays] = useState<TimeRangeDays>([0, 730]);
   const [phases, setPhases] = useState<TrainingPhase[]>([]);
   const [annotations, setAnnotations] = useState<MetricAnnotation[]>([]);
+  const [visibleAnnotationTypes, setVisibleAnnotationTypes] = useState<
+    Set<AnnotationType>
+  >(() => new Set(ANNOTATION_TYPE_ORDER));
+  const [overlaySeries, setOverlaySeries] = useState<MetricSeries>({});
+  const [overlayGroups, setOverlayGroups] = useState<OverlayMetricGroup[]>([]);
+  const [overlayMetadata, setOverlayMetadata] = useState<
+    Record<string, OverlayMetricMetadataEntry>
+  >({});
   const [mounted, setMounted] = useState(false);
   const [highlightedAnnotationId, setHighlightedAnnotationId] = useState<
     string | null
   >(null);
-  const annotationRefs = useMemo(() => new Map<string, HTMLDivElement>(), []);
+  const annotationRefs = useMemo(() => new Map<string, HTMLElement>(), []);
   const [noteModal, setNoteModal] = useState<MetricAnnotation | null>(null);
   const [phaseDeleteConfirm, setPhaseDeleteConfirm] = useState<string | null>(null);
   const [phaseEditModal, setPhaseEditModal] = useState<TrainingPhase | null>(null);
@@ -4308,10 +5182,60 @@ export default function MetricsSection({ clientId, clientGender, clientDateOfBir
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/clients/${clientId}/metrics`);
-      const d = await res.json();
-      setRows(d.rows ?? []);
-      setSeries(d.series ?? {});
+      const [metricsRes, overlayRes] = await Promise.all([
+        fetch(`/api/clients/${clientId}/metrics`),
+        fetch(`/api/clients/${clientId}/metrics-overlay?window=730`),
+      ]);
+
+      if (!metricsRes.ok) {
+        throw new Error(`Metrics load failed: ${metricsRes.status}`);
+      }
+
+      const metricsData = await metricsRes.json();
+      setRows(metricsData.rows ?? []);
+      setSeries(metricsData.series ?? {});
+
+      if (overlayRes.ok) {
+        const overlayData = await overlayRes.json();
+        const fallbackBodySeries = Object.fromEntries(
+          FIELDS.map((field) => [field.key, metricsData.series?.[field.key] ?? []]).filter(
+            ([, points]) => Array.isArray(points) && points.length > 0,
+          ),
+        ) as MetricSeries;
+        const primaryOverlaySeries = (overlayData.series ?? {}) as MetricSeries;
+        const fallbackMetadata = fallbackOverlayMetadata(fallbackBodySeries);
+        const primaryMetadata = (overlayData.metadata ?? {}) as Record<
+          string,
+          OverlayMetricMetadataEntry
+        >;
+        const primaryKeysWithData = new Set(
+          Object.entries(primaryOverlaySeries)
+            .filter(([, points]) => points.length > 0)
+            .map(([key]) => key),
+        );
+
+        setOverlaySeries(mergeOverlaySeries(fallbackBodySeries, primaryOverlaySeries));
+        setOverlayGroups(overlayData.groups ?? []);
+        setOverlayMetadata({
+          ...primaryMetadata,
+          ...Object.fromEntries(
+            Object.entries(fallbackMetadata).filter(
+              ([key]) => !primaryKeysWithData.has(key),
+            ),
+          ),
+        });
+      } else {
+        const fallbackBodySeries = Object.fromEntries(
+          FIELDS.map((field) => [field.key, metricsData.series?.[field.key] ?? []]).filter(
+            ([, points]) => Array.isArray(points) && points.length > 0,
+          ),
+        ) as MetricSeries;
+        setOverlaySeries(fallbackBodySeries);
+        setOverlayGroups([]);
+        setOverlayMetadata(fallbackOverlayMetadata(fallbackBodySeries));
+      }
+    } catch (error) {
+      console.error("[MetricsSection] load failed", error);
     } finally {
       setLoading(false);
     }
@@ -4401,6 +5325,14 @@ export default function MetricsSection({ clientId, clientGender, clientDateOfBir
     return result;
   }, [series, finalDateFrom, finalDateTo]);
 
+  const filteredOverlaySeries = useMemo(() => {
+    const result: MetricSeries = {};
+    for (const [k, data] of Object.entries(overlaySeries)) {
+      result[k] = filterSeries(data, finalDateFrom, finalDateTo);
+    }
+    return result;
+  }, [overlaySeries, finalDateFrom, finalDateTo]);
+
   const filteredAnnotations = useMemo(
     () => annotations.filter((a) => {
       if (finalDateFrom && a.event_date < finalDateFrom) return false;
@@ -4409,6 +5341,29 @@ export default function MetricsSection({ clientId, clientGender, clientDateOfBir
     }),
     [annotations, finalDateFrom, finalDateTo],
   );
+
+  const displayedAnnotations = useMemo(
+    () => filteredAnnotations.filter((annotation) =>
+      visibleAnnotationTypes.has(annotation.event_type),
+    ),
+    [filteredAnnotations, visibleAnnotationTypes],
+  );
+
+  const focusedAnnotation = useMemo(
+    () => annotations.find((annotation) => annotation.id === highlightedAnnotationId) ?? null,
+    [annotations, highlightedAnnotationId],
+  );
+
+  const openTimelineAnnotation = useCallback((annotation: MetricAnnotation) => {
+    setHighlightedAnnotationId(annotation.id);
+    setNoteModal(annotation);
+    requestAnimationFrame(() => {
+      annotationRefs.get(annotation.id)?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    });
+  }, [annotationRefs]);
 
   const filteredPhases = useMemo(
     () => phases.filter((p) => {
@@ -4421,6 +5376,9 @@ export default function MetricsSection({ clientId, clientGender, clientDateOfBir
 
   const hasData = rows.some((row) =>
     FIELDS.some((f) => row.values[f.key] !== undefined),
+  );
+  const hasOverlayData = Object.values(overlaySeries).some(
+    (points) => (points?.length ?? 0) > 0,
   );
 
   // For norms: needs weight_kg AND height_cm across all submissions (not necessarily same row)
@@ -4443,8 +5401,12 @@ export default function MetricsSection({ clientId, clientGender, clientDateOfBir
   // For overlay view: show metrics that have data in the FULL series (not filtered window)
   // so that the slider can be moved freely without making the chart disappear.
   // The chart itself receives filteredSeries and will show the filtered window.
-  const overlayMetrics = filter.selectedMetrics.filter(
-    (k) => (series[k]?.length ?? 0) > 0,
+  const availableOverlayMetrics = useMemo(
+    () =>
+      Object.keys(overlayMetadata).filter(
+        (key) => (overlaySeries[key]?.length ?? 0) > 0,
+      ),
+    [overlayMetadata, overlaySeries],
   );
 
   // Active filter count (for badge)
@@ -4535,14 +5497,14 @@ export default function MetricsSection({ clientId, clientGender, clientDateOfBir
             { key: "overlay" as ViewMode, label: "Superposé", Icon: Layers },
             { key: "norms" as ViewMode, label: "Normes", Icon: Activity },
           ].map(({ key, label, Icon }) => {
-            const canOverlay = filter.selectedMetrics.length > 1;
+            const canOverlay = hasOverlayData;
             const isOverlay = key === "overlay";
             const isNorms = key === "norms";
             const disabled =
               (isOverlay && !canOverlay) ||
               (isNorms && !normsSubmissionId);
             const disabledTitle = isOverlay
-              ? "Sélectionnez au moins 2 métriques pour activer ce mode"
+              ? "Aucune série compatible n’est encore disponible"
               : isNorms
                 ? "Aucune mesure avec poids et taille — requis pour les normes"
                 : undefined;
@@ -4714,7 +5676,7 @@ export default function MetricsSection({ clientId, clientGender, clientDateOfBir
       )}
 
       {/* ── Empty state ── */}
-      {!loading && !hasData && (
+      {!loading && ((viewMode === "overlay" && !hasOverlayData) || (viewMode !== "overlay" && !hasData)) && (
         <div className="bg-[#181818] border-subtle rounded-2xl p-10 flex flex-col items-center gap-3 text-center">
           <div className="w-12 h-12 rounded-full bg-white/[0.06] flex items-center justify-center">
             <BarChart2 size={20} className="text-[#1f8a65]" />
@@ -4988,29 +5950,32 @@ export default function MetricsSection({ clientId, clientGender, clientDateOfBir
       )}
 
       {/* ── Bloc 5 : OVERLAY VIEW ── */}
-      {!loading && hasData && viewMode === "overlay" && (
+      {!loading && hasOverlayData && viewMode === "overlay" && (
         <>
           {/* Graphique superposé */}
           <MultiSeriesChart
-            selectedMetrics={overlayMetrics}
-            series={filteredSeries}
+            selectedMetrics={availableOverlayMetrics}
+            series={filteredOverlaySeries}
+            overlayGroups={overlayGroups}
+            overlayMetadata={overlayMetadata}
             rows={filteredRows}
             clientId={clientId}
             clientGender={clientGender}
             phases={filteredPhases}
-            annotations={filteredAnnotations}
+            annotations={displayedAnnotations}
             onPhasesChange={setPhases}
             onAnnotationsChange={setAnnotations}
+            focusedAnnotation={focusedAnnotation}
             onAnnotationClick={(id) => {
               const ann = annotations.find((a) => a.id === id);
-              if (ann) setNoteModal(ann);
+              if (ann) openTimelineAnnotation(ann);
             }}
             timeRangeDays={timeRangeDays}
             setTimeRangeDays={setTimeRangeDays}
           />
 
           {/* Bloc Phases & Événements — vue liste groupée par mois */}
-          {(phases.length > 0 || annotations.length > 0) &&
+          {(filteredPhases.length > 0 || filteredAnnotations.length > 0) &&
             (() => {
               // Build unified timeline items sorted by date descending
               type TimelineItem =
@@ -5018,17 +5983,38 @@ export default function MetricsSection({ clientId, clientGender, clientDateOfBir
                 | { kind: "ann"; date: string; ann: MetricAnnotation };
 
               const items: TimelineItem[] = [
-                ...phases.map((p) => ({
+                ...filteredPhases.map((p) => ({
                   kind: "phase" as const,
                   date: p.date_start,
                   phase: p,
                 })),
-                ...annotations.map((a) => ({
+                ...displayedAnnotations.map((a) => ({
                   kind: "ann" as const,
                   date: a.event_date,
                   ann: a,
                 })),
               ].sort((a, b) => b.date.localeCompare(a.date));
+
+              const navigableAnnotations = [...displayedAnnotations].sort((a, b) =>
+                b.event_date.localeCompare(a.event_date),
+              );
+              const currentAnnotationIndex = navigableAnnotations.findIndex(
+                (annotation) => annotation.id === highlightedAnnotationId,
+              );
+              const navigateAnnotation = (direction: -1 | 1) => {
+                if (navigableAnnotations.length === 0) return;
+                const fallbackIndex = direction === 1 ? 0 : navigableAnnotations.length - 1;
+                const nextIndex = currentAnnotationIndex < 0
+                  ? fallbackIndex
+                  : (currentAnnotationIndex + direction + navigableAnnotations.length) % navigableAnnotations.length;
+                openTimelineAnnotation(navigableAnnotations[nextIndex]);
+              };
+              const availableAnnotationTypes = ANNOTATION_TYPE_ORDER.filter((type) =>
+                filteredAnnotations.some((annotation) => annotation.event_type === type),
+              );
+              const allAnnotationTypesVisible = availableAnnotationTypes.every((type) =>
+                visibleAnnotationTypes.has(type),
+              );
 
               // Group by "MMMM YYYY" (fr-FR)
               const groups: { label: string; items: TimelineItem[] }[] = [];
@@ -5045,18 +6031,88 @@ export default function MetricsSection({ clientId, clientGender, clientDateOfBir
 
               return (
                 <div className="bg-[#181818] border-subtle rounded-2xl px-5 py-4">
-                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/[0.05]">
-                    <p className="text-[9px] font-bold text-white/30 uppercase tracking-[0.18em]">
-                      Phases & Événements
-                    </p>
-                    <span className="text-[9px] text-white/20 tabular-nums">
-                      {phases.length + annotations.length} entrée
-                      {phases.length + annotations.length > 1 ? "s" : ""}
-                    </span>
+                  <div className="mb-4 border-b border-white/[0.05] pb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[9px] font-bold text-white/40 uppercase tracking-[0.18em]">
+                          Phases & Événements
+                        </p>
+                        <p className="mt-1 text-[9px] text-white/25 tabular-nums">
+                          {filteredPhases.length + displayedAnnotations.length} affiché
+                          {filteredPhases.length + displayedAnnotations.length > 1 ? "s" : ""}
+                          {displayedAnnotations.length !== filteredAnnotations.length
+                            ? ` sur ${filteredPhases.length + filteredAnnotations.length}`
+                            : ""}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          disabled={navigableAnnotations.length === 0}
+                          onClick={() => navigateAnnotation(-1)}
+                          aria-label="Ouvrir l’événement précédent"
+                          className="flex size-8 items-center justify-center rounded-lg bg-white/[0.04] text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white/70 disabled:cursor-default disabled:opacity-30"
+                        >
+                          <ChevronLeft size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={navigableAnnotations.length === 0}
+                          onClick={() => navigateAnnotation(1)}
+                          aria-label="Ouvrir l’événement suivant"
+                          className="flex size-8 items-center justify-center rounded-lg bg-white/[0.04] text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white/70 disabled:cursor-default disabled:opacity-30"
+                        >
+                          <ChevronRight size={13} />
+                        </button>
+                      </div>
+                    </div>
+                    {availableAnnotationTypes.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Filtrer les événements par type">
+                        <button
+                          type="button"
+                          aria-pressed={allAnnotationTypesVisible}
+                          onClick={() => setVisibleAnnotationTypes(new Set(ANNOTATION_TYPE_ORDER))}
+                          className={`min-h-8 rounded-lg px-2.5 text-[9px] font-semibold transition-colors ${
+                            allAnnotationTypesVisible
+                              ? "bg-[#1f8a65]/18 text-[#72d6ae]"
+                              : "bg-white/[0.035] text-white/35 hover:bg-white/[0.07] hover:text-white/60"
+                          }`}
+                        >
+                          Tous
+                        </button>
+                        {availableAnnotationTypes.map((type) => {
+                          const isVisible = visibleAnnotationTypes.has(type);
+                          const count = filteredAnnotations.filter(
+                            (annotation) => annotation.event_type === type,
+                          ).length;
+                          return (
+                            <button
+                              key={type}
+                              type="button"
+                              aria-pressed={isVisible}
+                              onClick={() => setVisibleAnnotationTypes((current) => {
+                                const next = new Set(current);
+                                if (isVisible) next.delete(type);
+                                else next.add(type);
+                                return next;
+                              })}
+                              className={`min-h-8 rounded-lg px-2.5 text-[9px] font-semibold transition-colors ${
+                                isVisible
+                                  ? "bg-white/[0.09] text-white/75"
+                                  : "bg-white/[0.025] text-white/25 hover:bg-white/[0.06] hover:text-white/50"
+                              }`}
+                            >
+                              {ANNOTATION_LABELS[type]} · {count}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex flex-col gap-5">
-                    {groups.map((group) => (
+                  {groups.length > 0 ? (
+                    <div className="flex flex-col gap-5">
+                      {groups.map((group) => (
                       <div key={group.label}>
                         <p className="text-[9px] font-bold text-white/20 tracking-[0.14em] mb-2 capitalize">
                           {group.label}
@@ -5153,8 +6209,16 @@ export default function MetricsSection({ clientId, clientGender, clientDateOfBir
                             return (
                               <button
                                 key={`ann-${ann.id}-${i}`}
-                                onClick={() => setNoteModal(ann)}
-                                className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white/[0.02] hover:bg-white/[0.05] transition-all text-left group w-full"
+                                ref={(element) => {
+                                  if (element) annotationRefs.set(ann.id, element);
+                                  else annotationRefs.delete(ann.id);
+                                }}
+                                onClick={() => openTimelineAnnotation(ann)}
+                                className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors group ${
+                                  highlightedAnnotationId === ann.id
+                                    ? "border-[#1f8a65]/35 bg-[#1f8a65]/10"
+                                    : "border-transparent bg-white/[0.02] hover:bg-white/[0.05]"
+                                }`}
                               >
                                 {/* Emoji */}
                                 <span className="text-[13px] shrink-0 w-[18px] text-center">
@@ -5186,8 +6250,13 @@ export default function MetricsSection({ clientId, clientGender, clientDateOfBir
                           })}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded-xl bg-white/[0.025] px-4 py-5 text-center text-[10px] text-white/30">
+                      Aucun événement ne correspond aux filtres actifs.
+                    </p>
+                  )}
                 </div>
               );
             })()}

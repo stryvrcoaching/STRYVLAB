@@ -21,6 +21,9 @@ import type { MissingDataKey } from "./missingData";
 interface Props {
   clientData: NutritionClientData | null;
   onClientDataChange?: (data: NutritionClientData) => void;
+  onDataSourceChange?: (
+    updater: (prev: Record<string, "selected" | "fallback" | "manual" | "estimated">) => Record<string, "selected" | "fallback" | "manual" | "estimated">,
+  ) => void;
   clientId?: string;
   loading: boolean;
   trainingConfig: TrainingConfig;
@@ -37,7 +40,7 @@ interface Props {
   onDataModeChange?: (mode: NutritionDataMode) => void;
   selectedSubmissionId?: string | null;
   onSubmissionChange?: (submissionId: string) => void;
-  dataSource?: Record<string, 'selected' | 'fallback' | 'manual'>;
+  dataSource?: Record<string, 'selected' | 'fallback' | 'manual' | 'estimated'>;
   focusMissingDataKey?: MissingDataKey | null;
   onFocusHandled?: () => void;
 }
@@ -125,6 +128,7 @@ function NumberInput({
 export default function ClientIntelligencePanel({
   clientData,
   onClientDataChange,
+  onDataSourceChange,
   clientId,
   loading,
   trainingConfig,
@@ -150,27 +154,36 @@ export default function ClientIntelligencePanel({
   const [selectedMissingData, setSelectedMissingData] = useState<MissingDataKey | null>(null);
   const [completing, setCompleting] = useState(false);
 
+  const buildNutritionDataUrl = useCallback(() => {
+    const url = new URL(
+      `/api/clients/${clientId}/nutrition-data`,
+      typeof window !== "undefined" ? window.location.origin : "",
+    );
+    url.searchParams.set("mode", dataMode);
+    if (dataMode === "bilan" && selectedSubmissionId) {
+      url.searchParams.set("submissionId", selectedSubmissionId);
+    }
+    return url;
+  }, [clientId, dataMode, selectedSubmissionId]);
+
   useEffect(() => {
     if (!focusMissingDataKey) return;
     setSelectedMissingData(focusMissingDataKey);
-    setPanelOpen(true);
+    setPanelOpen(false);
     onFocusHandled?.();
   }, [focusMissingDataKey, onFocusHandled]);
 
   const handleMissingDataSave = useCallback(
-    async (fieldValue: Record<string, unknown>) => {
+    async (
+      fieldValue: Record<string, unknown>,
+      options?: {
+        sourcePatch?: Partial<Record<string, "selected" | "fallback" | "manual" | "estimated">>;
+      },
+    ) => {
       if (!clientId) return;
       setCompleting(true);
       try {
-        // Build PATCH URL with submission ID (ties data to specific bilan)
-        const patchUrl = new URL(
-          `/api/clients/${clientId}/nutrition-data`,
-          typeof window !== "undefined" ? window.location.origin : "",
-        );
-        patchUrl.searchParams.set("mode", dataMode);
-        if (dataMode === "bilan" && selectedSubmissionId) {
-          patchUrl.searchParams.set("submissionId", selectedSubmissionId);
-        }
+        const patchUrl = buildNutritionDataUrl();
 
         const res = await fetch(patchUrl.toString(), {
           method: "PATCH",
@@ -179,28 +192,32 @@ export default function ClientIntelligencePanel({
         });
         if (!res.ok) throw new Error("Erreur lors de la sauvegarde");
 
-        // Refetch updated client data with same submission ID
-        const refetchUrl = new URL(
-          `/api/clients/${clientId}/nutrition-data`,
-          typeof window !== "undefined" ? window.location.origin : "",
-        );
-        refetchUrl.searchParams.set("mode", dataMode);
-        if (dataMode === "bilan" && selectedSubmissionId) {
-          refetchUrl.searchParams.set("submissionId", selectedSubmissionId);
-        }
+        const refetchUrl = buildNutritionDataUrl();
         const refetchRes = await fetch(refetchUrl.toString());
         const refetchData = await refetchRes.json();
         const freshClient: NutritionClientData = refetchData.client;
+        const mergedClient: NutritionClientData = {
+          ...freshClient,
+          ...Object.fromEntries(
+            Object.entries(fieldValue).filter(([, value]) => typeof value === "number"),
+          ),
+        };
 
-        onClientDataChange?.(freshClient);
+        onClientDataChange?.(mergedClient);
+        if (options?.sourcePatch && Object.keys(options.sourcePatch).length > 0) {
+          onDataSourceChange?.((prev) => ({
+            ...prev,
+            ...options.sourcePatch,
+          }) as Record<string, "selected" | "fallback" | "manual" | "estimated">);
+        }
         onBiometricsChange({
-          weight_kg: freshClient.weight_kg,
-          height_cm: freshClient.height_cm,
-          body_fat_pct: freshClient.body_fat_pct,
-          lean_mass_kg: freshClient.lean_mass_kg,
-          muscle_mass_kg: freshClient.muscle_mass_kg,
-          visceral_fat_level: freshClient.visceral_fat_level,
-          bmr_kcal_measured: freshClient.bmr_kcal_measured,
+          weight_kg: mergedClient.weight_kg,
+          height_cm: mergedClient.height_cm,
+          body_fat_pct: mergedClient.body_fat_pct,
+          lean_mass_kg: mergedClient.lean_mass_kg,
+          muscle_mass_kg: mergedClient.muscle_mass_kg,
+          visceral_fat_level: mergedClient.visceral_fat_level,
+          bmr_kcal_measured: mergedClient.bmr_kcal_measured,
         } as Partial<BiometricsConfig>);
 
         setSelectedMissingData(null);
@@ -210,8 +227,94 @@ export default function ClientIntelligencePanel({
         setCompleting(false);
       }
     },
-    [clientId, dataMode, selectedSubmissionId, onBiometricsChange]
+    [buildNutritionDataUrl, clientId, onBiometricsChange, onClientDataChange, onDataSourceChange]
   );
+
+  const handlePanelSave = useCallback(async () => {
+    if (!clientId) return;
+
+    const payload = {
+      weekly_frequency: trainingConfig.weeklyFrequency,
+      session_duration_min: trainingConfig.sessionDurationMin,
+      training_calories_weekly: trainingConfig.trainingCaloriesWeekly,
+      cardio_frequency: trainingConfig.cardioFrequency,
+      cardio_duration_min: trainingConfig.cardioDurationMin,
+      daily_steps: trainingConfig.dailySteps,
+      sleep_duration_h: lifestyleConfig.sleepDurationH,
+      sleep_quality: lifestyleConfig.sleepQuality,
+      stress_level: lifestyleConfig.stressLevel,
+      work_hours_per_week: lifestyleConfig.workHoursPerWeek,
+      caffeine_daily_mg: lifestyleConfig.caffeineDailyMg,
+      alcohol_weekly: lifestyleConfig.alcoholWeekly,
+      weight_kg: biometricsConfig.weight_kg,
+      height_cm: biometricsConfig.height_cm,
+      body_fat_pct: biometricsConfig.body_fat_pct,
+      lean_mass_kg: biometricsConfig.lean_mass_kg,
+      muscle_mass_kg: biometricsConfig.muscle_mass_kg,
+      visceral_fat_level: biometricsConfig.visceral_fat_level,
+      bmr_kcal_measured: biometricsConfig.bmr_kcal_measured,
+      bmr_source: biometricsConfig.bmr_source,
+    };
+
+    const patchUrl = buildNutritionDataUrl();
+    const res = await fetch(patchUrl.toString(), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      throw new Error("Erreur lors de la sauvegarde");
+    }
+
+    const refetchRes = await fetch(buildNutritionDataUrl().toString());
+    if (!refetchRes.ok) {
+      throw new Error("Erreur lors du rechargement des données");
+    }
+    const refetchData = await refetchRes.json();
+    const freshClient: NutritionClientData = refetchData.client;
+    onClientDataChange?.(freshClient);
+    onDataSourceChange?.((prev) => ({
+      ...prev,
+      ...(refetchData.dataSource ?? {}),
+    }));
+    onTrainingChange({
+      weeklyFrequency: freshClient.weekly_frequency ?? 0,
+      sessionDurationMin: freshClient.session_duration_min ?? 0,
+      cardioFrequency: freshClient.cardio_frequency ?? 0,
+      cardioDurationMin: freshClient.cardio_duration_min ?? 0,
+      dailySteps: freshClient.daily_steps ?? 0,
+      trainingCaloriesWeekly: freshClient.training_calories_weekly,
+    });
+    onLifestyleChange({
+      stressLevel: freshClient.stress_level,
+      sleepDurationH: freshClient.sleep_duration_h,
+      sleepQuality: freshClient.sleep_quality,
+      caffeineDailyMg: freshClient.caffeine_daily_mg,
+      alcoholWeekly: freshClient.alcohol_weekly,
+      workHoursPerWeek: freshClient.work_hours_per_week,
+    });
+    onBiometricsChange({
+      weight_kg: freshClient.weight_kg,
+      height_cm: freshClient.height_cm,
+      body_fat_pct: freshClient.body_fat_pct,
+      lean_mass_kg: freshClient.lean_mass_kg,
+      muscle_mass_kg: freshClient.muscle_mass_kg,
+      visceral_fat_level: freshClient.visceral_fat_level,
+      bmr_kcal_measured: freshClient.bmr_kcal_measured,
+      bmr_source: freshClient.bmr_kcal_measured ? "measured" : biometricsConfig.bmr_source,
+    });
+  }, [
+    biometricsConfig,
+    buildNutritionDataUrl,
+    clientId,
+    lifestyleConfig,
+    onBiometricsChange,
+    onClientDataChange,
+    onDataSourceChange,
+    onLifestyleChange,
+    onTrainingChange,
+    trainingConfig,
+  ]);
 
   if (loading) {
     return (
@@ -490,7 +593,7 @@ export default function ClientIntelligencePanel({
         {tdee && (
           <div className="rounded-xl bg-[#1f8a65]/10 border-[0.3px] border-[#1f8a65]/25 p-4 text-center">
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#1f8a65]/60 mb-1">
-              TDEE estimé
+              Référence formule
             </p>
             <p className="text-[28px] font-black text-[#1f8a65] leading-none">
               {Math.round(tdee)}
@@ -543,6 +646,7 @@ export default function ClientIntelligencePanel({
             } as Partial<BiometricsConfig>);
           }
         }}
+        onSave={handlePanelSave}
         trainingConfig={trainingConfig}
         lifestyleConfig={lifestyleConfig}
         biometricsConfig={biometricsConfig}
@@ -553,7 +657,6 @@ export default function ClientIntelligencePanel({
         <MissingDataPanel
           missingKey={selectedMissingData}
           clientData={clientData}
-          biometricsConfig={biometricsConfig}
           onSave={handleMissingDataSave}
           onClose={() => setSelectedMissingData(null)}
           saving={completing}

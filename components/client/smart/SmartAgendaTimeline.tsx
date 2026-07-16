@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import type { TimelineEntry } from "@/lib/client/smart/timelineBuilder";
+import { useClientT } from "@/components/client/ClientI18nProvider";
 import {
   ForkKnife,
   Drop,
   Barbell,
   PersonSimpleRun,
   Moon,
+  CalendarBlank,
 } from "@phosphor-icons/react";
 
 const KIND_CONFIG: Record<
@@ -23,31 +25,37 @@ const KIND_CONFIG: Record<
     tint: "text-white/80",
   },
   checkin: { Icon: Moon, bg: "bg-white/[0.06]", tint: "text-[#b0b0b0]" },
+  appointment: { Icon: CalendarBlank, bg: "bg-[#c6b48b]/15", tint: "text-[#c6b48b]" },
 };
-
-function timeOf(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleTimeString("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-}
 
 export default function SmartAgendaTimeline({
   entries,
 }: {
   entries: TimelineEntry[];
 }) {
+  const { lang, t } = useClientT();
+
+  function timeOf(iso: string): string {
+    const d = new Date(iso);
+    return d.toLocaleTimeString(
+      lang === "es" ? "es-ES" : lang === "en" ? "en-GB" : "fr-FR",
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      },
+    );
+  }
+
   return (
     <div className="bg-[#111111] rounded-2xl p-[18px]">
       <div className="font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[11px] text-white mb-3">
-        Smart Agenda
+        {t("smart.agenda.panelTitle")}
       </div>
 
       {entries.length === 0 ? (
         <p className="text-[12px] text-white/40 py-4 text-center">
-          Aucune activité enregistrée aujourd'hui.
+          {t("smart.agenda.empty")}.
         </p>
       ) : (
         <div className="flex flex-col gap-2.5">
@@ -57,15 +65,10 @@ export default function SmartAgendaTimeline({
               bg: "bg-white/[0.08]",
               tint: "text-white/80",
             };
-            const highlight =
-              e.kind === "workout"
-                ? "bg-[#1a1a1a]"
-                : "bg-[#111111]";
+            const highlight = e.kind === "workout" ? "bg-[#1a1a1a]" : "bg-[#111111]";
 
             const Body = (
-              <div
-                className={`flex items-center gap-3 p-2.5 rounded-xl ${highlight}`}
-              >
+              <div className={`flex items-center gap-3 p-2.5 rounded-xl ${highlight}`}>
                 <div className="w-[44px] text-[10px] text-white/40 font-bold tabular-nums shrink-0">
                   {timeOf(e.start_iso)}
                 </div>

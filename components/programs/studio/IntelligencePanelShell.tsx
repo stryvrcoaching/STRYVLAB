@@ -5,7 +5,7 @@ import { motion, useDragControls } from 'framer-motion'
 import { Activity, Minus, Maximize2, Move, PanelRight, Zap } from 'lucide-react'
 import ProgramIntelligencePanel from '@/components/programs/ProgramIntelligencePanel'
 import StudioPerformancePanel from '@/components/programs/studio/StudioPerformancePanel'
-import type { IntelligenceResult, SRAHeatmapWeek, TemplateMeta } from '@/lib/programs/intelligence'
+import type { IntelligenceResult, SRAHeatmapWeek, TemplateMeta, VolumeFocus } from '@/lib/programs/intelligence'
 
 type PanelMode = 'docked' | 'floating' | 'minimized'
 type InsightsTab = 'smartfit' | 'performance'
@@ -21,6 +21,7 @@ interface Props {
   presentPatterns?: string[]
   onOverrideChange?: (pattern: string, value: number) => void
   onOverrideReset?: () => void
+  onVolumeFocusChange?: (group: string, focus: VolumeFocus) => void
   clientId?: string
   anchorExerciseNames?: string[]
   activeTab?: InsightsTab
@@ -31,7 +32,7 @@ interface Props {
 export default function IntelligencePanelShell({
   result, meta, onAlertClick,
   morphoConnected, morphoDate, sraHeatmap, labOverrides, presentPatterns,
-  onOverrideChange, onOverrideReset,
+  onOverrideChange, onOverrideReset, onVolumeFocusChange,
   clientId, anchorExerciseNames = [], activeTab: controlledTab, onTabChange, onExerciseSelect,
 }: Props) {
   const [mode, setMode] = useState<PanelMode>('docked')
@@ -74,6 +75,7 @@ export default function IntelligencePanelShell({
         presentPatterns={presentPatterns}
         onOverrideChange={onOverrideChange}
         onOverrideReset={onOverrideReset}
+        onVolumeFocusChange={onVolumeFocusChange}
       />
     )
   }

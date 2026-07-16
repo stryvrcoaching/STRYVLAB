@@ -10,10 +10,12 @@ import { buildDailyBrief } from '@/lib/client/ai-coach/buildDailyBrief'
 import { computePhysiologicalDate } from '@/lib/nutrition/physiological-date'
 import { resolveProtocolDayByDate } from '@/lib/nutrition/protocol-schedule'
 import {
+  computePhysiologicalDateInTimezone,
   getLocalTimeParts,
-  utcRangeForLocalDate,
+  isWithinBacklogWindow,
 } from '@/lib/client/checkin/timeWindows'
 import { formatSleepHours } from '@/lib/client/checkin/sleepTimeFormat'
+import { getPointsForAction } from '@/lib/checkins/points'
 
 function service() {
   return createServiceClient(
@@ -25,6 +27,7 @@ function service() {
 const bodySchema = z.object({
   config_id: z.string().uuid(),
   moment: z.enum(['morning', 'evening']),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   responses: z.record(z.string(), z.number()),
 })
 
@@ -222,22 +225,26 @@ export async function POST(req: NextRequest) {
   const timezone = await resolveClientTimezone(db, client.id)
   const now = new Date()
   const localNow = getLocalTimeParts(now, timezone)
-  const { start: todayStart, end: todayEnd } = utcRangeForLocalDate(localNow.dateKey, timezone)
+  const slotDate = body.data.date ?? computePhysiologicalDateInTimezone(now, timezone)
 
-  // Prevent duplicate response for same moment today
+  if (!isWithinBacklogWindow(now, slotDate, body.data.moment, timezone)) {
+    return NextResponse.json({ error: 'Check-in unavailable for this slot' }, { status: 409 })
+  }
+
+  // Prevent duplicate response for the exact requested slot
   const { data: existing } = await db
-    .from('daily_checkin_responses')
+    .from('client_daily_checkins')
     .select('id')
     .eq('client_id', client.id)
-    .eq('moment', body.data.moment)
-    .gte('responded_at', todayStart.toISOString())
-    .lte('responded_at', todayEnd.toISOString())
+    .eq('date', slotDate)
+    .eq('flow_type', body.data.moment)
     .maybeSingle()
   if (existing) {
-    return NextResponse.json({ error: 'Already responded today' }, { status: 409 })
+    return NextResponse.json({ error: 'Already responded for this slot' }, { status: 409 })
   }
 
   const isLate = localNow.hour >= 0 && localNow.hour < 2
+  const pointsAwarded = getPointsForAction(isLate ? 'checkin_late' : 'checkin')
   const normalized = normalizeLegacyResponses(body.data.responses)
 
   const { data: response, error } = await db
@@ -259,7 +266,7 @@ export async function POST(req: NextRequest) {
     .upsert(
       {
         client_id: client.id,
-        date: localNow.dateKey,
+        date: slotDate,
         flow_type: body.data.moment,
         sleep_hours: normalized.sleep_hours,
         sleep_quality: normalized.sleep_quality,
@@ -279,7 +286,7 @@ export async function POST(req: NextRequest) {
     .upsert(
       {
         client_id: client.id,
-        date: localNow.dateKey,
+        date: slotDate,
         flow_type: body.data.moment,
         completed_at: now.toISOString(),
       },
@@ -290,7 +297,7 @@ export async function POST(req: NextRequest) {
   void db.from('smart_agenda_events').insert({
     client_id: client.id,
     event_type: 'checkin',
-    event_date: localNow.dateKey,
+    event_date: slotDate,
     event_time: `${String(localNow.hour).padStart(2, '0')}:${String(localNow.minute).padStart(2, '0')}`,
     source_id: response.id,
     title: body.data.moment === 'morning' ? 'Check-in du matin' : 'Check-in du soir',
@@ -310,7 +317,7 @@ export async function POST(req: NextRequest) {
   })
 
   try {
-    await projectCheckinToAssessment(db, client.id, localNow.dateKey, normalized)
+    await projectCheckinToAssessment(db, client.id, slotDate, normalized)
   } catch {
     // Non-blocking — legacy modal check-in remains saved
   }
@@ -440,6 +447,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ...response,
+    points_awarded: pointsAwarded,
     summaryMessage,
     botMessage,
   }, { status: 201 })

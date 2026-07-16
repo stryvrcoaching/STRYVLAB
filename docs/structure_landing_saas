@@ -1,0 +1,1231 @@
+# Source de vérité — Structure fonctionnelle d’une landing page SaaS
+
+## 1. Objectif du document
+
+Ce document définit une structure de référence pour créer une landing page SaaS orientée conversion.
+
+Il doit servir de base à Codex pour générer, refactorer ou auditer une landing page SaaS, quel que soit le produit concerné.
+
+La structure repose sur une logique simple :
+
+> Captiver → qualifier le problème → prouver → expliquer → rassurer → convertir.
+
+Chaque section doit avoir un rôle précis. Une landing page SaaS ne doit pas être une accumulation de blocs visuels. Elle doit guider progressivement le visiteur depuis la compréhension du problème jusqu’à l’action.
+
+---
+
+## 2. Principe central
+
+Une landing page SaaS efficace ne vend pas d’abord un outil.
+
+Elle vend :
+
+1. un résultat ;
+2. une transformation ;
+3. une simplification ;
+4. une réduction de friction ;
+5. une meilleure manière de résoudre un problème existant.
+
+Le visiteur doit comprendre rapidement :
+
+* ce qu’est le produit ;
+* à qui il s’adresse ;
+* quel problème il résout ;
+* pourquoi cette solution est crédible ;
+* quelle action il doit faire ensuite.
+
+---
+
+## 3. Architecture globale recommandée
+
+Structure standard :
+
+1. Navbar sticky
+2. Hero section
+3. Preuve sociale initiale
+4. Section problème
+5. Section douleur vs soulagement
+6. Témoignage court
+7. Section solution
+8. Fonctionnement en 3 étapes
+9. CTA intermédiaire
+10. Démo produit
+11. Témoignage ou preuve contextuelle
+12. Storytelling / crédibilité fondateur ou entreprise
+13. Pricing ou offre
+14. FAQ / objections
+15. Mur de preuves sociales
+16. CTA final
+17. Footer
+
+Cette structure peut être adaptée selon le niveau de maturité du SaaS.
+
+Pour un SaaS early-stage, tout peut tenir sur une seule page.
+
+Pour un SaaS mature ou complexe, certaines parties peuvent être séparées :
+
+* pricing page ;
+* product pages ;
+* use case pages ;
+* enterprise page ;
+* documentation ;
+* security page.
+
+---
+
+## 4. Règles de conversion générales
+
+## 4.1 Une section = un job
+
+Chaque section doit avoir un objectif unique.
+
+Exemples :
+
+* Hero : faire comprendre la valeur immédiatement.
+* Problème : créer l’identification.
+* Solution : expliquer pourquoi le produit est adapté.
+* Démo : réduire l’incertitude.
+* Pricing : clarifier l’engagement.
+* FAQ : lever les objections.
+* CTA final : déclencher l’action.
+
+Ne jamais créer une section uniquement parce qu’elle “fait joli”.
+
+---
+
+## 4.2 Vendre la valeur, pas la fonctionnalité
+
+Une fonctionnalité décrit ce que fait le produit.
+
+Un bénéfice décrit ce que l’utilisateur obtient.
+
+Mauvais exemple :
+
+> Tableau de bord avec filtres avancés.
+
+Meilleur exemple :
+
+> Repérez en quelques secondes les clients qui nécessitent une action.
+
+La landing peut mentionner les fonctionnalités, mais toujours dans une logique d’usage, de résultat ou de soulagement.
+
+---
+
+## 4.3 Répéter la preuve
+
+La preuve sociale ne doit pas être isolée dans une seule section.
+
+Elle peut apparaître :
+
+* sous le hero ;
+* entre deux sections clés ;
+* près du pricing ;
+* dans la FAQ ;
+* avant le CTA final.
+
+La répétition de la preuve réduit progressivement le doute.
+
+---
+
+## 4.4 CTA cohérent
+
+Une landing SaaS doit éviter de multiplier les actions contradictoires.
+
+CTA principal possible selon le modèle :
+
+* `Start free trial`
+* `Get started`
+* `Book a demo`
+* `Request access`
+* `Create your account`
+* `Try for free`
+* `Get [desired outcome]`
+
+Le CTA doit être orienté valeur quand c’est pertinent.
+
+Exemple :
+
+* Faible : `Commencer`
+* Meilleur : `Créer mon espace gratuitement`
+* Meilleur : `Automatiser mon reporting`
+* Meilleur : `Demander une démo`
+
+Un CTA secondaire est possible, mais il doit rester subordonné.
+
+Exemples :
+
+* `Voir la démo`
+* `Explorer les fonctionnalités`
+* `Comparer les plans`
+
+---
+
+# 5. Structure détaillée
+
+---
+
+## 5.1 Navbar sticky
+
+## Objectif
+
+Donner accès aux sections principales et garder le CTA visible.
+
+## Contenu recommandé
+
+À gauche :
+
+* logo du SaaS.
+
+Au centre :
+
+* Product
+* Features
+* Use cases
+* Pricing
+* FAQ
+* Resources, optionnel.
+
+À droite :
+
+* CTA principal.
+
+## Règles
+
+La navbar doit être :
+
+* simple ;
+* lisible ;
+* sticky au scroll ;
+* non envahissante ;
+* responsive mobile ;
+* cohérente avec le CTA principal de la page.
+
+## À éviter
+
+* Trop de liens.
+* Plusieurs CTA concurrents.
+* Navigation complexe.
+* Menu desktop identique à une homepage corporate complète.
+
+---
+
+## 5.2 Hero section
+
+## Objectif
+
+Faire comprendre la proposition de valeur en moins de quelques secondes.
+
+Le hero est la section la plus critique. Si le visiteur ne comprend pas immédiatement :
+
+* ce que fait le produit ;
+* pour qui il est fait ;
+* pourquoi il devrait continuer ;
+
+la landing échoue.
+
+## Structure recommandée
+
+1. Eyebrow court
+2. Headline orientée résultat
+3. Sous-titre explicatif
+4. CTA principal
+5. CTA secondaire optionnel
+6. 2 à 3 bénéfices courts
+7. Preuve sociale initiale
+8. Visuel produit
+
+## Headline
+
+La headline doit vendre le résultat désiré.
+
+Formule possible :
+
+> [Résultat souhaité] sans [douleur principale].
+
+Exemples :
+
+> Gérez vos contrats clients sans tableurs ni relances manuelles.
+
+> Lancez vos campagnes email sans dépendre d’un développeur.
+
+> Centralisez votre support client et répondez plus vite.
+
+## Sous-titre
+
+Le sous-titre doit expliquer simplement comment le SaaS aide à atteindre ce résultat.
+
+Formule possible :
+
+> [Nom du produit] aide [cible] à [résultat] grâce à [mécanisme principal].
+
+Exemple :
+
+> Acme aide les équipes support à prioriser, assigner et résoudre les tickets depuis un espace unique connecté à leurs outils existants.
+
+## CTA
+
+Le CTA doit être visible above the fold.
+
+Exemples :
+
+* `Start free trial`
+* `Book a demo`
+* `Get early access`
+* `Try it free`
+* `Request access`
+
+## Visuel hero
+
+Le visuel doit montrer le produit ou le résultat concret.
+
+Priorité :
+
+1. capture produit réelle ;
+2. mockup produit réaliste ;
+3. courte animation produit ;
+4. illustration abstraite uniquement si le produit n’est pas encore visuel.
+
+## À éviter
+
+* Headline vague.
+* Claim générique type “The future of productivity”.
+* Illustration abstraite sans produit.
+* CTA peu clair.
+* Trop de texte dans le premier écran.
+
+---
+
+## 5.3 Preuve sociale initiale
+
+## Objectif
+
+Réduire le doute immédiatement.
+
+## Formats possibles
+
+* Logos clients.
+* Nombre d’utilisateurs.
+* Nombre d’équipes.
+* Note moyenne.
+* Témoignage court.
+* Badge sécurité ou conformité.
+* Mention média.
+* Résultat mesurable.
+
+## Exemple
+
+> Trusted by 1,200+ teams.
+
+> Used by finance, ops and support teams in 14 countries.
+
+> Rated 4.8/5 by 300+ users.
+
+## Règles
+
+La preuve doit être réelle.
+
+Ne jamais inventer :
+
+* logos ;
+* utilisateurs ;
+* chiffres ;
+* citations ;
+* notes ;
+* badges.
+
+Si aucune preuve sociale forte n’existe encore, utiliser une preuve plus faible mais honnête :
+
+* beta privée ;
+* waitlist ;
+* early adopters ;
+* construit avec des utilisateurs pilotes ;
+* cas d’usage réel ;
+* démonstration produit solide.
+
+---
+
+## 5.4 Section problème
+
+## Objectif
+
+Créer l’identification.
+
+Le visiteur doit se reconnaître dans le problème.
+
+## Titre recommandé
+
+Le titre doit formuler le problème avec précision.
+
+Exemples :
+
+> Your team is not slow. Your workflow is fragmented.
+
+> Le problème n’est pas le manque d’outils. C’est leur dispersion.
+
+> Les meilleurs leads ne se perdent pas par hasard. Ils se perdent dans le suivi.
+
+## Structure
+
+1. Titre problème.
+2. Court paragraphe de contexte.
+3. Liste de douleurs concrètes.
+
+## Douleurs
+
+Les douleurs doivent être spécifiques, observables et liées à la cible.
+
+Exemples :
+
+* Les données sont dispersées entre plusieurs outils.
+* Les décisions reposent sur des informations incomplètes.
+* Les relances sont faites trop tard.
+* Les équipes perdent du temps à chercher le contexte.
+* Les clients ne voient pas clairement l’avancement.
+* Les tâches répétitives absorbent du temps stratégique.
+
+## À éviter
+
+* Douleurs trop génériques.
+* Problème artificiel.
+* Dramatisation excessive.
+* Critique vague du marché.
+
+---
+
+## 5.5 Section douleur vs soulagement
+
+## Objectif
+
+Montrer clairement l’avant / après.
+
+Le script recommande une mise en face-à-face :
+
+* douleurs sans le produit ;
+* soulagements avec le produit.
+
+## Format recommandé
+
+Deux colonnes :
+
+### Sans le produit
+
+* Process manuel.
+* Données dispersées.
+* Peu de visibilité.
+* Relances oubliées.
+* Expérience utilisateur incohérente.
+
+### Avec le produit
+
+* Workflow centralisé.
+* Données accessibles.
+* Décisions plus rapides.
+* Relances automatisées.
+* Expérience structurée.
+
+## Règle
+
+Chaque douleur doit avoir un soulagement correspondant.
+
+Mauvais :
+
+* Douleur : “trop de travail manuel”
+* Soulagement : “interface moderne”
+
+Meilleur :
+
+* Douleur : “trop de travail manuel”
+* Soulagement : “les tâches répétitives sont automatisées”
+
+---
+
+## 5.6 Témoignage court intermédiaire
+
+## Objectif
+
+Insérer de la preuve sociale après l’identification au problème.
+
+## Format
+
+Citation courte avec :
+
+* nom ;
+* rôle ;
+* entreprise ;
+* photo optionnelle ;
+* résultat obtenu si disponible.
+
+## Exemple
+
+> “We replaced three internal spreadsheets with one workflow and cut our weekly reporting time in half.”
+
+## Règles
+
+Un témoignage efficace doit être :
+
+* spécifique ;
+* crédible ;
+* orienté résultat ;
+* lié à la section précédente.
+
+## À éviter
+
+* “Super outil, je recommande.”
+* Témoignage anonyme.
+* Citation trop longue.
+* Résultat invérifiable présenté comme certitude.
+
+---
+
+## 5.7 Section solution
+
+## Objectif
+
+Présenter le SaaS comme la réponse logique au problème.
+
+## Structure
+
+1. Titre solution.
+2. Paragraphe simple.
+3. 3 à 5 bénéfices majeurs.
+4. Visuel produit ou schéma de fonctionnement.
+
+## Titre possible
+
+> One platform to manage the entire workflow.
+
+> Un seul espace pour piloter tout le processus.
+
+> Built to turn scattered work into a clear system.
+
+## Contenu
+
+La section doit expliquer :
+
+* ce que le produit centralise ;
+* ce qu’il automatise ;
+* ce qu’il clarifie ;
+* ce qu’il rend plus rapide ;
+* ce qu’il rend plus fiable.
+
+## Règle
+
+Cette section doit rester simple.
+
+Le visiteur ne doit pas avoir besoin de comprendre toute l’architecture produit.
+
+---
+
+## 5.8 Fonctionnement en 3 étapes
+
+## Objectif
+
+Rendre le produit facile à comprendre.
+
+## Format
+
+Trois étapes simples.
+
+Exemple générique :
+
+### 1. Connect
+
+Connectez vos outils, importez vos données ou créez votre espace.
+
+### 2. Configure
+
+Paramétrez votre workflow, vos règles, vos utilisateurs ou vos objectifs.
+
+### 3. Execute
+
+Suivez, automatisez, analysez ou livrez depuis un espace centralisé.
+
+## Règle
+
+Les étapes doivent être orientées usage, pas architecture technique.
+
+Mauvais :
+
+1. Créer une base PostgreSQL.
+2. Connecter l’API.
+3. Configurer les webhooks.
+
+Meilleur :
+
+1. Importez vos données.
+2. Définissez vos règles.
+3. Pilotez votre workflow.
+
+## Objection à lever sous la section
+
+Ajouter une phrase qui réduit une objection clé.
+
+Exemples :
+
+* `No technical setup required.`
+* `Works with your existing tools.`
+* `Setup takes less than 10 minutes.`
+* `No credit card required.`
+* `Cancel anytime.`
+
+Seulement si vrai.
+
+---
+
+## 5.9 CTA intermédiaire
+
+## Objectif
+
+Permettre au visiteur déjà convaincu d’agir sans attendre la fin.
+
+## Format
+
+Court bloc avec :
+
+* phrase de valeur ;
+* CTA principal ;
+* objection courte.
+
+## Exemple
+
+> Start organizing your workflow today.
+
+CTA : `Start free trial`
+
+Microcopy : `No credit card required.`
+
+## Règle
+
+Le CTA intermédiaire doit être cohérent avec le CTA principal.
+
+Ne pas changer d’objectif en cours de page.
+
+---
+
+## 5.10 Démo produit
+
+## Objectif
+
+Montrer le produit en action.
+
+Cette section réduit l’incertitude et rend la promesse concrète.
+
+## Formats possibles
+
+* Vidéo démo courte.
+* GIF produit.
+* Capture interactive.
+* Série de captures annotées.
+* Product tour.
+
+## Durée vidéo recommandée
+
+Maximum 3 minutes.
+
+## Contenu de la démo
+
+La démo doit montrer :
+
+1. le point de départ ;
+2. l’action principale ;
+3. le résultat visible ;
+4. le bénéfice obtenu.
+
+## Exemple
+
+Pour un SaaS support :
+
+1. arrivée d’un ticket ;
+2. priorisation automatique ;
+3. assignation ;
+4. résolution et reporting.
+
+## Règles
+
+La démo ne doit pas être une vidéo branding.
+
+Elle doit montrer :
+
+* l’interface ;
+* les actions ;
+* le résultat ;
+* le workflow.
+
+## Bonus
+
+Si la vente repose sur la confiance personnelle, une vidéo avec visage peut aider. Mais ce n’est pas obligatoire pour tous les SaaS.
+
+---
+
+## 5.11 Storytelling / crédibilité
+
+## Objectif
+
+Rassurer sur la légitimité du produit.
+
+Cette section explique pourquoi le produit existe et pourquoi l’équipe comprend le problème.
+
+## Formats possibles
+
+### Version fondateur
+
+* problème vécu ;
+* observation terrain ;
+* solution construite ;
+* mission produit.
+
+### Version entreprise
+
+* expertise sectorielle ;
+* années d’expérience ;
+* clients accompagnés ;
+* problème récurrent identifié ;
+* création du produit.
+
+## Structure recommandée
+
+1. Court titre.
+2. 1 à 3 paragraphes maximum.
+3. Photo ou visuel sobre optionnel.
+4. Lien vers about page optionnel.
+
+## Règles
+
+Cette section doit renforcer la confiance, pas détourner la page vers une autobiographie.
+
+## À éviter
+
+* Long récit personnel.
+* Ton héroïque.
+* Storytelling artificiel.
+* Trop de détails sans lien avec le problème client.
+
+---
+
+## 5.12 Pricing / offre
+
+## Objectif
+
+Clarifier le coût, l’engagement ou le mode d’accès.
+
+## Cas 1 — SaaS self-serve
+
+Afficher les plans clairement.
+
+Chaque plan doit inclure :
+
+* nom ;
+* cible ;
+* prix ;
+* bénéfice principal ;
+* fonctionnalités clés ;
+* CTA ;
+* limites ou conditions.
+
+## Cas 2 — SaaS B2B / high-ticket
+
+Le pricing peut être remplacé par :
+
+* `Book a demo`
+* `Talk to sales`
+* `Request pricing`
+* `Get a custom plan`
+
+Mais il faut clarifier pourquoi.
+
+## Cas 3 — SaaS early-stage
+
+Utiliser :
+
+* accès anticipé ;
+* beta privée ;
+* waitlist ;
+* prix fondateur ;
+* accès limité.
+
+## Badge promotionnel
+
+Les promotions peuvent fonctionner, mais elles doivent être utilisées avec prudence.
+
+Acceptable :
+
+* prix early adopter réel ;
+* réduction temporaire réelle ;
+* offre bêta assumée.
+
+À éviter :
+
+* fausse urgence ;
+* faux prix barré ;
+* lifetime deal automatique ;
+* discount agressif non justifié.
+
+## Titre pricing
+
+Le titre doit rappeler le résultat désiré.
+
+Exemples :
+
+> Choose the plan that fits your workflow.
+
+> Start small. Scale when your team grows.
+
+> Build a cleaner workflow today.
+
+## Règle
+
+Le pricing doit réduire la friction, pas créer de confusion.
+
+---
+
+## 5.13 FAQ / objections
+
+## Objectif
+
+Répondre aux objections avant qu’elles bloquent la conversion.
+
+La FAQ n’est pas une section informative secondaire. C’est une section de vente rationnelle.
+
+## Types de questions à traiter
+
+### Compatibilité
+
+* Est-ce compatible avec mes outils ?
+* Peut-on importer mes données ?
+* Est-ce adapté à mon secteur ?
+
+### Mise en place
+
+* Combien de temps faut-il pour démarrer ?
+* Faut-il une compétence technique ?
+* Peut-on migrer depuis un autre outil ?
+
+### Prix
+
+* Y a-t-il un essai gratuit ?
+* Peut-on annuler ?
+* Quelle est la différence entre les plans ?
+
+### Sécurité
+
+* Où sont stockées les données ?
+* Qui a accès aux données ?
+* Le produit est-il conforme aux exigences nécessaires ?
+
+### Différenciation
+
+* Pourquoi utiliser ce SaaS plutôt qu’un outil existant ?
+* Quelle différence avec un tableur, Notion, Airtable, Slack, Zapier ou un concurrent direct ?
+
+### Maturité produit
+
+* Le produit est-il prêt ?
+* Est-il encore en bêta ?
+* Quelles fonctionnalités arrivent ensuite ?
+
+## Règle
+
+Chaque réponse doit être courte, directe et utile.
+
+Ne pas esquiver les objections.
+
+---
+
+## 5.14 Mur de preuves sociales
+
+## Objectif
+
+Consolider la confiance avant le CTA final.
+
+## Formats possibles
+
+* grille de témoignages ;
+* logos clients ;
+* cas d’usage ;
+* screenshots de retours ;
+* notes utilisateurs ;
+* statistiques ;
+* citations médias ;
+* badges sécurité.
+
+## Règles
+
+La quantité ne remplace pas la crédibilité.
+
+Mieux vaut :
+
+* 3 témoignages précis ;
+* 1 cas client solide ;
+* 1 statistique vérifiable ;
+
+qu’un mur de citations vagues.
+
+## À éviter
+
+* faux témoignages ;
+* avatars générés ;
+* logos non autorisés ;
+* citations anonymes génériques.
+
+---
+
+## 5.15 CTA final
+
+## Objectif
+
+Transformer l’intention en action.
+
+Le CTA final doit résumer la promesse et redonner un chemin clair.
+
+## Structure
+
+1. Titre orienté résultat.
+2. Court paragraphe.
+3. CTA principal.
+4. CTA secondaire optionnel.
+5. Microcopy rassurante.
+
+## Exemple
+
+> Build a cleaner workflow in less time.
+
+> Centralize your data, automate repetitive tasks and give your team one place to work.
+
+CTA : `Start free trial`
+
+Microcopy : `No credit card required.`
+
+## Règle
+
+Le CTA final ne doit pas introduire une nouvelle idée.
+
+Il doit conclure la logique de la page.
+
+---
+
+## 5.16 Footer
+
+## Objectif
+
+Fournir les liens utiles, légaux et institutionnels.
+
+## Contenu recommandé
+
+* logo ;
+* courte baseline ;
+* liens produit ;
+* liens ressources ;
+* pricing ;
+* contact ;
+* réseaux sociaux ;
+* mentions légales ;
+* politique de confidentialité ;
+* conditions d’utilisation ;
+* sécurité ou conformité si pertinent.
+
+## Règle
+
+Le footer doit être propre, complet et discret.
+
+---
+
+# 6. Variantes selon le type de SaaS
+
+## 6.1 SaaS self-serve
+
+Priorité :
+
+* essai gratuit ;
+* pricing clair ;
+* onboarding simple ;
+* preuve sociale ;
+* friction minimale.
+
+CTA principal :
+
+* `Start free trial`
+* `Try for free`
+* `Create account`
+
+Sections importantes :
+
+* hero ;
+* product demo ;
+* features ;
+* pricing ;
+* FAQ ;
+* CTA final.
+
+---
+
+## 6.2 SaaS B2B avec démo commerciale
+
+Priorité :
+
+* crédibilité ;
+* ROI ;
+* sécurité ;
+* cas clients ;
+* intégrations ;
+* objections ;
+* prise de rendez-vous.
+
+CTA principal :
+
+* `Book a demo`
+* `Talk to sales`
+* `Request demo`
+
+Sections importantes :
+
+* hero ;
+* logos clients ;
+* problème ;
+* cas d’usage ;
+* démo ;
+* sécurité ;
+* FAQ ;
+* CTA final.
+
+---
+
+## 6.3 SaaS early-stage
+
+Priorité :
+
+* clarté ;
+* crédibilité honnête ;
+* accès anticipé ;
+* feedback utilisateur ;
+* démonstration produit.
+
+CTA principal :
+
+* `Request access`
+* `Join waitlist`
+* `Get early access`
+
+Sections importantes :
+
+* hero ;
+* problème ;
+* solution ;
+* démo ou walkthrough ;
+* accès limité ;
+* FAQ ;
+* CTA final.
+
+Ne pas inventer de traction.
+
+---
+
+## 6.4 SaaS complexe / plateforme
+
+Priorité :
+
+* simplification ;
+* segmentation ;
+* cas d’usage ;
+* navigation claire ;
+* pages secondaires.
+
+La landing principale doit rester claire.
+
+Les détails peuvent aller dans :
+
+* pages fonctionnalités ;
+* pages cas d’usage ;
+* pricing page ;
+* documentation ;
+* security page.
+
+---
+
+# 7. Checklist copywriting
+
+## La page doit répondre à ces questions
+
+1. Pour qui est ce produit ?
+2. Quel problème résout-il ?
+3. Quel résultat permet-il d’obtenir ?
+4. Comment fonctionne-t-il ?
+5. Pourquoi est-il crédible ?
+6. Combien ça coûte ou comment y accéder ?
+7. Quelle action faire maintenant ?
+
+## Les titres doivent être
+
+* courts ;
+* spécifiques ;
+* orientés résultat ;
+* compréhensibles sans contexte ;
+* liés à la section.
+
+## Les paragraphes doivent être
+
+* simples ;
+* directs ;
+* concrets ;
+* courts ;
+* sans jargon inutile.
+
+## Les CTA doivent être
+
+* visibles ;
+* cohérents ;
+* orientés valeur ;
+* répétés aux bons endroits ;
+* non contradictoires.
+
+---
+
+# 8. Checklist design
+
+## Règles générales
+
+* Hiérarchie visuelle claire.
+* Produit visible rapidement.
+* Sections aérées.
+* Contraste suffisant.
+* Mobile-first.
+* Aucun bloc inutile.
+* Aucun effet décoratif qui nuit à la compréhension.
+
+## Above the fold
+
+Doit contenir :
+
+* headline claire ;
+* sous-titre explicatif ;
+* CTA ;
+* preuve sociale ou réassurance ;
+* visuel produit.
+
+## Mobile
+
+La version mobile doit :
+
+* garder le CTA visible rapidement ;
+* éviter les visuels illisibles ;
+* réduire les grilles complexes ;
+* empiler proprement les sections ;
+* garder une vitesse de chargement correcte.
+
+---
+
+# 9. Checklist technique pour Codex
+
+## Architecture
+
+* Créer une landing structurée par composants.
+* Un composant par section majeure.
+* Séparer les données textuelles si pertinent.
+* Ne pas créer un fichier monolithique difficile à maintenir.
+* Respecter la stack existante.
+* Ne pas ajouter de dépendance inutile.
+
+## Sections minimales obligatoires
+
+* Navbar
+* Hero
+* Social proof
+* Problem
+* Solution
+* How it works
+* Product demo / visual
+* Pricing or access
+* FAQ
+* Final CTA
+* Footer
+
+## Qualité
+
+* Responsive complet.
+* Accessibilité correcte.
+* Contraste suffisant.
+* Images optimisées.
+* CTA fonctionnels.
+* Ancres fonctionnelles.
+* Pas de placeholder.
+* Pas de fausse preuve sociale.
+* Pas de texte générique type template.
+
+## Performance
+
+* Optimiser les images.
+* Lazy-load les éléments non critiques.
+* Prioriser le visuel hero si nécessaire.
+* Éviter les animations lourdes.
+* Préserver les Core Web Vitals.
+
+## Vérifications
+
+Avant livraison :
+
+* lint ;
+* typecheck si disponible ;
+* build si disponible ;
+* test mobile ;
+* vérification des liens ;
+* vérification des CTA ;
+* vérification absence de placeholders ;
+* vérification cohérence entre CTA principal, pricing et objectif business.
+
+---
+
+# 10. Critères d’acceptation
+
+Une landing page SaaS est acceptable si :
+
+1. La proposition de valeur est compréhensible rapidement.
+2. Le visiteur sait pour qui le produit est fait.
+3. Le problème est précis.
+4. La solution est expliquée simplement.
+5. Les bénéfices sont formulés comme des résultats, pas comme une liste technique.
+6. Le produit est montré concrètement.
+7. La preuve sociale est crédible.
+8. Les objections principales sont traitées.
+9. Le CTA principal est cohérent sur toute la page.
+10. Le pricing ou le mode d’accès est clair.
+11. La page est responsive.
+12. Le code est maintenable.
+13. Aucune preuve, promesse ou statistique n’est inventée.
+14. La page suit une progression logique jusqu’à la conversion.
+
+---
+
+# 11. Prompt exécutable pour Codex
+
+Créer ou refactorer une landing page SaaS selon cette structure fonctionnelle :
+
+1. Navbar sticky avec logo, ancres et CTA principal.
+2. Hero section avec headline orientée résultat, sous-titre explicatif, CTA, bénéfices courts, preuve sociale et visuel produit.
+3. Section preuve sociale initiale.
+4. Section problème pour créer l’identification.
+5. Section douleur vs soulagement en avant/après.
+6. Témoignage court ou preuve contextuelle.
+7. Section solution expliquant le produit simplement.
+8. Section “How it works” en 3 étapes.
+9. CTA intermédiaire.
+10. Section démo produit avec vidéo, GIF, mockup ou captures annotées.
+11. Section storytelling ou crédibilité.
+12. Section pricing, accès anticipé ou demande de démo selon le modèle SaaS.
+13. FAQ orientée objections.
+14. Mur de preuves sociales si des preuves réelles existent.
+15. CTA final.
+16. Footer complet.
+
+Contraintes :
+
+* Ne pas inventer de témoignages, logos, chiffres ou preuves.
+* Ne pas utiliser de promesses non vérifiables.
+* Ne pas créer une landing générique sans cible claire.
+* Ne pas multiplier les CTA contradictoires.
+* Ne pas ajouter de dépendances inutiles.
+* Garder une architecture propre, responsive, maintenable et performante.
+
+La page doit suivre la logique :
+
+> Captiver → qualifier le problème → prouver → expliquer → rassurer → convertir.
+
+Chaque section doit avoir un objectif clair et contribuer à la conversion.

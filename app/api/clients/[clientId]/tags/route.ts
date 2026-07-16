@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { z } from 'zod'
+import { coachOwnsClient } from '@/lib/security/client-resource-access'
 
 function serviceClient() {
   return createServiceClient(
@@ -10,6 +12,25 @@ function serviceClient() {
 }
 
 type Params = { params: { clientId: string } }
+const idSchema = z.string().uuid()
+
+async function requireOwnedClient(db: ReturnType<typeof serviceClient>, coachId: string, clientId: string) {
+  if (!idSchema.safeParse(clientId).success) return false
+  return coachOwnsClient({ db, coachUserId: coachId, clientId })
+}
+
+async function coachOwnsTag(db: ReturnType<typeof serviceClient>, coachId: string, tagId: string) {
+  if (!idSchema.safeParse(tagId).success) return false
+
+  const { data } = await db
+    .from('coach_tags')
+    .select('id')
+    .eq('id', tagId)
+    .eq('coach_id', coachId)
+    .maybeSingle()
+
+  return Boolean(data)
+}
 
 // GET /api/clients/[clientId]/tags
 export async function GET(req: NextRequest, { params }: Params) {
@@ -17,7 +38,12 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const { data, error } = await serviceClient()
+  const db = serviceClient()
+  if (!(await requireOwnedClient(db, user.id, params.clientId))) {
+    return NextResponse.json({ error: 'Client introuvable' }, { status: 404 })
+  }
+
+  const { data, error } = await db
     .from('client_tags')
     .select('tag:coach_tags(*)')
     .eq('client_id', params.clientId)
@@ -32,12 +58,21 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const { tag_id } = await req.json()
-  if (!tag_id) return NextResponse.json({ error: 'tag_id requis' }, { status: 400 })
+  const parsed = z.object({ tag_id: z.string().uuid() }).safeParse(await req.json().catch(() => null))
+  if (!parsed.success) return NextResponse.json({ error: 'tag_id invalide' }, { status: 400 })
 
-  const { error } = await serviceClient()
+  const db = serviceClient()
+  const [ownsClient, ownsTag] = await Promise.all([
+    requireOwnedClient(db, user.id, params.clientId),
+    coachOwnsTag(db, user.id, parsed.data.tag_id),
+  ])
+  if (!ownsClient || !ownsTag) {
+    return NextResponse.json({ error: 'Ressource introuvable' }, { status: 404 })
+  }
+
+  const { error } = await db
     .from('client_tags')
-    .insert({ client_id: params.clientId, tag_id })
+    .insert({ client_id: params.clientId, tag_id: parsed.data.tag_id })
 
   if (error) {
     if (error.code === '23505') return NextResponse.json({ error: 'Tag déjà assigné' }, { status: 409 })
@@ -54,9 +89,20 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   const { searchParams } = new URL(req.url)
   const tagId = searchParams.get('tag_id')
-  if (!tagId) return NextResponse.json({ error: 'tag_id requis' }, { status: 400 })
+  if (!tagId || !idSchema.safeParse(tagId).success) {
+    return NextResponse.json({ error: 'tag_id invalide' }, { status: 400 })
+  }
 
-  const { error } = await serviceClient()
+  const db = serviceClient()
+  const [ownsClient, ownsTag] = await Promise.all([
+    requireOwnedClient(db, user.id, params.clientId),
+    coachOwnsTag(db, user.id, tagId),
+  ])
+  if (!ownsClient || !ownsTag) {
+    return NextResponse.json({ error: 'Ressource introuvable' }, { status: 404 })
+  }
+
+  const { error } = await db
     .from('client_tags')
     .delete()
     .eq('client_id', params.clientId)

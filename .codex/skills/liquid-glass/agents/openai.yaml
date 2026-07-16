@@ -1,0 +1,4 @@
+interface:
+  display_name: "Liquid Glass"
+  short_description: "Apply restrained liquid-glass UI optics"
+  default_prompt: "Use $liquid-glass to add a subtle, accessible liquid-glass surface."

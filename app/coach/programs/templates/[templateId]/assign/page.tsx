@@ -189,7 +189,7 @@ export default function AssignTemplatePage() {
             {" · "}
             {LEVELS[template?.level ?? ""] ?? template?.level}
             {" · "}
-            {template?.frequency}j/sem.
+            {template?.frequency ?? 0} séances/sem.
             {" · "}
             {template?.weeks} sem.
             {template?.equipment_archetype && (
@@ -364,7 +364,7 @@ export default function AssignTemplatePage() {
                           )}
                           {client.weekly_frequency != null && (
                             <span className="text-[9px] font-mono text-white/70">
-                              {client.weekly_frequency}j/sem.
+                              {client.weekly_frequency} séances/sem.
                             </span>
                           )}
                           {client.sport_practice && (

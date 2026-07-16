@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from 'react'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { NUTRITION_UI_COLORS } from '@/lib/nutrition/ui-colors'
 import { useChartScrubber } from '@/hooks/useChartScrubber'
+import { useClientT } from '@/components/client/ClientI18nProvider'
+import { clientLocale } from '@/lib/i18n/clientTranslations'
 
 type TdeePoint = {
   calculated_at: string
@@ -23,9 +25,9 @@ const PAD = { top: 12, right: 8, bottom: 20, left: 36 }
 const INNER_W = W - PAD.left - PAD.right
 const INNER_H = H - PAD.top - PAD.bottom
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   const d = new Date(iso)
-  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(d)
+  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(d)
 }
 
 function svgPath(points: [number, number][]): string {
@@ -42,17 +44,19 @@ function svgPath(points: [number, number][]): string {
 }
 
 export default function TdeeChart({ days }: Props) {
+  const { lang, t } = useClientT()
+  const locale = clientLocale(lang)
   const [data, setData] = useState<TdeePoint[]>([])
-  const [protocolTdee, setProtocolTdee] = useState<number | null>(null)
+  const [clientTdee, setClientTdee] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setLoading(true)
     fetch(`/api/client/nutrition/tdee-history?days=${days}`)
-      .then(r => r.ok ? r.json() : { history: [], protocolTdee: null })
-      .then((res: { history: TdeePoint[]; protocolTdee: number | null }) => {
+      .then(r => r.ok ? r.json() : { history: [], clientTdee: null })
+      .then((res: { history: TdeePoint[]; clientTdee: number | null }) => {
         setData(Array.isArray(res?.history) ? res.history : [])
-        setProtocolTdee(typeof res?.protocolTdee === 'number' ? res.protocolTdee : null)
+        setClientTdee(typeof res?.clientTdee === 'number' ? res.clientTdee : null)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -60,19 +64,19 @@ export default function TdeeChart({ days }: Props) {
 
   const filtered = useMemo(() => {
     if (data.length > 0) return data
-    if (protocolTdee !== null) {
+    if (clientTdee !== null) {
       return [{
         calculated_at: new Date().toISOString(),
-        tdee_adaptive: protocolTdee,
-        tdee_formula: protocolTdee,
+        tdee_adaptive: clientTdee,
+        tdee_formula: clientTdee,
         delta_kcal: 0,
-        avg_intake_kcal: protocolTdee,
+        avg_intake_kcal: clientTdee,
         weight_delta_kg: 0,
         weight_samples: 0,
       }]
     }
     return []
-  }, [data, protocolTdee])
+  }, [data, clientTdee])
 
   const { activeIndex, handlers, svgRef } = useChartScrubber(filtered.length, W, PAD.left, PAD.right)
 
@@ -121,22 +125,22 @@ export default function TdeeChart({ days }: Props) {
       <div className="flex items-start justify-between mb-3">
         <div>
           <p className="font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[11px] text-white/50 mb-0.5">
-            Dépense énergétique
+            {t('nutrition.tdee.title')}
           </p>
           {activePoint ? (
             <div className="flex items-baseline gap-1.5">
-              <span className="text-[13px] font-bold text-white/50 tabular-nums">{formatDate(activePoint.calculated_at)}</span>
+              <span className="text-[13px] font-bold text-white/50 tabular-nums">{formatDate(activePoint.calculated_at, locale)}</span>
               <span className="text-[18px] font-black text-white tabular-nums leading-none">
-                {activePoint.tdee_adaptive.toLocaleString('fr-FR')}
+                {activePoint.tdee_adaptive.toLocaleString(locale)}
               </span>
-              <span className="text-[10px] text-white/40">kcal/j</span>
+              <span className="text-[10px] text-white/40">{t('nutrition.tdee.perDayShort')}</span>
             </div>
           ) : (
             <div className="flex items-baseline gap-2">
               <span className="text-[22px] font-black text-white tabular-nums leading-none">
-                {latest.tdee_adaptive.toLocaleString('fr-FR')}
+                {latest.tdee_adaptive.toLocaleString(locale)}
               </span>
-              <span className="text-[10px] text-white/40">kcal/jour</span>
+              <span className="text-[10px] text-white/40">{t('nutrition.tdee.perDay')}</span>
               {deltaTrend !== 0 && (
                 <span className="text-[10px] font-bold flex items-center gap-0.5 text-white/40">
                   {deltaTrend > 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
@@ -185,10 +189,10 @@ export default function TdeeChart({ days }: Props) {
           {activeIndex === null && filtered.length >= 2 && (
             <>
               <text x={PAD.left} y={H - 2} textAnchor="start" fontSize="7" fill="rgba(255,255,255,0.25)">
-                {formatDate(filtered[0].calculated_at)}
+                {formatDate(filtered[0].calculated_at, locale)}
               </text>
               <text x={W - PAD.right} y={H - 2} textAnchor="end" fontSize="7" fill="rgba(255,255,255,0.25)">
-                {formatDate(filtered[filtered.length - 1].calculated_at)}
+                {formatDate(filtered[filtered.length - 1].calculated_at, locale)}
               </text>
             </>
           )}
@@ -215,26 +219,26 @@ export default function TdeeChart({ days }: Props) {
                   fill="rgba(22,22,22,0.96)" stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
 
                 <text x={tx + 8} y={ty + 13} fontSize="8" fill="rgba(255,255,255,0.45)" fontWeight="600">
-                  {formatDate(pt.calculated_at)}
+                  {formatDate(pt.calculated_at, locale)}
                 </text>
 
                 <circle cx={tx + 10} cy={ty + 25} r="3" fill={NUTRITION_UI_COLORS.calories} />
-                <text x={tx + 17} y={ty + 29} fontSize="8" fill="rgba(255,255,255,0.55)">Adaptatif</text>
+                <text x={tx + 17} y={ty + 29} fontSize="8" fill="rgba(255,255,255,0.55)">TDEE client</text>
                 <text x={tx + tooltipW - 8} y={ty + 29} fontSize="8.5" fill="white" textAnchor="end" fontWeight="700">
-                  {pt.tdee_adaptive.toLocaleString('fr-FR')}
+                  {pt.tdee_adaptive.toLocaleString(locale)}
                 </text>
 
                 <circle cx={tx + 10} cy={ty + 40} r="3" fill="rgba(255,255,255,0.3)" />
-                <text x={tx + 17} y={ty + 44} fontSize="8" fill="rgba(255,255,255,0.55)">Formule</text>
+                <text x={tx + 17} y={ty + 44} fontSize="8" fill="rgba(255,255,255,0.55)">{t('nutrition.tdee.formula')}</text>
                 <text x={tx + tooltipW - 8} y={ty + 44} fontSize="8.5" fill="rgba(255,255,255,0.6)" textAnchor="end" fontWeight="700">
-                  {pt.tdee_formula.toLocaleString('fr-FR')}
+                  {pt.tdee_formula.toLocaleString(locale)}
                 </text>
 
                 <rect x={tx + 8} y={ty + 49} width={tooltipW - 16} height={13} rx="3"
                   fill={delta >= 0 ? 'rgba(93,186,135,0.15)' : 'rgba(255,209,94,0.15)'} />
                 <text x={tx + tooltipW / 2} y={ty + 58.5} fontSize="7.5" textAnchor="middle"
                   fill={delta >= 0 ? '#5dba87' : '#ffd15e'} fontWeight="700">
-                  {delta >= 0 ? '+' : ''}{delta} kcal vs formule
+                  {delta >= 0 ? '+' : ''}{delta} kcal {t('nutrition.tdee.vsFormula')}
                 </text>
               </g>
             )
@@ -246,7 +250,7 @@ export default function TdeeChart({ days }: Props) {
       <div className="flex items-center gap-4 mt-2 mb-3">
         <div className="flex items-center gap-1.5">
           <div className="w-6 h-[2px] rounded" style={{ background: NUTRITION_UI_COLORS.calories }} />
-          <span className="text-[9px] text-white/40">Adaptatif</span>
+          <span className="text-[9px] text-white/40">TDEE client</span>
         </div>
         <div className="flex items-center gap-1.5">
           <svg width="20" height="4"><line x1="0" y1="2" x2="20" y2="2" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeDasharray="3 3"/></svg>
@@ -254,30 +258,30 @@ export default function TdeeChart({ days }: Props) {
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-6 h-3 rounded-sm" style={{ background: 'rgba(104,159,250,0.12)' }} />
-          <span className="text-[9px] text-white/40">Plage flux</span>
+          <span className="text-[9px] text-white/40">{t('nutrition.tdee.flowRange')}</span>
         </div>
       </div>
 
       {/* Insights */}
       <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/[0.06]">
         <div>
-          <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">vs formule</p>
+          <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">{t('nutrition.tdee.vsFormula')}</p>
           <p className={`text-[12px] font-black tabular-nums ${deltaVsFormula >= 0 ? 'text-[#22c55e]' : 'text-[#f59e0b]'}`}>
             {deltaVsFormula >= 0 ? '+' : ''}{deltaVsFormula} kcal
           </p>
         </div>
         <div>
-          <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">Apport moy.</p>
+          <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">{t('nutrition.tdee.avgIntake')}</p>
           <p className="text-[12px] font-black text-white tabular-nums">
-            {latest.avg_intake_kcal.toLocaleString('fr-FR')} kcal
+            {latest.avg_intake_kcal.toLocaleString(locale)} kcal
           </p>
         </div>
         <div>
-          <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">Tendance</p>
+          <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">{t('nutrition.tdee.trend')}</p>
           <p className={`text-[12px] font-black flex items-center gap-1 ${
             deltaTrend > 20 ? 'text-[#22c55e]' : deltaTrend < -20 ? 'text-[#f59e0b]' : 'text-white/50'
           }`}>
-            {deltaTrend > 20 ? <><TrendingUp size={12} /> Hausse</> : deltaTrend < -20 ? <><TrendingDown size={12} /> Baisse</> : <><Minus size={12} /> Stable</>}
+            {deltaTrend > 20 ? <><TrendingUp size={12} /> {t('nutrition.tdee.trendUp')}</> : deltaTrend < -20 ? <><TrendingDown size={12} /> {t('nutrition.tdee.trendDown')}</> : <><Minus size={12} /> {t('nutrition.tdee.trendFlat')}</>}
           </p>
         </div>
       </div>

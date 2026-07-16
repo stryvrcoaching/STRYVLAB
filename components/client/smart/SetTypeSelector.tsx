@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SetType } from './SetRow'
 import { useClientT } from '@/components/client/ClientI18nProvider'
+import useBodyScrollLock from '@/components/client/useBodyScrollLock'
 
 interface SetTypeSelectorProps {
   open: boolean
@@ -13,6 +14,8 @@ interface SetTypeSelectorProps {
 
 export default function SetTypeSelector({ open, current, onSelect, onClose }: SetTypeSelectorProps) {
   const { t } = useClientT()
+  useBodyScrollLock(open)
+
   const OPTIONS: { type: SetType; label: string; sublabel: string; icon: string; color: string }[] = [
     { type: 'warmup',   label: t('settype.warmup'),   sublabel: 'EC', icon: '⚡', color: 'text-[#FF6B35]' },
     { type: 'working',  label: t('settype.working'),  sublabel: '',   icon: '1',  color: 'text-white' },
@@ -31,7 +34,8 @@ export default function SetTypeSelector({ open, current, onSelect, onClose }: Se
             onClick={onClose}
           />
           <motion.div
-            className="fixed bottom-0 left-0 right-0 z-[70] bg-[#111111] rounded-t-2xl pb-8 max-h-[88vh] overflow-y-auto"
+            className="client-native-bottom-sheet fixed bottom-0 left-0 right-0 z-[70] bg-[#111111] rounded-t-2xl max-h-[88dvh] overflow-y-auto"
+            style={{ paddingBottom: 'var(--client-modal-bottom-padding)' }}
             initial={{ y: '100%' }}
             animate={{ y: 0, transition: { type: 'spring', stiffness: 350, damping: 30 } }}
             exit={{ y: '100%', transition: { duration: 0.18, ease: 'easeIn' } }}

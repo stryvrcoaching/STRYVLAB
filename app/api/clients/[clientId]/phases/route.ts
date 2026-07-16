@@ -2,22 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { coachOwnsClient } from '@/lib/security/client-resource-access'
 
 function serviceClient() {
   return createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
-}
-
-async function verifyOwnership(db: ReturnType<typeof serviceClient>, clientId: string, userId: string) {
-  const { data } = await db
-    .from('coach_clients')
-    .select('id')
-    .eq('id', clientId)
-    .eq('coach_id', userId)
-    .maybeSingle()
-  return !!data
 }
 
 const createSchema = z.object({
@@ -38,7 +29,7 @@ export async function GET(
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const db = serviceClient()
-  const owns = await verifyOwnership(db, clientId, user.id)
+  const owns = await coachOwnsClient({ db, clientId, coachUserId: user.id })
   if (!owns) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const { data, error } = await db
@@ -61,7 +52,7 @@ export async function POST(
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const db = serviceClient()
-  const owns = await verifyOwnership(db, clientId, user.id)
+  const owns = await coachOwnsClient({ db, clientId, coachUserId: user.id })
   if (!owns) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const body = createSchema.safeParse(await req.json())

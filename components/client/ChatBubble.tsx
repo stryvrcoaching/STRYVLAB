@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { MoreHorizontal } from "lucide-react"
+import { useClientT } from "@/components/client/ClientI18nProvider"
+import type { ChatAttachment } from "@/lib/chat/attachments"
 import { formatSleepHours, sleepPartsToHoursNumber, splitSleepHours } from "@/lib/client/checkin/sleepTimeFormat"
 
 export interface InteractiveMetadata {
@@ -27,7 +29,7 @@ export interface ChatMessage {
   role: "user" | "assistant"
   content: string
   message_type: string
-  metadata?: InteractiveMetadata | null
+  metadata?: (InteractiveMetadata & { attachment?: ChatAttachment }) | null
   from_coach_human?: boolean
   seen_at?: string | null
   created_at: string
@@ -37,6 +39,8 @@ interface ChatBubbleProps {
   message: ChatMessage
   coachAvatarUrl?: string | null
   coachInitial?: string | null
+  clientAvatarUrl?: string | null
+  clientInitial?: string | null
   onInteract?: (messageId: string, key: string, value: number) => void
   onSkip?: (messageId: string, key: string) => void
   onEdit?: (messageId: string) => void
@@ -213,7 +217,7 @@ function TimeInput({
   )
 }
 
-function CoachAvatar({ url, initial }: { url?: string | null; initial: string }) {
+function MessageAvatar({ url, initial }: { url?: string | null; initial: string }) {
   const [imgError, setImgError] = useState(false)
 
   // Reset error state when URL changes
@@ -245,10 +249,19 @@ function CoachAvatar({ url, initial }: { url?: string | null; initial: string })
   )
 }
 
+function formatMessageTime(value: string, lang: "fr" | "en" | "es"): string {
+  return new Intl.DateTimeFormat(lang === "es" ? "es-ES" : lang === "en" ? "en-US" : "fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value))
+}
+
 export default function ChatBubble({
   message,
   coachAvatarUrl,
   coachInitial,
+  clientAvatarUrl,
+  clientInitial,
   onInteract,
   onSkip,
   onEdit,
@@ -256,9 +269,11 @@ export default function ChatBubble({
   isMenuOpen,
   onMenuToggle,
 }: ChatBubbleProps) {
+  const { t, lang } = useClientT()
   const isUser = message.role === "user";
   const meta = message.metadata;
   const answered = meta?.answered ?? false;
+  const attachment = meta?.attachment;
 
   const initial = coachInitial?.trim() || "?";
 
@@ -282,7 +297,13 @@ export default function ChatBubble({
       data-observe-visible={!isUser && !message.seen_at ? 'true' : 'false'}
     >
       {!isUser && (
-        <CoachAvatar url={coachAvatarUrl} initial={initial} />
+        <MessageAvatar url={coachAvatarUrl} initial={initial} />
+      )}
+      {isUser && (
+        <MessageAvatar
+          url={clientAvatarUrl}
+          initial={(clientInitial?.trim() || "C").charAt(0).toUpperCase()}
+        />
       )}
 
       <div className={`flex flex-col gap-2 ${isUser ? "items-end" : "items-start"} max-w-[82%]`}>
@@ -295,14 +316,14 @@ export default function ChatBubble({
                 className="block w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#2e2e2e] transition-colors"
                 onClick={handleEdit}
               >
-                Modifier
+                {t('common.edit')}
               </button>
               <button
                 type="button"
                 className="block w-full text-left px-3 py-2 text-xs font-semibold text-red-400 hover:bg-[#2e2e2e] transition-colors"
                 onClick={handleDelete}
               >
-                Supprimer
+                {t('common.delete')}
               </button>
             </div>
           )}
@@ -315,8 +336,8 @@ export default function ChatBubble({
             <div
               className={`px-3.5 py-2.5 text-[13px] leading-[1.5] ${
                 isUser
-                  ? "bg-[#f2f2f2] text-[#080808] font-medium rounded-2xl rounded-tr-sm cursor-pointer select-none active:opacity-80 transition-opacity"
-                  : `bg-[#111111] text-[#b0b0b0] rounded-2xl rounded-tl-sm ${message.from_coach_human ? 'ring-1 ring-emerald-500' : ''}`
+                ? "bg-[#f2f2f2] text-[#080808] font-medium rounded-2xl rounded-tr-sm cursor-pointer select-none active:opacity-80 transition-opacity"
+                  : `border border-white/[0.07] bg-[#151817] text-[#e1e5e3] rounded-2xl rounded-tl-sm shadow-[0_4px_18px_rgba(0,0,0,0.16)] ${message.from_coach_human ? 'border-[#1f8a65]/45 bg-[#17231e]' : ''}`
               }`}
               onClick={isUser && message.message_type !== "checkin_summary" ? handleMenuToggle : undefined}
             >
@@ -324,6 +345,19 @@ export default function ChatBubble({
             </div>
           )}
         </div>
+        {attachment?.url && (
+          <a href={attachment.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-2xl border border-white/[0.08] bg-black/20">
+            {attachment.type.startsWith("image/") ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={attachment.url} alt={attachment.name} className="max-h-56 max-w-[240px] object-cover" />
+            ) : (
+              <span className="flex max-w-[240px] items-center gap-2 px-3 py-2 text-[11px] text-white/75">📎 {attachment.name}</span>
+            )}
+          </a>
+        )}
+        <span className={`px-1 text-[9px] font-medium text-white/25 ${isUser ? "text-right" : "text-left"}`}>
+          {formatMessageTime(message.created_at, lang)}
+        </span>
 
         {/* Chips */}
         {!isUser && meta?.component === 'chips' && (

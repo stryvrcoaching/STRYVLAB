@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import {
+  isMinor,
+  normalizeDateOfBirth,
+  validateGuardianDetails,
+} from '@/lib/privacy/minor-authorization'
 
 function serviceClient() {
   return createServiceClient(
@@ -45,11 +50,29 @@ export async function PATCH(
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
-  const body = await req.json()
+  let body: Record<string, unknown>
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Corps JSON invalide' }, { status: 400 })
+  }
+
+  const service = serviceClient()
+  const { data: existingClient, error: existingClientError } = await service
+    .from('coach_clients')
+    .select('id, date_of_birth, minor_authorization_status, minor_guardian_name, minor_guardian_email, minor_authorization_confirmed_at')
+    .eq('id', params.clientId)
+    .eq('coach_id', user.id)
+    .maybeSingle()
+
+  if (existingClientError || !existingClient) {
+    return NextResponse.json({ error: 'Client introuvable' }, { status: 404 })
+  }
+
   const allowed = [
     'first_name', 'last_name', 'email', 'phone', 'date_of_birth', 'gender', 'notes', 'status',
     'transformation_phase', 'training_goal', 'fitness_level', 'sport_practice', 'weekly_frequency', 'equipment_category',
-    'equipment',
+    'equipment', 'step_target',
     // CRM fields
     'address', 'city', 'emergency_contact_name', 'emergency_contact_phone',
     'acquisition_source', 'internal_notes',
@@ -57,6 +80,49 @@ export async function PATCH(
   const update: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) update[key] = body[key]
+  }
+
+  const updatesMinorAuthorization =
+    'date_of_birth' in body ||
+    'minor_guardian_authorization_confirmed' in body ||
+    'minor_guardian_name' in body ||
+    'minor_guardian_email' in body
+
+  if (updatesMinorAuthorization) {
+    const normalizedDate = normalizeDateOfBirth(
+      'date_of_birth' in body ? body.date_of_birth : existingClient.date_of_birth,
+    )
+    if (!normalizedDate.valid) {
+      return NextResponse.json({ error: normalizedDate.error }, { status: 400 })
+    }
+
+    update.date_of_birth = normalizedDate.value
+
+    if (isMinor(normalizedDate.value)) {
+      if (body.minor_guardian_authorization_confirmed !== true) {
+        return NextResponse.json(
+          { error: 'L’autorisation du représentant légal doit être confirmée pour un client mineur.' },
+          { status: 422 },
+        )
+      }
+
+      const guardian = validateGuardianDetails(body.minor_guardian_name, body.minor_guardian_email)
+      if (!guardian.valid) {
+        return NextResponse.json({ error: guardian.error }, { status: 422 })
+      }
+
+      update.minor_authorization_status = 'authorized'
+      update.minor_guardian_name = guardian.name
+      update.minor_guardian_email = guardian.email
+      update.minor_authorization_confirmed_at = new Date().toISOString()
+      update.minor_authorization_confirmed_by = user.id
+    } else {
+      update.minor_authorization_status = 'not_required'
+      update.minor_guardian_name = null
+      update.minor_guardian_email = null
+      update.minor_authorization_confirmed_at = null
+      update.minor_authorization_confirmed_by = null
+    }
   }
 
   // Validate weekly_frequency bounds (1-7 days/week)
@@ -70,7 +136,17 @@ export async function PATCH(
     }
   }
 
-  const service = serviceClient()
+  // Validate step_target bounds
+  if ('step_target' in update && update.step_target != null) {
+    const steps = Number(update.step_target)
+    if (isNaN(steps) || steps < 0 || steps > 200000) {
+      return NextResponse.json(
+        { error: 'step_target must be between 0 and 200000' },
+        { status: 400 }
+      )
+    }
+    update.step_target = Math.round(steps)
+  }
 
   const { data, error } = await service
     .from('coach_clients')

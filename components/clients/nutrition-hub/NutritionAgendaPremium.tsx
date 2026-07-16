@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { NUTRITION_UI_COLORS } from "@/lib/nutrition/ui-colors";
 
 type NutritionAgendaRow = {
@@ -21,6 +22,16 @@ type NutritionAgendaRow = {
     carbs_g: number | null;
     fat_g: number | null;
     hydration_ml: number | null;
+  };
+  smoothing?: null | {
+    planId: string;
+    sourceDate: string;
+    direction: "surplus" | "deficit";
+    kcalDelta: number;
+    remainingKcal: number;
+    dayStatus: string;
+    coachNote: string | null;
+    coachLastAction: string | null;
   };
 };
 
@@ -63,6 +74,14 @@ function toRatio(consumed: number, target: number | null) {
   return Math.max(0, Math.min(consumed / target, 1));
 }
 
+function formatRemaining(row: NutritionAgendaRow["smoothing"]) {
+  if (!row) return null;
+  const abs = Math.abs(row.remainingKcal);
+  return row.direction === "surplus"
+    ? `reste ${abs} kcal à retirer`
+    : `reste ${abs} kcal à réinjecter`;
+}
+
 function RatioBar({
   label,
   consumed,
@@ -83,7 +102,7 @@ function RatioBar({
       <div className="flex items-center justify-between gap-2">
         <p className="text-[10px] uppercase tracking-[0.14em] text-white/32">{label}</p>
         <p className="truncate text-[11px] font-medium text-white/76">
-          {consumed} / {target ?? "N/A"} {unit}
+          {consumed} / {target ?? "—"} {unit}
         </p>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
@@ -101,9 +120,18 @@ function RatioBar({
 
 export default function NutritionAgendaPremium({
   rows,
+  focusDate,
 }: {
   rows: NutritionAgendaRow[];
+  focusDate?: string | null;
 }) {
+  const focusRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!focusDate || !focusRef.current) return;
+    focusRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusDate]);
+
   return (
     <section className="rounded-[28px] border border-white/[0.07] bg-[#181818] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.18)]">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -125,10 +153,13 @@ export default function NutritionAgendaPremium({
         {[...rows].reverse().map((row) => (
           <div
             key={row.date}
+            ref={row.date === focusDate ? focusRef : null}
             className={`rounded-[22px] border px-4 py-4 ${
-              row.isToday
-                ? "border-[#1f8a65]/50 bg-[#1f8a65]/[0.04]"
-                : "border-white/[0.06] bg-white/[0.03]"
+              row.date === focusDate
+                ? "border-[#ffd15e]/42 bg-[#ffd15e]/[0.08]"
+                : row.isToday
+                  ? "border-[#1f8a65]/50 bg-[#1f8a65]/[0.04]"
+                  : "border-white/[0.06] bg-white/[0.03]"
             }`}
           >
             <div className="flex flex-col gap-4">
@@ -137,6 +168,11 @@ export default function NutritionAgendaPremium({
                   <div className="min-w-[96px]">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold text-white">{formatDate(row.date)}</p>
+                      {row.date === focusDate ? (
+                        <span className="rounded-full border border-[#ffd15e]/35 bg-[#ffd15e]/12 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-[#ffe7a3]">
+                          Détection
+                        </span>
+                      ) : null}
                       {row.isToday && (
                         <span className="rounded-full border border-[#1f8a65]/40 bg-[#1f8a65]/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-[#8ef0c7]">
                           Aujourd&apos;hui
@@ -145,11 +181,29 @@ export default function NutritionAgendaPremium({
                     </div>
                     <p className="mt-1 text-[11px] text-white/42">{row.mealCount} repas</p>
                   </div>
-                  <span
-                    className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${STATUS_STYLES[row.status] ?? STATUS_STYLES.no_target}`}
-                  >
-                    {STATUS_LABELS[row.status] ?? row.status}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${STATUS_STYLES[row.status] ?? STATUS_STYLES.no_target}`}
+                    >
+                      {STATUS_LABELS[row.status] ?? row.status}
+                    </span>
+                    {row.smoothing && (
+                      <>
+                        <span className="rounded-full border border-[#7fe0b8]/18 bg-[#1f8a65]/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#8ef0c7]">
+                          {row.smoothing.kcalDelta > 0 ? "+" : ""}
+                          {row.smoothing.kcalDelta} kcal
+                        </span>
+                        <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[10px] font-semibold text-white/58">
+                          {formatRemaining(row.smoothing)}
+                        </span>
+                        {row.smoothing.coachLastAction && (
+                          <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[10px] font-semibold text-white/58">
+                            Coach {row.smoothing.coachLastAction}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5 xl:min-w-[760px]">

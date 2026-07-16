@@ -41,20 +41,22 @@ export default function SmartNutritionWidget({ consumed, target, proteinStreakDa
   const [waterDelta, setWaterDelta] = useState(0)
   const effectiveWaterMl = consumed.water_ml + waterDelta
 
-  function getStateColor(state: NutritionProgressState, baseColor: string): string {
-    if (state === 'over')       return '#ef4444'
-    if (state === 'near_limit') return '#f59e0b'
+  function getStateColor(_state: NutritionProgressState, baseColor: string): string {
     return baseColor
   }
 
   const kcalMeta = getNutritionProgressMeta(consumed.kcal, target.kcal)
   const waterMeta = getNutritionProgressMeta(effectiveWaterMl, target.water_ml)
-  const waterOverflowLabel = formatOverflow((effectiveWaterMl - target.water_ml) / 1000, 'L')
+  const waterStatusLabel = effectiveWaterMl >= target.water_ml
+    ? effectiveWaterMl > target.water_ml
+      ? t('nutrition.hero.goalExceeded')
+      : t('nutrition.hero.goalReached')
+    : null
   const kcalPct = Math.min(kcalMeta.ratio, 1)
   const r = 80
   const arcTotal = Math.PI * r
   const arcOffset = arcTotal * (1 - kcalPct)
-  const kcalStroke = getStateColor(kcalMeta.state, NUTRITION_UI_COLORS.calories)
+  const kcalStroke = NUTRITION_UI_COLORS.calories
 
   return (
     <>
@@ -69,7 +71,7 @@ export default function SmartNutritionWidget({ consumed, target, proteinStreakDa
         className="block bg-[#111111] rounded-2xl p-5 active:scale-[0.99] transition-transform"
       >
         <div className="flex items-baseline justify-between mb-3">
-          <span className="font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[11px] text-white/30">Nutrition</span>
+          <span className="font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[11px] text-white/30">{t('smart.nutrition.label')}</span>
           <span className="text-[10px] font-semibold text-[#f2f2f2]">→</span>
         </div>
 
@@ -98,7 +100,7 @@ export default function SmartNutritionWidget({ consumed, target, proteinStreakDa
             <div className="font-black leading-none text-white tabular-nums text-[28px]">
               {Math.round(consumed.kcal)}
             </div>
-            <div className="text-[9px] uppercase tracking-[0.12em] text-white/35 mt-1">Calories consommées</div>
+            <div className="text-[9px] uppercase tracking-[0.12em] text-white/35 mt-1">{t('smart.nutrition.caloriesConsumed')}</div>
             <div className="text-[10px] text-white/50 tabular-nums">/ {target.kcal} kcal</div>
           </div>
         </div>
@@ -109,8 +111,12 @@ export default function SmartNutritionWidget({ consumed, target, proteinStreakDa
             const c = (consumed[m.key] as number) ?? 0
             const tg = (target[m.key] as number) ?? 0
             const meta = getNutritionProgressMeta(c, tg)
-            const fillColor = getStateColor(meta.state, m.color)
-            const overflowLabel = formatOverflow(c - tg, 'g')
+            const fillColor = m.color
+            const statusLabel = c > tg
+              ? t('nutrition.hero.goalExceeded')
+              : c >= tg
+                ? t('nutrition.hero.goalReached')
+                : null
             return (
               <div key={m.key}>
                 <div className="flex justify-between text-[10px] mb-1">
@@ -129,8 +135,8 @@ export default function SmartNutritionWidget({ consumed, target, proteinStreakDa
                     }}
                   />
                 </div>
-                <div className="mt-1 min-h-[14px] text-[9px] font-bold tabular-nums" style={{ color: meta.state === 'over' ? '#ef4444' : 'rgba(255,255,255,0.28)' }}>
-                  {overflowLabel ?? '\u00A0'}
+                <div className="mt-1 min-h-[14px] text-[9px] font-medium tabular-nums text-white/40">
+                  {statusLabel ?? '\u00A0'}
                 </div>
               </div>
             )
@@ -141,7 +147,9 @@ export default function SmartNutritionWidget({ consumed, target, proteinStreakDa
         <div className="flex items-center gap-3 mt-4 pt-3">
           <div className="flex-1">
             <div className="flex justify-between text-[10px] mb-1">
-              <span className="text-white/50 uppercase tracking-[0.1em] font-bold">Hydratation</span>
+              <span className="text-[10px] font-bold tracking-[0.1em] text-white/50" style={{ color: NUTRITION_UI_COLORS.water }}>
+                {t('smart.nutrition.hydration')}
+              </span>
               <span className="text-white font-bold tabular-nums">
                 {(effectiveWaterMl / 1000).toFixed(1)} / {(target.water_ml / 1000).toFixed(1)} L
               </span>
@@ -151,13 +159,13 @@ export default function SmartNutritionWidget({ consumed, target, proteinStreakDa
                 className="h-full rounded-full"
                 style={{
                   width: `${waterMeta.clampedPercent}%`,
-                  background: getStateColor(waterMeta.state, NUTRITION_UI_COLORS.water),
+                  background: NUTRITION_UI_COLORS.water,
                   transition: 'width 0.4s ease',
                 }}
               />
             </div>
-            <div className="mt-1 min-h-[14px] text-[9px] font-bold tabular-nums" style={{ color: waterMeta.state === 'over' ? '#ef4444' : 'rgba(255,255,255,0.28)' }}>
-              {waterOverflowLabel ?? '\u00A0'}
+            <div className="mt-1 min-h-[14px] text-[9px] font-medium tabular-nums text-white/40">
+              {waterStatusLabel ?? '\u00A0'}
             </div>
           </div>
           <button
@@ -170,7 +178,7 @@ export default function SmartNutritionWidget({ consumed, target, proteinStreakDa
 
         {consumed.caffeine_mg != null && consumed.caffeine_mg > 0 && (
           <div className="mt-2 flex items-center justify-between rounded-xl bg-white/[0.03] px-3 py-2 text-[10px]">
-            <span className="text-white/40 uppercase tracking-[0.1em] font-bold">Caféine / théine</span>
+            <span className="text-white/40 uppercase tracking-[0.1em] font-bold">{t('smart.nutrition.caffeine')}</span>
             <span className="text-white font-bold tabular-nums">{Math.round(consumed.caffeine_mg)} mg</span>
           </div>
         )}
@@ -180,7 +188,7 @@ export default function SmartNutritionWidget({ consumed, target, proteinStreakDa
           <div className="mt-3 pt-3">
             <div className="flex justify-between text-[10px] mb-1.5">
               <span className="text-white/40 uppercase tracking-[0.1em] font-bold">{t('nutrition.consistency')}</span>
-              <span className="text-white/60 tabular-nums font-bold">{proteinStreakDays}/7j</span>
+              <span className="text-white/60 tabular-nums font-bold">{proteinStreakDays}/7{t('feedback.time.d')}</span>
             </div>
             <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
               <div

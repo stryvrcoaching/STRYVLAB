@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "marketplaces": [
+    {
+      "name": "aidd-framework-codex",
+      "source": {
+        "kind": "local",
+        "path": "/Users/user/Desktop/STRYVLAB/.tmp/aidd/extracted/aidd-framework-codex-marketplace-5.0.3"
+      },
+      "scope": "project",
+      "addedAt": "2026-06-24T17:16:12.351Z",
+      "lastFetched": "2026-06-24T17:16:42.013Z",
+      "version": "5.0.3"
+    },
+    {
+      "name": "aidd-framework",
+      "source": {
+        "kind": "local",
+        "path": "/Users/user/Desktop/STRYVLAB/.tmp/aidd/extracted/aidd-framework-codex-marketplace-5.0.3"
+      },
+      "scope": "project",
+      "addedAt": "2026-06-24T17:16:41.802Z",
+      "lastFetched": "2026-06-24T17:16:42.040Z",
+      "version": "5.0.3"
+    }
+  ]
+}

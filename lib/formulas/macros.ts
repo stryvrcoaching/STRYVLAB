@@ -98,11 +98,13 @@ export interface MacroInput {
   sessionDurationMin?:      number;     // Durée session (min)
   trainingCaloriesWeekly?:  number;     // Kcal tracker/semaine
   trainingTypes?:           string[];   // Types d'entraînement
+  trainingRir?:             number;     // RIR cible moyen, ajustement estimatif
 
   // ── Cardio EAT (séparé muscu) ────────────────────────────────────────────
   cardioFrequency?:    number;    // Séances cardio/semaine
   cardioDurationMin?:  number;    // Durée cardio moy (min)
   cardioTypes?:        string[];  // Types de cardio
+  cardioRpe?:          number;    // RPE cible cardio (1–10), ajustement estimatif
 
   // ── Bien-être & récupération ──────────────────────────────────────────────
   stressLevel?:         number;  // 1–10
@@ -235,19 +237,23 @@ function mifflinBMR(weight: number, height: number, age: number, gender: MacroGe
 }
 
 /** EAT musculation par MET */
-function computeEATMuscu(weight: number, durationMin: number, weeklyWorkouts: number, types?: string[]): number {
+function computeEATMuscu(weight: number, durationMin: number, weeklyWorkouts: number, types?: string[], rir?: number): number {
   const met = types && types.length > 0
     ? types.reduce((s, t) => s + (TRAINING_TYPE_MET[t] ?? 5.0), 0) / types.length
     : 5.0;
-  return (met * weight * durationMin / 60 * weeklyWorkouts) / 7;
+  const boundedRir = rir == null ? null : Math.min(5, Math.max(0, rir));
+  const rirFactor = boundedRir == null ? 1 : 1 + ((2 - boundedRir) * 0.03);
+  return (met * rirFactor * weight * durationMin / 60 * weeklyWorkouts) / 7;
 }
 
 /** EAT cardio séparé — Swain & Franklin 2002 */
-function computeEATCardio(weight: number, durationMin: number, weeklyCardio: number, types?: string[]): number {
+function computeEATCardio(weight: number, durationMin: number, weeklyCardio: number, types?: string[], rpe?: number): number {
   const met = types && types.length > 0
     ? types.reduce((s, t) => s + (CARDIO_TYPE_MET[t] ?? 6.0), 0) / types.length
     : 6.0;
-  return (met * weight * durationMin / 60 * weeklyCardio) / 7;
+  const boundedRpe = rpe == null ? null : Math.min(10, Math.max(1, rpe));
+  const rpeFactor = boundedRpe == null ? 1 : 0.85 + ((boundedRpe - 1) / 9) * 0.30;
+  return (met * rpeFactor * weight * durationMin / 60 * weeklyCardio) / 7;
 }
 
 const TRAINING_TABLE: Record<number, number> = {
@@ -674,7 +680,7 @@ export function calculateMacros(input: MacroInput): MacroResult {
     eatMuscu  = delta > 0.20 ? trackerPerDay : tableEAT;
     eatSource = delta > 0.20 ? 'tracker' : 'table';
   } else if (input.sessionDurationMin != null && input.sessionDurationMin > 0 && weeklyMuscu > 0) {
-    eatMuscu  = computeEATMuscu(weight, input.sessionDurationMin, weeklyMuscu, input.trainingTypes);
+    eatMuscu  = computeEATMuscu(weight, input.sessionDurationMin, weeklyMuscu, input.trainingTypes, input.trainingRir);
     eatSource = 'duration-met';
   } else {
     eatMuscu  = tableEAT;
@@ -686,7 +692,7 @@ export function calculateMacros(input: MacroInput): MacroResult {
   let cardioEatSrc: MacroResult['dataProvenance']['cardioEatSource'] = 'none';
 
   if (input.cardioFrequency != null && input.cardioFrequency > 0 && input.cardioDurationMin != null && input.cardioDurationMin > 0) {
-    eatCardio    = computeEATCardio(weight, input.cardioDurationMin, input.cardioFrequency, input.cardioTypes);
+    eatCardio    = computeEATCardio(weight, input.cardioDurationMin, input.cardioFrequency, input.cardioTypes, input.cardioRpe);
     cardioEatSrc = 'duration-met';
   }
 

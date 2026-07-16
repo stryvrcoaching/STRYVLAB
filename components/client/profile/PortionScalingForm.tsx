@@ -54,12 +54,12 @@ export default function PortionScalingForm() {
   async function clearOverride() {
     setHandCm("")
     setSaving(true)
-    await fetch("/api/client/profile-scaling", {
+    const res = await fetch("/api/client/profile-scaling", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ hand_length_cm: null }),
     })
-    setSavedHand(null)
+    if (res.ok) setSavedHand(null)
     setSaving(false)
   }
 

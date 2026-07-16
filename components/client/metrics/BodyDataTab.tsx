@@ -64,7 +64,7 @@ export default function BodyDataTab({ data }: Props) {
       )}
       {latestFat && (
         <MetricCard
-          label="Masse grasse"
+          label={t('metrics.fatMass')}
           value={`${latestFat.value.toFixed(1)}%`}
           series={data.bodyFatSeries}
           unit="%"
@@ -74,7 +74,7 @@ export default function BodyDataTab({ data }: Props) {
       )}
       {latestLean && (
         <MetricCard
-          label="Masse maigre"
+          label={t('metrics.leanMass')}
           value={`${latestLean.value.toFixed(1)} kg`}
           series={data.leanMassSeries}
           unit=" kg"
@@ -85,7 +85,7 @@ export default function BodyDataTab({ data }: Props) {
 
       {data.composition.muscle_mass_kg != null && (
         <MetricCard
-          label="Masse musculaire"
+          label={t('metrics.muscleMass')}
           value={`${data.composition.muscle_mass_kg.toFixed(1)} kg`}
           series={[]}
           unit=" kg"
@@ -94,7 +94,7 @@ export default function BodyDataTab({ data }: Props) {
       )}
       {data.composition.skeletal_muscle_pct != null && (
         <MetricCard
-          label="Masse musculaire squelettique"
+          label={t('metrics.skeletalMuscle')}
           value={`${data.composition.skeletal_muscle_pct.toFixed(1)}%`}
           series={[]}
           unit="%"
@@ -103,7 +103,7 @@ export default function BodyDataTab({ data }: Props) {
       )}
       {data.composition.visceral_fat_level != null && (
         <MetricCard
-          label="Graisse viscérale"
+          label={t('metrics.visceralFat')}
           value={`${data.composition.visceral_fat_level.toFixed(1)}`}
           series={[]}
           unit=""
@@ -112,7 +112,7 @@ export default function BodyDataTab({ data }: Props) {
       )}
       {data.composition.body_water_pct != null && (
         <MetricCard
-          label="Hydratation"
+          label={t('metrics.hydration')}
           value={`${data.composition.body_water_pct.toFixed(1)}%`}
           series={[]}
           unit="%"
@@ -121,7 +121,7 @@ export default function BodyDataTab({ data }: Props) {
       )}
       {data.composition.muscle_mass_pct != null && (
         <MetricCard
-          label="Masse musculaire (%)"
+          label={t('metrics.muscleMassPct')}
           value={`${data.composition.muscle_mass_pct.toFixed(1)}%`}
           series={[]}
           unit="%"
@@ -130,7 +130,7 @@ export default function BodyDataTab({ data }: Props) {
       )}
       {data.composition.bone_mass_kg != null && (
         <MetricCard
-          label="Masse osseuse"
+          label={t('metrics.boneMass')}
           value={`${data.composition.bone_mass_kg.toFixed(1)} kg`}
           series={[]}
           unit=" kg"

@@ -1,4 +1,8 @@
 // lib/nutrition/types.ts
+import type { NutritionPlanMeal } from '@/lib/nutrition/protocol-builder'
+import type { NutritionDayRole } from '@/lib/nutrition/day-role'
+import type { CycleSyncProfile } from '@/lib/nutrition/cycle-sync-profile'
+import { inferNutritionDayRole } from '@/lib/nutrition/day-role'
 
 export interface NutritionProtocol {
   id: string
@@ -9,15 +13,55 @@ export interface NutritionProtocol {
   notes: string | null
   schedule_start_date?: string | null
   cycle_sync_enabled: boolean
+  cycle_sync_profile?: CycleSyncProfile | null
   tdee_auto_enabled: boolean
   tdee_adaptive_active: boolean
   tdee_adaptive?: number | null
   tdee_adaptive_at?: string | null
   tdee_data_source?: 'weight_delta' | 'formula_proxy' | null
+  tdee_snapshot_source?: 'client_state' | 'manual' | 'formula' | null
+  tdee_snapshot_used_at?: string | null
   created_at: string
   updated_at: string
   days?: NutritionProtocolDay[]
   schedule_slots?: NutritionProtocolScheduleSlot[]
+  analytics?: NutritionProtocolAnalytics
+  plan_analytics?: NutritionProtocolPlanAnalytics
+  tracking_analytics?: NutritionProtocolTrackingAnalytics | null
+  historical_tracking_analytics?: NutritionProtocolTrackingAnalytics | null
+  card_mode?: 'plan' | 'tracking'
+  card_state?: NutritionProtocolCardState
+}
+
+export interface NutritionProtocolAnalytics {
+  days_count: number
+  avg_kcal_delta: number | null
+  nutrition_score: number | null
+  avg_daily_kcal_variation: number | null
+  reliability_label: 'Fiables' | 'Partielles' | 'Faibles'
+  analyzed_days_count: number
+  kcal_delta_trend: number[]
+  kcal_variation_trend: number[]
+}
+
+export type NutritionProtocolCardState = 'waiting' | 'early' | 'partial' | 'reliable'
+
+export interface NutritionProtocolPlanAnalytics {
+  days_count: number
+  avg_target_kcal: number | null
+  kcal_amplitude: number | null
+  training_days_count: number
+  rest_days_count: number
+  hydration_target_avg_ml: number | null
+  structure_score: number | null
+  warnings: string[]
+}
+
+export interface NutritionProtocolTrackingAnalytics extends NutritionProtocolAnalytics {
+  window_label: string
+  complete_days_count: number
+  partial_days_count: number
+  state_label: 'En attente' | 'Précoce' | 'Partiel' | 'Fiable'
 }
 
 export interface NutritionProtocolDay {
@@ -30,9 +74,11 @@ export interface NutritionProtocolDay {
   carbs_g: number | null
   fat_g: number | null
   hydration_ml: number | null
+  role: NutritionDayRole
   carb_cycle_type: 'high' | 'medium' | 'low' | null
   cycle_sync_phase: 'follicular' | 'ovulatory' | 'luteal' | 'menstrual' | null
   recommendations: string | null
+  meal_plan: NutritionPlanMeal[] | null
   created_at: string
 }
 
@@ -55,9 +101,11 @@ export interface DayDraft {
   carbs_g: string
   fat_g: string
   hydration_ml: string
+  role: NutritionDayRole
   carb_cycle_type: 'high' | 'medium' | 'low' | ''
   cycle_sync_phase: 'follicular' | 'ovulatory' | 'luteal' | 'menstrual' | ''
   recommendations: string
+  meal_plan: NutritionPlanMeal[]
 }
 
 export function emptyDayDraft(name = 'Nouveau jour'): DayDraft {
@@ -69,9 +117,11 @@ export function emptyDayDraft(name = 'Nouveau jour'): DayDraft {
     carbs_g: '',
     fat_g: '',
     hydration_ml: '',
+    role: 'neutral',
     carb_cycle_type: '',
     cycle_sync_phase: '',
     recommendations: '',
+    meal_plan: [],
   }
 }
 
@@ -85,9 +135,11 @@ export function dayDraftFromDb(day: NutritionProtocolDay): DayDraft {
     carbs_g: day.carbs_g != null ? String(day.carbs_g) : '',
     fat_g: day.fat_g != null ? String(day.fat_g) : '',
     hydration_ml: day.hydration_ml != null ? String(day.hydration_ml) : '',
+    role: day.role ?? inferNutritionDayRole(day),
     carb_cycle_type: day.carb_cycle_type ?? '',
     cycle_sync_phase: day.cycle_sync_phase ?? '',
     recommendations: day.recommendations ?? '',
+    meal_plan: Array.isArray(day.meal_plan) ? day.meal_plan : [],
   }
 }
 
@@ -99,6 +151,9 @@ export interface NutritionClientData {
   age: number | null
   height_cm: number | null
   weight_kg: number | null
+  waist_cm?: number | null
+  neck_cm?: number | null
+  hips_cm?: number | null
   body_fat_pct: number | null
   muscle_mass_kg: number | null
   lean_mass_kg: number | null
@@ -124,3 +179,5 @@ export interface NutritionClientData {
   occupation: string | null
   occupation_multiplier: number | null
 }
+
+export * from '@/lib/nutrition/smoothing/types'

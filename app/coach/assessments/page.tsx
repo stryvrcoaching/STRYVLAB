@@ -17,6 +17,7 @@ import {
 import { useSetTopBar } from "@/components/layout/useSetTopBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AssessmentTemplate } from "@/types/assessment";
+import HeaderIconButton from "@/components/layout/HeaderIconButton";
 
 interface Client {
   id: string;
@@ -66,13 +67,12 @@ export default function AssessmentsPage() {
 
   const topBarRight = useMemo(
     () => (
-      <button
+      <HeaderIconButton
         onClick={() => router.push("/coach/assessments/templates/new")}
-        className="flex items-center gap-2 px-4 h-8 rounded-lg bg-[#1f8a65] text-[12px] font-bold text-white hover:bg-[#217356] transition-colors active:scale-[0.98]"
-      >
-        <Plus size={13} />
-        Nouveau
-      </button>
+        icon={<Plus size={13} />}
+        label="Nouveau template de bilan"
+        variant="accent"
+      />
     ),
     [router],
   );

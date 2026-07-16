@@ -2,15 +2,18 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { ArrowRight, Microphone } from "@phosphor-icons/react"
+import { useClientT } from "@/components/client/ClientI18nProvider"
 
 interface ChatInputBarProps {
   onSend: (content: string, type?: string) => void
   disabled?: boolean
   editContent?: string
   onCancelEdit?: () => void
+  compact?: boolean
 }
 
-export default function ChatInputBar({ onSend, disabled, editContent, onCancelEdit }: ChatInputBarProps) {
+export default function ChatInputBar({ onSend, disabled, editContent, onCancelEdit, compact = false }: ChatInputBarProps) {
+  const { lang, t } = useClientT()
   const [value, setValue] = useState("")
   const [isRecording, setIsRecording] = useState(false)
   const [interimText, setInterimText] = useState("")
@@ -54,7 +57,7 @@ export default function ChatInputBar({ onSend, disabled, editContent, onCancelEd
     if (!SR) return
 
     const recognition = new SR()
-    recognition.lang = "fr-FR"
+    recognition.lang = lang === "es" ? "es-ES" : lang === "en" ? "en-US" : "fr-FR"
     recognition.continuous = true
     recognition.interimResults = true
     recognitionRef.current = recognition
@@ -109,30 +112,30 @@ export default function ChatInputBar({ onSend, disabled, editContent, onCancelEd
   }
 
   return (
-    <div className="shrink-0 bg-[#0d0d0d] flex flex-col border-t border-white/[0.04]">
+    <div className={`shrink-0 flex flex-col ${compact ? "bg-transparent" : "border-t border-white/[0.04] bg-[#0d0d0d]"}`}>
       {editContent !== undefined && editContent !== null && (
         <div className="flex items-center justify-between px-4 py-1.5 bg-[#111111] border-b border-white/[0.04] text-[11px] text-[#808080] font-barlow">
-          <span>Mode édition</span>
+          <span>{t('chat.input.editing')}</span>
           <button
             type="button"
             onClick={onCancelEdit}
             className="text-red-400 hover:text-red-300 font-semibold transition-colors"
           >
-            Annuler
+            {t('common.cancel')}
           </button>
         </div>
       )}
-      <div className="px-3 py-2.5 flex items-end gap-2">
+      <div className={`flex items-end gap-2 ${compact ? "p-0" : "px-3 py-2.5"}`}>
         <button
           type="button"
           onClick={toggleRecording}
           disabled={disabled}
-          className={`h-9 w-9 flex items-center justify-center rounded-xl transition-colors shrink-0 ${
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
             isRecording
               ? "bg-red-500/15 text-red-400"
               : "bg-[#1a1a1a] text-[#5a5a5a] active:bg-[#222222]"
           }`}
-          aria-label={isRecording ? "Arrêter la dictée" : "Saisie vocale"}
+          aria-label={isRecording ? t('chat.input.voice.stop') : t('chat.input.voice.start')}
         >
           <Microphone size={18} weight={isRecording ? "fill" : "regular"} />
         </button>
@@ -142,11 +145,11 @@ export default function ChatInputBar({ onSend, disabled, editContent, onCancelEd
           value={displayValue}
           onChange={e => { if (!isRecording) setValue(e.target.value) }}
           onKeyDown={handleKey}
-          placeholder="Écrire un message..."
+          placeholder={t('chat.input.placeholder')}
           disabled={disabled}
           readOnly={isRecording}
           rows={1}
-          className="flex-1 min-w-0 bg-[#111111] rounded-xl px-3.5 py-2 text-[13px] font-barlow text-[#e0e0e0] placeholder-[#5a5a5a] outline-none transition-colors disabled:opacity-50 resize-none leading-relaxed"
+          className={`min-h-10 min-w-0 flex-1 resize-none rounded-xl px-3.5 py-2 text-[13px] font-barlow leading-relaxed text-[#e0e0e0] placeholder-[#5a5a5a] outline-none transition-colors disabled:opacity-50 ${compact ? "bg-transparent" : "bg-[#111111]"}`}
           style={{ overflowY: "auto", maxHeight: "120px" }}
         />
 
@@ -154,8 +157,8 @@ export default function ChatInputBar({ onSend, disabled, editContent, onCancelEd
           type="button"
           onClick={handleSend}
           disabled={!value.trim() || disabled}
-          className="h-9 w-9 flex items-center justify-center rounded-xl bg-[#f2f2f2] text-[#080808] disabled:opacity-30 active:scale-95 transition-all shrink-0"
-          aria-label="Envoyer"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f2f2f2] text-[#080808] transition-all active:scale-95 disabled:opacity-30"
+          aria-label={t('common.send')}
         >
           <ArrowRight size={16} weight="bold" />
         </button>

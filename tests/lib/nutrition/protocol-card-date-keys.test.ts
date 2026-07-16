@@ -15,6 +15,20 @@ describe('buildProtocolDateKeysForAnalytics', () => {
     expect(dateKeys).toEqual(['2026-06-29', '2026-06-30', '2026-07-01'])
   })
 
+  it('returns no history when fallback is disabled for an unassigned protocol', () => {
+    const dateKeys = buildProtocolDateKeysForAnalytics({
+      protocol: {
+        id: 'protocol-1',
+        schedule_start_date: '2026-06-29',
+      },
+      referenceDateKey: '2026-07-01',
+      timezone: 'UTC',
+      allowUnassignedFallback: false,
+    })
+
+    expect(dateKeys).toEqual([])
+  })
+
   it('uses the assignment window when it exists', () => {
     const dateKeys = buildProtocolDateKeysForAnalytics({
       protocol: {

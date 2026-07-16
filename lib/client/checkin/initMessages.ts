@@ -7,6 +7,30 @@ export type InitMessageRow = {
   metadata?: Record<string, unknown> | null
 }
 
+function isInteractiveMetadata(metadata: Record<string, unknown> | null | undefined): boolean {
+  const component = metadata?.component
+  return component === 'chips' || component === 'slider' || component === 'number' || component === 'time'
+}
+
+export function hasPendingInteractivePrompt(
+  rows: Array<Pick<InitMessageRow, 'metadata'>>,
+): boolean {
+  return rows.some((row) => {
+    const metadata = row.metadata ?? null
+    if (!isInteractiveMetadata(metadata)) return false
+    return metadata.answered !== true
+  })
+}
+
+export function hasPendingInteractivePromptForFlow(
+  rows: Array<Pick<InitMessageRow, 'metadata'>>,
+  flowType: 'morning' | 'evening',
+): boolean {
+  return hasPendingInteractivePrompt(rows.filter((row) => (
+    (row.metadata ?? {}).flow_type === flowType
+  )))
+}
+
 export function hasInteractiveCheckinInit(row: InitMessageRow | null | undefined): boolean {
   const meta = (row?.metadata ?? {}) as Record<string, unknown>
   return meta.key === 'checkin_ready' && (meta.flow_type === 'morning' || meta.flow_type === 'evening')

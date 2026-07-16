@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Dumbbell,
@@ -19,6 +20,7 @@ import {
   isCompletedSession,
   type SessionStatusFilter,
 } from "@/lib/training/sessionLogUtils";
+import { resolveCanonicalExerciseName } from "@/lib/training/exerciseHistoryKey";
 
 interface SessionLog {
   id: string;
@@ -27,6 +29,9 @@ interface SessionLog {
   completed_at: string | null;
   duration_min: number | null;
   notes: string | null;
+  session_kind?: "planned" | "flex" | null;
+  flex_session_id?: string | null;
+  relation_to_planned_workout?: "replace" | "bonus" | "unknown" | null;
   client_set_logs: {
     id: string;
     exercise_name: string;
@@ -51,6 +56,12 @@ const STATUS_LABELS: Record<SessionStatusFilter, string> = {
   completed: "Complétées",
   incomplete: "Brouillons",
 };
+
+function resolveFlexLabel(log: SessionLog) {
+  if (log.relation_to_planned_workout === "replace") return "Remplacement";
+  if (log.relation_to_planned_workout === "bonus") return "Bonus";
+  return "Séance libre";
+}
 
 export default function SessionHistory({
   clientId,
@@ -328,8 +339,9 @@ export default function SessionHistory({
 
             const byExercise: Record<string, typeof sets> = {};
             for (const s of sets) {
-              if (!byExercise[s.exercise_name]) byExercise[s.exercise_name] = [];
-              byExercise[s.exercise_name].push(s);
+              const exerciseName = resolveCanonicalExerciseName(s.exercise_name);
+              if (!byExercise[exerciseName]) byExercise[exerciseName] = [];
+              byExercise[exerciseName].push(s);
             }
 
             return (
@@ -376,7 +388,14 @@ export default function SessionHistory({
                         <p className="font-semibold text-white text-sm truncate">
                           {log.session_name}
                         </p>
-                        <p className="text-xs text-white/45 capitalize">{date}</p>
+                        <div className="mt-0.5 flex items-center gap-2">
+                          <p className="text-xs text-white/45 capitalize">{date}</p>
+                          {log.session_kind === "flex" && (
+                            <span className="rounded-full border border-white/[0.08] bg-white/[0.05] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] text-white/60">
+                              {resolveFlexLabel(log)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
@@ -480,6 +499,21 @@ export default function SessionHistory({
                       <p className="text-xs text-white/45 italic border-t border-white/[0.06] pt-3">
                         {log.notes}
                       </p>
+                    )}
+                    {log.session_kind === "flex" && (
+                      <div className="border-t border-white/[0.06] pt-3 flex items-center justify-between gap-3">
+                        <p className="text-[11px] text-white/30">
+                          Détail complet disponible.
+                        </p>
+                        {log.flex_session_id && (
+                          <Link
+                            href={`/coach/clients/${clientId}/data/performances/flex-workouts/${log.flex_session_id}`}
+                            className="shrink-0 rounded-lg bg-white/[0.06] px-3 py-1.5 text-[11px] font-semibold text-white/75 transition-colors hover:bg-white/[0.1] hover:text-white"
+                          >
+                            Ouvrir
+                          </Link>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}

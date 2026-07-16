@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { selectAdvice, type AdviceInput } from '@/lib/client/ai-coach/adviceRules'
 
 const base: AdviceInput = {
+  lang: 'fr',
   facts: {
     dayKind: 'training',
     session: { planned: 'Push A', status: 'completed' },

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Plus, X, Calendar, Kanban, Check, Bell, Edit3, User, FileText, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Calendar, Kanban, Check, Bell, Edit3, User, FileText, ExternalLink, Video, Phone, MapPin, Link2, MessageSquare, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export type AgendaEvent = {
@@ -20,6 +20,7 @@ export type AgendaEvent = {
   template_type?: string | null;
   is_completed: boolean;
   notify_minutes_before?: number | null;
+  alert_at?: string | null;
 };
 
 type BoardOption = { id: string; title: string };
@@ -49,21 +50,19 @@ const PRIORITY_CONFIG = {
 } as const;
 
 const TEMPLATE_TYPES = [
-  { value: "", label: "Aucun template" },
+  { value: "", label: "Aucun type" },
   { value: "seance", label: "Séance d'entraînement" },
   { value: "bilan", label: "Bilan client" },
   { value: "appel", label: "Appel de suivi" },
+  { value: "rendez-vous", label: "Planifier un rendez-vous" },
   { value: "autre", label: "Autre" },
 ] as const;
 
-const NOTIFY_OPTIONS = [
-  { value: 0, label: "Au moment de l'événement" },
-  { value: 5, label: "5 min avant" },
-  { value: 10, label: "10 min avant" },
-  { value: 15, label: "15 min avant" },
-  { value: 30, label: "30 min avant" },
-  { value: 60, label: "1h avant" },
-  { value: 1440, label: "1 jour avant" },
+type MeetingKindLocal = 'video' | 'phone' | 'in_person';
+const MEETING_KINDS: { value: MeetingKindLocal; label: string; icon: React.ElementType }[] = [
+  { value: 'video', label: 'Visioconférence', icon: Video },
+  { value: 'phone', label: 'Téléphone', icon: Phone },
+  { value: 'in_person', label: 'Présentiel', icon: MapPin },
 ];
 
 const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -71,7 +70,18 @@ const DAY_LABELS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 const fmtDate = (date: Date, opts: Intl.DateTimeFormatOptions) =>
   new Intl.DateTimeFormat("fr-FR", opts).format(date);
 
-const toIsoDate = (date: Date) => date.toISOString().slice(0, 10);
+const toDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const toMonthKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+};
 
 const getMonday = (date: Date) => {
   const d = new Date(date);
@@ -97,7 +107,28 @@ const buildMonthMatrix = (date: Date): Date[][] => {
   return matrix;
 };
 
-const todayKey = toIsoDate(new Date());
+const today = new Date();
+const todayKey = toDateKey(today);
+const currentMonthKey = toMonthKey(today);
+
+const formatAlertLabel = (event: AgendaEvent) => {
+  if (event.alert_at) {
+    const alertDate = new Date(event.alert_at);
+    if (Number.isNaN(alertDate.getTime())) return "Alerte active";
+    return `Alerte ${new Intl.DateTimeFormat("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(alertDate)}`;
+  }
+
+  if (event.notify_minutes_before == null) return null;
+  if (event.notify_minutes_before === 0) return "Alerte au moment";
+  if (event.notify_minutes_before >= 1440) return `Alerte ${event.notify_minutes_before / 1440}j avant`;
+  if (event.notify_minutes_before >= 60) return `Alerte ${event.notify_minutes_before / 60}h avant`;
+  return `Alerte ${event.notify_minutes_before}min avant`;
+};
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
@@ -135,7 +166,9 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
   const [newDesc, setNewDesc] = useState("");
   const [newPriority, setNewPriority] = useState<"high" | "medium" | "low">("medium");
   const [newTemplateType, setNewTemplateType] = useState("");
-  const [newNotify, setNewNotify] = useState<number | null>(null);
+  const [alertEnabled, setAlertEnabled] = useState(false);
+  const [alertDate, setAlertDate] = useState(todayKey);
+  const [alertTime, setAlertTime] = useState("08:00");
   const [addToKanban, setAddToKanban] = useState(false);
   const [boards, setBoards] = useState<BoardOption[]>([]);
   const [columns, setKanbanColumns] = useState<ColumnOption[]>([]);
@@ -144,10 +177,17 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
   const [loadingBoards, setLoadingBoards] = useState(false);
   const [loadingColumns, setLoadingColumns] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
   // Assignation — creation modal
   const [newClientId, setNewClientId] = useState("");
   const [newProgramTemplateId, setNewProgramTemplateId] = useState("");
   const [newAssessmentTemplateId, setNewAssessmentTemplateId] = useState("");
+  // Rendez-vous fields (used when newTemplateType === "rendez-vous")
+  const [apptMeetingKind, setApptMeetingKind] = useState<MeetingKindLocal>('video');
+  const [apptMeetingUrl, setApptMeetingUrl] = useState('');
+  const [apptClientMessage, setApptClientMessage] = useState('');
+  const [apptConfirmationRequired, setApptConfirmationRequired] = useState(false);
+  const [apptCreateKanbanTask, setApptCreateKanbanTask] = useState(true);
 
   // Edit modal state
   const [editEvent, setEditEvent] = useState<AgendaEvent | null>(null);
@@ -158,12 +198,15 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
   const [editDesc, setEditDesc] = useState("");
   const [editPriority, setEditPriority] = useState<"high" | "medium" | "low">("medium");
   const [editTemplateType, setEditTemplateType] = useState("");
-  const [editNotify, setEditNotify] = useState<number | null>(null);
+  const [editAlertEnabled, setEditAlertEnabled] = useState(false);
+  const [editAlertDate, setEditAlertDate] = useState(todayKey);
+  const [editAlertTime, setEditAlertTime] = useState("08:00");
   const [editSaving, setEditSaving] = useState(false);
   // Assignation — edit modal
   const [editClientId, setEditClientId] = useState("");
   const [editProgramTemplateId, setEditProgramTemplateId] = useState("");
   const [editAssessmentTemplateId, setEditAssessmentTemplateId] = useState("");
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
 
   // ─── Modal open/close — defined after loadAssignData ─────────────────────────
   // (openModal is declared below loadAssignData to avoid hoisting issues)
@@ -180,7 +223,9 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
       ]);
       if (clientRes.ok) {
         const data = await clientRes.json();
-        setClients(Array.isArray(data) ? data : []);
+        // /api/clients retourne { clients: [...] } — extraire le tableau
+        const clientList = Array.isArray(data) ? data : (Array.isArray(data?.clients) ? data.clients : []);
+        setClients(clientList);
       }
       if (progRes.ok) {
         const data = await progRes.json();
@@ -195,8 +240,12 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
     finally { setLoadingAssignData(false); }
   }, [assignDataLoaded, loadingAssignData]);
 
-  const openModal = useCallback(() => {
+  const openModal = useCallback((dateKey?: string) => {
     isControlled ? setModalOpen?.(true) : setInternalOpen(true);
+    if (dateKey) {
+      setNewDate(dateKey);
+      setAlertDate(dateKey);
+    }
     loadAssignData();
   }, [isControlled, setModalOpen, loadAssignData]);
 
@@ -206,6 +255,10 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
   }, [isControlled, setModalOpen]);
 
   const openEdit = useCallback((ev: AgendaEvent) => {
+    if (ev.template_type === "appel" && ev.client_id) {
+      router.push(`/coach/clients/${ev.client_id}/profil`);
+      return;
+    }
     setEditEvent(ev);
     setEditTitle(ev.title);
     setEditDate(ev.event_date);
@@ -214,7 +267,9 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
     setEditDesc(ev.description ?? "");
     setEditPriority(ev.priority);
     setEditTemplateType(ev.template_type ?? "");
-    setEditNotify(ev.notify_minutes_before ?? null);
+    setEditAlertEnabled(Boolean(ev.alert_at || ev.notify_minutes_before != null));
+    setEditAlertDate(ev.alert_at ? ev.alert_at.slice(0, 10) : ev.event_date);
+    setEditAlertTime(ev.alert_at ? ev.alert_at.slice(11, 16) : "08:00");
     setEditClientId(ev.client_id ?? "");
     setEditProgramTemplateId("");
     setEditAssessmentTemplateId("");
@@ -235,10 +290,11 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
         description: editDesc.trim() || null,
         priority:    editPriority,
         client_id:   editClientId || null,
+        notify_minutes_before: null,
+        alert_at: editAlertEnabled ? `${editAlertDate}T${editAlertTime || '08:00'}:00` : null,
       };
       if (editTimeEnd !== undefined)      payload.event_time_end        = editTimeEnd || null;
       if (editTemplateType !== undefined) payload.template_type         = editTemplateType || null;
-      if (editNotify !== undefined)       payload.notify_minutes_before = editNotify;
 
       const res = await fetch(`/api/organisation/events?id=${editEvent.id}`, {
         method: "PATCH",
@@ -264,7 +320,9 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
     setNewDesc("");
     setNewPriority("medium");
     setNewTemplateType("");
-    setNewNotify(null);
+    setAlertEnabled(false);
+    setAlertDate(todayKey);
+    setAlertTime("08:00");
     setAddToKanban(false);
     setBoards([]);
     setKanbanColumns([]);
@@ -273,14 +331,56 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
     setNewClientId("");
     setNewProgramTemplateId("");
     setNewAssessmentTemplateId("");
+    setAddError(null);
+    setApptMeetingKind('video');
+    setApptMeetingUrl('');
+    setApptClientMessage('');
+    setApptConfirmationRequired(false);
+    setApptCreateKanbanTask(true);
   };
 
   // Load events
   useEffect(() => {
     setLoadingEvents(true);
-    fetch("/api/organisation/events")
-      .then((r) => r.json())
-      .then((data) => setEvents(Array.isArray(data) ? data.map((e: AgendaEvent) => ({ ...e, is_completed: e.is_completed ?? false })) : []))
+    Promise.all([
+      fetch("/api/organisation/events").then((r) => r.json()).catch(() => []),
+      fetch("/api/coach/appointments").then((r) => r.json()).catch(() => []),
+    ])
+      .then(([eventsData, appointmentsData]) => {
+        const normalEvents = Array.isArray(eventsData)
+          ? eventsData.map((e: AgendaEvent) => ({ ...e, is_completed: e.is_completed ?? false }))
+          : [];
+
+        const mappedAppointments = Array.isArray(appointmentsData)
+          ? appointmentsData.map((a: any) => {
+              const startDate = new Date(a.starts_at);
+              const endDate = new Date(a.ends_at);
+              const pad = (n: number) => String(n).padStart(2, "0");
+              const event_date = `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`;
+              const event_time = `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`;
+              const event_time_end = `${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`;
+
+              return {
+                id: a.id,
+                coach_id: a.coach_id,
+                title: `📞 ${a.title}`,
+                event_date,
+                event_time,
+                event_time_end,
+                description: a.client_message,
+                priority: "high" as const,
+                is_completed: ["completed", "no_show"].includes(a.status),
+                client_id: a.client_id,
+                template_type: "appel",
+                meeting_kind: a.meeting_kind,
+                meeting_url: a.meeting_url,
+                status: a.status,
+              } as AgendaEvent;
+            })
+          : [];
+
+        setEvents([...normalEvents, ...mappedAppointments]);
+      })
       .catch(() => setEvents([]))
       .finally(() => setLoadingEvents(false));
   }, []);
@@ -341,8 +441,8 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
   }, [currentDate, view]);
 
   const visibleEvents = useMemo(() => {
-    const startKey = toIsoDate(startOfRange);
-    const endKey = toIsoDate(endOfRange);
+    const startKey = toDateKey(startOfRange);
+    const endKey = toDateKey(endOfRange);
     return events.filter((e) => e.event_date >= startKey && e.event_date <= endKey);
   }, [events, startOfRange, endOfRange]);
 
@@ -383,6 +483,80 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newDate) return;
+    setAddError(null);
+
+    // Si type rendez-vous : appel dédié à /api/coach/appointments
+    if (newTemplateType === 'rendez-vous') {
+      if (!newClientId) {
+        setAddError('Sélectionne un client pour planifier un rendez-vous.');
+        return;
+      }
+      if (!newDate || !newTime) {
+        setAddError('Date et heure de début requises pour un rendez-vous.');
+        return;
+      }
+      setSaving(true);
+      try {
+        // Construire starts_at / ends_at
+        const durationMin = newTimeEnd && newTime
+          ? (() => {
+              const [sh, sm] = newTime.split(':').map(Number);
+              const [eh, em] = newTimeEnd.split(':').map(Number);
+              return (eh * 60 + em) - (sh * 60 + sm);
+            })()
+          : 60;
+        const startsAt = new Date(`${newDate}T${newTime}:00`).toISOString();
+        const endsAt = new Date(new Date(`${newDate}T${newTime}:00`).getTime() + Math.max(durationMin, 15) * 60_000).toISOString();
+
+        const res = await fetch('/api/coach/appointments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_id: newClientId,
+            title: newTitle.trim(),
+            starts_at: startsAt,
+            ends_at: endsAt,
+            meeting_kind: apptMeetingKind,
+            meeting_url: apptMeetingUrl.trim() || null,
+            client_message: apptClientMessage.trim() || null,
+            confirmation_required: apptConfirmationRequired,
+            create_kanban_task: apptCreateKanbanTask,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          setAddError(json?.error ?? 'Impossible de créer le rendez-vous.');
+          return;
+        }
+        // Mapper le rendez-vous en événement agenda local
+        const appt = json.appointment;
+        const startDate = new Date(appt.starts_at);
+        const endDate = new Date(appt.ends_at);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const mappedEvent: AgendaEvent = {
+          id: appt.id,
+          coach_id: appt.coach_id,
+          title: `📞 ${appt.title}`,
+          event_date: `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`,
+          event_time: `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`,
+          event_time_end: `${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`,
+          description: appt.client_message,
+          priority: 'high',
+          is_completed: false,
+          client_id: appt.client_id,
+          template_type: 'appel',
+        };
+        setEvents((prev) => [...prev, mappedEvent]);
+        closeModal();
+      } catch {
+        setAddError('Erreur réseau. Réessaie.');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Événement standard
     setSaving(true);
     try {
       const payload: Record<string, unknown> = {
@@ -393,7 +567,8 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
         description:           newDesc.trim() || null,
         priority:              newPriority,
         template_type:         newTemplateType || null,
-        notify_minutes_before: newNotify,
+        notify_minutes_before: null,
+        alert_at:              alertEnabled ? `${alertDate}T${alertTime || '08:00'}:00` : null,
         client_id:             newClientId || null,
       };
 
@@ -408,12 +583,16 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setAddError(json?.error ? String(json.error) : 'Impossible de créer l\'événement.');
+        return;
+      }
       const created = await res.json();
       setEvents((prev) => [...prev, { ...created, is_completed: created.is_completed ?? false }]);
       closeModal();
     } catch {
-      // silent
+      setAddError('Erreur réseau. Réessaie.');
     } finally {
       setSaving(false);
     }
@@ -462,7 +641,13 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
         <div className={`text-[12px] font-medium leading-snug transition-all ${
           ev.is_completed ? "line-through text-white/30" : "text-white"
         }`}>
-          {ev.title}
+          <button
+            type="button"
+            onClick={() => openEdit(ev)}
+            className="text-left transition-colors hover:text-[#8ef0c7]"
+          >
+            {ev.title}
+          </button>
         </div>
         {ev.description && (
           <div className="text-[11px] text-white/45 leading-relaxed mt-0.5">{ev.description}</div>
@@ -487,18 +672,12 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
               {TEMPLATE_TYPES.find((t) => t.value === ev.template_type)?.label ?? ev.template_type}
             </span>
           )}
-          {ev.notify_minutes_before != null && (
+          {formatAlertLabel(ev) ? (
             <span className="flex items-center gap-1 text-[10px] text-white/25">
               <Bell size={9} />
-              {ev.notify_minutes_before === 0
-                ? "Au moment"
-                : ev.notify_minutes_before >= 1440
-                ? `${ev.notify_minutes_before / 1440}j`
-                : ev.notify_minutes_before >= 60
-                ? `${ev.notify_minutes_before / 60}h`
-                : `${ev.notify_minutes_before}min`}
+              {formatAlertLabel(ev)}
             </span>
-          )}
+          ) : null}
         </div>
       </div>
       <div className="flex-shrink-0 flex items-center gap-1">
@@ -590,10 +769,20 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
           {/* Day view */}
           {view === "day" && (
             <div className="space-y-2">
-              {(grouped[toIsoDate(currentDate)] ?? []).length === 0 ? (
-                <EmptyState onAdd={openModal} />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => openModal(toDateKey(currentDate))}
+                  className="flex items-center gap-1.5 rounded-xl bg-white/[0.04] px-3 py-2 text-[11px] text-white/60 transition-all hover:bg-white/[0.08] hover:text-white"
+                >
+                  <Plus size={12} />
+                  Ajouter un événement
+                </button>
+              </div>
+              {(grouped[toDateKey(currentDate)] ?? []).length === 0 ? (
+                <EmptyState onAdd={() => openModal(toDateKey(currentDate))} />
               ) : (
-                (grouped[toIsoDate(currentDate)] ?? []).map(renderEvent)
+                (grouped[toDateKey(currentDate)] ?? []).map(renderEvent)
               )}
             </div>
           )}
@@ -604,15 +793,16 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
               {Array.from({ length: 7 }).map((_, i) => {
                 const day = new Date(getMonday(currentDate));
                 day.setDate(day.getDate() + i);
-                const key = toIsoDate(day);
+                const key = toDateKey(day);
                 const isToday = key === todayKey;
                 return (
                   <div
                     key={key}
-                    className={`rounded-xl p-3 border-[0.3px] transition-colors ${
+                    onClick={() => setSelectedDateKey(key)}
+                    className={`cursor-pointer rounded-xl p-3 border-[0.3px] transition-colors ${
                       isToday
-                        ? "bg-[#1f8a65]/[0.06] border-[#1f8a65]/20"
-                        : "bg-white/[0.02] border-white/[0.05]"
+                        ? "bg-[#1f8a65]/[0.06] border-[#1f8a65]/20 hover:bg-[#1f8a65]/[0.12] hover:border-[#1f8a65]/35"
+                        : "bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.05] hover:border-white/[0.1]"
                     }`}
                   >
                     <div className={`text-[10px] font-semibold mb-2 ${isToday ? "text-[#1f8a65]" : "text-white/40"}`}>
@@ -625,8 +815,10 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
                         (grouped[key] ?? []).map((ev) => (
                           <div
                             key={ev.id}
-                            className={`group flex items-center justify-between gap-1 rounded-lg px-2 py-1.5 ${
-                              ev.is_completed ? "bg-white/[0.015]" : "bg-white/[0.03]"
+                            className={`group flex items-center justify-between gap-1 rounded-lg px-2 py-1.5 transition-colors ${
+                              ev.is_completed
+                                ? "bg-white/[0.015] hover:bg-white/[0.03]"
+                                : "bg-white/[0.03] hover:bg-white/[0.05]"
                             }`}
                           >
                             <span className={`text-[11px] truncate ${ev.is_completed ? "line-through text-white/30" : "text-white/70"}`}>
@@ -637,7 +829,10 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
                             )}
                             <button
                               type="button"
-                              onClick={() => handleDelete(ev.id)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void handleDelete(ev.id);
+                              }}
                               className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-white/25 hover:text-red-400 transition-all"
                             >
                               <X size={11} />
@@ -664,19 +859,22 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
               </div>
               <div className="grid grid-cols-7 gap-1">
                 {monthMatrix.flat().map((day) => {
-                  const key = toIsoDate(day);
-                  const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+                  const key = toDateKey(day);
+                  const isCurrentMonth =
+                    day.getMonth() === currentDate.getMonth() &&
+                    day.getFullYear() === currentDate.getFullYear();
                   const isToday = key === todayKey;
                   const dayEvents = grouped[key] ?? [];
                   return (
                     <div
                       key={key}
-                      className={`min-h-[80px] rounded-xl p-2 border-[0.3px] transition-colors ${
+                      onClick={() => setSelectedDateKey(key)}
+                      className={`min-h-[80px] cursor-pointer rounded-xl p-2 border-[0.3px] transition-colors ${
                         isToday
-                          ? "bg-[#1f8a65]/[0.08] border-[#1f8a65]/25"
+                          ? "bg-[#1f8a65]/[0.08] border-[#1f8a65]/25 hover:bg-[#1f8a65]/[0.12] hover:border-[#1f8a65]/35"
                           : isCurrentMonth
-                          ? "bg-white/[0.02] border-white/[0.04]"
-                          : "bg-transparent border-transparent"
+                          ? "bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.05] hover:border-white/[0.1]"
+                          : "bg-transparent border-transparent hover:bg-white/[0.03] hover:border-white/[0.06]"
                       }`}
                     >
                       <div className={`text-[11px] font-semibold mb-1 ${
@@ -686,8 +884,10 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
                       </div>
                       <div className="space-y-0.5">
                         {dayEvents.slice(0, 2).map((ev) => (
-                          <div key={ev.id} className={`rounded px-1.5 py-0.5 text-[10px] truncate flex items-center gap-1 ${
-                            ev.is_completed ? "bg-white/[0.02] text-white/30 line-through" : "bg-white/[0.05] text-white/60"
+                          <div key={ev.id} className={`rounded px-1.5 py-0.5 text-[10px] truncate flex items-center gap-1 transition-colors ${
+                            ev.is_completed
+                              ? "bg-white/[0.02] text-white/30 line-through hover:bg-white/[0.04]"
+                              : "bg-white/[0.05] text-white/60 hover:bg-white/[0.08]"
                           }`}>
                             {ev.linked_column_title && <Kanban size={8} className="text-[#1f8a65]/50 flex-shrink-0" />}
                             {ev.title}
@@ -708,15 +908,24 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
           {view === "year" && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
               {yearMonths.map((month) => {
-                const monthKey = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
+                const monthKey = toMonthKey(month);
+                const isCurrentMonth = monthKey === currentMonthKey;
                 const count = events.filter((e) => e.event_date.startsWith(monthKey)).length;
                 const completed = events.filter((e) => e.event_date.startsWith(monthKey) && e.is_completed).length;
                 return (
                   <div
                     key={monthKey}
-                    className="rounded-xl bg-white/[0.02] border-[0.3px] border-white/[0.05] p-4"
+                    onClick={() => {
+                      setCurrentDate(month);
+                      setView("month");
+                    }}
+                    className={`cursor-pointer rounded-xl border-[0.3px] p-4 transition-colors ${
+                      isCurrentMonth
+                        ? "bg-[#1f8a65]/[0.08] border-[#1f8a65]/25 hover:bg-[#1f8a65]/[0.12] hover:border-[#1f8a65]/35"
+                        : "bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.05]"
+                    }`}
                   >
-                    <p className="text-[11px] font-semibold text-white/50 mb-2 capitalize">
+                    <p className={`mb-2 text-[11px] font-semibold capitalize ${isCurrentMonth ? "text-[#1f8a65]" : "text-white/50"}`}>
                       {fmtDate(month, { month: "long" })}
                     </p>
                     <p className="text-2xl font-black text-white leading-none mb-1">{count}</p>
@@ -730,6 +939,55 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
             </div>
           )}
         </>
+      )}
+
+      {selectedDateKey && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-[#181818] border-[0.3px] border-white/[0.08] rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between gap-3 mb-5">
+              <div>
+                <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-white/30">Agenda</p>
+                <h3 className="mt-1 text-[15px] font-bold text-white">
+                  {fmtDate(new Date(`${selectedDateKey}T12:00:00`), {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                  })}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedDateKey(null)}
+                className="text-white/30 hover:text-white/70 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedDateKey(null);
+                openModal(selectedDateKey);
+              }}
+              className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1f8a65] px-4 py-2.5 text-[12px] font-semibold text-white hover:bg-[#217356] transition-colors"
+            >
+              <Plus size={13} />
+              Ajouter un événement
+            </button>
+
+            <div className="space-y-2">
+              {(grouped[selectedDateKey] ?? []).length === 0 ? (
+                <EmptyState onAdd={() => {
+                  setSelectedDateKey(null);
+                  openModal(selectedDateKey);
+                }} />
+              ) : (
+                (grouped[selectedDateKey] ?? []).map(renderEvent)
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Add event modal */}
@@ -809,19 +1067,39 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
                 ))}
               </select>
 
-              {/* Notification */}
-              <div className="flex items-center gap-2">
-                <Bell size={13} className="text-white/30 flex-shrink-0" />
-                <select
-                  className="flex-1 rounded-xl bg-[#0a0a0a] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
-                  value={newNotify ?? ""}
-                  onChange={(e) => setNewNotify(e.target.value === "" ? null : Number(e.target.value))}
+              <div className="rounded-xl bg-[#0a0a0a] p-3 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setAlertEnabled((prev) => !prev)}
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-[12px] font-medium transition-all ${
+                    alertEnabled
+                      ? "bg-[#1f8a65]/15 text-[#1f8a65] border-[0.3px] border-[#1f8a65]/30"
+                      : "bg-white/[0.03] text-white/40 hover:bg-white/[0.06] hover:text-white/65"
+                  }`}
                 >
-                  <option value="">Pas de rappel</option>
-                  {NOTIFY_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
+                  <span className="flex items-center gap-2">
+                    <Bell size={12} />
+                    {alertEnabled ? "Alerte activée" : "Activer une alerte"}
+                  </span>
+                  <span className="text-[10px]">{alertEnabled ? "Oui" : "Non"}</span>
+                </button>
+
+                {alertEnabled && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="date"
+                      className="w-full rounded-xl bg-[#181818] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
+                      value={alertDate}
+                      onChange={(e) => setAlertDate(e.target.value)}
+                    />
+                    <input
+                      type="time"
+                      className="w-full rounded-xl bg-[#181818] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
+                      value={alertTime}
+                      onChange={(e) => setAlertTime(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Kanban sync toggle */}
@@ -920,74 +1198,172 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
                   )}
                 </div>
 
-                {/* Programme template */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <FileText size={10} className="text-white/30" />
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Template programme</p>
-                  </div>
-                  {loadingAssignData ? (
-                    <div className="h-9 rounded-lg bg-white/[0.04] animate-pulse" />
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <select
-                        className="flex-1 rounded-lg bg-[#181818] px-3 py-2 text-[12px] text-white outline-none"
-                        value={newProgramTemplateId}
-                        onChange={(e) => setNewProgramTemplateId(e.target.value)}
-                      >
-                        <option value="">Aucun template</option>
-                        {programTemplates.map((t) => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
-                        ))}
-                      </select>
-                      {newProgramTemplateId && (
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/coach/programs/templates/${newProgramTemplateId}/view`)}
-                          className="flex-shrink-0 p-1.5 rounded-lg bg-white/[0.04] text-white/30 hover:text-white/70 hover:bg-white/[0.08] transition-all"
-                          title="Voir le template"
-                        >
-                          <ExternalLink size={12} />
-                        </button>
-                      )}
+                {/* Programme template — masqué si type rendez-vous */}
+                {newTemplateType !== 'rendez-vous' && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <FileText size={10} className="text-white/30" />
+                      <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Template programme</p>
                     </div>
-                  )}
-                </div>
+                    {loadingAssignData ? (
+                      <div className="h-9 rounded-lg bg-white/[0.04] animate-pulse" />
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="flex-1 rounded-lg bg-[#181818] px-3 py-2 text-[12px] text-white outline-none"
+                          value={newProgramTemplateId}
+                          onChange={(e) => setNewProgramTemplateId(e.target.value)}
+                        >
+                          <option value="">Aucun template</option>
+                          {programTemplates.map((t) => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                        {newProgramTemplateId && (
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/coach/programs/templates/${newProgramTemplateId}/view`)}
+                            className="flex-shrink-0 p-1.5 rounded-lg bg-white/[0.04] text-white/30 hover:text-white/70 hover:bg-white/[0.08] transition-all"
+                            title="Voir le template"
+                          >
+                            <ExternalLink size={12} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                {/* Bilan template */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <FileText size={10} className="text-white/30" />
-                    <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Template bilan</p>
-                  </div>
-                  {loadingAssignData ? (
-                    <div className="h-9 rounded-lg bg-white/[0.04] animate-pulse" />
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <select
-                        className="flex-1 rounded-lg bg-[#181818] px-3 py-2 text-[12px] text-white outline-none"
-                        value={newAssessmentTemplateId}
-                        onChange={(e) => setNewAssessmentTemplateId(e.target.value)}
-                      >
-                        <option value="">Aucun bilan</option>
-                        {assessmentTemplates.map((t) => (
-                          <option key={t.id} value={t.id}>{t.title}</option>
-                        ))}
-                      </select>
-                      {newAssessmentTemplateId && (
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/coach/assessments`)}
-                          className="flex-shrink-0 p-1.5 rounded-lg bg-white/[0.04] text-white/30 hover:text-white/70 hover:bg-white/[0.08] transition-all"
-                          title="Voir les bilans"
+                {/* Bilan template — masqué si type rendez-vous */}
+                {newTemplateType !== 'rendez-vous' && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <FileText size={10} className="text-white/30" />
+                      <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Template bilan</p>
+                    </div>
+                    {loadingAssignData ? (
+                      <div className="h-9 rounded-lg bg-white/[0.04] animate-pulse" />
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="flex-1 rounded-lg bg-[#181818] px-3 py-2 text-[12px] text-white outline-none"
+                          value={newAssessmentTemplateId}
+                          onChange={(e) => setNewAssessmentTemplateId(e.target.value)}
                         >
-                          <ExternalLink size={12} />
-                        </button>
-                      )}
+                          <option value="">Aucun bilan</option>
+                          {assessmentTemplates.map((t) => (
+                            <option key={t.id} value={t.id}>{t.title}</option>
+                          ))}
+                        </select>
+                        {newAssessmentTemplateId && (
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/coach/assessments`)}
+                            className="flex-shrink-0 p-1.5 rounded-lg bg-white/[0.04] text-white/30 hover:text-white/70 hover:bg-white/[0.08] transition-all"
+                            title="Voir les bilans"
+                          >
+                            <ExternalLink size={12} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Panneau Rendez-vous — visible uniquement si type = rendez-vous */}
+              {newTemplateType === 'rendez-vous' && (
+                <div className="rounded-xl bg-[#0a0a0a] p-3 space-y-3">
+                  <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Détails du rendez-vous</p>
+
+                  {/* Modalité */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {MEETING_KINDS.map(({ value, label, icon: Icon }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setApptMeetingKind(value)}
+                        className={`flex flex-col items-center gap-1.5 px-2 py-2.5 rounded-lg border text-[11px] font-medium transition-all ${
+                          apptMeetingKind === value
+                            ? 'border-[#1f8a65]/50 bg-[#1f8a65]/10 text-[#1f8a65]'
+                            : 'border-white/[0.08] bg-white/[0.03] text-white/40 hover:text-white/70 hover:border-white/20'
+                        }`}
+                      >
+                        <Icon size={14} />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Lien de participation — conditionnel visio */}
+                  {apptMeetingKind === 'video' && (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <Link2 size={10} className="text-white/30" />
+                        <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Lien de participation</p>
+                      </div>
+                      <input
+                        type="url"
+                        value={apptMeetingUrl}
+                        onChange={(e) => setApptMeetingUrl(e.target.value)}
+                        placeholder="https://meet.google.com/..."
+                        className="w-full rounded-lg bg-[#181818] px-3 py-2 text-[12px] text-white placeholder:text-white/20 outline-none"
+                      />
                     </div>
                   )}
+
+                  {/* Message de préparation */}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <MessageSquare size={10} className="text-white/30" />
+                      <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Message de préparation</p>
+                    </div>
+                    <textarea
+                      value={apptClientMessage}
+                      onChange={(e) => setApptClientMessage(e.target.value)}
+                      rows={2}
+                      placeholder="Objectif, consignes, documents à préparer..."
+                      className="w-full rounded-lg bg-[#181818] px-3 py-2 text-[12px] text-white placeholder:text-white/20 outline-none resize-none"
+                    />
+                  </div>
+
+                  {/* Options confirmation + Kanban */}
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setApptConfirmationRequired(!apptConfirmationRequired)}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[11px] font-medium transition-all bg-white/[0.03] hover:bg-white/[0.06] text-white/50 hover:text-white/70"
+                    >
+                      <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 ${
+                        apptConfirmationRequired ? 'bg-[#1f8a65] border-[#1f8a65]' : 'border-white/20'
+                      }`}>
+                        {apptConfirmationRequired && <Check size={9} className="text-white" strokeWidth={3} />}
+                      </div>
+                      Demander une confirmation au client
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setApptCreateKanbanTask(!apptCreateKanbanTask)}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[11px] font-medium transition-all bg-white/[0.03] hover:bg-white/[0.06] text-white/50 hover:text-white/70"
+                    >
+                      <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 ${
+                        apptCreateKanbanTask ? 'bg-[#1f8a65] border-[#1f8a65]' : 'border-white/20'
+                      }`}>
+                        {apptCreateKanbanTask && <Check size={9} className="text-white" strokeWidth={3} />}
+                      </div>
+                      Créer une tâche de préparation dans le Kanban
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Erreur inline */}
+              {addError && (
+                <div className="flex items-center gap-2 rounded-xl bg-red-500/10 border-[0.3px] border-red-500/20 px-3 py-2.5">
+                  <AlertCircle size={13} className="text-red-400 shrink-0" />
+                  <p className="text-[12px] text-red-400">{addError}</p>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-1">
                 <button
@@ -1002,7 +1378,7 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
                   disabled={!newTitle.trim() || !newDate || saving}
                   className="flex-1 py-2.5 rounded-xl bg-[#1f8a65] text-white text-[13px] font-bold hover:bg-[#217356] disabled:opacity-50 transition-colors"
                 >
-                  {saving ? "..." : "Ajouter"}
+                  {saving ? "..." : newTemplateType === 'rendez-vous' ? 'Planifier' : 'Ajouter'}
                 </button>
               </div>
             </form>
@@ -1086,18 +1462,39 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
               </select>
-              <div className="flex items-center gap-2">
-                <Bell size={13} className="text-white/30 flex-shrink-0" />
-                <select
-                  className="flex-1 rounded-xl bg-[#0a0a0a] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
-                  value={editNotify ?? ""}
-                  onChange={(e) => setEditNotify(e.target.value === "" ? null : Number(e.target.value))}
+              <div className="rounded-xl bg-[#0a0a0a] p-3 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setEditAlertEnabled((prev) => !prev)}
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-[12px] font-medium transition-all ${
+                    editAlertEnabled
+                      ? "bg-[#1f8a65]/15 text-[#1f8a65] border-[0.3px] border-[#1f8a65]/30"
+                      : "bg-white/[0.03] text-white/40 hover:bg-white/[0.06] hover:text-white/65"
+                  }`}
                 >
-                  <option value="">Pas de rappel</option>
-                  {NOTIFY_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
+                  <span className="flex items-center gap-2">
+                    <Bell size={12} />
+                    {editAlertEnabled ? "Alerte activée" : "Activer une alerte"}
+                  </span>
+                  <span className="text-[10px]">{editAlertEnabled ? "Oui" : "Non"}</span>
+                </button>
+
+                {editAlertEnabled && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="date"
+                      className="w-full rounded-xl bg-[#181818] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
+                      value={editAlertDate}
+                      onChange={(e) => setEditAlertDate(e.target.value)}
+                    />
+                    <input
+                      type="time"
+                      className="w-full rounded-xl bg-[#181818] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
+                      value={editAlertTime}
+                      onChange={(e) => setEditAlertTime(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
               {editEvent.linked_column_title && (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.03]">

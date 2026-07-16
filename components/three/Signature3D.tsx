@@ -15,6 +15,7 @@ export function Signature3D() {
 
   useEffect(() => {
     if (!containerRef.current) return;
+    const container = containerRef.current;
 
     gsap.registerPlugin(ScrollTrigger);
 
@@ -28,7 +29,7 @@ export function Signature3D() {
     );
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    containerRef.current.appendChild(renderer.domElement);
+    container.appendChild(renderer.domElement);
 
     sceneRef.current = scene;
     cameraRef.current = camera;
@@ -142,8 +143,8 @@ export function Signature3D() {
       }
       window.removeEventListener('resize', handleResize);
       ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
-      if (containerRef.current && renderer.domElement) {
-        containerRef.current.removeChild(renderer.domElement);
+      if (renderer.domElement.parentNode === container) {
+        container.removeChild(renderer.domElement);
       }
       renderer.dispose();
       geometry.dispose();
@@ -159,7 +160,6 @@ export function Signature3D() {
     />
   );
 }
-
 
 
 

@@ -68,6 +68,7 @@ export const CANONICAL_MUSCLES = {
 
   // Legacy/catch-all (maps to specific muscles)
   dos_large: true, // Internal use only for grouping
+  cardio: true,
 } as const;
 
 export type CanonicalMuscle = keyof typeof CANONICAL_MUSCLES;
@@ -97,6 +98,9 @@ export const LEGACY_TO_CANONICAL: Record<string, CanonicalMuscle> = {
   traps: "trapeze_superieur",
   upper_traps: "trapeze_superieur",
   trapezius: "trapeze_superieur",
+  trapezius_upper: "trapeze_superieur",
+  trapezius_middle: "trapeze_moyen",
+  trapezius_lower: "trapeze_inferieur",
 
   // ── Épaules ──
   shoulders: "deltoide_anterieur",
@@ -137,6 +141,7 @@ export const LEGACY_TO_CANONICAL: Record<string, CanonicalMuscle> = {
   grip_flexors: "flechisseurs_avant_bras",
   pronators_supinators: "flechisseurs_avant_bras",
   forearm_flexors: "flechisseurs_avant_bras",
+  forearm_extensors: "extenseurs_avant_bras",
   forearm_stabilizers: "flechisseurs_avant_bras",
   wrist_stabilizers: "flechisseurs_avant_bras",
 
@@ -196,6 +201,7 @@ export const LEGACY_TO_CANONICAL: Record<string, CanonicalMuscle> = {
   mollet: "mollet",
   abdos: "abdos",
   dos_large: "dos_large",
+  cardio: "cardio",
 };
 
 /**
@@ -301,6 +307,7 @@ export const CanonicalMuscleSchema = z.enum([
   "obliques_internes",
   "transverse_abdominal",
   "dos_large",
+  "cardio",
 ] as const);
 
 export const MuscleArraySchema = z

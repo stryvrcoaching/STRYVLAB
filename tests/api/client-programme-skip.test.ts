@@ -11,7 +11,7 @@ vi.mock('@/lib/client/checkin/resolveClientTimezone', () => ({
   resolveClientTimezone: vi.fn().mockResolvedValue('Europe/Brussels'),
 }))
 
-import { POST } from '@/app/api/client/programme/skip/route'
+import { DELETE, POST } from '@/app/api/client/programme/skip/route'
 
 beforeEach(() => {
   mocks.resetMocks()
@@ -21,6 +21,14 @@ beforeEach(() => {
 function makePost(body: unknown): NextRequest {
   return new NextRequest('http://localhost:3000/api/client/programme/skip', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+function makeDelete(body: unknown): NextRequest {
+  return new NextRequest('http://localhost:3000/api/client/programme/skip', {
+    method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
@@ -93,5 +101,44 @@ describe('POST /api/client/programme/skip', () => {
     expect(res.status).toBe(409)
     const body = await res.json()
     expect(String(body.error)).toMatch(/started/i)
+  })
+})
+
+describe('DELETE /api/client/programme/skip', () => {
+  it('reverts a skipped session for today', async () => {
+    const today = computePhysiologicalDateInTimezone(new Date(), 'Europe/Brussels')
+
+    mocks.setServiceResults([
+      { data: { id: 'client-1', coach_id: 'coach-1', user_id: 'user-client-1' } },
+      { data: { id: 'skip-1' } },
+      { data: null },
+      { data: null },
+    ])
+
+    const res = await DELETE(makeDelete({
+      programSessionId: '11111111-1111-1111-1111-111111111111',
+      scheduledDate: today,
+    }))
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.ok).toBe(true)
+    expect(body.skipped).toBe(false)
+    expect(body.dayOverride).toBeNull()
+  })
+
+  it('rejects revert for a date other than today', async () => {
+    mocks.setServiceResults([
+      { data: { id: 'client-1', coach_id: 'coach-1', user_id: 'user-client-1' } },
+    ])
+
+    const res = await DELETE(makeDelete({
+      programSessionId: '11111111-1111-1111-1111-111111111111',
+      scheduledDate: '2026-01-01',
+    }))
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(String(body.error)).toMatch(/today/i)
   })
 })

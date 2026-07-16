@@ -13,6 +13,8 @@ import {
   prepEntrySchema,
 } from "@/lib/nutrition/preps-service"
 import type { SmartPrepSlot } from "@/lib/nutrition/simulation-state"
+import { ct } from '@/lib/i18n/clientTranslations'
+import { resolveClientLanguage } from '@/lib/client/resolve-language'
 
 const prepSlotSchema = z.enum(["breakfast", "lunch", "dinner", "snack"])
 
@@ -66,6 +68,7 @@ export async function POST(req: NextRequest) {
   if (!body.success) return NextResponse.json({ error: body.error }, { status: 400 })
 
   const db = createSupabaseService()
+  const lang = await resolveClientLanguage(db, clientId)
   const timezone = await resolveClientTimezone(db, clientId)
   const plannedFor = body.data.planned_for ? new Date(body.data.planned_for) : new Date()
   const physiologicalDate = computePhysiologicalDate(plannedFor, timezone)
@@ -73,7 +76,7 @@ export async function POST(req: NextRequest) {
   const mealSlot = body.data.meal_slot ?? mealType
   const variantGroupId = body.data.variant_group_id?.trim() || mealSlot
   const scenarioKey = body.data.scenario_key?.trim() || "default"
-  const scenarioLabel = body.data.scenario_label?.trim() || "Scénario principal"
+  const scenarioLabel = body.data.scenario_label?.trim() || ct(lang, 'nutrition.scenario.main')
   const shouldActivate = body.data.is_active ?? true
   const prepared = await buildPrepEntries(body.data.entries)
 

@@ -22,6 +22,8 @@ import { useSetTopBar } from "@/components/layout/useSetTopBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import AssessmentForm from "@/components/assessments/form/AssessmentForm";
 import { BlockConfig, AssessmentResponse, SubmissionStatus } from "@/types/assessment";
+import HeaderIconButton from "@/components/layout/HeaderIconButton";
+import { extractTemplateBlocks } from "@/lib/assessments/templateSnapshot";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,7 +34,7 @@ interface SubmissionDetail {
   bilan_date: string | null;
   created_at: string;
   submitted_at: string | null;
-  template_snapshot: BlockConfig[];
+  template_snapshot: BlockConfig[] | { name?: string | null; blocks?: BlockConfig[] | null };
   token?: string;
   client: {
     id: string;
@@ -126,6 +128,7 @@ function PhotoViewer({
         </div>
         <div className="p-4 flex items-center justify-center min-h-[300px]">
           {url ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt={label} className="max-h-[70vh] rounded-xl object-contain" />
           ) : (
             <Loader2 size={24} className="animate-spin text-white/40" />
@@ -168,6 +171,7 @@ function PhotoThumb({ path, label }: { path: string; label: string }) {
       >
         <div className="w-full aspect-[3/4] rounded-xl overflow-hidden bg-white/[0.04] relative">
           {url ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt={label} className="w-full h-full object-cover group-hover:opacity-80 transition-opacity" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
@@ -229,20 +233,17 @@ export default function CoachBilanViewPage() {
     if (!submission || submission.status !== "completed") return null;
     return (
       <div className="flex items-center gap-2">
-        <button
+        <HeaderIconButton
           onClick={() => setConfirmReopen(true)}
-          className="flex items-center gap-2 px-3 h-8 rounded-lg bg-white/[0.04] text-[12px] font-bold text-white/60 hover:bg-white/[0.08] hover:text-white/80 transition-colors"
-        >
-          <Unlock size={13} />
-          Réouvrir
-        </button>
-        <button
+          icon={<Unlock size={13} />}
+          label="Réouvrir le bilan"
+        />
+        <HeaderIconButton
           onClick={() => setEditMode(true)}
-          className="flex items-center gap-2 px-4 h-8 rounded-lg bg-[#1f8a65] text-[12px] font-bold text-white hover:bg-[#217356] transition-colors active:scale-[0.98]"
-        >
-          <Edit3 size={13} />
-          Modifier
-        </button>
+          icon={<Edit3 size={13} />}
+          label="Modifier le bilan"
+          variant="accent"
+        />
       </div>
     );
   }, [submission]);
@@ -346,7 +347,7 @@ export default function CoachBilanViewPage() {
         </div>
         <AssessmentForm
           submissionId={submissionId}
-          blocks={submission.template_snapshot}
+          blocks={extractTemplateBlocks(submission.template_snapshot)}
           token=""
           clientName={`${submission.client.first_name} ${submission.client.last_name}`}
           isCoach={true}
@@ -362,7 +363,7 @@ export default function CoachBilanViewPage() {
 
   // ── Vue lecture ──────────────────────────────────────────────────────────────
   const responseMap = buildResponseMap(submission.responses);
-  const blocks = submission.template_snapshot ?? [];
+  const blocks = extractTemplateBlocks(submission.template_snapshot);
   const templateName = submission.template?.name ?? "Bilan";
   const bilanDate = submission.bilan_date ?? submission.created_at;
   const dateFormatted = new Date(bilanDate).toLocaleDateString("fr-FR", {

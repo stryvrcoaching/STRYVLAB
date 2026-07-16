@@ -12,6 +12,12 @@ function isItemActive(item: NavRowAItem, pathname: string): boolean {
   if (item.href) {
     return pathname === item.href || pathname.startsWith(item.href + "/");
   }
+  if (item.matchHrefs?.length) {
+    const matchesExtraPath = item.matchHrefs.some(
+      (href) => pathname === href || pathname.startsWith(href + "/")
+    );
+    if (matchesExtraPath) return true;
+  }
   if (item.dropdown) {
     return item.dropdown.some(
       (d) => pathname === d.href || pathname.startsWith(d.href + "/")

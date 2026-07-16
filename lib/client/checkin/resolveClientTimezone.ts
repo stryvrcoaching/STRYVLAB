@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { resolveTone } from '@/lib/client/ai-coach/resolveTone'
 import { composeMorningGreeting, composeEveningGreeting } from '@/lib/client/ai-coach/messageComposer'
 import { canonicalizeFields } from '@/lib/client/checkin/legacyFieldMap'
+import type { ClientLang } from '@/lib/i18n/clientTranslations'
+import { buildCheckinReadyCopy } from '@/lib/client/checkin/flows'
 
 const DEFAULT_TZ = 'Europe/Paris'
 
@@ -47,6 +49,7 @@ export async function resolveClientTimezone(
 
 export function buildCheckinReadyMetadata(
   flowType: 'morning' | 'evening',
+  lang: ClientLang,
   firstName?: string | null,
   context?: CheckinReadyContext,
   options?: CheckinReadyOptions,
@@ -58,6 +61,7 @@ export function buildCheckinReadyMetadata(
   const greeting = flowType === 'morning'
     ? composeMorningGreeting({
       name,
+      lang,
       tone,
       enabledFields,
       hasTrainingToday: Boolean(context?.hasTrainingToday),
@@ -65,27 +69,26 @@ export function buildCheckinReadyMetadata(
     })
     : composeEveningGreeting({
       name,
+      lang,
       tone,
       enabledEveningFields: enabledFields,
       hasTrainingToday: Boolean(context?.hasTrainingToday),
       trainingName: context?.trainingName ?? null,
     })
 
-  const deferMessage = flowType === 'morning'
-    ? "Très bien, prends ton temps. Quand tu veux, lance ton check-in via le bouton Check-in en haut à gauche et on le fait ensemble."
-    : "Très bien, prends ton temps. Quand tu veux, lance ton check-in via le bouton Check-in en haut à gauche et on fait le point sur ta journée."
+  const readyCopy = buildCheckinReadyCopy(lang, flowType)
 
   return {
     greeting,
     flow_type: flowType,
     component: 'chips',
     key: 'checkin_ready',
-    question: 'Es-tu prêt pour ton check-in ?',
+    question: readyCopy.question,
     options: [
-      { label: 'Oui, on y va', value: 1 },
-      { label: 'Plus tard', value: 2 },
+      { label: readyCopy.yes, value: 1 },
+      { label: readyCopy.later, value: 2 },
     ],
-    defer_message: deferMessage,
+    defer_message: readyCopy.deferMessage,
     answered: false,
     deferred_until: null as string | null,
   }

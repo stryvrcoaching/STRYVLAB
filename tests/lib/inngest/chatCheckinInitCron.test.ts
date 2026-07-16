@@ -21,6 +21,11 @@ describe('chatCheckinInitCron time gating', () => {
     expect(isLocalTimeInRange(new Date('2026-05-30T04:45:00.000Z'), 'Europe/Paris', 6, 0, 7, 0)).toBe(true)
     expect(isLocalTimeInRange(new Date('2026-05-30T05:00:00.000Z'), 'Europe/Paris', 6, 0, 7, 0)).toBe(false)
   })
+
+  it('keeps the evening send open for the full hour after 21:00', () => {
+    expect(isLocalTimeInRange(new Date('2026-05-30T19:45:00.000Z'), 'Europe/Paris', 21, 0, 22, 0)).toBe(true)
+    expect(isLocalTimeInRange(new Date('2026-05-30T20:00:00.000Z'), 'Europe/Paris', 21, 0, 22, 0)).toBe(false)
+  })
 })
 
 describe('chatCheckinInitCron AI routine gating', () => {

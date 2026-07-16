@@ -11,19 +11,23 @@ import DeleteClientModal from "@/components/clients/DeleteClientModal";
 import { useRouter } from "next/navigation";
 import {
   Mail, Phone, Calendar, Edit2, Save, Loader2, User,
-  Tag, Plus, X, Check, MapPin, User2, StickyNote, PhoneCall, ChevronDown,
+  Tag, Plus, X, Check, MapPin, User2, StickyNote, PhoneCall, ChevronDown, ShieldAlert,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import TransformationScoreWidget from "@/components/coach/TransformationScoreWidget";
 import PhaseOptimizationWidget from "@/components/coach/PhaseOptimizationWidget";
 import AiCoachSettingsWidget from "@/components/coach/AiCoachSettingsWidget";
 import CheckinConfigWidget from "@/components/coach/CheckinConfigWidget";
+import CoachMessageComposer from "@/components/coach/CoachMessageComposer";
+import ClientAppointmentsWidget from "@/components/appointments/ClientAppointmentsWidget";
 import {
   TRANSFORMATION_PHASE_OPTIONS,
   getTransformationPhaseLabel,
   transformationPhaseToFamily,
   transformationPhaseToMacroGoal,
 } from "@/lib/coach/transformationPhase";
+import { publishClientImpact } from "@/lib/coach/client-impact-events";
+import { isMinor, type MinorAuthorizationStatus } from "@/lib/privacy/minor-authorization";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -164,6 +168,10 @@ type CrmFields = {
   emergency_contact_phone?: string | null;
   internal_notes?: string | null;
   acquisition_source?: string | null;
+  minor_authorization_status?: MinorAuthorizationStatus;
+  minor_guardian_name?: string | null;
+  minor_guardian_email?: string | null;
+  minor_authorization_confirmed_at?: string | null;
 };
 
 type TagObj = { id: string; name: string; color: string };
@@ -186,15 +194,18 @@ export default function ProfilPage() {
 
   useClientTopBar(
     "Profil",
-    needsInvite ? (
-      <button
-        type="button"
-        onClick={scrollToAccess}
-        className="flex items-center gap-1.5 bg-[#1f8a65] hover:bg-[#217356] text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors"
-      >
-        <Mail size={12} /> Envoyer l'accès
-      </button>
-    ) : undefined,
+    <div className="flex items-center gap-2">
+      <CoachMessageComposer clientId={clientId} clientName={`${client.first_name} ${client.last_name}`} />
+      {needsInvite && (
+        <button
+          type="button"
+          onClick={scrollToAccess}
+          className="flex items-center gap-1.5 rounded-lg bg-[#1f8a65] px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-[#217356]"
+        >
+          <Mail size={12} /> Envoyer l'accès
+        </button>
+      )}
+    </div>,
   );
 
   // Sport profile editing
@@ -211,6 +222,7 @@ export default function ProfilPage() {
     weekly_frequency: client.weekly_frequency?.toString() ?? "",
     equipment_category: client.equipment_category ?? "",
     notes: client.notes ?? "",
+    step_target: client.step_target?.toString() ?? "",
   });
 
   useEffect(() => {
@@ -222,6 +234,7 @@ export default function ProfilPage() {
       weekly_frequency: client.weekly_frequency?.toString() ?? "",
       equipment_category: client.equipment_category ?? "",
       notes: client.notes ?? "",
+      step_target: client.step_target?.toString() ?? "",
     });
   }, [
     client.transformation_phase,
@@ -231,11 +244,13 @@ export default function ProfilPage() {
     client.weekly_frequency,
     client.equipment_category,
     client.notes,
+    client.step_target,
   ]);
 
   // CRM editing
   const [editingCrm, setEditingCrm] = useState(false);
   const [savingCrm, setSavingCrm] = useState(false);
+  const [saveErrorCrm, setSaveErrorCrm] = useState("");
   const [crm, setCrm] = useState<CrmFields>({});
   const [crmDraft, setCrmDraft] = useState<CrmFields>({});
 
@@ -266,6 +281,10 @@ export default function ProfilPage() {
           emergency_contact_phone: data.emergency_contact_phone ?? null,
           internal_notes: data.internal_notes ?? null,
           acquisition_source: data.acquisition_source ?? null,
+          minor_authorization_status: data.minor_authorization_status ?? "not_required",
+          minor_guardian_name: data.minor_guardian_name ?? null,
+          minor_guardian_email: data.minor_guardian_email ?? null,
+          minor_authorization_confirmed_at: data.minor_authorization_confirmed_at ?? null,
         };
         setCrm(fields);
       })
@@ -301,10 +320,12 @@ export default function ProfilPage() {
           weekly_frequency: sportDraft.weekly_frequency ? Number(sportDraft.weekly_frequency) : null,
           equipment_category: sportDraft.equipment_category || null,
           notes: sportDraft.notes || null,
+          step_target: sportDraft.step_target ? Number(sportDraft.step_target) : null,
         }),
       });
       if (!res.ok) { setSaveErrorSport("Erreur lors de la sauvegarde"); return; }
       await refetch();
+      publishClientImpact({ clientId, kind: "refresh" });
       setEditingSport(false);
     } catch {
       setSaveErrorSport("Erreur réseau");
@@ -339,6 +360,8 @@ export default function ProfilPage() {
   // CRM save
   async function saveCrm() {
     setSavingCrm(true);
+    setSaveErrorCrm("");
+    const clientIsMinor = isMinor(crmDraft.date_of_birth);
     const res = await fetch(`/api/clients/${clientId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -351,9 +374,27 @@ export default function ProfilPage() {
         emergency_contact_phone: crmDraft.emergency_contact_phone || null,
         internal_notes: crmDraft.internal_notes || null,
         acquisition_source: crmDraft.acquisition_source || null,
+        minor_guardian_authorization_confirmed:
+          clientIsMinor && crmDraft.minor_authorization_status === "authorized",
+        minor_guardian_name: clientIsMinor ? crmDraft.minor_guardian_name || null : null,
+        minor_guardian_email: clientIsMinor ? crmDraft.minor_guardian_email || null : null,
       }),
     });
-    if (res.ok) { setCrm({ ...crmDraft }); setEditingCrm(false); }
+    if (res.ok) {
+      const payload = await res.json();
+      const saved = payload?.client ?? {};
+      setCrm({
+        ...crmDraft,
+        minor_authorization_status: saved.minor_authorization_status ?? crmDraft.minor_authorization_status,
+        minor_guardian_name: saved.minor_guardian_name ?? null,
+        minor_guardian_email: saved.minor_guardian_email ?? null,
+        minor_authorization_confirmed_at: saved.minor_authorization_confirmed_at ?? null,
+      });
+      setEditingCrm(false);
+    } else {
+      const payload = await res.json().catch(() => null);
+      setSaveErrorCrm(payload?.error || "Erreur lors de la sauvegarde");
+    }
     setSavingCrm(false);
   }
 
@@ -398,8 +439,9 @@ export default function ProfilPage() {
     { label: "Objectif", value: TRAINING_GOALS.find(g => g.value === client.training_goal)?.label },
     { label: "Niveau", value: FITNESS_LEVELS.find(l => l.value === client.fitness_level)?.label },
     { label: "Activité", value: SPORT_PRACTICES.find(s => s.value === client.sport_practice)?.label },
-    { label: "Disponibilité", value: client.weekly_frequency ? `${client.weekly_frequency}j/sem.` : null },
+    { label: "Disponibilité", value: client.weekly_frequency ? `${client.weekly_frequency} séances/sem.` : null },
     { label: "Catégorie", value: EQUIPMENT_CATEGORIES.find(e => e.value === client.equipment_category)?.label },
+    { label: "Objectif Pas", value: client.step_target ? `${client.step_target.toLocaleString("fr-FR")} pas/jour` : null },
   ].filter(f => f.value);
   const activePhaseMeta = TRANSFORMATION_PHASES.find(
     (phase) => phase.value === sportDraft.transformation_phase,
@@ -589,6 +631,15 @@ export default function ProfilPage() {
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                   <InfoCell icon={User} label="Date de naissance"
                     value={crm.date_of_birth ? new Date(crm.date_of_birth).toLocaleDateString("fr-FR") : null} />
+                  {isMinor(crm.date_of_birth) && (
+                    <InfoCell
+                      icon={ShieldAlert}
+                      label="Autorisation représentant légal"
+                      value={crm.minor_authorization_status === "authorized"
+                        ? `Confirmée${crm.minor_guardian_name ? ` — ${crm.minor_guardian_name}` : ""}`
+                        : "À confirmer"}
+                    />
+                  )}
                   <InfoCell icon={User2} label="Genre"
                     value={crm.gender ? GENDER_LABELS[crm.gender] : null} />
                   <InfoCell icon={MapPin} label="Adresse"
@@ -614,7 +665,18 @@ export default function ProfilPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-white/40 mb-1.5">Date de naissance</label>
-                    <input type="date" value={crmDraft.date_of_birth ?? ""} onChange={e => setCrmDraft(d => ({ ...d, date_of_birth: e.target.value }))} className={inputCls} />
+                    <input
+                      type="date"
+                      value={crmDraft.date_of_birth ?? ""}
+                      onChange={e => setCrmDraft(d => ({
+                        ...d,
+                        date_of_birth: e.target.value,
+                        minor_authorization_status: isMinor(e.target.value)
+                          ? (d.minor_authorization_status === "authorized" ? "authorized" : "authorization_required")
+                          : "not_required",
+                      }))}
+                      className={inputCls}
+                    />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-white/40 mb-1.5">Genre</label>
@@ -626,6 +688,49 @@ export default function ProfilPage() {
                       <option value="prefer_not_to_say">Préfère ne pas dire</option>
                     </select>
                   </div>
+                  {isMinor(crmDraft.date_of_birth) && (
+                    <div className="col-span-2 rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-3 space-y-3">
+                      <div>
+                        <p className="text-[11px] font-bold text-amber-100/80">Client mineur</p>
+                        <p className="mt-1 text-[10px] leading-relaxed text-white/40">
+                          Confirmez avoir vérifié l’identité et l’accord du titulaire de l’autorité parentale,
+                          et avoir informé le mineur dans un langage adapté.
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-white/40 mb-1.5">Représentant légal — Nom</label>
+                          <input
+                            type="text"
+                            value={crmDraft.minor_guardian_name ?? ""}
+                            onChange={e => setCrmDraft(d => ({ ...d, minor_guardian_name: e.target.value }))}
+                            className={inputCls}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-white/40 mb-1.5">Représentant légal — Email</label>
+                          <input
+                            type="email"
+                            value={crmDraft.minor_guardian_email ?? ""}
+                            onChange={e => setCrmDraft(d => ({ ...d, minor_guardian_email: e.target.value }))}
+                            className={inputCls}
+                          />
+                        </div>
+                      </div>
+                      <label className="flex cursor-pointer items-start gap-2.5 text-[11px] leading-relaxed text-white/60">
+                        <input
+                          type="checkbox"
+                          checked={crmDraft.minor_authorization_status === "authorized"}
+                          onChange={e => setCrmDraft(d => ({
+                            ...d,
+                            minor_authorization_status: e.target.checked ? "authorized" : "authorization_required",
+                          }))}
+                          className="mt-0.5 h-4 w-4 accent-[#c6b48b]"
+                        />
+                        J’atteste avoir vérifié l’autorisation du représentant légal pour le suivi et le traitement des données nécessaires.
+                      </label>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-white/40 mb-1.5">Adresse</label>
                     <input type="text" placeholder="Rue, numéro..." value={crmDraft.address ?? ""} onChange={e => setCrmDraft(d => ({ ...d, address: e.target.value }))} className={inputCls} />
@@ -663,6 +768,9 @@ export default function ProfilPage() {
                       className="w-full rounded-xl bg-[#0a0a0a] border-[0.3px] border-white/[0.06] px-3 py-2.5 text-[12px] text-white outline-none resize-none placeholder:text-white/20"
                     />
                   </div>
+                  {saveErrorCrm && (
+                    <p className="col-span-2 text-[11px] text-red-300/80">{saveErrorCrm}</p>
+                  )}
                 </div>
               )}
             </CollapsibleCard>
@@ -739,11 +847,21 @@ export default function ProfilPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-white/40 mb-1.5">Disponibilité (j/sem)</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-white/40 mb-1.5">Disponibilité (séances/sem)</label>
                     <input
                       type="number" min={1} max={7}
                       value={sportDraft.weekly_frequency}
                       onChange={e => setSportDraft(d => ({ ...d, weekly_frequency: e.target.value }))}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-white/40 mb-1.5">Objectif Pas (par jour)</label>
+                    <input
+                      type="number" min={0} step={500}
+                      placeholder="10000"
+                      value={sportDraft.step_target}
+                      onChange={e => setSportDraft(d => ({ ...d, step_target: e.target.value }))}
                       className={inputCls}
                     />
                   </div>
@@ -777,13 +895,15 @@ export default function ProfilPage() {
 
             {/* Configuration check-in quotidien */}
             <CheckinConfigWidget clientId={clientId} />
-          </div>
 
-          {/* ── COLONNE DROITE : phase + accès & billing ── */}
-          <div className="flex flex-col gap-4">
-            <PhaseOptimizationWidget clientId={clientId} />
+            {/* Gestion des rendez-vous */}
+            <ClientAppointmentsWidget
+              clientId={clientId}
+              clientFirstName={client?.first_name ?? null}
+              clientLastName={client?.last_name ?? null}
+            />
 
-            {/* Accès client */}
+            {/* Espace client STRYVR */}
             <div
               ref={accessSectionRef}
               className={`rounded-2xl transition-[box-shadow,border-color] ${
@@ -792,7 +912,7 @@ export default function ProfilPage() {
             >
               <Card>
                 <div className="flex items-center justify-between mb-1">
-                  <SectionLabel>Accès client</SectionLabel>
+                  <SectionLabel>Espace client STRYVR</SectionLabel>
                   {needsInvite && (
                     <span className="flex items-center gap-1 rounded-full bg-[#1f8a65]/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-[#7fe2bf]">
                       Action requise
@@ -906,7 +1026,7 @@ export default function ProfilPage() {
               )}
             </Card>
 
-            {/* Zone dangereuse — toujours tout en bas de la colonne droite */}
+            {/* Zone dangereuse — toujours tout en bas de la colonne gauche */}
             <div className="bg-red-950/20 border-[0.3px] border-red-500/20 rounded-2xl px-4 py-3 flex items-center justify-between">
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-red-400/60">Zone dangereuse</p>
               <button
@@ -916,6 +1036,11 @@ export default function ProfilPage() {
                 Supprimer ou archiver →
               </button>
             </div>
+          </div>
+
+          {/* ── COLONNE DROITE : optimisation de phase ── */}
+          <div className="flex flex-col gap-4">
+            <PhaseOptimizationWidget clientId={clientId} />
           </div>
         </div>
       </div>

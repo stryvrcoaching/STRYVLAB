@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useClientT } from '@/components/client/ClientI18nProvider'
 import type { BilanMeasures } from '@/app/api/client/body-data/route'
 
 interface Props {
@@ -34,10 +35,11 @@ function deltaInfo(cur: number | null, prev: number | null): { text: string; col
   if (Math.abs(diff) < 0.5) return null
   const sign = diff > 0 ? '+' : ''
   const color = diff < 0 ? '#6aab8e' : '#ef4444'
-  return { text: `${sign}${diff}cm`, color }
+  return { text: `${sign}${diff}`, color }
 }
 
 export default function BodySilhouette({ bilanList }: Props) {
+  const { t, lang } = useClientT()
   const [selectedIdx, setSelectedIdx] = useState(bilanList.length - 1)
 
   if (bilanList.length === 0) return null
@@ -49,6 +51,14 @@ export default function BodySilhouette({ bilanList }: Props) {
     const { y, lx, rx, labelRight } = ANCHORS[key]
     const val   = selected[key]
     const delta = prev ? deltaInfo(val, prev[key]) : null
+    const translatedLabel =
+      labelRight === 'Poitrine'
+        ? t('metrics.body.chest')
+        : labelRight === 'Taille'
+          ? t('metrics.body.waist')
+          : labelRight === 'Hanches'
+            ? t('metrics.body.hips')
+            : t('metrics.body.arm')
 
     return (
       <g key={key}>
@@ -67,7 +77,7 @@ export default function BodySilhouette({ bilanList }: Props) {
         </text>
         {delta && (
           <text x="6" y={y + 17} textAnchor="end" fontSize="7" fill={delta.color} fontFamily="sans-serif">
-            {delta.text}
+            {t('metrics.delta.cm', { n: delta.text })}
           </text>
         )}
 
@@ -78,14 +88,14 @@ export default function BodySilhouette({ bilanList }: Props) {
               stroke={LINE} strokeWidth="0.8" strokeDasharray="3,3" />
             <text x="274" y={y - 4} textAnchor="start" fontSize="8"
               fill={TEXT_L} fontFamily="sans-serif">
-              {labelRight}
+              {translatedLabel}
             </text>
           </>
         )}
         {rx == null && (
           <text x="274" y={y - 4} textAnchor="start" fontSize="8"
             fill={TEXT_L} fontFamily="sans-serif">
-            {labelRight}
+            {translatedLabel}
           </text>
         )}
       </g>
@@ -100,7 +110,7 @@ export default function BodySilhouette({ bilanList }: Props) {
           {bilanList.map((b, i) => {
             const active = i === selectedIdx
             const dt = new Date(b.date + 'T00:00:00')
-            const label = dt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+            const label = dt.toLocaleDateString(lang === 'es' ? 'es-ES' : lang === 'en' ? 'en-US' : 'fr-FR', { day: 'numeric', month: 'short' })
             return (
               <button
                 key={b.bilanIndex}
@@ -123,7 +133,7 @@ export default function BodySilhouette({ bilanList }: Props) {
         viewBox="0 0 280 460"
         className="w-full max-w-[240px] mx-auto"
         style={{ height: 'auto' }}
-        aria-label="Silhouette corporelle avec mensurations"
+        aria-label={t('metrics.body.silhouetteAria')}
       >
         {/* ── Head ── */}
         <ellipse cx="140" cy="32" rx="26" ry="30"

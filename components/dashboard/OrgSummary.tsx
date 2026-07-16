@@ -5,14 +5,24 @@ import { Calendar, Kanban, Bell, CheckCircle2, Plus, ArrowRight } from 'lucide-r
 import { type KanbanBoard as KanbanBoardType, type KanbanTask } from '@/components/ui/KanbanBoard'
 import { type AgendaEvent } from '@/components/ui/AgendaCalendar'
 
-const NOTIFY_LABELS: Record<number, string> = {
-  0: 'au moment',
-  5: '5 min',
-  10: '10 min',
-  15: '15 min',
-  30: '30 min',
-  60: '1h',
-  1440: '1 jour',
+function formatReminderLabel(event: AgendaEvent) {
+  if (event.alert_at) {
+    const alertDate = new Date(event.alert_at)
+    if (!Number.isNaN(alertDate.getTime())) {
+      return new Intl.DateTimeFormat('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(alertDate)
+    }
+  }
+
+  if (event.notify_minutes_before == null) return null
+  if (event.notify_minutes_before === 0) return 'au moment'
+  if (event.notify_minutes_before >= 1440) return `${event.notify_minutes_before / 1440} jour`
+  if (event.notify_minutes_before >= 60) return `${event.notify_minutes_before / 60}h`
+  return `${event.notify_minutes_before} min`
 }
 
 export default function OrgSummary({
@@ -71,13 +81,21 @@ export default function OrgSummary({
 
   const upcoming = events
     .filter(e => {
-      if (!e.notify_minutes_before || e.is_completed) return false
-      if (!e.event_time) return false
-      const evDate = new Date(`${e.event_date}T${e.event_time}`)
-      const diffMin = (evDate.getTime() - now.getTime()) / 60000
+      if (e.is_completed) return false
+      const triggerAt = e.alert_at
+        ? new Date(e.alert_at)
+        : e.notify_minutes_before != null && e.event_time
+          ? new Date(new Date(`${e.event_date}T${e.event_time}`).getTime() - e.notify_minutes_before * 60000)
+          : null
+      if (!triggerAt || Number.isNaN(triggerAt.getTime())) return false
+      const diffMin = (triggerAt.getTime() - now.getTime()) / 60000
       return diffMin >= 0 && diffMin <= 1440
     })
-    .sort((a, b) => `${a.event_date}T${a.event_time}`.localeCompare(`${b.event_date}T${b.event_time}`))
+    .sort((a, b) => {
+      const aKey = a.alert_at ?? `${a.event_date}T${a.event_time ?? '09:00'}`
+      const bKey = b.alert_at ?? `${b.event_date}T${b.event_time ?? '09:00'}`
+      return aKey.localeCompare(bKey)
+    })
 
   // Tâches non complétées, triées par board puis par position
   const pendingTasks = tasks
@@ -270,9 +288,9 @@ export default function OrgSummary({
                     <p className="text-[12px] font-medium text-white truncate">{ev.title}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[10px] text-[#1f8a65]/80">{label}</span>
-                      {ev.notify_minutes_before != null && (
+                      {formatReminderLabel(ev) && (
                         <span className="text-[10px] text-white/25">
-                          rappel {NOTIFY_LABELS[ev.notify_minutes_before] ?? `${ev.notify_minutes_before}min`} avant
+                          rappel {formatReminderLabel(ev)}
                         </span>
                       )}
                     </div>
@@ -283,6 +301,7 @@ export default function OrgSummary({
           </div>
         )}
       </div>
+
     </div>
   )
 }

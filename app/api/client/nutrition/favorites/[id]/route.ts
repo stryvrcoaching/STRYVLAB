@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createServiceClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { computePhysiologicalDate, inferMealType } from "@/lib/nutrition/physiological-date"
-import { calcEntryMacros } from "@/lib/nutrition/food-items"
 import { resolveClientTimezone } from "@/lib/client/checkin/resolveClientTimezone"
+import { resolveClientLanguage } from "@/lib/client/resolve-language"
+import { ct, type ClientLang } from "@/lib/i18n/clientTranslations"
 
 function service() {
   return createServiceClient(
@@ -22,6 +24,63 @@ async function resolveClientId(userId: string): Promise<string | null> {
   return data?.id ?? null
 }
 
+const updateFavoriteSchema = z.object({
+  name: z.string().min(1).max(100),
+  entries: z.array(z.object({
+    food_item_id: z.string().uuid(),
+    name_fr: z.string(),
+    quantity_g: z.number().positive(),
+    calories_kcal: z.number().nonnegative(),
+    protein_g: z.number().nonnegative(),
+    carbs_g: z.number().nonnegative(),
+    fat_g: z.number().nonnegative(),
+    fiber_g: z.number().nonnegative().optional(),
+  })).min(1).max(30),
+  total_calories: z.number().nonnegative(),
+  total_protein_g: z.number().nonnegative(),
+  total_carbs_g: z.number().nonnegative(),
+  total_fat_g: z.number().nonnegative(),
+})
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const clientId = await resolveClientId(user.id)
+  if (!clientId) return NextResponse.json({ error: "Client not found" }, { status: 404 })
+
+  const body = updateFavoriteSchema.safeParse(await req.json())
+  if (!body.success) return NextResponse.json({ error: body.error }, { status: 400 })
+
+  const db = service()
+  const lang = await resolveClientLanguage(db, clientId) as ClientLang
+  const { data: favorite, error } = await db
+    .from("client_meal_favorites")
+    .update({
+      name: body.data.name.trim(),
+      entries: body.data.entries,
+      total_calories: body.data.total_calories,
+      total_protein_g: body.data.total_protein_g,
+      total_carbs_g: body.data.total_carbs_g,
+      total_fat_g: body.data.total_fat_g,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", params.id)
+    .eq("client_id", clientId)
+    .select("id, name, entries, total_calories, total_protein_g, total_carbs_g, total_fat_g, use_count, last_used_at")
+    .maybeSingle()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!favorite) return NextResponse.json({ error: "Favorite not found" }, { status: 404 })
+
+  revalidatePath("/client/nutrition")
+  return NextResponse.json({ data: favorite }, { status: 200 })
+}
+
 // DELETE /api/client/nutrition/favorites/[id]
 export async function DELETE(
   req: NextRequest,
@@ -35,7 +94,6 @@ export async function DELETE(
   if (!clientId) return NextResponse.json({ error: "Client not found" }, { status: 404 })
 
   const db = service()
-  const timezone = await resolveClientTimezone(db, clientId)
 
   // Vérifier l'ownership
   const { data: favorite, error: fetchError } = await db
@@ -60,6 +118,7 @@ export async function DELETE(
     return NextResponse.json({ error: deleteError.message }, { status: 500 })
   }
 
+  revalidatePath("/client/nutrition")
   return NextResponse.json({ success: true }, { status: 200 })
 }
 
@@ -77,6 +136,7 @@ export async function POST(
   if (!clientId) return NextResponse.json({ error: "Client not found" }, { status: 404 })
 
   const db = service()
+  const timezone = await resolveClientTimezone(db, clientId)
 
   // Récupérer le favori
   const { data: favorite, error: fetchError } = await db
@@ -151,7 +211,9 @@ export async function POST(
     event_date: physiologicalDate,
     event_time: loggedAt.toTimeString().slice(0, 8),
     source_id: mealId,
-    title: `Repas — ${resolvedMealType === "breakfast" ? "Petit-déjeuner" : resolvedMealType === "lunch" ? "Déjeuner" : resolvedMealType === "dinner" ? "Dîner" : "Collation"}`,
+    title: ct(lang, "nutrition.agenda.mealTitle", {
+      label: ct(lang, `meal.type.${resolvedMealType}` as const),
+    }),
     summary: `${Math.round(favorite.total_calories ?? 0)} kcal · P ${favorite.total_protein_g}g · G ${favorite.total_carbs_g}g · L ${favorite.total_fat_g}g`,
     data: {
       total_calories: favorite.total_calories,
@@ -159,15 +221,6 @@ export async function POST(
       total_carbs_g: favorite.total_carbs_g,
       total_fat_g: favorite.total_fat_g,
     },
-  })
-
-  // Ajouter points (+3 par repas créé)
-  await db.from("client_points").insert({
-    client_id: clientId,
-    action_type: "meal",
-    points: 3,
-    reference_id: mealId,
-    earned_at: loggedAt.toISOString(),
   })
 
   // Incrémenter use_count et mettre à jour last_used_at
@@ -181,5 +234,6 @@ export async function POST(
     .eq("id", params.id)
     .eq("client_id", clientId)
 
+  revalidatePath("/client/nutrition")
   return NextResponse.json({ meal_id: mealId }, { status: 201 })
 }

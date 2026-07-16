@@ -12,8 +12,15 @@ import type { HydrationClimate } from "@/lib/formulas/hydration";
 import CycleSyncPhaseGrid from "./CycleSyncPhaseGrid";
 import type { NutritionMacros } from "@/components/client/smart/SmartNutritionWidget";
 import type { CycleState } from "@/lib/cycle/cycleEngine";
+import type { CyclePhaseObservation } from "@/lib/cycle/cycle-phase-observations";
 import { getCycleSyncAdjustment } from "@/lib/nutrition/engine/cycleSync";
+import {
+  DEFAULT_CYCLE_SYNC_PROFILE,
+  getEffectiveCycleSyncAdjustment,
+  type CycleSyncProfile,
+} from "@/lib/nutrition/cycle-sync-profile";
 import CyclePhasePill from "@/components/client/cycle/CyclePhasePill";
+import CoachDocLinkButton from "@/components/coach/docs/CoachDocLinkButton";
 import type { NutritionDataMode } from "./useNutritionStudio";
 import {
   buildNutritionDataQualityHeadline,
@@ -28,11 +35,16 @@ import {
 } from "@/lib/coach/transformationPhase";
 import type { MissingDataKey } from "./missingData";
 import { signalToMissingDataKey } from "./missingData";
+import type { TdeeEstimationStatus } from "@/lib/nutrition/tdee-quality";
+import type { PhaseProtocolPreview } from "@/lib/nutrition/phase-protocol-recalibration";
 
 interface Props {
   goal: MacroGoal;
   transformationPhase: TransformationPhase;
   onTransformationPhaseChange: (phase: TransformationPhase) => void;
+  phaseProtocolPreview?: PhaseProtocolPreview | null;
+  onApplyPhaseProtocolPreview?: () => void;
+  onDismissPhaseProtocolPreview?: () => void;
   calorieAdjustPct: number;
   onCalorieAdjustChange: (v: number) => void;
   proteinOverride: number | null;
@@ -53,8 +65,22 @@ interface Props {
   realtimeWindowDays?: number;
   tdeeAdaptive: number | null;
   tdeeAdaptiveAt: Date | null;
+  tdeeAdaptiveLower: number | null;
+  tdeeAdaptiveUpper: number | null;
+  tdeeObserved: number | null;
+  tdeeObservedLower: number | null;
+  tdeeObservedUpper: number | null;
+  tdeeActionableStreak: number;
   tdeeDataSource: 'weight_delta' | 'formula_proxy' | null;
   tdeeHistory: import('./useNutritionStudio').TdeeHistoryEntry[];
+  tdeeStabilityStatus: 'stable' | 'watch' | 'action' | null;
+  tdeeLastSkipReason: string | null;
+  tdeeLastSuccessAt: Date | null;
+  tdeeProtocolStartDate: string | null;
+  tdeeEstimationStatus: TdeeEstimationStatus;
+  tdeeDataQualityScore: number | null;
+  tdeeDataQualityReasons: string[];
+  tdeeError: string | null;
   applyAdaptiveTdee: () => Promise<void>;
   applyingAdaptive: boolean;
   tdeeAdaptiveActive: boolean;
@@ -67,6 +93,9 @@ interface Props {
   cycleState?: CycleState | null;
   cycleSyncEnabled?: boolean;
   onCycleSyncEnabledChange?: (v: boolean) => void;
+  cycleSyncProfile?: CycleSyncProfile;
+  onCycleSyncProfileChange?: (profile: CycleSyncProfile) => void;
+  cyclePhaseObservations?: CyclePhaseObservation[];
   onResolveSignal?: (missingKey: MissingDataKey) => void;
 }
 
@@ -80,11 +109,11 @@ const CLIMATE_OPTIONS: { value: HydrationClimate; label: string }[] = [
 // ─── Hydratation phase helpers ────────────────────────────────────────────────
 
 const PHASE_MARKERS = [
-  { value: 40, label: "Pré-compet." },
+  { value: 40, label: "Pré-compét." },
   { value: 80, label: "Sèche" },
   { value: 100, label: "Base" },
   { value: 130, label: "Sèche int." },
-  { value: 160, label: "Water load" },
+  { value: 160, label: "Charge hydrique" },
 ];
 
 function getPhaseLabel(v: number): string {
@@ -92,7 +121,7 @@ function getPhaseLabel(v: number): string {
   if (v < 90) return "Phase de sèche";
   if (v < 115) return "Hors-saison";
   if (v < 145) return "Sèche intensive";
-  return "Water loading";
+  return "Charge hydrique";
 }
 
 function getPhaseDescription(v: number): string {
@@ -104,7 +133,7 @@ function getPhaseDescription(v: number): string {
     return "Baseline EFSA — hydratation optimale pour la performance et la récupération.";
   if (v < 145)
     return "Sèche intensive — volume accru pour soutenir le métabolisme sous déficit calorique fort.";
-  return "Water loading (RP Strength) — signal osmotique pour purger la rétention sous-cutanée avant la peak week.";
+  return "Charge hydrique (RP Strength) — signal osmotique pour purger la rétention sous-cutanée avant la semaine d'affûtage.";
 }
 
 function getPhaseColor(v: number): string {
@@ -139,6 +168,38 @@ function getConfidenceTone(confidence?: "high" | "medium" | "low") {
     label: "Confiance faible",
     className: "text-red-300 bg-red-500/10 border-red-500/20",
   };
+}
+
+function formatLongFrenchDate(value: Date) {
+  return value.toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+  });
+}
+
+function formatTdeeSkipReason(reason: string) {
+  const labels: Record<string, string> = {
+    window_too_short_since_protocol_start:
+      "la fenêtre de données depuis le début du protocole est encore trop courte",
+    insufficient_weight_samples:
+      "il manque suffisamment de pesées pour établir une tendance",
+    low_confidence:
+      "les données disponibles ne permettent pas encore un calcul suffisamment fiable",
+  };
+
+  return labels[reason] ?? "les données disponibles ne permettent pas encore un calcul fiable";
+}
+
+function getTdeeEstimationStatusLabel(status: TdeeEstimationStatus) {
+  if (status === 'actionable') return 'Estimation exploitable';
+  if (status === 'observing') return 'En observation';
+  return 'Données à compléter';
+}
+
+function getTdeeEstimationStatusClassName(status: TdeeEstimationStatus) {
+  if (status === 'actionable') return 'border-[#1f8a65]/25 bg-[#1f8a65]/10 text-[#7fe0b8]';
+  if (status === 'observing') return 'border-amber-500/20 bg-amber-500/10 text-amber-300';
+  return 'border-white/[0.08] bg-white/[0.04] text-white/55';
 }
 
 function SectionDivider({ label }: { label: string }) {
@@ -182,6 +243,9 @@ export default function CalculationEngine({
   goal,
   transformationPhase,
   onTransformationPhaseChange,
+  phaseProtocolPreview,
+  onApplyPhaseProtocolPreview,
+  onDismissPhaseProtocolPreview,
   calorieAdjustPct,
   onCalorieAdjustChange,
   proteinOverride,
@@ -202,8 +266,22 @@ export default function CalculationEngine({
   realtimeWindowDays = 7,
   tdeeAdaptive,
   tdeeAdaptiveAt,
+  tdeeAdaptiveLower,
+  tdeeAdaptiveUpper,
+  tdeeObserved,
+  tdeeObservedLower,
+  tdeeObservedUpper,
+  tdeeActionableStreak,
   tdeeDataSource,
   tdeeHistory,
+  tdeeStabilityStatus,
+  tdeeLastSkipReason,
+  tdeeLastSuccessAt,
+  tdeeProtocolStartDate,
+  tdeeEstimationStatus,
+  tdeeDataQualityScore,
+  tdeeDataQualityReasons,
+  tdeeError,
   applyAdaptiveTdee,
   applyingAdaptive,
   tdeeAdaptiveActive,
@@ -216,9 +294,23 @@ export default function CalculationEngine({
   cycleState,
   cycleSyncEnabled = false,
   onCycleSyncEnabledChange,
+  cycleSyncProfile = DEFAULT_CYCLE_SYNC_PROFILE,
+  onCycleSyncProfileChange,
+  cyclePhaseObservations = [],
   onResolveSignal,
 }: Props) {
   const [openInfoModal, setOpenInfoModal] = useState<string | null>(null);
+
+  const getDaysSinceProtocolStart = () => {
+    if (!tdeeProtocolStartDate) return null;
+    const anchor = new Date(`${tdeeProtocolStartDate.slice(0, 10)}T00:00:00.000Z`);
+    const today = new Date();
+    const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+    const anchorUtc = anchor.getTime();
+    return Math.max(0, Math.floor((todayUtc - anchorUtc) / 86400000));
+  };
+  const daysSinceProtocolStart = getDaysSinceProtocolStart();
+
 
   const anyMacroOverride =
     macroOverrides.protein_g !== null ||
@@ -343,12 +435,21 @@ export default function CalculationEngine({
 
           {/* Header : titre + bouton Calculer */}
           <div className="flex items-center justify-between">
-            <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/40">
-              TDEE Adaptatif
-              {tdeeDataSource === 'formula_proxy' && (
-                <span className="ml-2 text-amber-400">⚠ Proxy</span>
-              )}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/40">
+                TDEE adaptatif
+                {tdeeDataSource === 'formula_proxy' && (
+                  <span className="ml-2 text-amber-400">⚠ Proxy</span>
+                )}
+              </p>
+              <button
+                onClick={() => setOpenInfoModal("tdeeClientTruth")}
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-white/40 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
+                aria-label="Ouvrir la documentation TDEE"
+              >
+                <Info size={11} />
+              </button>
+            </div>
             <button
               onClick={applyAdaptiveTdee}
               disabled={applyingAdaptive}
@@ -388,10 +489,62 @@ export default function CalculationEngine({
                 )}
               </div>
 
-              {tdeeAdaptiveAt && (
-                <p className="text-[10px] text-white/30">
-                  Mis à jour le {tdeeAdaptiveAt.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
+              {tdeeAdaptiveLower != null && tdeeAdaptiveUpper != null && (
+                <p className="text-[10px] text-white/35">
+                  Plage d’incertitude : {tdeeAdaptiveLower.toLocaleString('fr-FR')}–{tdeeAdaptiveUpper.toLocaleString('fr-FR')} kcal/jour
                 </p>
+              )}
+
+              {daysSinceProtocolStart !== null && daysSinceProtocolStart < 14 && (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2.5 flex items-start gap-2">
+                  <AlertTriangle className="text-amber-400 shrink-0 mt-0.5" size={14} />
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-amber-200 leading-tight">
+                      Calibrage en cours (Jour {daysSinceProtocolStart})
+                    </p>
+                    <p className="text-[9px] leading-relaxed text-amber-100/70">
+                      Ce protocole a démarré il y a moins de 14 jours. Les variations de poids initiales (eau/glycogène) peuvent temporairement fausser la pente de calcul. Il est recommandé de surveiller ce TDEE sans l'appliquer immédiatement.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+
+              {(tdeeLastSuccessAt ?? tdeeAdaptiveAt) && (
+                <p className="text-[10px] text-white/30">
+                  Mis à jour le {formatLongFrenchDate(tdeeLastSuccessAt ?? tdeeAdaptiveAt!)}
+                </p>
+              )}
+
+              {(tdeeStabilityStatus || tdeeLastSuccessAt || tdeeLastSkipReason) && (
+                <div className="flex flex-wrap items-center gap-2 text-[10px]">
+                  <span className={`rounded-lg border px-2 py-1 ${getTdeeEstimationStatusClassName(tdeeEstimationStatus)}`}>
+                    {getTdeeEstimationStatusLabel(tdeeEstimationStatus)}
+                    {tdeeDataQualityScore != null && ` · ${tdeeDataQualityScore}/100`}
+                  </span>
+                  {tdeeStabilityStatus && (
+                    <span
+                      className={`rounded-lg border px-2 py-1 ${
+                        tdeeStabilityStatus === 'stable'
+                          ? 'border-[#1f8a65]/25 bg-[#1f8a65]/10 text-[#7fe0b8]'
+                          : tdeeStabilityStatus === 'watch'
+                            ? 'border-amber-500/20 bg-amber-500/10 text-amber-300'
+                            : 'border-blue-500/20 bg-blue-500/10 text-blue-300'
+                      }`}
+                    >
+                      {tdeeStabilityStatus === 'stable'
+                        ? 'Stable'
+                        : tdeeStabilityStatus === 'watch'
+                          ? 'Sous surveillance'
+                          : 'Ajustement validé'}
+                    </span>
+                  )}
+                  {tdeeLastSuccessAt && (
+                    <span className="text-white/25">
+                      Dernier calcul utile {formatLongFrenchDate(tdeeLastSuccessAt)}
+                    </span>
+                  )}
+                </div>
               )}
 
               {/* Toggle — utiliser comme source de vérité */}
@@ -405,11 +558,11 @@ export default function CalculationEngine({
               >
                 <div className="text-left">
                   <p className={`text-[10px] font-bold ${tdeeAdaptiveActive ? 'text-[#1f8a65]' : 'text-white/50'}`}>
-                    {tdeeAdaptiveActive ? 'TDEE adaptatif actif — source de vérité' : 'Utiliser comme base de calcul'}
+                    {tdeeAdaptiveActive ? 'TDEE client actif — source de vérité' : 'Utiliser comme base de calcul'}
                   </p>
                   <p className="text-[9px] text-white/25 mt-0.5">
                     {tdeeAdaptiveActive
-                      ? 'Macros, déficit et protocole calculés sur ce TDEE'
+                      ? 'Macros et déficit pilotés par le TDEE client stabilisé'
                       : 'Remplace le TDEE estimé dans tous les calculs'}
                   </p>
                 </div>
@@ -426,7 +579,7 @@ export default function CalculationEngine({
               {tdeeHistory[0] && (
                 <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/[0.04]">
                   <div>
-                    <p className="text-[9px] text-white/25 uppercase tracking-[0.1em] font-bold mb-0.5">Apport moy.</p>
+                    <p className="text-[9px] text-white/25 uppercase tracking-[0.1em] font-bold mb-0.5">Calories moy.</p>
                     <p className="text-[11px] font-bold text-white tabular-nums">{tdeeHistory[0].avg_intake_kcal} kcal</p>
                   </div>
                   <div>
@@ -456,13 +609,13 @@ export default function CalculationEngine({
                     <div className="bg-white/[0.03] rounded-xl p-3 space-y-1.5">
                       <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold">Comment c'est calculé</p>
                       <p className="text-[10px] text-white/50 leading-relaxed">
-                        Méthode MacroFactor (régression linéaire) :
+                        Pente robuste (médiane de Theil–Sen) :
                       </p>
                       <p className="text-[10px] font-mono text-white/60 bg-white/[0.04] rounded-lg px-2 py-1.5">
-                        TDEE = apport moyen − (pente poids × 7700)
+                        TDEE = apport moyen − (pente de poids × 7700)
                       </p>
                       <p className="text-[10px] text-white/40 leading-relaxed">
-                        {tdeeHistory[0].avg_intake_kcal} kcal/j − ({Number(tdeeHistory[0].weight_delta_kg).toFixed(2)} kg ÷ {tdeeHistory[0].weight_samples} j × 7700)
+                        {tdeeHistory[0].avg_intake_kcal} kcal/j − (pente de poids × 7700)
                         {' '}= <span className="text-white font-bold">{tdeeAdaptive} kcal</span>
                       </p>
                       <p className="text-[9px] text-white/25 leading-relaxed mt-1">
@@ -477,6 +630,18 @@ export default function CalculationEngine({
                         <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold">Facteurs de confiance</p>
                         {(tdeeHistory[0].confidence_reasons as string[]).map((reason: string, i: number) => (
                           <div key={i} className="flex items-start gap-2">
+                            <span className="text-white/20 text-[10px] mt-0.5 shrink-0">·</span>
+                            <p className="text-[10px] text-white/45 leading-relaxed">{reason}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {tdeeDataQualityReasons.length > 0 && (
+                      <div className="bg-white/[0.03] rounded-xl p-3 space-y-2">
+                        <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold">Qualité de la collecte</p>
+                        {tdeeDataQualityReasons.map((reason, index) => (
+                          <div key={`${reason}-${index}`} className="flex items-start gap-2">
                             <span className="text-white/20 text-[10px] mt-0.5 shrink-0">·</span>
                             <p className="text-[10px] text-white/45 leading-relaxed">{reason}</p>
                           </div>
@@ -517,7 +682,7 @@ export default function CalculationEngine({
                         <p className="text-[9px] text-white/25 uppercase tracking-[0.1em] font-bold">Historique ({tdeeHistory.length} calculs)</p>
                         {tdeeHistory.map(h => (
                           <div key={h.id} className="flex items-center justify-between text-[10px] text-white/40">
-                            <span>{new Date(h.calculated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
+                            <span>{formatLongFrenchDate(new Date(h.calculated_at))}</span>
                             <span className="tabular-nums">{h.tdee_formula} → {h.tdee_adaptive} kcal</span>
                             <span className={h.delta_kcal > 0 ? 'text-[#1f8a65]' : 'text-amber-400'}>
                               {h.delta_kcal > 0 ? '+' : ''}{h.delta_kcal}
@@ -534,12 +699,45 @@ export default function CalculationEngine({
               )}
             </>
           ) : (
-            <p className="text-[11px] text-white/30 leading-relaxed">
-              Nécessite ≥ 2 mesures de poids sur 14 jours. Cliquez "Calculer" pour estimer le TDEE réel.
-            </p>
+            <div className="space-y-2">
+              <span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] ${getTdeeEstimationStatusClassName(tdeeEstimationStatus)}`}>
+                {getTdeeEstimationStatusLabel(tdeeEstimationStatus)}
+                {tdeeDataQualityScore != null && ` · ${tdeeDataQualityScore}/100`}
+              </span>
+              <p className="text-[11px] text-white/30 leading-relaxed">
+                {tdeeEstimationStatus === 'collecting'
+                  ? 'Le moteur enregistre les signaux client, sans encore promouvoir de TDEE de référence.'
+                  : 'Une estimation est observée en shadow mode ; elle ne peut pas encore modifier le protocole.'}
+              </p>
+              {tdeeObserved != null && (
+                <p className="text-[11px] text-white/55">
+                  Estimation observée : <span className="font-bold text-white">{tdeeObserved.toLocaleString('fr-FR')} kcal/jour</span>
+                  {tdeeObservedLower != null && tdeeObservedUpper != null && ` · plage ${tdeeObservedLower.toLocaleString('fr-FR')}–${tdeeObservedUpper.toLocaleString('fr-FR')}`}
+                </p>
+              )}
+              {tdeeEstimationStatus === 'actionable' && tdeeAdaptive == null && (
+                <p className="text-[10px] text-white/35">
+                  Validation {Math.min(tdeeActionableStreak, 2)}/2 : une seconde fenêtre exploitable est requise avant toute promotion.
+                </p>
+              )}
+            </div>
           )}
 
-          {/* Toggle recalcul auto nightly */}
+          {tdeeError && (
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2">
+              <p className="text-[10px] leading-relaxed text-amber-200">{tdeeError}</p>
+            </div>
+          )}
+
+          {!tdeeError && tdeeLastSkipReason && (
+            <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2">
+              <p className="text-[10px] leading-relaxed text-white/45">
+                Calcul automatique en attente : {formatTdeeSkipReason(tdeeLastSkipReason)}.
+              </p>
+            </div>
+          )}
+
+          {/* Toggle suivi client automatique */}
           <button
             onClick={() => onTdeeAutoToggle(!tdeeAutoEnabled)}
             className={`flex items-center justify-between w-full rounded-xl px-3 py-2 transition-all border ${
@@ -549,7 +747,7 @@ export default function CalculationEngine({
             }`}
           >
             <p className={`text-[9px] font-bold ${tdeeAutoEnabled ? 'text-[#1f8a65]' : 'text-white/30'}`}>
-              {tdeeAutoEnabled ? 'Recalcul automatique actif · nightly' : 'Recalcul automatique · désactivé'}
+              {tdeeAutoEnabled ? 'Suivi TDEE client actif · quotidien' : 'Suivi TDEE client · désactivé'}
             </p>
             <div className={`relative w-7 h-3.5 rounded-full transition-colors shrink-0 ml-3 ${
               tdeeAutoEnabled ? 'bg-[#1f8a65]' : 'bg-white/[0.10]'
@@ -583,6 +781,19 @@ export default function CalculationEngine({
               {getTransformationPhaseLabel(transformationPhase)} active. Cette phase pilote la direction nutritionnelle,
               puis le moteur applique les formules de {transformationPhaseToMacroGoal(transformationPhase)} avec les ajustements adaptes.
             </p>
+            {phaseProtocolPreview && (
+              <div className="mt-3 rounded-xl border border-[#86aeb8]/25 bg-[#86aeb8]/[0.07] p-3">
+                <p className="text-[10px] font-semibold text-[#c6dce2]">Synchronisation du plan prête</p>
+                <p className="mt-1 text-[10px] leading-relaxed text-white/55">
+                  {phaseProtocolPreview.changedDays} journée{phaseProtocolPreview.changedDays > 1 ? 's' : ''} type et {phaseProtocolPreview.changedMealPlans} plan{phaseProtocolPreview.changedMealPlans > 1 ? 's' : ''} alimentaire{phaseProtocolPreview.changedMealPlans > 1 ? 's' : ''} seront recalibrés en conservant les écarts entre jours, les portions fixes et les limites définies par le coach. Ensuite, enregistre le protocole pour conserver ces changements.
+                </p>
+                {phaseProtocolPreview.warnings.length > 0 && <p className="mt-1 text-[9px] text-amber-200/80">{phaseProtocolPreview.warnings[0]}</p>}
+                <div className="mt-2 flex gap-2">
+                  <button type="button" onClick={onApplyPhaseProtocolPreview} className="rounded-lg bg-[#86aeb8] px-2.5 py-1.5 text-[9px] font-bold text-[#0d0d0d]">Appliquer au plan</button>
+                  <button type="button" onClick={onDismissPhaseProtocolPreview} className="rounded-lg bg-white/[0.06] px-2.5 py-1.5 text-[9px] font-semibold text-white/60">Conserver tel quel</button>
+                </div>
+              </div>
+            )}
           </div>
 
           {macroResult && (
@@ -765,7 +976,12 @@ export default function CalculationEngine({
         {/* ── CYCLE SYNC ───────────────────────────────────────────────── */}
         {isFemale && (
           <div>
-            <SectionDivider label="Cycle Sync (femme)" />
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <SectionDivider label="Cycle Sync (femme)" />
+              </div>
+              <CoachDocLinkButton href="/coach/documentation/cycle-sync" label="Guide Cycle Sync" />
+            </div>
 
             {/* Toggle — same style as Carb Cycling */}
             <div className="flex gap-1.5 mb-3 flex-wrap">
@@ -797,6 +1013,52 @@ export default function CalculationEngine({
                 <p className="text-[9px] text-[#a855f7]/80 uppercase tracking-[0.14em] font-semibold">
                   Actif — appliqué automatiquement à la cliente
                 </p>
+              </div>
+            )}
+
+            {cycleSyncEnabled && (
+              <div className="mb-3 rounded-xl border-[0.3px] border-white/[0.06] bg-white/[0.025] p-3">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/35">Intensité d’ajustement</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {([
+                    ['conservative', 'Prudent'],
+                    ['standard', 'Standard'],
+                    ['custom', 'Personnalisé'],
+                  ] as const).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => onCycleSyncProfileChange?.({
+                        mode,
+                        intensity_percent: mode === 'conservative' ? 50 : mode === 'standard' ? 100 : cycleSyncProfile.intensity_percent,
+                      })}
+                      className={`rounded-lg px-2 py-1 text-[9px] font-medium transition-colors ${
+                        cycleSyncProfile.mode === mode
+                          ? 'bg-[#a855f7]/15 text-[#d8b4fe]'
+                          : 'bg-white/[0.04] text-white/45 hover:text-white/70'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {cycleSyncProfile.mode === 'custom' && (
+                  <label className="mt-2 flex items-center justify-between gap-3 text-[9px] text-white/45">
+                    Intensité
+                    <input
+                      type="number"
+                      min={25}
+                      max={125}
+                      value={cycleSyncProfile.intensity_percent}
+                      onChange={(event) => onCycleSyncProfileChange?.({
+                        mode: 'custom',
+                        intensity_percent: Math.min(125, Math.max(25, Number(event.target.value) || 25)),
+                      })}
+                      className="h-7 w-16 rounded-md border-[0.3px] border-white/[0.08] bg-white/[0.04] px-2 text-right text-[10px] text-white outline-none"
+                    />
+                  </label>
+                )}
+                <p className="mt-2 text-[9px] leading-relaxed text-white/35">La confiance des dates de règles limite toujours l’automatisation, même avec un profil personnalisé.</p>
               </div>
             )}
 
@@ -852,14 +1114,33 @@ export default function CalculationEngine({
                         </div>
                       </div>
                       {cycleState.currentPhase && (() => {
-                        const adj = getCycleSyncAdjustment(cycleState.currentPhase!)
+                        const observation = cyclePhaseObservations.find((item) => item.phase === cycleState.currentPhase)
+                        if (!observation || observation.samples === 0) return null
+                        return (
+                          <div className="border-t border-white/[0.06] pt-2">
+                            <p className="text-[9px] text-white/30 uppercase tracking-[0.12em]">Observations de cette phase</p>
+                            <p className="mt-1 text-[10px] text-white/50">
+                              {observation.samples} check-in{observation.samples > 1 ? 's' : ''} · énergie {observation.energyAverage ?? '—'}/5 · faim {observation.hungerAverage ?? '—'}/4
+                            </p>
+                            <p className="mt-1 text-[9px] text-white/30">Indication coach uniquement : ces données ne modifient jamais le plan sans décision explicite.</p>
+                          </div>
+                        )
+                      })()}
+                      {cycleState.currentPhase && (() => {
+                        const effective = getEffectiveCycleSyncAdjustment({
+                          adjustment: getCycleSyncAdjustment(cycleState.currentPhase!),
+                          cycleState,
+                          profile: cycleSyncProfile,
+                        })
+                        const adj = effective.adjustment
                         if (!adj.caloriesDelta && !adj.proteinDelta && !adj.carbsDelta) return null
                         return (
                           <div className="border-t border-white/[0.06] pt-2 space-y-1">
-                            <p className="text-[9px] text-white/30 uppercase tracking-[0.12em]">Ajustements phase actuelle</p>
+                            <p className="text-[9px] text-white/30 uppercase tracking-[0.12em]">Ajustements réellement appliqués</p>
                             {adj.caloriesDelta !== 0 && <p className="text-[11px] text-white/50">{adj.caloriesDelta > 0 ? '+' : ''}{adj.caloriesDelta} kcal/j</p>}
                             {adj.proteinDelta !== 0 && <p className="text-[11px] text-white/50">{adj.proteinDelta > 0 ? '+' : ''}{adj.proteinDelta}g protéines</p>}
                             {adj.carbsDelta !== 0 && <p className="text-[11px] text-white/50">{adj.carbsDelta > 0 ? '+' : ''}{adj.carbsDelta}g glucides</p>}
+                            {effective.isCautious && <p className="text-[9px] text-amber-200/75">Application réduite par le profil choisi ou la fiabilité actuelle du cycle.</p>}
                             <p className="text-[10px] text-white/35 leading-relaxed">{adj.notes[0]}</p>
                           </div>
                         )
@@ -965,6 +1246,12 @@ export default function CalculationEngine({
                   openInfoModal as keyof typeof INJECTION_INFO_MODALS
                 ].whenToUse
               }
+              tabs={
+                INJECTION_INFO_MODALS[
+                  openInfoModal as keyof typeof INJECTION_INFO_MODALS
+                ].tabs
+              }
+              docLink={openInfoModal === 'tdeeClientTruth' ? '/coach/documentation/adaptive-tdee' : undefined}
               onClose={() => setOpenInfoModal(null)}
             />
           )}

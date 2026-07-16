@@ -76,11 +76,42 @@ export const translations: Record<Language, any> = {
       pillar2Desc: "Increased metabolism. Caloric adjustment to prevent catabolism."
     }
   },
-  // On ajoute une clé 'es' vide pour éviter l'erreur de propriété manquante
-  // Ou on utilise le fallback dans getTranslation
   es: {
-    common: { calculate: "Calcular", backToTools: "Panel", labLabel: "Laboratorio", consultation: "Consulta" },
-    toolsPage: { title: "Herramientas", subtitle: "Optimiza tu fisiología.", access: "Iniciar", tools: {} }
+    common: {
+      calculate: "Calcular",
+      backToTools: "Hub de Herramientas",
+      labLabel: "Laboratorio de precisión",
+      consultation: "Consulta"
+    },
+    toolsPage: {
+      title: "Herramientas",
+      subtitle: "Optimiza tu fisiología con nuestros avanzados algoritmos de cálculo biométrico.",
+      access: "Iniciar Auditoría",
+      tools: {
+        macros: { title: "Cálculo de Macros", description: "Suma energética real (TMB, NEAT, EAT) para recomposición." },
+        bodyFat: { title: "Grasa Corporal", description: "Análisis de composición corporal vía algoritmo de la Marina de EE. UU." },
+        cycleSync: { title: "Cycle Sync", description: "Optimización hormonal de la nutrición y el entrenamiento." },
+        carbCycling: { title: "Carb Cycling", description: "Estratificación cíclica de carbohidratos según la actividad." },
+        hrZones: { title: "Zonas FC", description: "Definición de zonas de frecuencia cardíaca objetivo para resistencia." },
+        oneRM: { title: "Calculadora 1RM", description: "Estimación de carga máxima y zonas de fuerza teóricas." }
+      }
+    },
+    oneRMPage: {
+      title: "CALC 1RM",
+      category: "Rendimiento",
+      pillar1Title: "Precisión de Fuerza",
+      pillar1Desc: "Calcula tu repetición máxima teórica para calibrar tus ciclos de fuerza.",
+      pillar2Title: "Zonas de Carga",
+      pillar2Desc: "Distribución automática de porcentajes para hipertrofia y potencia."
+    },
+    cycleSyncPage: {
+      title: "CYCLE SYNC",
+      category: "Fisiología",
+      pillar1Title: "Fase Folicular",
+      pillar1Desc: "Máxima sensibilidad a la insulina. Ventana ideal para volumen e intensidad.",
+      pillar2Title: "Fase Lútea",
+      pillar2Desc: "Metabolismo aumentado. Ajuste calórico para prevenir el catabolismo."
+    }
   }
 };
 

@@ -1,14 +1,8 @@
 "use client"
 
 import { Moon } from 'lucide-react'
+import { useClientT } from '@/components/client/ClientI18nProvider'
 import type { CyclePhase, CycleSyncAdjustment } from '@/lib/nutrition/engine/cycleSync'
-
-const PHASE_LABELS: Record<CyclePhase, string> = {
-  menstrual: 'Menstruation',
-  follicular: 'Phase folliculaire',
-  ovulatory: 'Phase ovulatoire',
-  luteal: 'Phase lutéale',
-}
 
 const PHASE_COLORS: Record<CyclePhase, { bg: string; border: string; dot: string }> = {
   menstrual:  { bg: 'rgba(239,68,68,0.06)',   border: 'rgba(239,68,68,0.18)',   dot: '#ef4444' },
@@ -24,8 +18,9 @@ interface Props {
 }
 
 export default function CycleSyncBanner({ phase, adjustment, cycleDay }: Props) {
+  const { t } = useClientT()
   const colors = PHASE_COLORS[phase]
-  const label = PHASE_LABELS[phase]
+  const label = t(`cycle.phase.${phase}.full`)
 
   return (
     <div
@@ -40,13 +35,13 @@ export default function CycleSyncBanner({ phase, adjustment, cycleDay }: Props) 
           </div>
           <div>
             <p className="text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/30">
-              Cycle Sync
+              {t('nutrition.cycleSync')}
             </p>
             <p className="text-[13px] font-semibold text-white/90">{label}</p>
           </div>
         </div>
         {cycleDay && (
-          <span className="text-[10px] text-white/30 font-mono">J{cycleDay}</span>
+          <span className="text-[10px] text-white/30 font-mono">{t('cycle.day.short', { day: cycleDay })}</span>
         )}
       </div>
 
@@ -66,7 +61,7 @@ export default function CycleSyncBanner({ phase, adjustment, cycleDay }: Props) 
               <p className="text-[18px] font-bold text-[color:var(--data-copper)]">
                 {adjustment.proteinDelta > 0 ? '+' : ''}{adjustment.proteinDelta}g
               </p>
-              <p className="text-[9px] text-white/30 font-barlow-condensed uppercase tracking-[0.12em]">protéines</p>
+              <p className="text-[9px] text-white/30 font-barlow-condensed uppercase tracking-[0.12em]">{t('nutrition.protein')}</p>
             </div>
           )}
           {adjustment.carbsDelta !== 0 && (
@@ -74,7 +69,7 @@ export default function CycleSyncBanner({ phase, adjustment, cycleDay }: Props) 
               <p className="text-[18px] font-bold text-[color:var(--data-gold)]">
                 {adjustment.carbsDelta > 0 ? '+' : ''}{adjustment.carbsDelta}g
               </p>
-              <p className="text-[9px] text-white/30 font-barlow-condensed uppercase tracking-[0.12em]">glucides</p>
+              <p className="text-[9px] text-white/30 font-barlow-condensed uppercase tracking-[0.12em]">{t('nutrition.carbs')}</p>
             </div>
           )}
         </div>
@@ -84,7 +79,7 @@ export default function CycleSyncBanner({ phase, adjustment, cycleDay }: Props) 
       {adjustment.optimalForDeficit && (
         <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/[0.04] w-fit">
           <div className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
-          <p className="text-[10px] text-white/50">Phase optimale pour le déficit</p>
+          <p className="text-[10px] text-white/50">{t('cycle.optimalDeficit')}</p>
         </div>
       )}
 

@@ -18,27 +18,27 @@ const facts: DailyFacts = {
 
 describe('composeClosingMessage', () => {
   it('names the cancelled session honestly (no false praise)', () => {
-    const msg = composeClosingMessage({ facts, tips: [], tone: 'neutre', flow: 'evening' })
+    const msg = composeClosingMessage({ facts, tips: [], tone: 'neutre', flow: 'evening', lang: 'fr' })
     expect(msg).toMatch(/non faite|annulée/i)
     expect(msg).not.toMatch(/bien avancé|bravo|félicitations/i)
   })
   it('states calorie overshoot with the delta', () => {
-    const msg = composeClosingMessage({ facts, tips: [], tone: 'neutre', flow: 'evening' })
+    const msg = composeClosingMessage({ facts, tips: [], tone: 'neutre', flow: 'evening', lang: 'fr' })
     expect(msg).toMatch(/\+300/)
   })
   it('appends tips when provided', () => {
-    const msg = composeClosingMessage({ facts, tips: ['Bois par gorgées.'], tone: 'neutre', flow: 'evening' })
+    const msg = composeClosingMessage({ facts, tips: ['Bois par gorgées.'], tone: 'neutre', flow: 'evening', lang: 'fr' })
     expect(msg).toMatch(/Bois par gorgées\./)
   })
   it('uses the tone opener', () => {
-    const msg = composeClosingMessage({ facts, tips: [], tone: 'motivant', flow: 'evening' })
+    const msg = composeClosingMessage({ facts, tips: [], tone: 'motivant', flow: 'evening', lang: 'fr' })
     expect(msg.length).toBeGreaterThan(0)
   })
 })
 
 describe('composeMorningGreeting', () => {
   it('starts the check-in CTA with the highest-priority enabled action (BPM first)', () => {
-    const msg = composeMorningGreeting({ name: 'Kev', tone: 'bienveillant', enabledFields: ['energy_level', 'rhr_morning', 'sleep_hours'], hasTrainingToday: true, trainingName: 'Push A' })
+    const msg = composeMorningGreeting({ name: 'Kev', tone: 'bienveillant', lang: 'fr', enabledFields: ['energy_level', 'rhr_morning', 'sleep_hours'], hasTrainingToday: true, trainingName: 'Push A' })
     const idxBpm = msg.indexOf('fréquence cardiaque')
     const idxEnergy = msg.indexOf('énergie')
     expect(idxBpm).toBeGreaterThan(-1)
@@ -48,7 +48,7 @@ describe('composeMorningGreeting', () => {
 
 describe('composeEveningGreeting', () => {
   it('asks for the evening check-in and lists enabled evening fields', () => {
-    const msg = composeEveningGreeting({ name: 'Kev', tone: 'strict', enabledEveningFields: ['stress_level', 'daily_steps'], hasTrainingToday: false, trainingName: null })
+    const msg = composeEveningGreeting({ name: 'Kev', tone: 'strict', lang: 'fr', enabledEveningFields: ['stress_level', 'daily_steps'], hasTrainingToday: false, trainingName: null })
     expect(msg).toMatch(/check-in du soir/i)
     expect(msg).toMatch(/stress/i)
   })
@@ -56,13 +56,13 @@ describe('composeEveningGreeting', () => {
 
 describe('composeEveningReminder', () => {
   it('primes tomorrow starting with the first waking action enabled', () => {
-    const msg = composeEveningReminder({ tone: 'neutre', enabledMorningFields: ['energy_level', 'rhr_morning'] })
+    const msg = composeEveningReminder({ tone: 'neutre', lang: 'fr', enabledMorningFields: ['energy_level', 'rhr_morning'] })
     expect(msg).toMatch(/fréquence cardiaque/i)
     const idxBpm = msg.indexOf('fréquence cardiaque')
     const idxEnergy = msg.indexOf('énergie')
     expect(idxBpm).toBeLessThan(idxEnergy === -1 ? Infinity : idxEnergy)
   })
   it('falls back gracefully with no fields', () => {
-    expect(composeEveningReminder({ tone: 'neutre', enabledMorningFields: [] }).length).toBeGreaterThan(0)
+    expect(composeEveningReminder({ tone: 'neutre', lang: 'fr', enabledMorningFields: [] }).length).toBeGreaterThan(0)
   })
 })

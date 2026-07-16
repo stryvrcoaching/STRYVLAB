@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">STRYV</string>
+    <string name="title_activity_main">STRYV</string>
+    <string name="health_connect_privacy_policy_url">https://genesis-system.vercel.app/confidentialite</string>
+    <string name="package_name">com.stryvlab.client</string>
+    <string name="custom_url_scheme">com.stryvlab.client</string>
+</resources>

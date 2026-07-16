@@ -1,294 +1,547 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { ArrowRight } from 'lucide-react'
-import { useTour } from './TourContext'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, ArrowRight, Check, Home, MoreVertical, Smartphone } from 'lucide-react'
+import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 import { useClientT } from './ClientI18nProvider'
+import { useTour } from './TourContext'
 import type { ClientDictKey } from '@/lib/i18n/clientTranslations'
+import {
+  readLocalStorage,
+  readSessionStorage,
+  removeLocalStorage,
+  writeLocalStorage,
+  writeSessionStorage,
+} from '@/lib/client/browserStorage'
+import {
+  getClientInstallPlatform,
+  isInstalledClientApp,
+  resolveClientEntryExperience,
+  type ClientInstallPlatform,
+} from '@/lib/client/appMode'
 
-type StripItem = 'checkin' | 'program' | 'calories' | 'water'
+type TourTarget = 'dashboard' | 'progression' | 'daily-strip' | 'coach-chat' | 'workout' | 'nutrition' | 'quick-add' | 'metrics'
 
 type TourStep = {
-  navIndex?: number
-  isFAB?: boolean
-  stripItem?: StripItem
-  isFemaleOnly?: boolean
+  id: string
+  target?: TourTarget
+  optional?: boolean
   titleKey: ClientDictKey
   bodyKey: ClientDictKey
 }
 
+const DONE_KEY = 'onboarding_tour_done'
+const STEP_KEY = 'onboarding_tour_step'
+const INSTALL_GUIDE_SESSION_KEY = 'stryvr_install_guide_seen'
+
 const TOUR_STEPS: TourStep[] = [
-  // 0 — Chat tab
   {
-    navIndex: 0,
-    titleKey: 'tour.step0.title',
-    bodyKey:  'tour.step0.body',
-  },
-  // 1–4 — TopBar strip pills (explained on chat page)
-  {
-    stripItem: 'checkin',
-    titleKey: 'tour.strip.checkin.title',
-    bodyKey:  'tour.strip.checkin.body',
+    id: 'welcome',
+    titleKey: 'tour.welcome.title',
+    bodyKey: 'tour.welcome.body',
   },
   {
-    stripItem: 'program',
-    titleKey: 'tour.strip.program.title',
-    bodyKey:  'tour.strip.program.body',
+    id: 'dashboard',
+    target: 'dashboard',
+    titleKey: 'tour.dashboard.title',
+    bodyKey: 'tour.dashboard.body',
   },
   {
-    stripItem: 'calories',
-    titleKey: 'tour.strip.calories.title',
-    bodyKey:  'tour.strip.calories.body',
+    id: 'progression',
+    target: 'progression',
+    optional: true,
+    titleKey: 'tour.progression.title',
+    bodyKey: 'tour.progression.body',
   },
   {
-    stripItem: 'water',
-    titleKey: 'tour.strip.water.title',
-    bodyKey:  'tour.strip.water.body',
+    id: 'daily-strip',
+    target: 'daily-strip',
+    optional: true,
+    titleKey: 'tour.dailyStrip.title',
+    bodyKey: 'tour.dailyStrip.body',
   },
-  // 5 — Programme tab
   {
-    navIndex: 1,
-    titleKey: 'tour.step1.title',
-    bodyKey:  'tour.step1.body',
+    id: 'coach-chat',
+    target: 'coach-chat',
+    optional: true,
+    titleKey: 'tour.coach.title',
+    bodyKey: 'tour.coach.body',
   },
-  // 6 — Nutrition tab
   {
-    navIndex: 2,
-    titleKey: 'tour.step2.title',
-    bodyKey:  'tour.step2.body',
+    id: 'workout',
+    target: 'workout',
+    titleKey: 'tour.workout.title',
+    bodyKey: 'tour.workout.body',
   },
-  // 7 — FAB
   {
-    isFAB: true,
-    titleKey: 'tour.step3.title',
-    bodyKey:  'tour.step3.body',
+    id: 'nutrition',
+    target: 'nutrition',
+    titleKey: 'tour.nutrition.title',
+    bodyKey: 'tour.nutrition.body',
   },
-  // 8 — Metrics tab
   {
-    navIndex: 3,
-    titleKey: 'tour.step4.title',
-    bodyKey:  'tour.step4.body',
+    id: 'quick-add',
+    target: 'quick-add',
+    titleKey: 'tour.quickAdd.title',
+    bodyKey: 'tour.quickAdd.body',
   },
-  // 9 — Cycle (female only) — anchored to FAB since cycle logging lives in QuickLogSheet
   {
-    isFemaleOnly: true,
-    isFAB: true,
-    titleKey: 'tour.female.title',
-    bodyKey:  'tour.female.body',
+    id: 'metrics',
+    target: 'metrics',
+    titleKey: 'tour.metrics.title',
+    bodyKey: 'tour.metrics.body',
   },
 ]
 
+function getTarget(target: TourTarget): HTMLElement | null {
+  const selector = target === 'quick-add'
+    ? '[data-tour-fab]'
+    : `[data-tour-id="${target}"]`
+  return document.querySelector<HTMLElement>(selector)
+}
+
+function restoreStepIndex(steps: TourStep[]): number {
+  const stored = readLocalStorage(STEP_KEY)
+  if (!stored) return 0
+
+  const storedIdIndex = steps.findIndex((candidate) => candidate.id === stored)
+  if (storedIdIndex >= 0) return storedIdIndex
+
+  const legacyIndex = Number.parseInt(stored, 10)
+  if (!Number.isFinite(legacyIndex)) return 0
+  return Math.min(Math.max(legacyIndex, 0), Math.max(steps.length - 1, 0))
+}
+
+function IosShareIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 15V3" />
+      <path d="m8 7 4-4 4 4" />
+      <path d="M6 10H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1" />
+    </svg>
+  )
+}
+
 export default function OnboardingTour() {
+  const pathname = usePathname()
   const { t } = useClientT()
-  const [active, setActive]               = useState(false)
-  const [stepIndex, setStepIndex]         = useState(0)
-  const [navItemRects, setNavItemRects]   = useState<DOMRect[]>([])
-  const [fabRect, setFabRect]             = useState<DOMRect | null>(null)
-  const [stripRects, setStripRects]       = useState<Partial<Record<StripItem, DOMRect>>>({})
-  const [isFemale, setIsFemale]           = useState(false)
-  const { setHighlightedNavIndex, setHighlightFAB } = useTour()
+  const {
+    setHighlightedNavIndex,
+    setHighlightFAB,
+    setStatus,
+  } = useTour()
+  const [steps, setSteps] = useState<TourStep[]>([])
+  const [showInstallGuide, setShowInstallGuide] = useState(false)
+  const [installPlatform, setInstallPlatform] = useState<ClientInstallPlatform>('other')
+  const [stepIndex, setStepIndex] = useState(0)
+  const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
+  const nextButtonRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
 
-  const measureElements = useCallback(() => {
-    const nav = document.querySelector('nav')
-    if (!nav) return
+  const active = steps.length > 0
+  const overlayActive = active || showInstallGuide
+  const step = steps[stepIndex]
+  const isLast = stepIndex === steps.length - 1
 
-    // Nav tab <a> links
-    const links = nav.querySelectorAll('a')
-    const rects: DOMRect[] = []
-    links.forEach(link => rects.push(link.getBoundingClientRect()))
-    setNavItemRects(rects)
-
-    // FAB
-    const fab = nav.querySelector('[data-tour-fab]')
-    if (fab) setFabRect(fab.getBoundingClientRect())
-
-    // Strip pills
-    const keys: StripItem[] = ['checkin', 'program', 'calories', 'water']
-    const newStripRects: Partial<Record<StripItem, DOMRect>> = {}
-    keys.forEach(key => {
-      const el = document.querySelector(`[data-tour-strip="${key}"]`)
-      if (el) newStripRects[key] = el.getBoundingClientRect()
-    })
-    setStripRects(newStripRects)
-  }, [])
-
-  // Start tour on first load
-  useEffect(() => {
-    const done = localStorage.getItem('onboarding_tour_done')
-    if (done === null || done === 'false') {
-      const timer = setTimeout(() => {
-        measureElements()
-        setActive(true)
-      }, 800)
-      return () => clearTimeout(timer)
-    }
-  }, [measureElements])
-
-  // Fetch gender for female-only steps
-  useEffect(() => {
-    fetch('/api/client/profile')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.gender === 'female') setIsFemale(true) })
-      .catch(() => {})
-  }, [])
-
-  // Remeasure on each step change (strip items may load after tour starts)
-  useEffect(() => {
-    if (active) measureElements()
-  }, [active, stepIndex, measureElements])
-
-  // Sync highlight state with current step
-  useEffect(() => {
-    if (!active) {
-      setHighlightedNavIndex(null)
-      setHighlightFAB(false)
+  const measureTarget = useCallback(() => {
+    if (!step?.target) {
+      setTargetRect(null)
       return
     }
-    const step = TOUR_STEPS[stepIndex]
-    if (step.isFAB) {
-      setHighlightedNavIndex(null)
-      setHighlightFAB(true)
-    } else {
-      setHighlightFAB(false)
-      setHighlightedNavIndex(step.navIndex ?? null)
+    setTargetRect(getTarget(step.target)?.getBoundingClientRect() ?? null)
+  }, [step])
+
+  const finish = useCallback(() => {
+    writeLocalStorage(DONE_KEY, 'true')
+    removeLocalStorage(STEP_KEY)
+    setSteps([])
+    setStepIndex(0)
+    setTargetRect(null)
+    setHighlightedNavIndex(null)
+    setHighlightFAB(false)
+    setStatus('complete')
+  }, [setHighlightFAB, setHighlightedNavIndex, setStatus])
+
+  const dismissInstallGuide = useCallback(() => {
+    writeSessionStorage(INSTALL_GUIDE_SESSION_KEY, 'true')
+    setShowInstallGuide(false)
+    setStatus('complete')
+  }, [setStatus])
+
+  const advance = useCallback(() => {
+    if (isLast) {
+      finish()
+      return
     }
-  }, [active, stepIndex, setHighlightedNavIndex, setHighlightFAB])
+    const nextIndex = stepIndex + 1
+    writeLocalStorage(STEP_KEY, steps[nextIndex]?.id ?? String(nextIndex))
+    setStepIndex(nextIndex)
+  }, [finish, isLast, stepIndex, steps])
 
-  const visibleSteps = TOUR_STEPS.filter(s => !s.isFemaleOnly || isFemale)
+  const goBack = useCallback(() => {
+    const previousIndex = Math.max(stepIndex - 1, 0)
+    writeLocalStorage(STEP_KEY, steps[previousIndex]?.id ?? String(previousIndex))
+    setStepIndex(previousIndex)
+  }, [stepIndex, steps])
 
-  function advance() {
-    if (stepIndex < visibleSteps.length - 1) {
-      setStepIndex(i => i + 1)
-    } else {
-      localStorage.setItem('onboarding_tour_done', 'true')
+  useEffect(() => {
+    if (pathname !== '/client') {
+      setStatus('checking')
+      return
+    }
+
+    const installed = isInstalledClientApp()
+    const experience = resolveClientEntryExperience({
+      installed,
+      onboardingDone: readLocalStorage(DONE_KEY) === 'true',
+      installGuideSeen: readSessionStorage(INSTALL_GUIDE_SESSION_KEY) === 'true',
+    })
+
+    if (experience === 'install-guide') {
+      setSteps([])
+      setTargetRect(null)
       setHighlightedNavIndex(null)
       setHighlightFAB(false)
-      setActive(false)
+      setInstallPlatform(getClientInstallPlatform())
+      setShowInstallGuide(true)
+      setStatus('active')
+      return
     }
-  }
 
-  if (!active) return null
+    setShowInstallGuide(false)
+    if (experience === 'none') {
+      setStatus('complete')
+      return
+    }
 
-  const step    = visibleSteps[stepIndex]
-  const isLast  = stepIndex === visibleSteps.length - 1
-  const isFABStep = !!step.isFAB
+    setStatus('checking')
+    const timer = window.setTimeout(() => {
+      const availableSteps = TOUR_STEPS.filter((candidate) => (
+        !candidate.optional || !candidate.target || Boolean(getTarget(candidate.target))
+      ))
+      setSteps(availableSteps)
+      setStepIndex(restoreStepIndex(availableSteps))
+      setStatus('active')
+    }, 450)
 
-  // Resolve target rect
-  const targetRect: DOMRect | undefined = step.isFAB
-    ? (fabRect ?? undefined)
-    : step.stripItem
-      ? (stripRects[step.stripItem] ?? undefined)
-      : step.navIndex !== undefined
-        ? navItemRects[step.navIndex]
-        : undefined
+    return () => window.clearTimeout(timer)
+  }, [pathname, setHighlightFAB, setHighlightedNavIndex, setStatus])
 
-  // Tooltip x-center — clamped to viewport edges
-  const tooltipLeft = targetRect
-    ? Math.min(Math.max(targetRect.left + targetRect.width / 2, 160), window.innerWidth - 160)
-    : window.innerWidth / 2
+  useEffect(() => {
+    if (pathname === '/client') return
+    setShowInstallGuide(false)
+    setSteps([])
+    setTargetRect(null)
+    setHighlightedNavIndex(null)
+    setHighlightFAB(false)
+    setStatus('checking')
+  }, [pathname, setHighlightFAB, setHighlightedNavIndex, setStatus])
 
-  // For strip items (top of page): tooltip appears BELOW target
-  // For nav/FAB (bottom of page): tooltip appears ABOVE target
-  const isTopTarget = !!step.stripItem
-  const tooltipVertical: React.CSSProperties = targetRect
-    ? isTopTarget
-      ? { top: targetRect.bottom + 12 }
-      : { bottom: window.innerHeight - targetRect.top + 16 }
-    : { bottom: 120 }
+  useEffect(() => {
+    if (!active || !step) return
 
-  // Arrow direction: points toward the target
-  // Top targets → arrow points UP (at top of tooltip card)
-  // Bottom targets → arrow points DOWN (at bottom of tooltip card)
-  const arrowClass = isTopTarget
-    ? 'absolute top-[-6px] w-3 h-3 bg-[#111111] rotate-45 border-l border-t border-white/[0.08]'
-    : 'absolute bottom-[-6px] w-3 h-3 bg-[#111111] rotate-45 border-r border-b border-white/[0.08]'
+    setHighlightedNavIndex(
+      step.target === 'dashboard'
+        ? 0
+        : step.target === 'workout'
+          ? 1
+          : step.target === 'nutrition'
+            ? 2
+            : step.target === 'metrics'
+              ? 3
+              : null,
+    )
+    setHighlightFAB(step.target === 'quick-add')
+    measureTarget()
+    nextButtonRef.current?.focus({ preventScroll: true })
 
-  const arrowOffset: React.CSSProperties = {
-    left: targetRect
-      ? `calc(50% + ${(targetRect.left + targetRect.width / 2) - tooltipLeft}px)`
-      : '50%',
-    transform: 'translateX(-50%)',
-  }
+    const handleViewportChange = () => measureTarget()
+    window.addEventListener('resize', handleViewportChange)
+    window.addEventListener('orientationchange', handleViewportChange)
+    document.addEventListener('scroll', handleViewportChange, true)
 
-  return (
-    <>
-      {/* Spotlight overlay — nav tabs and strip items */}
-      {!isFABStep && (
-        <div className="fixed inset-0 z-[60] pointer-events-none">
-          {targetRect && (
-            <div
-              className="absolute rounded-xl"
-              style={{
-                left:   targetRect.left - 6,
-                top:    targetRect.top - 6,
-                width:  targetRect.width + 12,
-                height: targetRect.height + 12,
-                background: 'transparent',
-                boxShadow: '0 0 0 9999px rgba(0,0,0,0.82), 0 0 0 2px rgba(255,255,255,0.70)',
-              }}
-            />
-          )}
-          {/* Fallback full dimmer if no target (e.g. program strip not yet in DOM) */}
-          {!targetRect && (
-            <div className="fixed inset-0" style={{ background: 'rgba(0,0,0,0.82)' }} />
-          )}
-        </div>
-      )}
+    const target = step.target ? getTarget(step.target) : null
+    const observer = target && 'ResizeObserver' in window
+      ? new ResizeObserver(handleViewportChange)
+      : null
+    if (target && observer) observer.observe(target)
 
-      {/* Dimmer for FAB steps */}
-      {isFABStep && (
-        <div
-          className="fixed inset-0 pointer-events-none"
-          style={{ zIndex: 60, background: 'rgba(0,0,0,0.82)' }}
-        />
-      )}
+    return () => {
+      window.removeEventListener('resize', handleViewportChange)
+      window.removeEventListener('orientationchange', handleViewportChange)
+      document.removeEventListener('scroll', handleViewportChange, true)
+      observer?.disconnect()
+    }
+  }, [active, measureTarget, setHighlightFAB, setHighlightedNavIndex, step])
 
-      {/* Tooltip */}
+  useEffect(() => {
+    if (!overlayActive) return
+
+    document.documentElement.dataset.stryvrOverlayOpen = 'true'
+    window.dispatchEvent(new CustomEvent('stryvr-onboarding-tour-toggle', { detail: { open: true } }))
+    return () => {
+      delete document.documentElement.dataset.stryvrOverlayOpen
+      window.dispatchEvent(new CustomEvent('stryvr-onboarding-tour-toggle', { detail: { open: false } }))
+    }
+  }, [overlayActive])
+
+  useEffect(() => {
+    if (!active) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        advance()
+      } else if (event.key === 'ArrowLeft' && stepIndex > 0) {
+        event.preventDefault()
+        goBack()
+      } else if (event.key === 'Tab') {
+        const focusable = dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled])')
+        if (!focusable?.length) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault()
+          last.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first.focus()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [active, advance, goBack, stepIndex])
+
+  const spotlightStyle = useMemo<React.CSSProperties | undefined>(() => {
+    if (!targetRect) return undefined
+    const padding = step?.target === 'quick-add' ? 8 : 6
+    return {
+      left: targetRect.left - padding,
+      top: targetRect.top - padding,
+      width: targetRect.width + padding * 2,
+      height: targetRect.height + padding * 2,
+      borderRadius: step?.target === 'quick-add' ? 20 : 18,
+    }
+  }, [step?.target, targetRect])
+
+  if (showInstallGuide) {
+    const isIos = installPlatform === 'ios'
+    const isAndroid = installPlatform === 'android'
+
+    return (
       <div
-        className="fixed z-[70] pointer-events-auto"
+        className="fixed inset-0 z-[90] touch-pan-y overflow-y-auto overscroll-contain bg-black/85 px-4 backdrop-blur-[2px]"
+        aria-label={t('tour.install.dialog')}
+        aria-modal="true"
+        role="dialog"
         style={{
-          ...tooltipVertical,
-          left: tooltipLeft,
-          transform: 'translateX(-50%)',
-          width: 'min(280px, calc(100vw - 32px))',
+          WebkitOverflowScrolling: 'touch',
+          paddingTop: 'max(env(safe-area-inset-top, 0px), 16px)',
+          paddingBottom: 'max(calc(env(safe-area-inset-bottom, 0px) + 24px), 120px)',
         }}
       >
-        {/* Arrow */}
-        <div className={arrowClass} style={arrowOffset} />
+        <div className="mx-auto flex min-h-full w-full max-w-[420px] items-start sm:items-center">
+          <div className="w-full overflow-hidden rounded-[30px] bg-[#111111] shadow-[0_28px_90px_rgba(0,0,0,0.78)]">
+            <div className="p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#202020] text-white">
+                  <Smartphone size={21} strokeWidth={1.7} />
+                </div>
+                <Image
+                  src="/logo/logo-stryvr-silver.png"
+                  alt="STRYVR"
+                  width={48}
+                  height={48}
+                  className="h-12 w-12 object-contain opacity-90"
+                />
+              </div>
+              <p className="mt-5 font-barlow-condensed text-[10px] font-bold uppercase tracking-[0.22em] text-white/38">
+                {t('tour.install.eyebrow')}
+              </p>
+              <h2 className="mt-2 text-[24px] font-semibold leading-[1.08] tracking-[-0.03em] text-white">
+                {t('tour.install.title')}
+              </h2>
+              <p className="mt-3 text-[14px] leading-[1.55] text-white/58">
+                {t('tour.install.body')}
+              </p>
 
-        <div className="bg-[#111111] rounded-xl p-4 border border-white/[0.06]">
-          {/* Progress dots */}
-          <div className="flex items-center gap-1.5 mb-2">
-            {visibleSteps.map((_, i) => (
-              <div
-                key={i}
-                className={`rounded-full transition-all duration-300 ${
-                  i === stepIndex
-                    ? 'w-4 h-1 bg-[#f2f2f2]'
-                    : i < stepIndex
-                    ? 'w-1 h-1 bg-[#f2f2f2]/40'
-                    : 'w-1 h-1 bg-white/15'
-                }`}
-              />
-            ))}
-          </div>
+              <ol className="mt-5 space-y-2.5">
+                <li className="flex gap-3 rounded-2xl bg-[#191919] p-3.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#262626] text-white/82">
+                    {isIos ? <IosShareIcon size={17} /> : <MoreVertical size={17} />}
+                  </span>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/30">01</p>
+                    <p className="mt-1 text-[13px] leading-5 text-white/72">
+                      {t(isIos ? 'tour.install.step1.ios' : isAndroid ? 'tour.install.step1.android' : 'tour.install.step1.other')}
+                    </p>
+                  </div>
+                </li>
+                <li className="flex gap-3 rounded-2xl bg-[#191919] p-3.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#262626] text-white/82">
+                    <Home size={16} />
+                  </span>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/30">02</p>
+                    <p className="mt-1 text-[13px] leading-5 text-white/72">
+                      {t(isIos ? 'tour.install.step2.ios' : isAndroid ? 'tour.install.step2.android' : 'tour.install.step2.other')}
+                    </p>
+                  </div>
+                </li>
+                <li className="flex gap-3 rounded-2xl bg-[#191919] p-3.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#262626] text-white/82">
+                    <Check size={16} />
+                  </span>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/30">03</p>
+                    <p className="mt-1 text-[13px] leading-5 text-white/72">{t('tour.install.step3')}</p>
+                  </div>
+                </li>
+              </ol>
 
-          <p className="text-[13px] font-bold text-white mb-1">{t(step.titleKey)}</p>
-          <p className="text-[12px] text-white/55 leading-relaxed mb-3">{t(step.bodyKey)}</p>
+              <p className="mt-4 rounded-2xl bg-[#171717] px-4 py-3 text-[12px] leading-5 text-white/48">
+                {t('tour.install.note')}
+              </p>
 
-          <button
-            onClick={advance}
-            className="w-full h-9 flex items-center justify-between bg-[#f2f2f2] hover:bg-white active:scale-[0.98] rounded-xl transition-all pl-4 pr-1.5"
-          >
-            <span className="text-[11px] font-barlow-condensed font-bold uppercase tracking-[0.10em] text-[#080808]">
-              {isLast ? t('tour.cta.ready') : t('tour.cta.understood')}
-            </span>
-            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-black/[0.12]">
-              <ArrowRight size={13} className="text-[#080808]" />
+              <div className="mt-5 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={dismissInstallGuide}
+                  className="h-12 shrink-0 rounded-2xl px-4 text-[12px] font-medium text-white/46 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                >
+                  {t('tour.install.later')}
+                </button>
+                <button
+                  type="button"
+                  onClick={dismissInstallGuide}
+                  className="flex h-12 flex-1 items-center justify-between rounded-2xl bg-[#f0f0ef] pl-5 pr-2 text-[#090909] active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#121212]"
+                >
+                  <span className="font-barlow-condensed text-[12px] font-bold uppercase tracking-[0.14em]">
+                    {t('tour.install.understood')}
+                  </span>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-black/[0.08]">
+                    <ArrowRight size={16} />
+                  </span>
+                </button>
+              </div>
             </div>
-          </button>
+          </div>
         </div>
       </div>
-    </>
+    )
+  }
+
+  if (!active || !step) return null
+
+  const isWelcome = !step.target
+
+  return (
+    <div
+      className="fixed inset-0 z-[90]"
+      aria-label={t('tour.dialog.label')}
+      aria-modal="true"
+      role="dialog"
+    >
+      {spotlightStyle ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute shadow-[0_0_0_9999px_rgba(0,0,0,0.82),0_18px_50px_rgba(0,0,0,0.55)] transition-[left,top,width,height] duration-300 ease-out"
+          style={spotlightStyle}
+        />
+      ) : (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-black/85" />
+      )}
+
+      <div
+        ref={dialogRef}
+        className={isWelcome
+          ? 'absolute inset-x-5 top-1/2 mx-auto w-auto max-w-[380px] -translate-y-1/2'
+          : 'absolute inset-x-4 bottom-[calc(var(--client-bottom-nav-reserved)+16px)] mx-auto w-auto max-w-[420px]'}
+      >
+        <div className="overflow-hidden rounded-[28px] bg-[#111111] shadow-[0_28px_90px_rgba(0,0,0,0.78)]">
+          <div className="p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <Image
+                  src="/logo/logo-stryvr-silver.png"
+                  alt="STRYVR"
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 shrink-0 object-contain opacity-90"
+                />
+                <div className="min-w-0">
+                  <p className="font-barlow-condensed text-[10px] font-bold uppercase tracking-[0.2em] text-white/38">
+                    STRYVR · {t('tour.progress', { current: stepIndex + 1, total: steps.length })}
+                  </p>
+                  <div aria-hidden="true" className="mt-2 flex w-full max-w-[180px] gap-1">
+                    {steps.map((item, index) => (
+                      <span
+                        key={item.id}
+                        className={index <= stepIndex
+                          ? 'h-1.5 min-w-2 flex-1 rounded-full bg-white transition-colors duration-300'
+                          : 'h-1.5 min-w-2 flex-1 rounded-full bg-[#343434] transition-colors duration-300'}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={finish}
+                className="shrink-0 rounded-lg px-1 py-1 text-[11px] font-medium text-white/42 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              >
+                {t('tour.cta.skip')}
+              </button>
+            </div>
+
+            <h2 className="mt-5 text-[22px] font-semibold leading-[1.08] tracking-[-0.025em] text-white">
+              {t(step.titleKey)}
+            </h2>
+            <p className="mt-2.5 max-w-[34rem] text-[14px] leading-[1.55] text-white/58">
+              {t(step.bodyKey)}
+            </p>
+
+            <div className="mt-5 flex items-center gap-2">
+              {stepIndex > 0 && (
+                <button
+                  type="button"
+                  onClick={goBack}
+                  aria-label={t('tour.cta.back')}
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#1d1d1d] text-white/68 transition-colors hover:bg-[#262626] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                >
+                  <ArrowLeft size={17} />
+                </button>
+              )}
+              <button
+                ref={nextButtonRef}
+                type="button"
+                onClick={advance}
+                className="flex h-12 flex-1 items-center justify-between rounded-2xl bg-[#f0f0ef] pl-5 pr-2 text-[#090909] transition-transform active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#121212]"
+              >
+                <span className="font-barlow-condensed text-[12px] font-bold uppercase tracking-[0.14em]">
+                  {isLast ? t('tour.cta.finish') : t('tour.cta.next')}
+                </span>
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-black/[0.08]">
+                  <ArrowRight size={16} />
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

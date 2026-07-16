@@ -67,10 +67,10 @@ export default function NutritionAgenda({
               </div>
               <div className="text-right">
                 <p className="text-sm font-semibold text-white">
-                  {row.consumed.calories} / {row.target.calories ?? "N/A"} kcal
+                  {row.consumed.calories} / {row.target.calories ?? "—"} kcal
                 </p>
                 <p className="mt-1 text-[11px] text-white/45">
-                  Eau {row.consumed.hydration_ml} / {row.target.hydration_ml ?? "N/A"} ml
+                  Eau {row.consumed.hydration_ml} / {row.target.hydration_ml ?? "—"} ml
                 </p>
               </div>
             </div>

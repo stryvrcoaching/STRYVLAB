@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { resolveClientFromUser } from "@/lib/client/resolve-client";
 import { ct, cta, type ClientLang } from "@/lib/i18n/clientTranslations";
 import {
-  buildHeatmap,
   buildPRs,
   buildSessionList,
   calculateStreaks,
@@ -16,22 +15,21 @@ import {
   getSecondaryMusclesFromCatalog,
   getBiomechData,
 } from "@/lib/programs/intelligence/catalog-utils";
-import {
-  analyzeExercisePerformance,
-  type SessionPerf,
-  type OverloadEvent,
-  type SetLogEntry,
-} from "@/lib/performance/analyzer";
-import { computeWorkoutAlerts } from "@/lib/client/smart/workoutAlerts";
+import { fetchRecentFlexWorkouts } from "@/lib/training/flexTraining/queries";
 import {
   getVolumeTargets,
   VOLUME_GROUP_LABELS,
   MUSCLE_TO_VOLUME_GROUP,
 } from "@/lib/programs/intelligence/volume-targets";
-import type { GenericAlert } from "@/components/client/smart/SmartAlertsFeed";
 import { fetchClientDayOverride } from '@/lib/client/day-kind'
 import { computePhysiologicalDateInTimezone, utcRangeForPhysiologicalDate, getLocalWeekday } from '@/lib/client/checkin/timeWindows'
 import { resolveClientTimezone } from '@/lib/client/checkin/resolveClientTimezone'
+import { sessionMatchesProgrammeDow } from '@/lib/client/plannedSessions'
+import {
+  resolveProgramCycleSchedule,
+  selectSessionsForProgramWeek,
+  type ProgramCompletionBehavior,
+} from '@/lib/programs/cycleSchedule'
 
 function getTodayDow(dateIso?: string) {
   const jsDay = dateIso ? new Date(`${dateIso}T12:00:00Z`).getUTCDay() : new Date().getDay();
@@ -69,6 +67,8 @@ export default async function ClientProgrammePage({
 }: {
   searchParams?: { dow?: string; tab?: string };
 }) {
+  const activeTab = searchParams?.tab ?? "seance";
+
   const supabase = createClient();
   const {
     data: { user },
@@ -89,11 +89,9 @@ export default async function ClientProgrammePage({
   );
   if (!client) return <NoProgramPage lang="fr" />;
 
-  const timezone = await resolveClientTimezone(service, client.id)
+  const timezone = String(client.timezone ?? '').trim() || await resolveClientTimezone(service, client.id)
   const todayIso = computePhysiologicalDateInTimezone(new Date(), timezone);
   const { start: todayStart, end: todayEnd } = utcRangeForPhysiologicalDate(todayIso, timezone)
-  const eightWeeksAgo = new Date();
-  eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56);
 
   const { monday, sunday } = getCurrentWeekBounds()
 
@@ -103,11 +101,9 @@ export default async function ClientProgrammePage({
     completedTodayResult,
     startedTodayResult,
     skippedTodayResult,
-    sessionLogsResult,
-    perfSessionsResult,
-    progressionEventsResult,
+    progressLogsResult,
     weekSessionsResult,
-    recentSessionsResult,
+    recentFlexSessionsResult,
   ] = await Promise.all([
     service
       .from("programs")
@@ -127,6 +123,7 @@ export default async function ClientProgrammePage({
       )
       .eq("client_id", client.id)
       .eq("status", "active")
+      .eq("is_client_visible", true)
       .order("created_at", { ascending: false })
       .limit(1),
 
@@ -173,23 +170,6 @@ export default async function ClientProgrammePage({
       .not("completed_at", "is", null)
       .order("logged_at", { ascending: true }),
 
-    // For workout alerts (last 8 weeks sessions with sets)
-    service
-      .from("client_session_logs")
-      .select(
-        "id, completed_at, client_set_logs(id, exercise_id, exercise_name, set_number, actual_reps, rir_actual, completed)",
-      )
-      .eq("client_id", client.id)
-      .not("completed_at", "is", null)
-      .gte("completed_at", eightWeeksAgo.toISOString()),
-
-    // Progression events for overload counting
-    service
-      .from("progression_events")
-      .select("exercise_id, created_at, trigger_type")
-      .eq("client_id", client.id)
-      .gte("created_at", eightWeeksAgo.toISOString()),
-
     // This week's sessions for volume coverage
     service
       .from("client_session_logs")
@@ -199,16 +179,7 @@ export default async function ClientProgrammePage({
       .gte("completed_at", monday.toISOString())
       .lte("completed_at", sunday.toISOString()),
 
-    // Recent sessions (last 3)
-    service
-      .from("client_session_logs")
-      .select(
-        "id, completed_at, program_session_id, client_set_logs(actual_weight_kg, actual_reps, rir_actual)",
-      )
-      .eq("client_id", client.id)
-      .not("completed_at", "is", null)
-      .order("completed_at", { ascending: false })
-      .limit(3),
+    fetchRecentFlexWorkouts(service, client.id, 30),
   ]);
 
   const programs = programsResult?.data;
@@ -219,8 +190,89 @@ export default async function ClientProgrammePage({
   const daysShort = cta(lang, "programme.days.short");
   const daysFull = cta(lang, "programme.days.full");
 
-  const program = programs?.[0];
+  // Fetch exercise translations for dynamic lookups
+  const { data: exTrans } = await service
+    .from('exercise_translations')
+    .select('exerciseId, name')
+    .eq('lang', lang.toUpperCase());
+
+  const exerciseDict = (exTrans || []).reduce((acc: any, row: any) => {
+    acc[row.exerciseId] = row.name;
+    return acc;
+  }, {} as Record<string, string>);
+
+  const program = programs?.[0] as any;
   if (!program) return <NoProgramPage lang={lang} />;
+
+  const [
+    explicitWeeksResult,
+    sessionWeekLinksResult,
+    completionBehaviorResult,
+  ] = await Promise.all([
+    service
+      .from('program_weeks')
+      .select('id, position, label, week_type')
+      .eq('program_id', program.id)
+      .order('position', { ascending: true }),
+    service
+      .from('program_sessions')
+      .select('id, program_week_id')
+      .eq('program_id', program.id),
+    service
+      .from('programs')
+      .select('completion_behavior')
+      .eq('id', program.id)
+      .maybeSingle(),
+  ])
+
+  const sessionWeekById = new Map<string, string | null>(
+    ((sessionWeekLinksResult.data ?? []) as any[]).map((session) => [
+      String(session.id),
+      session.program_week_id ? String(session.program_week_id) : null,
+    ]),
+  )
+  program.program_sessions = ((program.program_sessions ?? []) as any[]).map(
+    (session) => ({
+      ...session,
+      program_week_id: sessionWeekById.get(String(session.id)) ?? null,
+    }),
+  )
+
+  const { data: activeAssignment } = await service
+    .from('client_workout_program_assignments')
+    .select('id, started_at')
+    .eq('client_id', client.id)
+    .eq('program_id', program.id)
+    .is('ended_at', null)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const { data: assignmentSchedule } = activeAssignment?.id
+    ? await service
+        .from('client_workout_program_assignments')
+        .select('schedule_start_date')
+        .eq('id', activeAssignment.id)
+        .maybeSingle()
+    : { data: null }
+
+  const programmeStartDate = assignmentSchedule?.schedule_start_date
+    ?? computePhysiologicalDateInTimezone(
+      new Date(activeAssignment?.started_at ?? program.created_at),
+      timezone,
+    )
+  const explicitWeeks = ((explicitWeeksResult.data ?? []) as any[])
+    .map((week) => ({ id: String(week.id), position: Number(week.position) }))
+    .sort((first, second) => first.position - second.position)
+  const cycleSchedule = resolveProgramCycleSchedule({
+    dateIso: todayIso,
+    startDateIso: programmeStartDate,
+    explicitWeekCount: explicitWeeks.length,
+    durationWeeks: program.weeks,
+    completionBehavior: (
+      completionBehaviorResult.data?.completion_behavior ?? 'repeat'
+    ) as ProgramCompletionBehavior,
+  })
 
   const GENERIC_SLUGS = new Set([
     "dos",
@@ -237,7 +289,7 @@ export default async function ClientProgrammePage({
     "avant_bras",
   ]);
 
-  const sessions = ((program.program_sessions ?? []) as any[])
+  const allSessions = ((program.program_sessions ?? []) as any[])
     .sort((a, b) => a.position - b.position)
     .map((session: any) => ({
       ...session,
@@ -270,13 +322,18 @@ export default async function ClientProgrammePage({
         },
       ),
     }));
+  const sessions = selectSessionsForProgramWeek(
+    allSessions,
+    explicitWeeks,
+    cycleSchedule.activeWeekPosition,
+  )
 
-  const rawLocalWeekday = getLocalWeekday(new Date(), timezone)
+  const rawLocalWeekday = getLocalWeekday(new Date(`${todayIso}T12:00:00.000Z`), timezone)
   const todayDow = rawLocalWeekday === 0 ? 7 : rawLocalWeekday;
-  const selectedDow = searchParams?.dow
-    ? parseInt(searchParams.dow, 10)
+  const requestedDow = searchParams?.dow ? parseInt(searchParams.dow, 10) : NaN
+  const selectedDow = Number.isInteger(requestedDow) && requestedDow >= 1 && requestedDow <= 7
+    ? requestedDow
     : todayDow;
-  const activeTab = searchParams?.tab ?? "seance";
 
   const completedRows = (completedTodayResult?.data ?? []) as any[];
   const completedTodayIds = new Set<string>(
@@ -294,73 +351,35 @@ export default async function ClientProgrammePage({
     skippedRows.map((r: any) => r.program_session_id).filter(Boolean),
   )
   const todayDayOverride = await fetchClientDayOverride(service, client.id, todayIso)
+  const todayScheduledSessionIds = new Set<string>(
+    sessions
+      .filter((session: any) => sessionMatchesProgrammeDow(session, todayDow))
+      .map((session: any) => session.id)
+      .filter(Boolean),
+  )
 
   // Performance data
-  const rawLogs: SessionLog[] = (sessionLogsResult?.data ?? []) as any[];
+  const rawLogs: SessionLog[] = (progressLogsResult?.data ?? []) as any[];
+
+  // Translate exercise names in logs
+  if (lang !== 'fr' && Object.keys(exerciseDict).length > 0) {
+    rawLogs.forEach(log => {
+      if (log.client_set_logs) {
+        log.client_set_logs.forEach(set => {
+          if (set.exercise_name && exerciseDict[set.exercise_name]) {
+            set.exercise_name = exerciseDict[set.exercise_name];
+          }
+        });
+      }
+    });
+  }
+
   const sessionDates = Array.from(
     new Set(rawLogs.map((l) => l.logged_at.split("T")[0])),
   ).sort() as string[];
   const { streak, bestStreak } = calculateStreaks(sessionDates);
-  const heatmapData = buildHeatmap(rawLogs);
   const allTimePRs = buildPRs(rawLogs);
   const sessionList = buildSessionList(rawLogs, allTimePRs);
-
-  const programExerciseNameById = new Map<string, string>(
-    sessions.flatMap((session: any) =>
-      ((session.program_exercises ?? []) as any[])
-        .filter((exercise: any) => exercise?.id && exercise?.name)
-        .map((exercise: any) => [exercise.id as string, exercise.name as string] as const),
-    ),
-  );
-
-  // ── Workout alerts (inline, no HTTP) ──────────────────────────────────────
-  const perfSessions: SessionPerf[] = (
-    (perfSessionsResult as any)?.data ?? []
-  ).map((s: any) => ({
-    session_log_id: s.id,
-    logged_at: s.completed_at as string,
-    sets: ((s.client_set_logs ?? []) as any[]).map(
-      (sl: any) =>
-        ({
-          exercise_id: sl.exercise_id ?? sl.exercise_name,
-          exercise_name:
-            sl.exercise_name ??
-            (sl.exercise_id ? programExerciseNameById.get(sl.exercise_id) : null) ??
-            "Exercice",
-          set_number: sl.set_number ?? 1,
-          actual_reps: sl.actual_reps ?? null,
-          rir_actual: sl.rir_actual ?? null,
-          completed: sl.completed === true,
-        }) satisfies SetLogEntry,
-    ),
-  }));
-
-  const overloads: OverloadEvent[] = (
-    (progressionEventsResult as any)?.data ?? []
-  ).map((e: any) => ({
-    exercise_id: e.exercise_id,
-    exercise_name: e.exercise_id,
-    created_at: e.created_at,
-    trigger_type: e.trigger_type,
-  }));
-
-  const analysis = analyzeExercisePerformance(perfSessions, overloads, 8);
-  const workoutAlerts: GenericAlert[] = computeWorkoutAlerts(
-    analysis.exercises.map((e) => ({
-      exercise_name: e.exercise_name,
-      completion_rate: e.completion_rate,
-      avg_rir: e.avg_rir,
-      rir_trend: e.rir_trend,
-      overloads_last_4_weeks: e.overloads_last_4_weeks,
-      stagnation: e.stagnation,
-      overreaching: e.overreaching,
-    })),
-  ).map((a) => ({
-    code: a.code,
-    severity: a.severity,
-    title: a.title,
-    body: a.body,
-  }));
 
   // ── Volume coverage (inline, no HTTP) ─────────────────────────────────────
   const weekSetRows = ((weekSessionsResult as any)?.data ?? []).flatMap(
@@ -413,7 +432,7 @@ export default async function ClientProgrammePage({
     }),
   };
 
-  const allCompletedSessions = ((sessionLogsResult as any)?.data ?? []) as any[]
+  const allCompletedSessions = ((progressLogsResult as any)?.data ?? []) as any[]
   const volumeCoverageByWindow = (['current_week', '7d', '14d', '30d'] as VolumeWindowKey[]).reduce((acc, key) => {
     const rangeStart = getWindowStart(new Date(), key, monday)
     const rangeEnd = new Date()
@@ -473,31 +492,26 @@ export default async function ClientProgrammePage({
     return acc
   }, {} as Record<VolumeWindowKey, { range_start: string; sessions_count: number; groups: any[] }>)
 
-  // ── Recent sessions (inline, no HTTP) ─────────────────────────────────────
-  const smartRecentSessions = ((recentSessionsResult as any)?.data ?? []).map(
-    (s: any) => {
-      const sets = (s.client_set_logs ?? []) as any[];
-      const volumeKg = sets.reduce(
-        (sum: number, st: any) =>
-          sum + Number(st.actual_weight_kg ?? 0) * Number(st.actual_reps ?? 0),
-        0,
-      );
-      const rirVals = sets
-        .map((st: any) => st.rir_actual)
-        .filter((v: unknown): v is number => v != null);
-      const avgRir =
-        rirVals.length > 0
-          ? rirVals.reduce((a: number, b: number) => a + b, 0) / rirVals.length
-          : null;
-      return {
-        id: s.id as string,
-        completed_at: s.completed_at as string,
-        program_session_id: s.program_session_id as string | null,
-        volume_kg: Math.round(volumeKg),
-        avg_rir: avgRir != null ? Math.round(avgRir * 10) / 10 : null,
-      };
-    },
-  );
+  const recentFlexSessions = (recentFlexSessionsResult ?? []).filter((item) =>
+    item.session.status === 'completed'
+    && item.session.ended_at != null
+    && item.summary.total_sets > 0
+  )
+  const recentFlexHistory = recentFlexSessions.map((item) => ({
+    id: item.session.id,
+    name:
+      item.session.relation_to_planned_workout === 'replace' || item.session.type === 'replacement'
+        ? `${ct(lang, 'logger.session.single')} ${ct(lang, 'logger.free.relation.replace').toLowerCase()}`
+        : item.session.relation_to_planned_workout === 'bonus' || item.session.type === 'bonus'
+          ? `${ct(lang, 'logger.session.single')} ${ct(lang, 'logger.free.relation.bonus').toLowerCase()}`
+          : ct(lang, 'logger.free.title'),
+    date: (item.session.ended_at ?? item.session.started_at).split('T')[0],
+    volume: Math.round(item.summary.tonnage),
+    setsCompleted: item.summary.total_sets,
+    durationMin: item.summary.duration_seconds != null ? Math.round(item.summary.duration_seconds / 60) : null,
+    kind: 'flex' as const,
+    href: `/client/flex-workout/recap/${item.session.id}`,
+  }))
 
   return (
     <ProgrammeClientPage
@@ -511,19 +525,19 @@ export default async function ClientProgrammePage({
       completedTodayNames={Array.from(completedTodayNames)}
       startedTodayIds={Array.from(startedTodayIds)}
       skippedTodayIds={Array.from(skippedTodayIds)}
+      todayScheduledSessionIds={Array.from(todayScheduledSessionIds)}
       todayDayOverrideKind={todayDayOverride?.kind ?? null}
       daysShort={daysShort}
       daysFull={daysFull}
       lang={lang}
       streak={streak}
       bestStreak={bestStreak}
-      heatmapData={heatmapData}
       allTimePRs={allTimePRs}
       sessionList={sessionList}
       rawLogs={rawLogs}
-      workoutAlerts={workoutAlerts}
       volumeCoverage={{ ...volumeCoverage, windows: volumeCoverageByWindow }}
-      smartRecentSessions={smartRecentSessions}
+      recentFlexHistory={recentFlexHistory}
+      exerciseDict={exerciseDict}
     />
   );
 }
@@ -532,7 +546,7 @@ import { Dumbbell } from "lucide-react";
 
 function NoProgramPage({ lang }: { lang: ClientLang }) {
   return (
-    <div className="min-h-screen bg-[#0d0d0d] font-barlow">
+    <div className="min-h-dvh bg-[#0d0d0d] font-barlow overflow-x-hidden">
       <div className="max-w-lg mx-auto px-5 pt-24 py-16 text-center">
         <Dumbbell size={36} className="text-white/10 mx-auto mb-4" />
         <p className="text-[13px] text-white/40">

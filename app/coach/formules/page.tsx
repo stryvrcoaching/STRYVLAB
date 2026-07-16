@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSetTopBar } from "@/components/layout/useSetTopBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "framer-motion";
+import HeaderIconButton from "@/components/layout/HeaderIconButton";
 import {
   CreditCard,
   Plus,
@@ -381,25 +382,19 @@ export default function FormulasPage() {
     () => (
       <div className="flex items-center gap-2">
         {archived.length > 0 && (
-          <button
+          <HeaderIconButton
             onClick={() => setShowArchived((v) => !v)}
-            className={`flex items-center gap-2 px-4 h-8 rounded-lg text-[12px] font-bold transition-colors ${
-              showArchived
-                ? "bg-[#1f8a65] text-white"
-                : "bg-white/[0.03] text-white/70 hover:text-white"
-            }`}
-          >
-            {showArchived ? <Eye size={13} /> : <EyeOff size={13} />}
-            {showArchived ? "Masquer" : `Archivées (${archived.length})`}
-          </button>
+            icon={showArchived ? <Eye size={13} /> : <EyeOff size={13} />}
+            label={showArchived ? "Masquer les formules archivées" : `Afficher les formules archivées (${archived.length})`}
+            active={showArchived}
+          />
         )}
-        <button
+        <HeaderIconButton
           onClick={openCreate}
-          className="flex items-center gap-1.5 h-8 px-4 rounded-lg bg-[#1f8a65] text-white text-[12px] font-bold uppercase tracking-[0.1em] hover:bg-[#217356] transition-all active:scale-[0.98]"
-        >
-          <Plus size={12} />
-          Nouvelle formule
-        </button>
+          icon={<Plus size={12} />}
+          label="Nouvelle formule"
+          variant="accent"
+        />
       </div>
     ),
     [showArchived, archived.length],

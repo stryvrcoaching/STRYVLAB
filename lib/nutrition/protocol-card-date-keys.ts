@@ -11,6 +11,7 @@ export type ProtocolCardDateKeyInput = {
   } | null
   referenceDateKey: string
   timezone: string
+  allowUnassignedFallback?: boolean
 }
 
 export function buildTrailingDateKeys(startDate: string, endDate: string) {
@@ -28,12 +29,14 @@ export function buildProtocolDateKeysForAnalytics({
   assignment,
   referenceDateKey,
   timezone,
+  allowUnassignedFallback = true,
 }: ProtocolCardDateKeyInput) {
   const scheduleStartDate = String(protocol.schedule_start_date ?? '').trim()
   const reference = String(referenceDateKey ?? '').trim()
   const fallbackStart = scheduleStartDate || reference
 
   if (!assignment?.started_at) {
+    if (!allowUnassignedFallback) return []
     return buildTrailingDateKeys(fallbackStart, reference)
   }
 

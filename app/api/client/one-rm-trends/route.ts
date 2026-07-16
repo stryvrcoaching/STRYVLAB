@@ -10,7 +10,7 @@ import { computeOneRMTrends } from '@/lib/training/oneRepMax'
  * GET /api/client/one-rm-trends
  *
  * Fetches last 8 weeks of completed set logs and computes 1RM trends.
- * Returns top 5 exercises by percent change.
+ * Returns all tracked exercises by percent change.
  *
  * Auth: Client authenticated via Supabase auth.
  */
@@ -85,12 +85,9 @@ export async function GET(req: NextRequest) {
     // Compute trends
     const trends = computeOneRMTrends(flattened)
 
-    // Return top 5
-    const top5 = trends.slice(0, 5)
-
     return NextResponse.json(
       {
-        trends: top5,
+        trends,
         count: trends.length,
       },
       { status: 200 }

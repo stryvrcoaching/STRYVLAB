@@ -3,6 +3,8 @@ import { createClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { resolveClientFromUser } from '@/lib/client/resolve-client'
+import { resolveClientLanguage } from '@/lib/client/resolve-language'
+import { buildCheckinReadyCopy } from '@/lib/client/checkin/flows'
 
 function service() {
   return createServiceClient(
@@ -14,6 +16,7 @@ function service() {
 const bodySchema = z.object({
   message_id: z.string().uuid(),
   action: z.enum(['defer', 'mark_answered']),
+  selected_label: z.string().trim().min(1).max(120).optional(),
 })
 
 /** Defer proactive check-in by 1h or mark ready prompt as answered. */
@@ -30,6 +33,7 @@ export async function POST(req: NextRequest) {
   const db = service()
   const cc = await resolveClientFromUser(user.id, user.email, db, 'id')
   if (!cc) return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+  const lang = await resolveClientLanguage(db, cc.id)
 
   const { data: msg } = await db
     .from('chat_messages')
@@ -68,13 +72,15 @@ export async function POST(req: NextRequest) {
   }> = []
 
   if (parsed.data.action === 'defer') {
+    const readyCopy = buildCheckinReadyCopy(lang, (meta.flow_type as 'morning' | 'evening') ?? 'morning')
+    const selectedLabel = parsed.data.selected_label ?? readyCopy.later
     const { data: persisted } = await db
       .from('chat_messages')
       .insert([
         {
           client_id: cc.id,
           role: 'user',
-          content: 'Plus tard',
+          content: selectedLabel,
           message_type: 'quick_reply',
           parent_message_id: parsed.data.message_id,
           metadata: { key: 'checkin_ready', action: 'defer' },
@@ -86,7 +92,7 @@ export async function POST(req: NextRequest) {
           content:
             typeof meta.defer_message === 'string' && meta.defer_message.length > 0
               ? meta.defer_message
-              : 'Très bien. Quand tu es prêt, clique sur le bouton Check-in juste au-dessus.',
+              : readyCopy.deferMessage,
           message_type: 'text',
           parent_message_id: parsed.data.message_id,
           metadata: { key: 'checkin_ready_followup', action: 'defer' },
@@ -97,12 +103,13 @@ export async function POST(req: NextRequest) {
 
     if (persisted) insertedMessages.push(...persisted as typeof insertedMessages)
   } else {
+    const selectedLabel = parsed.data.selected_label ?? buildCheckinReadyCopy(lang, (meta.flow_type as 'morning' | 'evening') ?? 'morning').yes
     const { data: persisted } = await db
       .from('chat_messages')
       .insert({
         client_id: cc.id,
         role: 'user',
-        content: 'Oui',
+        content: selectedLabel,
         message_type: 'quick_reply',
         parent_message_id: parsed.data.message_id,
         metadata: { key: 'checkin_ready', action: 'mark_answered' },

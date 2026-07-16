@@ -1,5 +1,6 @@
 "use client";
 
+import { useClientT } from "@/components/client/ClientI18nProvider";
 import {
   AreaChart,
   Area,
@@ -39,30 +40,29 @@ function shortDateLabel(label: unknown): string {
   return "";
 }
 
-function volumeFormatter(value: unknown): [string, string] {
-  if (typeof value === "number") {
-    return [`${value} kg`, "Volume"];
-  }
-  return ["", "Volume"];
-}
+export default function ProgressCharts({ timeline, exerciseProgression }: Props) {
+  const { t } = useClientT();
 
-function chargeFormatter(value: unknown): [string, string] {
-  if (typeof value === "number") {
-    return [`${value} kg`, "Charge max"];
+  function volumeFormatter(value: unknown): [string, string] {
+    if (typeof value === "number") {
+      return [`${value} kg`, t("charts.volume")];
+    }
+    return ["", t("charts.volume")];
   }
-  return ["", "Charge max"];
-}
 
-export default function ProgressCharts({
-  timeline,
-  exerciseProgression,
-}: Props) {
+  function chargeFormatter(value: unknown): [string, string] {
+    if (typeof value === "number") {
+      return [`${value} kg`, t("charts.maxLoad")];
+    }
+    return ["", t("charts.maxLoad")];
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Volume par séance */}
       <section className="bg-surface rounded-card p-4">
         <h2 className="text-sm font-semibold text-primary mb-4">
-          Volume par séance (kg)
+          {t("charts.volumePerSession")}
         </h2>
         <ResponsiveContainer width="100%" height={160}>
           <AreaChart
@@ -117,7 +117,7 @@ export default function ProgressCharts({
       {exerciseProgression.length > 0 && (
         <section className="bg-surface rounded-card p-4">
           <h2 className="text-sm font-semibold text-primary mb-4">
-            Progression — charge max (kg)
+            {t("charts.maxLoadProgress")}
           </h2>
           <div className="flex flex-col gap-6">
             {exerciseProgression.map((ex, i) => (

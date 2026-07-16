@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { BulkResponsePayload } from "@/types/assessment";
 import { sendBilanCompletedEmail } from "@/lib/email/mailer";
-import { inngest } from "@/lib/inngest/client";
+import { awardProgression } from '@/lib/rewards/progression';
 import { syncProfileFromResponses } from "@/lib/assessments/sync-profile";
+import {
+  isValidPublicAssessmentToken,
+  MAX_PUBLIC_ASSESSMENT_BODY_BYTES,
+  publicAssessmentPayloadSchema,
+  validatePublicAssessmentResponses,
+} from "@/lib/assessments/public-response-security";
+import {
+  checkPublicRateLimit,
+  rateLimitResponse,
+} from "@/lib/security/public-rate-limit";
 
 function serviceClient() {
   return createServiceClient(
@@ -18,6 +27,24 @@ export async function POST(
   { params }: { params: { token: string } },
 ) {
   const db = serviceClient();
+  let pointsEarned = 0;
+  const rateLimit = await checkPublicRateLimit({
+    db,
+    req,
+    scope: "public_assessment_write",
+    subject: params.token,
+    maxRequests: 120,
+    windowSeconds: 10 * 60,
+  });
+
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit);
+
+  if (!isValidPublicAssessmentToken(params.token)) {
+    return NextResponse.json(
+      { error: "Lien invalide" },
+      { status: 404, headers: { "Cache-Control": "no-store" } },
+    );
+  }
 
   // Valider token
   const { data: submission } = await db
@@ -33,13 +60,16 @@ export async function POST(
     .single();
 
   if (!submission) {
-    return NextResponse.json({ error: "Lien invalide" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Lien invalide" },
+      { status: 404, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   if (submission.status === "completed" || submission.status === "expired") {
     return NextResponse.json(
       { error: "Ce bilan ne peut plus être modifié" },
-      { status: 410 },
+      { status: 410, headers: { "Cache-Control": "no-store" } },
     );
   }
 
@@ -48,15 +78,59 @@ export async function POST(
       .from("assessment_submissions")
       .update({ status: "expired" })
       .eq("id", submission.id);
-    return NextResponse.json({ error: "Ce lien a expiré" }, { status: 410 });
+    return NextResponse.json(
+      { error: "Ce lien a expiré" },
+      { status: 410, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
-  const body: BulkResponsePayload = await req.json();
-
-  if (!Array.isArray(body.responses) || body.responses.length === 0) {
+  const declaredLength = Number(req.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_PUBLIC_ASSESSMENT_BODY_BYTES) {
     return NextResponse.json(
-      { error: "Aucune réponse fournie" },
-      { status: 400 },
+      { error: "Réponse trop volumineuse" },
+      { status: 413, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  const rawBody = await req.text();
+  if (new TextEncoder().encode(rawBody).byteLength > MAX_PUBLIC_ASSESSMENT_BODY_BYTES) {
+    return NextResponse.json(
+      { error: "Réponse trop volumineuse" },
+      { status: 413, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  let untrustedBody: unknown;
+  try {
+    untrustedBody = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json(
+      { error: "Corps de requête invalide" },
+      { status: 400, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  const parsedBody = publicAssessmentPayloadSchema.safeParse(untrustedBody);
+  if (!parsedBody.success) {
+    return NextResponse.json(
+      { error: "Réponses invalides" },
+      { status: 400, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  const body = parsedBody.data;
+  const responseValidation = validatePublicAssessmentResponses({
+    payload: body,
+    snapshot: submission.template_snapshot as any,
+    coachId: submission.coach_id,
+    clientId: submission.client_id,
+    submissionId: submission.id,
+  });
+
+  if (!responseValidation.ok) {
+    return NextResponse.json(
+      { error: responseValidation.error },
+      { status: 400, headers: { "Cache-Control": "no-store" } },
     );
   }
 
@@ -75,8 +149,11 @@ export async function POST(
     .upsert(rows, { onConflict: "submission_id,block_id,field_key" });
 
   if (upsertError) {
-    console.error("POST public responses:", upsertError);
-    return NextResponse.json({ error: upsertError.message }, { status: 500 });
+    console.error("POST public responses failed");
+    return NextResponse.json(
+      { error: "Impossible d'enregistrer les réponses" },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   if (body.submit) {
@@ -107,17 +184,21 @@ export async function POST(
     const clientName = client
       ? `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim()
       : "Le client";
-    const notifMessage = `${clientName} a complété le bilan ${templateName}.`;
-
-    // Utilise insertClientNotification pour cohérence (résout target_user_id)
-    const { insertClientNotification } =
-      await import("@/lib/notifications/insert-client-notification");
-    await insertClientNotification(db, {
-      coachId: submission.coach_id,
-      clientId: submission.client_id,
-      submissionId: submission.id,
-      type: "assessment_completed",
-      message: notifMessage,
+    await db.from("coach_notifications").insert({
+      coach_id: submission.coach_id,
+      client_id: submission.client_id,
+      category: "assessment",
+      subcategory: "assessment_completed",
+      priority: 3,
+      status: "pending",
+      email_sent: false,
+      title: "Bilan complété",
+      body: `${clientName} a complété le bilan "${templateName}".`,
+      payload: {
+        assessment_submission_id: submission.id,
+        template_name: templateName,
+        action_url: `/coach/clients/${submission.client_id}/bilans/${submission.id}`,
+      },
     });
 
     // Email de notification au coach
@@ -129,7 +210,13 @@ export async function POST(
       const coachFirstName =
         (coachAuth?.user?.user_metadata?.first_name as string | undefined) ??
         "Coach";
-      if (coachEmail) {
+      const { data: coachProfile } = await db
+        .from("coach_profiles")
+        .select("notif_bilan_completed")
+        .eq("coach_id", submission.coach_id)
+        .maybeSingle();
+
+      if (coachEmail && coachProfile?.notif_bilan_completed !== false) {
         const client = submission.client as any;
         const templateName =
           (submission.template_snapshot as any)?.[0]?.name ??
@@ -150,29 +237,19 @@ export async function POST(
       console.error("Email send failed (non-blocking):", emailError);
     }
 
-    // Award bilan points once per submission
-    const { data: existingBilanPoints } = await db
-      .from("client_points")
-      .select("id")
-      .eq("client_id", submission.client_id)
-      .eq("action_type", "bilan")
-      .eq("reference_id", submission.id)
-      .maybeSingle();
-
-    if (!existingBilanPoints) {
-      await db.from("client_points").insert({
-        client_id: submission.client_id,
-        action_type: "bilan",
-        points: 20,
-        reference_id: submission.id,
-      });
-
-      await inngest.send({
-        name: "points/level.update",
-        data: { client_id: submission.client_id },
-      });
-    }
+    const progression = await awardProgression(db, {
+      clientId: submission.client_id,
+      action: 'assessment',
+      basePoints: 25,
+      sourceKey: `assessment:${submission.id}`,
+      referenceId: submission.id,
+      metadata: { completed_after_due_date: false },
+    });
+    pointsEarned = progression?.already_awarded ? 0 : progression?.awarded_points ?? 0;
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json(
+    { success: true, points_earned: pointsEarned },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

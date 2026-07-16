@@ -366,11 +366,41 @@ type WidgetData = PhaseOptimizationResult & {
   };
 };
 
+function hasMeaningfulPhaseData(data: WidgetData): boolean {
+  if (data.analysisState === "insufficient_data") return false;
+  const signals = data.derivedSignals;
+  return Boolean(
+    signals.weightTrend.observed ||
+      signals.bodyFatTrend.observed ||
+      Boolean(signals.waistTrend?.observed) ||
+      signals.performanceTrend.observed ||
+      signals.recoveryTrend.observed ||
+      signals.nutritionAdherence.observed ||
+      data.coachDecision?.baselines.rhr.current != null,
+  );
+}
+
+function phaseBadgeExplanation(
+  data: WidgetData,
+  copy: ReturnType<typeof getPhaseEngineCopy>,
+): string {
+  if (data.insufficientData && !hasMeaningfulPhaseData(data)) {
+    return data.analysisStateReason ?? "Aucune donnée exploitable sur la fenêtre sélectionnée.";
+  }
+  const decision = data.coachDecision;
+  if (decision?.matrix.matchedConditions[0]) return decision.matrix.matchedConditions[0];
+  if (decision?.watchouts[0]) return decision.watchouts[0];
+  if (data.constraintFlags[0]) {
+    return copy.reasonMap[data.constraintFlags[0]] ?? data.constraintFlags[0];
+  }
+  return decision?.matrix.summary ?? data.microCopy;
+}
+
 export function StrategicPivotAlert({ insight }: { insight: any }) {
   if (!insight || insight.type !== 'STRATEGIC_PIVOT') return null;
 
   return (
-    <div className="relative mb-3 overflow-hidden rounded-xl border border-white/[0.08] bg-[linear-gradient(135deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] p-3.5">
+    <div className="relative mb-3 overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.02] p-3.5">
       
       <div className="flex items-start gap-3">
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] text-white/55">
@@ -439,7 +469,7 @@ function CoachDecisionPanel({ decision }: { decision: PhaseCoachDecision }) {
     );
 
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-[linear-gradient(135deg,rgba(255,255,255,0.045),rgba(255,255,255,0.018))] px-3.5 py-3">
+    <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3">
       <div className="mb-2.5 flex items-start justify-between gap-3">
         <div>
           <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/30">
@@ -493,7 +523,7 @@ function CoachDecisionPanel({ decision }: { decision: PhaseCoachDecision }) {
           }
         />
         <PhaseFooterMetricCard
-          label="Récup."
+          label="Récupération"
           value={String(decision.baselines.recovery.capacityPct)}
           unit="%"
           subtitle={`fatigue ${decision.baselines.recovery.fatiguePct}%`}
@@ -506,7 +536,7 @@ function CoachDecisionPanel({ decision }: { decision: PhaseCoachDecision }) {
           }
         />
         <PhaseFooterMetricCard
-          label="Perf."
+          label="Performance"
           value={
             decision.baselines.performance.trendPct != null
               ? String(decision.baselines.performance.trendPct)
@@ -515,7 +545,7 @@ function CoachDecisionPanel({ decision }: { decision: PhaseCoachDecision }) {
           unit={
             decision.baselines.performance.trendPct != null ? "%" : undefined
           }
-          subtitle={`${decision.baselines.performance.confidencePct}% conf.`}
+          subtitle={`${decision.baselines.performance.confidencePct}% confiance`}
           zone={metricZoneFromPct(decision.baselines.performance.trendPct)}
         />
       </div>
@@ -693,6 +723,13 @@ function oneGlanceStatus(
   color: string;
   bg: string;
 } {
+  if (data?.insufficientData && !hasMeaningfulPhaseData(data)) {
+    return {
+      label: "Données insuffisantes",
+      color: "#f59e0b",
+      bg: "rgba(245,158,11,0.15)",
+    };
+  }
   if (decision?.matrix.status === "not_adapted") {
     return { label: "Phase non adaptée", color: "#ef4444", bg: "rgba(239,68,68,0.15)" };
   }
@@ -718,6 +755,7 @@ function oneGlanceStatus(
 }
 
 function oneGlanceTone(decision: PhaseCoachDecision | undefined, data?: WidgetData): string {
+  if (data?.insufficientData && !hasMeaningfulPhaseData(data)) return "En attente";
   if (decision?.matrix.status === "not_adapted") return "A corriger";
   if (decision?.matrix.status === "partially_adapted") return "A surveiller";
   if (data?.phaseFit.band === "incoherent") return "A corriger";
@@ -757,41 +795,47 @@ function OneGlancePhaseCard({
   const targetLabel = data.enginePrescription?.optimalPhase
     ? formatPhaseTarget(data.enginePrescription.optimalPhase)
     : copy.directionLabels[data.recommendedAdjustment.direction];
-  const shortReason = decision?.matrix.summary ?? decision?.recommendation ?? data.microCopy;
+  const shortReason = phaseBadgeExplanation(data, copy);
+  const noData =
+    data.analysisState === "insufficient_data" ||
+    (data.insufficientData && !hasMeaningfulPhaseData(data));
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[radial-gradient(circle_at_top_right,rgba(31,138,101,0.18),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-4">
-      <div
-        className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full blur-2xl"
-        style={{ backgroundColor: `${status.color}22` }}
-      />
+    <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
           <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/30">
             Lecture rapide
           </p>
         </div>
-        <span
-          className="rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em]"
-          style={{ color: status.color, backgroundColor: status.bg }}
-        >
-          {tone}
-        </span>
+        <div className="max-w-[13rem] text-right">
+          <span
+            className="inline-flex rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em]"
+            style={{ color: status.color, backgroundColor: status.bg }}
+          >
+            {tone}
+          </span>
+          <p className="mt-1 text-[10px] leading-snug text-white/38">
+            {shortReason}
+          </p>
+        </div>
       </div>
 
       <div className="mb-5 text-center">
         <p className="text-[10px] text-white/35">Niveau d'optimisation</p>
         <p className="text-[68px] font-bold leading-none tracking-tight tabular-nums text-white">
-          {score}
+          {noData ? "—" : score}
         </p>
         <p className="mt-2 text-[13px] tracking-wide text-white/35">
-          {currentStateLabel}
+          {noData ? "Données insuffisantes" : currentStateLabel}
         </p>
       </div>
 
-      <div className="mb-4">
-        <PhaseConfidenceMeter score={score} />
-      </div>
+      {!noData && (
+        <div className="mb-4">
+          <PhaseConfidenceMeter score={score} />
+        </div>
+      )}
 
       <div className="grid gap-2 md:grid-cols-3">
         <div className="rounded-lg bg-white/[0.03] px-3 py-2.5">
@@ -799,10 +843,10 @@ function OneGlancePhaseCard({
             Etat actuel
           </p>
           <p className="mt-1 text-[14px] font-semibold text-white/82">
-            {currentStateLabel}
+            {noData ? "Non lisible" : currentStateLabel}
           </p>
           <p className="mt-0.5 text-[10px] text-white/35">
-            {copy.directionLabels[data.currentState.direction]}
+            {noData ? "Aucun signal disponible" : copy.directionLabels[data.currentState.direction]}
           </p>
         </div>
         <div className="rounded-lg bg-white/[0.03] px-3 py-2.5">
@@ -810,10 +854,10 @@ function OneGlancePhaseCard({
             Cap conseillé
           </p>
           <p className="mt-1 text-[14px] font-semibold text-white/82">
-            {targetLabel}
+            {noData ? "En attente de données" : targetLabel}
           </p>
           <p className="mt-0.5 text-[10px] text-white/35">
-            {copy.urgencyLabels[data.recommendedAdjustment.urgency]}
+            {noData ? "Créer une base de lecture" : copy.urgencyLabels[data.recommendedAdjustment.urgency]}
           </p>
         </div>
         <div className="rounded-lg bg-white/[0.03] px-3 py-2.5">
@@ -821,9 +865,13 @@ function OneGlancePhaseCard({
             Horizon
           </p>
           <p className="mt-1 text-[14px] font-semibold text-white/82">
-            {decision?.sevenDayTrajectory.title ?? copy.horizonLabels[data.recommendedAdjustment.horizon]}
+            {noData
+              ? "Aucun horizon fiable"
+              : decision?.sevenDayTrajectory.title ?? copy.horizonLabels[data.recommendedAdjustment.horizon]}
           </p>
-          <p className="mt-0.5 text-[10px] text-white/35">{sevenDay} jours actifs</p>
+          <p className="mt-0.5 text-[10px] text-white/35">
+            {noData ? "Attendre les premiers signaux" : `${sevenDay} jours actifs`}
+          </p>
         </div>
       </div>
 
@@ -834,6 +882,16 @@ function OneGlancePhaseCard({
         <p className="mt-1 text-[11px] leading-snug text-white/52">
           {shortReason}
         </p>
+        {!noData && decision?.recommendation && (
+          <div className="mt-2 border-t border-white/[0.06] pt-2">
+            <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
+              Prochaine action
+            </p>
+            <p className="mt-1 text-[11px] leading-snug text-white/65">
+              {decision.recommendation}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="mt-3 grid gap-2 md:grid-cols-2">
@@ -842,20 +900,26 @@ function OneGlancePhaseCard({
             Fenêtre 7j
           </p>
           <p className="mt-0.5 text-[11px] font-semibold text-white/70">
-            {decision?.sevenDayTrajectory.strategy === "deload"
-              ? "Reconditionnement"
-              : "Maintien / progression"}
+            {noData
+              ? "Créer la base"
+              : decision?.sevenDayTrajectory.strategy === "deload"
+                ? "Reconditionnement"
+                : "Maintien / progression"}
           </p>
-          <p className="text-[9px] text-white/35">{sevenDay} jours actifs</p>
+          <p className="text-[9px] text-white/35">
+            {noData ? "Check-ins, séances ou bilan" : `${sevenDay} jours actifs`}
+          </p>
         </div>
         <div className="rounded-lg bg-white/[0.03] px-2.5 py-2">
           <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
             Validation
           </p>
           <p className="mt-0.5 text-[11px] font-semibold text-white/70">
-            Suivi continu
+            {noData ? "Première lecture" : "Suivi continu"}
           </p>
-          <p className="text-[9px] text-white/35">{fourteenDayText}</p>
+          <p className="text-[9px] text-white/35">
+            {noData ? "Dès qu'un premier signal remonte" : fourteenDayText}
+          </p>
         </div>
       </div>
     </div>
@@ -911,7 +975,7 @@ export default function PhaseOptimizationWidget({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/[0.08] bg-[radial-gradient(circle_at_top_right,rgba(31,138,101,0.18),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-4">
+        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
           <div className="mb-5 flex items-start justify-between gap-3">
             <Skeleton className="h-2 w-24 bg-white/[0.04]" />
             <Skeleton className="h-7 w-24 rounded-md bg-white/[0.04]" />
@@ -1005,6 +1069,9 @@ export default function PhaseOptimizationWidget({
     preferredBulkAggressiveness: 0.5,
   };
   const derivedPrefs = data.derivedPhasePreferences ?? phasePrefs;
+  const noData =
+    data.analysisState === "insufficient_data" ||
+    (data.insufficientData && !hasMeaningfulPhaseData(data));
 
   const alertTone =
     ra.urgency === "high"
@@ -1057,8 +1124,19 @@ export default function PhaseOptimizationWidget({
       <div className="flex flex-1 flex-col gap-3.5">
         <OneGlancePhaseCard data={data} copy={copy} />
 
-        <PhaseCollapsibleSection title="Lecture coach" defaultOpen>
-          {data.enginePrescription ? (
+        <PhaseCollapsibleSection title="Actions recommandées" defaultOpen>
+          {noData ? (
+            <PhaseInsightCard>
+              <PhaseStatusAlert
+                message={
+                  data.analysisStateReason ??
+                  "Aucune donnée coach exploitable sur cette fenêtre. Le moteur attend au moins un check-in, une séance, un bilan corporel ou des logs nutrition avant de conclure."
+                }
+                tone="watch"
+                prominent
+              />
+            </PhaseInsightCard>
+          ) : data.enginePrescription ? (
             <div
               className={`rounded-xl border p-4 shadow-sm ${
                 data.enginePrescription.vetoActive
@@ -1101,12 +1179,12 @@ export default function PhaseOptimizationWidget({
             </PhaseInsightCard>
           )}
 
-          {data.coachDecision && (
+          {!noData && data.coachDecision && (
             <CoachDecisionPanel decision={data.coachDecision} />
           )}
         </PhaseCollapsibleSection>
 
-        <PhaseCollapsibleSection title="Repères clés">
+        <PhaseCollapsibleSection title="Signaux à suivre">
           <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-5">
             <PhaseFooterMetricCard
               label="Poids"
@@ -1132,7 +1210,7 @@ export default function PhaseOptimizationWidget({
               zoneLabel={mc.sleep.zoneLabel}
             />
             <PhaseFooterMetricCard
-              label="Perf."
+              label="Performance"
               value={mc.performance.value}
               unit={mc.performance.unit}
               zone={mc.performance.zone}
@@ -1149,9 +1227,16 @@ export default function PhaseOptimizationWidget({
           </div>
         </PhaseCollapsibleSection>
 
-        {hasSignalReview && (
-          <PhaseCollapsibleSection title="Détails utiles">
+        <PhaseCollapsibleSection title="Facteurs de décision">
             <div className="space-y-3">
+            <p className="text-[10px] leading-relaxed text-white/40">
+              Cette section montre les signaux réellement utilisés pour produire le verdict. Un facteur absent n’a pas participé à la décision sur la fenêtre sélectionnée.
+            </p>
+            {!hasSignalReview && (
+              <div className="rounded-lg bg-white/[0.02] px-3 py-2.5 text-[10px] text-white/40">
+                Aucun facteur dominant détecté. Le moteur conserve une lecture neutre et continue de surveiller les prochains check-ins, séances et bilans.
+              </div>
+            )}
             {data.insights?.strategicPivot && (
               <StrategicPivotAlert insight={data.insights.strategicPivot} />
             )}
@@ -1247,7 +1332,6 @@ export default function PhaseOptimizationWidget({
             )}
             </div>
           </PhaseCollapsibleSection>
-        )}
 
         <PhaseCollapsibleSection
           title="Réglages coach"
@@ -1259,11 +1343,22 @@ export default function PhaseOptimizationWidget({
             ) : undefined
           }
         >
+          <div className="mb-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+            <p className="text-[10px] font-semibold text-white/65">Comment utiliser ces réglages</p>
+            <p className="mt-1 text-[10px] leading-relaxed text-white/40">
+              Les préférences modulent la sensibilité du moteur pour ce client. Le réglage manuel remplace la recommandation affichée : utilisez-le seulement lorsqu’un contexte terrain non mesuré justifie de reprendre la main, puis documentez la raison.
+            </p>
+          </div>
           <div className="grid gap-2.5 md:grid-cols-2">
             <div className="rounded-xl border border-white/[0.06] bg-white/[0.015] p-3">
               <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.12em] text-white/30">
                 {ui.phasePrefs}
               </p>
+              <div className="mb-3 space-y-1.5 text-[10px] leading-relaxed text-white/38">
+                <p><span className="text-white/55">Favoriser la performance</span> augmente légèrement la priorité donnée aux performances lorsque leur tendance est fiable.</p>
+                <p><span className="text-white/55">Tolérance au déficit</span> autorise plus ou moins facilement une direction de cut agressive.</p>
+                <p><span className="text-white/55">Tolérance au surplus</span> autorise plus ou moins facilement une prise de masse offensive.</p>
+              </div>
               <PhasePreferencesPanel
                 clientId={clientId}
                 locale={locale}
@@ -1276,6 +1371,9 @@ export default function PhaseOptimizationWidget({
             <div className="rounded-xl border border-white/[0.06] bg-white/[0.015] p-3">
               <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.12em] text-white/30">
                 {ui.manualOverride}
+              </p>
+              <p className="mb-3 text-[10px] leading-relaxed text-white/38">
+                Force le cap ou l’état affiché sans effacer le calcul automatique. L’impact est immédiat sur la recommandation visible ; la raison sert de trace pour le suivi coach.
               </p>
               <ManualOverridePanel
                 clientId={clientId}

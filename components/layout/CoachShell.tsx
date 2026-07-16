@@ -1,10 +1,13 @@
 "use client";
 
 import { ReactNode, memo, useEffect, useState, createContext, useContext } from "react";
+import { usePathname } from "next/navigation";
 import { TopBarProvider, useTopBarContent } from "@/components/layout/TopBarContext";
 import { DockProvider } from "@/components/layout/DockContext";
 import { NavDock } from "@/components/layout/NavDock";
+import GlobalOrganizerButton from "@/components/layout/GlobalOrganizerButton";
 import NotificationBell from "@/components/layout/NotificationBell";
+import ClientPulseDashboard from "@/components/layout/ClientPulseDashboard";
 import { createClient } from "@/utils/supabase/client";
 
 // ─── FULLSCREEN PAGE CONTEXT ──────────────────────────────────────────────────
@@ -29,7 +32,7 @@ function TopBar({ firstName }: { firstName: string | null }) {
   const { left, right } = useTopBarContent();
 
   return (
-    <header className="fixed top-4 right-4 left-4 h-14 z-40 rounded-2xl px-5 flex items-center justify-between gap-4 border-[0.3px] border-white/[0.06] bg-[#121212]">
+    <header className="fixed top-4 right-4 left-4 z-50 flex h-14 items-center justify-between gap-4 rounded-2xl border-[0.3px] border-white/[0.06] bg-[#121212] px-5">
       <div className="flex-1 min-w-0">
         {left ?? (
           <div className="flex flex-col leading-tight">
@@ -40,6 +43,8 @@ function TopBar({ firstName }: { firstName: string | null }) {
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {right}
+        <ClientPulseDashboard />
+        <GlobalOrganizerButton />
         <NotificationBell />
       </div>
     </header>
@@ -50,7 +55,7 @@ function TopBar({ firstName }: { firstName: string | null }) {
 // Isolated so it does NOT subscribe to TopBarReadContext — only TopBar does.
 // This prevents setTopBar calls from re-rendering the page subtree.
 
-const PageContent = memo(function PageContent({ children }: { children: ReactNode }) {
+const PageContent = memo(function PageContent({ children, hideDock }: { children: ReactNode; hideDock: boolean }) {
   const { fullscreen } = useContext(FullscreenPageContext)
   // IMPORTANT: always render the same two-div depth regardless of fullscreen state.
   // Changing tree depth causes React to unmount+remount children, which triggers
@@ -59,7 +64,7 @@ const PageContent = memo(function PageContent({ children }: { children: ReactNod
   return (
     <div className={fullscreen
       ? "h-screen bg-[#121212] pt-[88px] overflow-hidden flex flex-col"
-      : "min-h-screen bg-[#121212] pt-[88px] pb-[138px]"
+      : `min-h-screen bg-[#121212] pt-[88px] ${hideDock ? 'pb-12' : 'pb-[138px]'}`
     }>
       <div className={fullscreen ? "flex-1 min-h-0 h-full" : undefined}>
         {children}
@@ -71,8 +76,15 @@ const PageContent = memo(function PageContent({ children }: { children: ReactNod
 // ─── SHELL INNER ─────────────────────────────────────────────────────────────
 
 function ShellInner({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
   const [firstName, setFirstName] = useState<string | null>(null)
   const [fullscreen, setFullscreen] = useState(false)
+  const hideDock = pathname === '/dashboard/overview'
+    || pathname === '/dashboard/business'
+    || pathname === '/dashboard/product-feedback'
+    || pathname === '/dashboard/stryv-connect'
+    || pathname === '/dashboard/security'
+    || pathname === '/dashboard/ai-nutrition-ops'
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
@@ -85,9 +97,22 @@ function ShellInner({ children }: { children: ReactNode }) {
     <FullscreenPageContext.Provider value={{ fullscreen, setFullscreen }}>
       <div className={fullscreen ? 'h-screen overflow-hidden bg-[#121212]' : 'min-h-screen bg-[#121212]'}>
         <TopBar firstName={firstName} />
+        {/*
+          Keeps scrolled content from ever reading above the floating top bar.
+          The fade becomes fully opaque around the bar's midpoint (44px), while
+          starting softly just below its lower edge (72px).
+        */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 top-0 z-[45] h-28"
+          style={{
+            background:
+              'linear-gradient(to bottom, #121212 0px, #121212 44px, rgba(18, 18, 18, 0.98) 58px, rgba(18, 18, 18, 0.84) 72px, rgba(18, 18, 18, 0) 112px)',
+          }}
+        />
         {/* pt = top-4(16) + h-14(56) + gap-4(16) = 88px | pb = bottom-6(24) + rowB h-14(56) + rowA h-9(36) + gap-1.5(6) + gap(16) = 138px */}
-        <PageContent>{children}</PageContent>
-        {!fullscreen && <NavDock />}
+        <PageContent hideDock={hideDock}>{children}</PageContent>
+        {!fullscreen && !hideDock && <NavDock />}
       </div>
     </FullscreenPageContext.Provider>
   );

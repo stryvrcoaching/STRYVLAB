@@ -338,8 +338,11 @@ export function canUseRealtimeSignal(
 export function getNutritionSignalSourceLabel(
   key: NutritionSignalKey,
   mode: NutritionDataMode,
-  dataSource?: "selected" | "fallback" | "manual",
+  dataSource?: "selected" | "fallback" | "manual" | "estimated",
 ): string {
+  if (dataSource === "estimated") {
+    return "estimé";
+  }
   if (dataSource === "manual") {
     return "saisie manuelle";
   }

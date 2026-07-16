@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { analyzeExercisePerformance, type SessionPerf, type OverloadEvent, type SetLogEntry } from '@/lib/performance/analyzer'
 import { computeWorkoutAlerts, type WorkoutAnalysisRow } from '@/lib/client/smart/workoutAlerts'
+import { resolveCanonicalExerciseKey, resolveCanonicalExerciseName } from '@/lib/training/exerciseHistoryKey'
 
 function svc() {
   return createServiceClient(
@@ -29,29 +30,42 @@ export async function GET(_req: NextRequest) {
     .not('completed_at', 'is', null)
     .gte('completed_at', eightWeeksAgo.toISOString())
 
+  const exerciseNameByTechnicalId = new Map<string, string>()
+  for (const session of sessionLogs ?? []) {
+    for (const setLog of ((session.client_set_logs ?? []) as any[])) {
+      if (typeof setLog.exercise_id !== 'string' || typeof setLog.exercise_name !== 'string') continue
+      if (!setLog.exercise_name.trim()) continue
+      exerciseNameByTechnicalId.set(setLog.exercise_id, setLog.exercise_name)
+    }
+  }
+
   const sessions: SessionPerf[] = (sessionLogs ?? []).map(s => ({
     session_log_id: s.id,
     logged_at: s.completed_at as string,
-    sets: ((s.client_set_logs ?? []) as any[]).map(sl => ({
-      exercise_id: sl.exercise_id ?? sl.exercise_name,
-      exercise_name: sl.exercise_name ?? 'Exercice',
-      set_number: sl.set_number ?? 1,
-      actual_reps: sl.actual_reps ?? null,
-      rir_actual: sl.rir_actual ?? null,
-      completed: sl.completed === true,
-    } satisfies SetLogEntry)),
+    sets: ((s.client_set_logs ?? []) as any[]).map(sl => {
+      const exerciseName = typeof sl.exercise_name === 'string' && sl.exercise_name.trim()
+        ? sl.exercise_name
+        : exerciseNameByTechnicalId.get(sl.exercise_id) ?? 'Exercice'
+      return {
+        exercise_id: resolveCanonicalExerciseKey(exerciseName),
+        exercise_name: resolveCanonicalExerciseName(exerciseName),
+        set_number: sl.set_number ?? 1,
+        actual_reps: sl.actual_reps ?? null,
+        rir_actual: sl.rir_actual ?? null,
+        completed: sl.completed === true,
+      } satisfies SetLogEntry
+    }),
   }))
 
   const { data: progressionEvents } = await svc()
     .from('progression_events')
-    .select('exercise_id, created_at, trigger_type')
+    .select('exercise_id, exercise_name, exercise_key, created_at, trigger_type')
     .eq('client_id', cc.id)
     .gte('created_at', eightWeeksAgo.toISOString())
 
-  // progression_events has no exercise_name column — use exercise_id as both fields
   const overloads: OverloadEvent[] = (progressionEvents ?? []).map(e => ({
-    exercise_id: e.exercise_id,
-    exercise_name: e.exercise_id,
+    exercise_id: e.exercise_key ?? resolveCanonicalExerciseKey(e.exercise_name ?? exerciseNameByTechnicalId.get(e.exercise_id) ?? e.exercise_id),
+    exercise_name: resolveCanonicalExerciseName(e.exercise_name ?? exerciseNameByTechnicalId.get(e.exercise_id) ?? e.exercise_id),
     created_at: e.created_at,
     trigger_type: e.trigger_type,
   }))

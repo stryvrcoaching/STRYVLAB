@@ -13,8 +13,10 @@ import {
   Edit2,
   Tag,
   BarChart2,
+  Heart,
 } from "lucide-react";
 import ProgramTemplateViewTopBar from "@/components/programs/ProgramTemplateViewTopBar";
+import { getSessionsPerWeek, getTrainingDaysPerWeek } from "@/lib/programs/frequency";
 
 const GOALS: Record<string, string> = {
   hypertrophy: "Hypertrophie",
@@ -49,6 +51,9 @@ const MOVEMENT_LABELS: Record<string, string> = {
   knee_flexion: "Flexion genou",
   knee_extension: "Extension genou",
   calf_raise: "Mollets",
+  wrist_flexion: "Flexion poignet",
+  wrist_extension: "Extension poignet",
+  forearm_rotation: "Rotation avant-bras",
   elbow_flexion: "Biceps",
   elbow_extension: "Triceps",
   lateral_raise: "Élévation lat.",
@@ -109,7 +114,7 @@ export default async function ViewProgramTemplatePage({
         id, name, day_of_week, position, notes,
         coach_program_template_exercises (
           id, name, sets, reps, rest_sec, rir, notes, position, image_url, movement_pattern, equipment_required,
-          rep_min, rep_max, target_rir, weight_increment_kg
+          rep_min, rep_max, target_rir, weight_increment_kg, execution_type, target_hr_zone
         )
       )
     `,
@@ -131,6 +136,9 @@ export default async function ViewProgramTemplatePage({
         s.coach_program_template_exercises ?? []
       ).sort((a: any, b: any) => a.position - b.position),
     }));
+
+  const scheduledSessionCount = getSessionsPerWeek(sessions);
+  const trainingDays = getTrainingDaysPerWeek(sessions);
 
   // Volume totals
   const totalSets = sessions.reduce(
@@ -200,7 +208,8 @@ export default async function ViewProgramTemplatePage({
           <div className="flex flex-wrap items-center gap-6 text-sm text-white/70">
             <span className="flex items-center gap-1.5 text-[#1f8a65]">
               <Calendar size={14} />
-              {(template as any).frequency} jours/semaine
+              {scheduledSessionCount || (template as any).frequency || 0} séances/sem
+              {trainingDays > 0 ? ` · ${trainingDays} jours` : ""}
             </span>
             <span className="flex items-center gap-1.5 text-[#1f8a65]">
               <Zap size={14} />
@@ -331,7 +340,11 @@ export default async function ViewProgramTemplatePage({
                             {e.sets} × {e.reps}
                           </span>
                           {e.rest_sec && <span>{e.rest_sec}s repos</span>}
-                          {e.rir != null && <span>RIR {e.rir}</span>}
+                          {e.rir != null && (
+                            <span>
+                              {(e.execution_type ?? 'reps_rir') === 'reps_rir' ? `RIR ${e.rir}` : `RPE ${e.rir}`}
+                            </span>
+                          )}
                           {e.rep_min != null && e.rep_max != null && (
                             <span className="text-[#1f8a65] font-sans">
                               ↑ {e.rep_min}–{e.rep_max} reps · +
@@ -346,6 +359,12 @@ export default async function ViewProgramTemplatePage({
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/[0.04] text-white/70">
                               {MOVEMENT_LABELS[e.movement_pattern] ??
                                 e.movement_pattern}
+                            </span>
+                          )}
+                          {e.target_hr_zone && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 flex items-center gap-1">
+                              <Heart size={9} className="fill-rose-400" />
+                              {e.target_hr_zone}
                             </span>
                           )}
                           {(e.equipment_required ?? []).map((eq: string) => (

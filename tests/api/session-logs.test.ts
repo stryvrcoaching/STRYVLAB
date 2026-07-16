@@ -93,6 +93,7 @@ describe('POST /api/session-logs', () => {
     mocks.setServiceResults([
       { data: { id: 'client-1' } },
       { data: { id: psId } },       // maybeSingle — session exists check
+      { data: null },               // existing draft lookup
       { data: sessionLog },         // insert session log
     ])
     const res = await POST(makePost({ session_name: 'Séance A', program_session_id: psId }))
@@ -186,6 +187,44 @@ describe('PATCH /api/session-logs/[logId]', () => {
     expect(body.success).toBe(true)
   })
 
+  it('triggers progression evaluation when completing a session with set logs', async () => {
+    const fetchSpy = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 200 }))
+
+    mocks.setServiceResults([
+      { data: { id: 'client-1' } }, // client lookup
+      { data: null }, // update session log
+      { data: { session_name: 'Séance A', coach_clients: { coach_id: 'coach-1', first_name: 'Bob', last_name: 'Smith' } } }, // fetch for notif
+      { data: { user_id: 'user-1' } }, // coach_clients lookup in insertClientNotification
+      { data: null }, // insert notification
+      { data: null }, // existing session points
+      { data: null }, // insert session points
+      { data: { session_name: 'Séance A' } }, // fetch session name for agenda
+      { data: null }, // smart agenda insert
+      { data: null }, // client_set_logs upsert
+    ])
+
+    const res = await PATCH(...makePatch('log-1', {
+      completed: true,
+      set_logs: [{ id: '11111111-1111-4111-8111-111111111111', actual_reps: 8, actual_weight_kg: 100, completed: true, rir_actual: 2 }],
+    }))
+
+    expect(res.status).toBe(200)
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://localhost:3000/api/progression/evaluate',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'x-internal-secret': 'test-internal-secret',
+        }),
+      }),
+    )
+
+    fetchSpy.mockRestore()
+  })
+
   it('returns 400 when set_logs item has unknown side value', async () => {
     mocks.setServiceResults([{ data: { id: 'client-1' } }])
     const res = await PATCH(...makePatch('log-1', {
@@ -220,8 +259,8 @@ describe('GET /api/session-logs', () => {
 
   it('returns session logs for valid client', async () => {
     const logs = [
-      { id: 'sl-1', session_name: 'Séance A', logged_at: '2026-04-05', client_set_logs: [] },
-      { id: 'sl-2', session_name: 'Séance B', logged_at: '2026-04-03', client_set_logs: [] },
+      { id: 'sl-1', session_name: 'Séance A', logged_at: '2026-04-05', completed_at: '2026-04-05T10:00:00Z', client_set_logs: [{ completed: true, actual_reps: 8, actual_weight_kg: 100 }] },
+      { id: 'sl-2', session_name: 'Séance B', logged_at: '2026-04-03', completed_at: '2026-04-03T10:00:00Z', client_set_logs: [{ completed: true, actual_reps: 10, actual_weight_kg: 60 }] },
     ]
     mocks.setServiceResults([
       { data: { id: 'client-1' } },   // ownership check

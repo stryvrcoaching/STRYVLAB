@@ -9,6 +9,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { resolveCanonicalExerciseName } from "@/lib/training/exerciseHistoryKey";
 
 interface ProgressionEvent {
   id: string;
@@ -77,23 +78,7 @@ export default function ProgressionHistory({ clientId }: Props) {
     );
   }
 
-  if (groups.length === 0) {
-    return (
-      <div className="bg-[#181818] border-subtle rounded-xl p-8 text-center">
-        <TrendingUp
-          size={32}
-          className="text-white/45 mx-auto mb-3 opacity-20"
-        />
-        <p className="text-sm text-white/45 font-medium">
-          Aucune donnée de progression.
-        </p>
-        <p className="text-xs text-white/45/60 mt-1">
-          Active la double progression sur un programme et attends la première
-          séance complétée.
-        </p>
-      </div>
-    );
-  }
+  if (groups.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -134,7 +119,7 @@ export default function ProgressionHistory({ clientId }: Props) {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-white leading-tight">
-                    {g.exercise_name}
+                    {resolveCanonicalExerciseName(g.exercise_name)}
                   </p>
                   <p className="text-[10px] text-white/45 mt-0.5">
                     {overloadCount > 0

@@ -8,12 +8,16 @@ import {
 } from '@/lib/client/checkin/timeWindows'
 import {
   aggregateMealsByDate,
+  buildNutritionProtocolPlanAnalytics,
   buildNutritionProtocolCardAnalytics,
 } from '@/lib/nutrition/protocol-card-analytics'
 import {
+  buildTrailingDateKeys,
   buildProtocolDateKeysForAnalytics,
 } from '@/lib/nutrition/protocol-card-date-keys'
 import { fetchActiveSmoothingPlanDaysForDates } from '@/lib/nutrition/smoothing/fetch'
+import { inferNutritionDayRole } from '@/lib/nutrition/day-role'
+import { fetchClientTdeeState } from '@/lib/nutrition/tdee-state'
 
 function serviceClient() {
   return createServiceClient(
@@ -32,6 +36,23 @@ async function ownershipCheck(coachId: string, clientId: string) {
     .single()
   return !!data
 }
+
+function isMissingNutritionProtocolDayRoleColumnError(error: { message?: string | null } | null | undefined) {
+  const message = String(error?.message ?? '').toLowerCase()
+  return (
+    message.includes("could not find the 'role' column") &&
+    message.includes('nutrition_protocol_days')
+  ) || (
+    message.includes('nutrition_protocol_days') &&
+    message.includes('schema cache') &&
+    message.includes('role')
+  )
+}
+
+const cycleSyncProfileSchema = z.object({
+  mode: z.enum(['conservative', 'standard', 'custom']).optional().default('standard'),
+  intensity_percent: z.number().int().min(25).max(125).optional().default(100),
+})
 
 export async function GET(
   _req: NextRequest,
@@ -95,6 +116,7 @@ export async function GET(
   }
 
   const protocolDateKeys = new Map<string, string[]>()
+  const protocolHistoricalDateKeys = new Map<string, string[]>()
   for (const protocol of protocolsBase) {
     const assignment = latestAssignmentByProtocol.get(protocol.id)
     const keys = buildProtocolDateKeysForAnalytics({
@@ -102,15 +124,42 @@ export async function GET(
       assignment,
       referenceDateKey: today,
       timezone,
+      allowUnassignedFallback: protocol.status === 'shared',
     })
     if (keys.length > 0) protocolDateKeys.set(protocol.id, keys)
+
+    const historicalStart = String(protocol.schedule_start_date ?? '').trim() || today
+    const historicalKeys = buildTrailingDateKeys(historicalStart, today)
+    if (historicalKeys.length > 0) protocolHistoricalDateKeys.set(protocol.id, historicalKeys)
   }
 
-  const allDateKeys = Array.from(new Set(Array.from(protocolDateKeys.values()).flat())).sort((a, b) => a.localeCompare(b))
+  const allDateKeys = Array.from(
+    new Set([
+      ...Array.from(protocolDateKeys.values()).flat(),
+      ...Array.from(protocolHistoricalDateKeys.values()).flat(),
+    ]),
+  ).sort((a, b) => a.localeCompare(b))
   if (allDateKeys.length === 0) {
     return NextResponse.json({
       protocols: protocolsBase.map((protocol) => ({
         ...protocol,
+        plan_analytics: buildNutritionProtocolPlanAnalytics({
+          protocol,
+        }),
+        tracking_analytics: buildNutritionProtocolCardAnalytics({
+          dateKeys: [],
+          referenceDateKey: today,
+          protocol,
+          mealsByDate: new Map(),
+          waterByDate: new Map(),
+        }),
+        historical_tracking_analytics: buildNutritionProtocolCardAnalytics({
+          dateKeys: [],
+          referenceDateKey: today,
+          protocol,
+          mealsByDate: new Map(),
+          waterByDate: new Map(),
+        }),
         analytics: buildNutritionProtocolCardAnalytics({
           dateKeys: [],
           referenceDateKey: today,
@@ -118,6 +167,11 @@ export async function GET(
           mealsByDate: new Map(),
           waterByDate: new Map(),
         }),
+        card_mode: protocol.status === 'shared' ? 'tracking' : 'plan',
+        card_state:
+          protocol.status !== 'shared'
+            ? 'reliable'
+            : 'waiting',
       })),
     })
   }
@@ -158,22 +212,55 @@ export async function GET(
 
   const protocols = protocolsBase.map((protocol) => {
     const protocolDates = protocolDateKeys.get(protocol.id) ?? []
+    const historicalProtocolDates = protocolHistoricalDateKeys.get(protocol.id) ?? []
     const mealsByDate = new Map(
       Array.from(globalMealsByDate.entries()).filter(([date]) => protocolDates.includes(date))
     )
     const waterByDate = new Map(
       Array.from(globalWaterByDate.entries()).filter(([date]) => protocolDates.includes(date))
     )
+    const historicalMealsByDate = new Map(
+      Array.from(globalMealsByDate.entries()).filter(([date]) => historicalProtocolDates.includes(date))
+    )
+    const historicalWaterByDate = new Map(
+      Array.from(globalWaterByDate.entries()).filter(([date]) => historicalProtocolDates.includes(date))
+    )
+    const trackingAnalytics = buildNutritionProtocolCardAnalytics({
+      dateKeys: protocolDates,
+      referenceDateKey: today,
+      protocol,
+      smoothingDaysByDate: protocol.status === 'shared' ? smoothingDaysByDate : undefined,
+      mealsByDate,
+      waterByDate,
+    })
+    const historicalTrackingAnalytics = buildNutritionProtocolCardAnalytics({
+      dateKeys: historicalProtocolDates,
+      referenceDateKey: today,
+      protocol,
+      smoothingDaysByDate: protocol.status === 'shared' ? smoothingDaysByDate : undefined,
+      mealsByDate: historicalMealsByDate,
+      waterByDate: historicalWaterByDate,
+    })
+
     return {
       ...protocol,
-      analytics: buildNutritionProtocolCardAnalytics({
-        dateKeys: protocolDates,
-        referenceDateKey: today,
+      plan_analytics: buildNutritionProtocolPlanAnalytics({
         protocol,
-        smoothingDaysByDate: protocol.status === 'shared' ? smoothingDaysByDate : undefined,
-        mealsByDate,
-        waterByDate,
       }),
+      tracking_analytics: protocol.status === 'shared' ? trackingAnalytics : null,
+      historical_tracking_analytics: protocol.status === 'shared' ? historicalTrackingAnalytics : null,
+      analytics: trackingAnalytics,
+      card_mode: protocol.status === 'shared' ? 'tracking' : 'plan',
+      card_state:
+        protocol.status !== 'shared'
+          ? 'reliable'
+          : trackingAnalytics.state_label === 'En attente'
+            ? 'waiting'
+            : trackingAnalytics.state_label === 'Précoce'
+              ? 'early'
+              : trackingAnalytics.state_label === 'Partiel'
+                ? 'partial'
+                : 'reliable',
     }
   })
 
@@ -198,6 +285,12 @@ const daySchema = z.object({
     items: z.array(z.object({
       id: z.string().min(1).max(120),
       quantity_g: z.number().positive().max(10000),
+      cycle_adjustment: z.object({
+        locked: z.boolean().optional(),
+        priority: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+        min_quantity_g: z.number().min(1).max(10000).optional(),
+        max_quantity_g: z.number().min(1).max(10000).optional(),
+      }).optional(),
       food: z.object({
         id: z.string().uuid(),
         name_fr: z.string().min(1).max(240),
@@ -245,6 +338,8 @@ const createSchema = z.object({
   notes: z.string().optional().nullable(),
   schedule_start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   cycle_sync_enabled: z.boolean().optional().default(false),
+  cycle_sync_profile: cycleSyncProfileSchema.optional().default({ mode: 'standard', intensity_percent: 100 }),
+  tdee_reference: z.number().int().positive().optional(),
   days: z.array(daySchema).min(1),
   schedule_slots: z.array(slotSchema).optional().default([]),
 })
@@ -266,6 +361,8 @@ export async function POST(
   if (!body.success) return NextResponse.json({ error: body.error }, { status: 400 })
 
   const db = serviceClient()
+  const clientTdeeState = await fetchClientTdeeState(db as any, clientId)
+  const tdeeReference = body.data.tdee_reference ?? clientTdeeState?.current_tdee ?? null
 
   const { data: protocol, error: protoError } = await db
     .from('nutrition_protocols')
@@ -276,6 +373,10 @@ export async function POST(
       notes: body.data.notes ?? null,
       schedule_start_date: body.data.schedule_start_date ?? new Date().toISOString().slice(0, 10),
       cycle_sync_enabled: body.data.cycle_sync_enabled ?? false,
+      cycle_sync_profile: body.data.cycle_sync_profile,
+      tdee_reference: tdeeReference,
+      tdee_snapshot_source: tdeeReference != null ? 'client_state' : null,
+      tdee_snapshot_used_at: tdeeReference != null ? new Date().toISOString() : null,
     })
     .select('*')
     .single()
@@ -305,8 +406,23 @@ export async function POST(
     .insert(daysToInsert)
     .select('*')
 
-  if (daysError) {
+  if (daysError && !isMissingNutritionProtocolDayRoleColumnError(daysError)) {
     return NextResponse.json({ error: daysError.message }, { status: 500 })
+  }
+
+  let createdDays = days ?? []
+  if (daysError && isMissingNutritionProtocolDayRoleColumnError(daysError)) {
+    const { data: fallbackDays, error: fallbackError } = await db
+      .from('nutrition_protocol_days')
+      .insert(daysToInsert.map(({ role, ...day }) => day))
+      .select('*')
+    if (fallbackError) {
+      return NextResponse.json({ error: fallbackError.message }, { status: 500 })
+    }
+    createdDays = (fallbackDays ?? []).map((day: any) => ({
+      ...day,
+      role: inferNutritionDayRole(day),
+    }))
   }
 
   let slots: unknown[] = []
@@ -326,5 +442,5 @@ export async function POST(
     slots = insertedSlots ?? []
   }
 
-  return NextResponse.json({ protocol: { ...protocol, days: days ?? [], schedule_slots: slots } }, { status: 201 })
+  return NextResponse.json({ protocol: { ...protocol, days: createdDays, schedule_slots: slots } }, { status: 201 })
 }

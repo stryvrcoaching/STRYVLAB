@@ -7,6 +7,7 @@ import { computePhysiologicalDate } from '@/lib/nutrition/physiological-date'
 import { resolveProtocolDayByDate } from '@/lib/nutrition/protocol-schedule'
 import { resolveClientTimezone } from '@/lib/client/checkin/resolveClientTimezone'
 import { utcRangeForPhysiologicalDate } from '@/lib/client/checkin/timeWindows'
+import { resolveClientLanguage } from '@/lib/client/resolve-language'
 
 function svc() {
   return createServiceClient(
@@ -24,6 +25,7 @@ export async function GET(_req: NextRequest) {
   if (!cc) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const timezone = await resolveClientTimezone(svc(), cc.id)
+  const lang = await resolveClientLanguage(svc(), cc.id)
   const date = computePhysiologicalDate(new Date(), timezone)
   const { start: physiologicalStart, end: physiologicalEnd } = utcRangeForPhysiologicalDate(date, timezone)
 
@@ -88,6 +90,7 @@ export async function GET(_req: NextRequest) {
     target,
     currentHour,
     hasLunchLog,
+    lang,
   })
 
   // Engine triggers — best-effort, never block daily alerts

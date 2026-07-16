@@ -1,7 +1,7 @@
 # STRYVR Design System v2.0 — Référence Canonique
 
-> Établi le 2026-04-06 à partir de `app/page.tsx` (homepage).
-> Ce fichier est la source de vérité design. Toute décision UI doit s'y conformer.
+> Référence de l’espace coach, alignée sur les tokens actifs de `app/globals.css`.
+> Ce document complète ces tokens pour les décisions d’interface coach.
 
 ---
 

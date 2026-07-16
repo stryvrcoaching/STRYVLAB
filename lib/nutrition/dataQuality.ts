@@ -39,12 +39,26 @@ function scoreSignal(
   key: NutritionSignalKey,
   mode: NutritionDataMode,
   value: unknown,
-  dataSource?: "selected" | "fallback" | "manual",
+  dataSource?: "selected" | "fallback" | "manual" | "estimated",
 ): NutritionDataQualitySignal {
   const governance = getNutritionSignalGovernance(key);
+  const isRealtimeCompositionSignal =
+    mode === "realtime" &&
+    (key === "body_fat_pct" || key === "lean_mass_kg" || key === "muscle_mass_kg");
 
   if (value == null) {
+    if (isRealtimeCompositionSignal) {
+      return { key, score: 0.55, reason: "optional_realtime_missing" };
+    }
     return { key, score: 0, reason: "absent" };
+  }
+
+  if (dataSource === "estimated") {
+    return {
+      key,
+      score: isRealtimeCompositionSignal ? 0.72 : 0.78,
+      reason: "estimated",
+    };
   }
 
   if (dataSource === "fallback") {
@@ -69,7 +83,7 @@ function scoreSignal(
 export function buildNutritionDataQualitySummary(params: {
   clientData: NutritionClientData | null;
   dataMode: NutritionDataMode;
-  dataSource: Record<string, "selected" | "fallback" | "manual">;
+  dataSource: Record<string, "selected" | "fallback" | "manual" | "estimated">;
 }): NutritionDataQualitySummary | null {
   const { clientData, dataMode, dataSource } = params;
   if (!clientData) return null;

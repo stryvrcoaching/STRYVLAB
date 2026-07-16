@@ -189,7 +189,7 @@ export function MorphoAnalysisDrawer({ analysis, clientId, onClose }: Props) {
       .then(data => { if (data?.recommendations) setExMap(data.recommendations) })
       .catch(() => {})
       .finally(() => setExMapLoading(false))
-  }, [analysis?.id, clientId])
+  }, [analysis, analysis?.id, clientId])
 
   const result = analysis?.analysis_result ?? null
   const isV2 = result != null && isMorphoV2(result)

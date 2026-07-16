@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createServiceClient } from "@supabase/supabase-js"
 import { z } from "zod"
@@ -140,5 +141,6 @@ export async function POST(req: NextRequest) {
     logged_at: loggedAt.toISOString(),
   })
 
+  revalidatePath("/client/nutrition")
   return NextResponse.json({ ok: true, meal_id: mealId, quantity_ml: quantity_g })
 }

@@ -1,3 +1,10 @@
+## 2026-07-08
+
+FEATURE: TDEE adaptatif — calibrage minimum augmenté à 14 jours (MIN_WINDOW_DAYS = 14) pour limiter l'impact des fluctuations hydriques initiales du nouveau protocole
+FEATURE: Nutrition Studio — bandeau d'alerte de calibrage visible par le coach pendant les 14 premiers jours d'un nouveau protocole
+FEATURE: Centre d'aide — 4 nouvelles documentations coach créées et enregistrées : CycleSync (synchronisation menstruelle), Cascade TDEE (Waterfall), Score de Cohérence/qualité des logs, et Écosystème Connecté/flux bidirectionnels (pour un total de 9 documentations officielles)
+FEATURE: Nutrition Studio — lien d'accès direct « Documentation complète » inséré dans la modale d'information du TDEE adaptatif
+
 ## 2026-06-05
 
 FIX(Nutrition PWA): VoiceLogSheet — quantité 0 grammes → suppression automatique de l'aliment ; changé condition v > 0 en v >= 0, avec logique removeItem(idx) si v === 0 ; permet d'effacer complètement un aliment en réduisant la quantité sans "zéro bloqué"

@@ -13,6 +13,10 @@ import {
   Clock,
 } from "lucide-react";
 import ClientTopBar from "@/components/client/ClientTopBar";
+import {
+  extractTemplateName,
+  isSystemAssessmentTemplateName,
+} from "@/lib/assessments/templateSnapshot";
 
 function StatusBadge({ status, lang }: { status: string; lang: ClientLang }) {
   const labelMap: Record<string, string> = {
@@ -68,7 +72,9 @@ export default async function ClientBilansPage() {
         .order("created_at", { ascending: false })
     : { data: [] };
 
-  const submissions = (submissionsData || []) as any[];
+  const submissions = ((submissionsData || []) as any[]).filter(
+    (submission) => !isSystemAssessmentTemplateName(extractTemplateName(submission.template_snapshot, "")),
+  );
 
   const pending = submissions.filter((s) => {
     const expired =
@@ -85,7 +91,7 @@ export default async function ClientBilansPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d] font-barlow">
+    <div className="min-h-dvh bg-[#0d0d0d] font-barlow overflow-x-hidden">
       <ClientTopBar
         section={ct(lang, 'bilans.section')}
         title={ct(lang, 'bilans.title')}
@@ -96,7 +102,7 @@ export default async function ClientBilansPage() {
         }
       />
 
-      <main className="max-w-lg mx-auto px-4 pt-[88px] pb-5 flex flex-col gap-6">
+      <main className="max-w-lg mx-auto px-4 pt-[104px] pb-5 flex flex-col gap-6">
 
         {/* ── État vide ── */}
         {submissions.length === 0 && (
@@ -125,7 +131,7 @@ export default async function ClientBilansPage() {
               </span>
             </div>
             {pending.map((sub) => {
-              const name = sub.template_snapshot?.name ?? "Bilan";
+              const name = extractTemplateName(sub.template_snapshot);
               const date = new Date(sub.created_at).toLocaleDateString(
                 dateLocale,
                 { day: "numeric", month: "long" },
@@ -176,7 +182,7 @@ export default async function ClientBilansPage() {
             </p>
             <div className="bg-[#161616] rounded-xl overflow-hidden">
               {history.map((sub) => {
-                const name = sub.template_snapshot?.name ?? "Bilan";
+                const name = extractTemplateName(sub.template_snapshot);
                 const isExpired =
                   sub.status === "expired" ||
                   (sub.token_expires_at &&

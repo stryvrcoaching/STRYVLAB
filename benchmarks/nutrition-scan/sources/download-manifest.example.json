@@ -1,0 +1,25 @@
+{
+  "contact": "benchmark@example.com",
+  "entries": [
+    {
+      "case_id": "public-001-example",
+      "title": "Exemple sous licence à remplacer",
+      "scenario": "packaging",
+      "split": "development",
+      "source_page": "https://example.com/source-page",
+      "source_type": "licensed_dataset",
+      "license": "CC-BY-4.0",
+      "attribution": "Auteur et jeu de données à renseigner",
+      "rights_confirmed": true,
+      "text": null,
+      "photos": [
+        {
+          "url": "https://example.com/image.jpg",
+          "filename": "01-front.jpg",
+          "kind": "context",
+          "role_hint": "packaging_front"
+        }
+      ]
+    }
+  ]
+}

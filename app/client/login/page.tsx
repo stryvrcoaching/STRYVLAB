@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Eye, EyeOff, ArrowRight } from 'lucide-react'
@@ -19,11 +20,16 @@ export default function ClientLoginPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    // If an invite/magiclink token lands here (misconfigured redirect URL),
-    // forward to the correct onboarding page instead of staying on login.
+    // If an auth token lands here, forward to the right flow instead of staying on login.
     const hash = window.location.hash
     if (hash && hash.includes('access_token=')) {
-      window.location.replace('/client/onboarding' + hash)
+      const hashParams = new URLSearchParams(hash.replace(/^#/, ''))
+      const tokenType = hashParams.get('type')
+      if (tokenType === 'recovery') {
+        window.location.replace('/client/auth/reset-password' + hash)
+      } else {
+        window.location.replace('/client/onboarding' + hash)
+      }
       return
     }
 
@@ -70,11 +76,11 @@ export default function ClientLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d] flex flex-col items-center justify-center p-6">
+    <div className="min-h-dvh bg-[#0d0d0d] flex flex-col items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
 
       {/* Logo */}
       <div className="mb-10 flex flex-col items-center gap-3">
-        <img src="/logo/logo-stryvr-silver.png" alt="STRYVR" className="w-12 h-12 object-contain" />
+        <Image src="/logo/logo-stryvr-silver.png" alt="STRYVR" width={48} height={48} className="w-12 h-12 object-contain" />
         <div className="text-center">
           <p className="text-[11px] text-white/30 mt-1.5">{t('login.mySpace')}</p>
         </div>

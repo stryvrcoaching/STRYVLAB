@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import {
   filterSessionsForJsWeekday,
+  filterSessionsForProgrammeDow,
+  programmeDowToJsWeekday,
+  sessionMatchesProgrammeDow,
   sessionMatchesJsWeekday,
 } from '@/lib/client/plannedSessions'
 
@@ -24,5 +27,36 @@ describe('plannedSessions', () => {
     ]
 
     expect(filterSessionsForJsWeekday(sessions, 2).map((session) => session.name)).toEqual(['Pull', 'Legs'])
+  })
+
+  it('supports legacy 1..7 weekday encoding including Sunday', () => {
+    expect(sessionMatchesJsWeekday({ day_of_week: 7 }, 0)).toBe(true)
+    expect(sessionMatchesJsWeekday({ days_of_week: [1, 7] }, 0)).toBe(true)
+    expect(sessionMatchesJsWeekday({ days_of_week: [1, 7] }, 1)).toBe(true)
+  })
+
+  it('maps programme weekday 1..7 to JS weekday', () => {
+    expect(programmeDowToJsWeekday(1)).toBe(1)
+    expect(programmeDowToJsWeekday(6)).toBe(6)
+    expect(programmeDowToJsWeekday(7)).toBe(0)
+  })
+
+  it('matches programme weekday against mixed session encodings', () => {
+    expect(sessionMatchesProgrammeDow({ day_of_week: 0 }, 7)).toBe(true)
+    expect(sessionMatchesProgrammeDow({ day_of_week: 7 }, 7)).toBe(true)
+    expect(sessionMatchesProgrammeDow({ day_of_week: 1 }, 1)).toBe(true)
+  })
+
+  it('filters sessions for programme weekday using normalized encoding', () => {
+    const sessions = [
+      { name: 'Sunday Legacy', day_of_week: 0 },
+      { name: 'Sunday ISO', day_of_week: 7 },
+      { name: 'Monday', day_of_week: 1 },
+    ]
+
+    expect(filterSessionsForProgrammeDow(sessions, 7).map((session) => session.name)).toEqual([
+      'Sunday Legacy',
+      'Sunday ISO',
+    ])
   })
 })

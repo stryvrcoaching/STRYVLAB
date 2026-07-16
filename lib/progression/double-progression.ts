@@ -18,6 +18,9 @@ export interface SetResult {
   actual_reps: number
   rir_actual: number | null  // null = non renseigné par le client
   completed: boolean
+  set_type?: 'warmup' | 'working' | 'cooldown' | 'dropset' | string | null
+  target_rir?: number | null
+  rep_max?: number | null
 }
 
 export interface ExerciseProgressionInput {
@@ -68,10 +71,14 @@ export interface ExerciseProgressionResult {
 /**
  * Vérifie si toutes les séries complétées atteignent rep_max.
  */
+function isProgressionEligibleSet(set: SetResult): boolean {
+  return set.set_type == null || set.set_type === 'working'
+}
+
 function allSetsAtRepMax(sets: SetResult[], rep_max: number): boolean {
   const completed = sets.filter(s => s.completed)
   if (completed.length === 0) return false
-  return completed.every(s => s.actual_reps >= rep_max)
+  return completed.every(s => s.actual_reps >= (s.rep_max ?? rep_max))
 }
 
 /**
@@ -87,7 +94,7 @@ function allSetsRirCompliant(sets: SetResult[], target_rir: number): boolean {
   // Si aucun RIR saisi → non-conforme (on ne peut pas évaluer)
   if (withRir.length === 0) return false
   // Tous les RIR saisis doivent être conformes
-  return withRir.every(s => (s.rir_actual as number) <= target_rir)
+  return withRir.every(s => (s.rir_actual as number) <= (s.target_rir ?? target_rir))
 }
 
 /**
@@ -131,7 +138,8 @@ function buildFeedbackMessage(
 export function evaluateProgression(
   input: ExerciseProgressionInput
 ): ExerciseProgressionResult {
-  const completedSets = input.sets.filter(s => s.completed)
+  const eligibleSets = input.sets.filter(isProgressionEligibleSet)
+  const completedSets = eligibleSets.filter(s => s.completed)
 
   // Données insuffisantes : aucune série complétée ou reps non renseignées
   const hasReps = completedSets.every(s => s.actual_reps > 0)

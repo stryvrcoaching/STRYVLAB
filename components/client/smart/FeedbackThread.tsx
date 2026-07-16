@@ -1,25 +1,27 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { MessageSquare, Send, Loader2 } from 'lucide-react'
 import type { CoachFeedback, FeedbackEmoji } from '@/lib/feedback/types'
 import { FEEDBACK_EMOJIS } from '@/lib/feedback/types'
+import { useClientT } from '@/components/client/ClientI18nProvider'
 
 interface FeedbackThreadProps {
   entityType: string
   entityId: string
 }
 
-function timeAgo(dateStr: string): string {
+function timeAgo(dateStr: string, t: ReturnType<typeof useClientT>['t']): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `il y a ${mins}m`
+  if (mins < 60) return t('feedback.time.m', { n: mins })
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `il y a ${hours}h`
-  return `il y a ${Math.floor(hours / 24)}j`
+  if (hours < 24) return t('feedback.time.h', { n: hours })
+  return t('feedback.time.d', { n: Math.floor(hours / 24) })
 }
 
 function FeedbackCard({ feedback, onReacted }: { feedback: CoachFeedback; onReacted: () => void }) {
+  const { t } = useClientT()
   const [selectedEmoji, setSelectedEmoji] = useState<FeedbackEmoji | null>(
     () => {
       const clientReaction = feedback.reactions.find(r => r.author_type === 'client')
@@ -77,7 +79,7 @@ function FeedbackCard({ feedback, onReacted }: { feedback: CoachFeedback; onReac
           </div>
           <span className="text-[12px] font-semibold text-white">Coach</span>
         </div>
-        <span className="text-[10px] text-white/30">{timeAgo(feedback.created_at)}</span>
+        <span className="text-[10px] text-white/30">{timeAgo(feedback.created_at, t)}</span>
       </div>
 
       {/* Body */}
@@ -107,7 +109,7 @@ function FeedbackCard({ feedback, onReacted }: { feedback: CoachFeedback; onReac
           onClick={() => setShowReply(true)}
           className="text-[11px] text-white/30 hover:text-white/50 transition-colors"
         >
-          Répondre…
+          {t('feedback.reply')}
         </button>
       )}
 
@@ -117,7 +119,7 @@ function FeedbackCard({ feedback, onReacted }: { feedback: CoachFeedback; onReac
           <textarea
             value={replyText}
             onChange={e => setReplyText(e.target.value)}
-            placeholder="Ta réponse..."
+            placeholder={t('feedback.placeholder')}
             rows={2}
             className="flex-1 bg-[#111111] rounded-xl px-3 py-2 text-[12px] text-white placeholder:text-[#5a5a5a] outline-none resize-none transition-colors"
           />
@@ -134,7 +136,7 @@ function FeedbackCard({ feedback, onReacted }: { feedback: CoachFeedback; onReac
       {/* Coach replies */}
       {coachReactions.filter(r => r.reply_text).map(r => (
         <div key={r.id} className="bg-white/[0.03] rounded-xl p-3">
-          <p className="text-[10px] text-white/30 mb-1">Coach · {timeAgo(r.created_at)}</p>
+          <p className="text-[10px] text-white/30 mb-1">Coach · {timeAgo(r.created_at, t)}</p>
           <p className="text-[12px] text-white/60">{r.reply_text}</p>
         </div>
       ))}
@@ -143,23 +145,24 @@ function FeedbackCard({ feedback, onReacted }: { feedback: CoachFeedback; onReac
 }
 
 export default function FeedbackThread({ entityType, entityId }: FeedbackThreadProps) {
+  const { t } = useClientT()
   const [feedbacks, setFeedbacks] = useState<CoachFeedback[]>([])
 
-  const load = () => {
+  const load = useCallback(() => {
     fetch(`/api/client/feedback/${entityType}/${entityId}`)
       .then(r => r.ok ? r.json() : [])
       .then(setFeedbacks)
       .catch(() => {})
-  }
+  }, [entityId, entityType])
 
-  useEffect(() => { load() }, [entityType, entityId])
+  useEffect(() => { load() }, [load])
 
   if (feedbacks.length === 0) return null
 
   return (
     <div className="space-y-3">
       <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/30 px-1">
-        Message coach
+        {t('feedback.coachMessage')}
       </p>
       {feedbacks.map(fb => (
         <FeedbackCard key={fb.id} feedback={fb} onReacted={load} />

@@ -85,7 +85,7 @@ TOTAL: ~60 fichiers, Production-ready
 cd virtus-smart-fit
 
 # Install dependencies
-npm install
+pnpm install --frozen-lockfile
 
 # Copie .env.example vers .env.local
 cp .env.example .env.local

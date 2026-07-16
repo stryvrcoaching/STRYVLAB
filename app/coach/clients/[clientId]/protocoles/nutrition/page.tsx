@@ -7,24 +7,28 @@ import { Plus } from 'lucide-react'
 import { useClientTopBar } from '@/components/clients/useClientTopBar'
 import { Skeleton } from '@/components/ui/skeleton'
 import NutritionProtocolDashboard from '@/components/nutrition/NutritionProtocolDashboard'
+import ProgramPdfModal from '@/components/programs/ProgramPdfModal'
+import { useClient } from '@/lib/client-context'
 import type { NutritionProtocol } from '@/lib/nutrition/types'
+import HeaderIconLink from '@/components/layout/HeaderIconLink'
 
 export default function NutritionPage() {
   const params   = useParams()
   const clientId = params.clientId as string
+  const { client } = useClient()
 
   const [protocols, setProtocols] = useState<NutritionProtocol[]>([])
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState('')
+  const [pdfProtocol, setPdfProtocol] = useState<NutritionProtocol | null>(null)
 
   const topBarRight = useMemo(() => (
-    <Link
+    <HeaderIconLink
       href={`/coach/clients/${clientId}/protocoles/nutrition/new`}
-      className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[#1f8a65] text-white text-[12px] font-bold uppercase tracking-[0.1em] hover:bg-[#217356] transition-all active:scale-[0.98]"
-    >
-      <Plus size={12} />
-      Nouveau protocole
-    </Link>
+      icon={<Plus size={12} />}
+      label="Nouveau protocole nutritionnel"
+      variant="accent"
+    />
   ), [clientId])
 
   useClientTopBar('Nutrition Studio', topBarRight)
@@ -98,9 +102,23 @@ export default function NutritionPage() {
         )}
 
         {!loading && !error && (
-          <NutritionProtocolDashboard protocols={protocols} onRefresh={fetchProtocols} />
+          <NutritionProtocolDashboard protocols={protocols} onRefresh={fetchProtocols} onRequestPdf={setPdfProtocol} />
         )}
       </div>
+
+      {pdfProtocol && (
+        <ProgramPdfModal
+          mode="nutrition-protocol"
+          entityId={pdfProtocol.id}
+          title={pdfProtocol.name}
+          programClient={{
+            firstName: client.first_name,
+            lastName: client.last_name,
+            email: client.email ?? null,
+          }}
+          onClose={() => setPdfProtocol(null)}
+        />
+      )}
     </main>
   )
 }

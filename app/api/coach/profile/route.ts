@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { PLAN_LIMITS, type BillingStatus, type CoachPlan } from '@/lib/billing/plans'
 import { z } from 'zod'
 
 function serviceClient() {
@@ -61,6 +62,18 @@ export async function GET() {
       notif_payment_reminder:      true,
       notif_payment_reminder_days: 3,
       notif_bilan_completed:       true,
+      notif_onboarding_emails:     true,
+      notif_inbox_assessments:     true,
+      notif_inbox_training:        true,
+      notif_inbox_messages:        true,
+      notif_inbox_checkins:        true,
+      notif_inbox_nutrition:       true,
+      notif_inbox_health_progress: true,
+      notif_inbox_administrative:  true,
+      plan:                        'solo',
+      billing_status:              'inactive',
+      client_limit:                PLAN_LIMITS.solo.clientLimit,
+      team_seats:                  PLAN_LIMITS.solo.teamSeats,
       has_ai_llm:                  false,
       ai_tone:                     null,
       ai_notif_email:              true,
@@ -77,12 +90,27 @@ const patchSchema = z.object({
   pro_email: z.string().email().nullable().optional().or(z.literal('')).or(z.literal(null)),
   phone: z.string().max(30).nullable().optional(),
   logo_url: z.string().nullable().optional(),
+  company_name: z.string().max(160).nullable().optional(),
+  billing_country: z.string().length(2).nullable().optional(),
+  business_registration_number: z.string().max(40).nullable().optional(),
   siret: z.string().max(20).nullable().optional(),
   address: z.string().max(300).nullable().optional(),
   vat_number: z.string().max(20).nullable().optional(),
   notif_payment_reminder: z.boolean().optional(),
   notif_payment_reminder_days: z.number().int().min(1).max(30).optional(),
   notif_bilan_completed: z.boolean().optional(),
+  notif_onboarding_emails: z.boolean().optional(),
+  notif_inbox_assessments: z.boolean().optional(),
+  notif_inbox_training: z.boolean().optional(),
+  notif_inbox_messages: z.boolean().optional(),
+  notif_inbox_checkins: z.boolean().optional(),
+  notif_inbox_nutrition: z.boolean().optional(),
+  notif_inbox_health_progress: z.boolean().optional(),
+  notif_inbox_administrative: z.boolean().optional(),
+  plan: z.enum(['solo', 'pro', 'studio']).optional(),
+  billing_status: z.enum(['inactive', 'trialing', 'active', 'past_due', 'canceled']).optional(),
+  client_limit: z.number().int().min(1).max(100000).nullable().optional(),
+  team_seats: z.number().int().min(1).max(10000).nullable().optional(),
   // IA Coach
   has_ai_llm: z.boolean().optional(),
   ai_tone: z.enum(['strict', 'bienveillant', 'motivant', 'neutre']).nullable().optional(),
@@ -103,12 +131,18 @@ export async function PATCH(req: NextRequest) {
   if (!body.success) return NextResponse.json({ error: body.error.flatten() }, { status: 400 })
 
   const db = serviceClient()
+  const updates = { ...body.data }
+  // Billing entitlement fields are managed by Stripe/webhooks, not by standard coach settings PATCH.
+  delete updates.plan
+  delete updates.billing_status
+  delete updates.client_limit
+  delete updates.team_seats
 
   // Upsert — create profile if it doesn't exist
   const { data, error } = await db
     .from('coach_profiles')
     .upsert(
-      { coach_id: user.id, ...body.data, updated_at: new Date().toISOString() },
+      { coach_id: user.id, ...updates, updated_at: new Date().toISOString() },
       { onConflict: 'coach_id' }
     )
     .select()

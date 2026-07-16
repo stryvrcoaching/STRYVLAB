@@ -10,6 +10,7 @@ const bodySchema = z.object({
   duration_min: z.number().int().min(1).max(360),
   intensity: z.number().int().min(1).max(10),
   notes: z.string().max(500).optional(),
+  steps: z.number().int().min(0).max(200000).optional().nullable(),
 })
 
 function svc() {
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
 
   let q = svc()
     .from('client_activity_logs')
-    .select('id, activity_type, custom_label, started_at, duration_min, intensity, notes')
+    .select('id, activity_type, custom_label, started_at, duration_min, intensity, notes, steps')
     .eq('client_id', clientId)
     .order('started_at', { ascending: false })
     .limit(50)

@@ -15,6 +15,7 @@ function svc() {
 const bodySchema = z.object({
   type: z.enum(['start', 'end']),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  force: z.boolean().optional().default(false),
 })
 
 export async function POST(req: NextRequest) {
@@ -45,42 +46,58 @@ export async function POST(req: NextRequest) {
 
     const { data: existing } = await db
       .from('menstrual_cycle_logs')
-      .select('period_start_date')
+      .select('id, period_start_date, period_end_date')
       .eq('client_id', cc.id)
       .gte('period_start_date', threeDaysBefore.toISOString().slice(0, 10))
       .lte('period_start_date', threeDaysAfter.toISOString().slice(0, 10))
       .maybeSingle()
 
-    if (existing) {
+    if (existing && !body.data.force) {
       return NextResponse.json(
         { conflict: true, existingDate: existing.period_start_date },
         { status: 409 },
       )
     }
 
-    // Compute cycle length from previous log
-    const { data: prevLog } = await db
-      .from('menstrual_cycle_logs')
-      .select('period_start_date')
-      .eq('client_id', cc.id)
-      .lt('period_start_date', targetDate)
-      .order('period_start_date', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    let computedLength: number | null = null
-    if (prevLog) {
-      const prev = new Date(prevLog.period_start_date)
-      const curr = new Date(targetDate)
-      const diff = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24))
-      if (diff >= 21 && diff <= 35) computedLength = diff
+    if (existing && body.data.force && existing.period_start_date !== targetDate) {
+      const { error: updateError } = await db
+        .from('menstrual_cycle_logs')
+        .update({
+          period_start_date: targetDate,
+          period_end_date: existing.period_end_date && existing.period_end_date < targetDate
+            ? null
+            : existing.period_end_date,
+          computed_cycle_length_days: null,
+        })
+        .eq('id', existing.id)
+      if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
     }
 
-    await db.from('menstrual_cycle_logs').insert({
-      client_id: cc.id,
-      period_start_date: targetDate,
-      computed_cycle_length_days: computedLength,
-    })
+    if (!existing) {
+      const { data: prevLog } = await db
+        .from('menstrual_cycle_logs')
+        .select('period_start_date')
+        .eq('client_id', cc.id)
+        .lt('period_start_date', targetDate)
+        .order('period_start_date', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      let computedLength: number | null = null
+      if (prevLog) {
+        const prev = new Date(prevLog.period_start_date)
+        const curr = new Date(targetDate)
+        const diff = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24))
+        if (diff >= 15 && diff <= 90) computedLength = diff
+      }
+
+      const { error: insertError } = await db.from('menstrual_cycle_logs').insert({
+        client_id: cc.id,
+        period_start_date: targetDate,
+        computed_cycle_length_days: computedLength,
+      })
+      if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+    }
   }
 
   if (body.data.type === 'end') {
@@ -88,6 +105,7 @@ export async function POST(req: NextRequest) {
       .from('menstrual_cycle_logs')
       .select('id, period_start_date')
       .eq('client_id', cc.id)
+      .is('period_end_date', null)
       .lte('period_start_date', targetDate)
       .order('period_start_date', { ascending: false })
       .limit(1)
@@ -102,10 +120,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'End date must be 1–14 days after start' }, { status: 400 })
     }
 
-    await db
+    const { error: updateError } = await db
       .from('menstrual_cycle_logs')
       .update({ period_end_date: targetDate })
       .eq('id', log.id)
+    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
   }
 
   // Return updated cycle state
@@ -132,7 +151,7 @@ export async function POST(req: NextRequest) {
       .from('assessment_responses')
       .select('value_text')
       .eq('field_key', 'menstrual_cycle')
-      .in('assessment_submission_id', submissionIds)
+      .in('submission_id', submissionIds)
       .not('value_text', 'is', null)
       .order('created_at', { ascending: false })
       .limit(1)

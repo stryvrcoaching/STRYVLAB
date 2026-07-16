@@ -16,6 +16,30 @@ function makeAnalysis(overrides: Partial<PhotoMealAnalysisSummary> = {}): PhotoM
 }
 
 describe("getNextPhotoMealClarification", () => {
+  it("does not apply plate clarifications to a receipt session", () => {
+    expect(getNextPhotoMealClarification({
+      meal_type: "lunch",
+      analysis_mode: "receipt",
+      source_context: "restaurant_receipt_v1",
+      scale_weight_g: null,
+      scale_weight_confidence: null,
+      manual_weight_g: null,
+      components: [{
+        name_fr: "Menu restaurant",
+        category_hint: "extras",
+        grams_estimate: 100,
+        kcal_per_100g: 650,
+        protein_per_100g: 28,
+        carbs_per_100g: 72,
+        fat_per_100g: 26,
+        fiber_per_100g: 5,
+        ambiguity_tags: ["hidden_fats"],
+      }],
+      ambiguity_tags: ["hidden_fats"],
+      leftovers_recommended: false,
+    }, {})).toBeNull()
+  })
+
   it("asks for extra egg whites on a single egg-like plate without weight anchor", () => {
     const question = getNextPhotoMealClarification(
       makeAnalysis({

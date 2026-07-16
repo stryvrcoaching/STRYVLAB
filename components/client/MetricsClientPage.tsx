@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { Gear } from '@phosphor-icons/react'
+import ClientTopBar from './ClientTopBar'
 import BodyDataTab from './metrics/BodyDataTab'
 import MesurationsTab from './metrics/MesurationsTab'
 import VitalityTab from './metrics/VitalityTab'
@@ -20,9 +21,9 @@ const MeasurementsEntrySheet = dynamic(
 type Tab = 'corps' | 'mensurations' | 'vitalite'
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'corps',        label: 'Données corporelles' },
-  { id: 'mensurations', label: 'Mensurations' },
-  { id: 'vitalite',     label: 'Vitalité' },
+  { id: 'corps',        label: 'metrics.tab.bodyData' },
+  { id: 'mensurations', label: 'metrics.tab.measurements' },
+  { id: 'vitalite',     label: 'metrics.tab.vitality' },
 ]
 
 interface Props {
@@ -34,7 +35,7 @@ interface Props {
 }
 
 export default function MetricsClientPage({ clientName, clientEmail, avatarInitials, avatarUrl, streak }: Props) {
-  const { t } = useClientT()
+  const { lang, t } = useClientT()
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('corps')
   const [bodyData, setBodyData] = useState<BodyDataResponse | null>(null)
@@ -58,28 +59,24 @@ export default function MetricsClientPage({ clientName, clientEmail, avatarIniti
   }, [])
 
   return (
-    <div className="flex flex-col min-h-full bg-[#0d0d0d]">
+    <div className="flex min-h-dvh flex-col bg-[#0d0d0d]">
+      <ClientTopBar
+        section="MON PROFIL"
+        title={t('metrics.title')}
+        right={
+          <button
+            onClick={() => router.push('/client/profil')}
+            className="premium-panel premium-micrograin flex h-9 w-9 items-center justify-center rounded-xl text-white/56 transition-colors active:bg-white/[0.08]"
+            aria-label={t('profil.section.prefs')}
+          >
+            <Gear size={16} />
+          </button>
+        }
+      />
 
-      {/* TopBar */}
-      <div className="flex items-center justify-between px-4 pt-12 pb-3 shrink-0">
-        <div>
-          <p className="text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/30">
-            MON PROFIL
-          </p>
-          <p className="text-[13px] font-barlow font-semibold text-white">Métriques</p>
-        </div>
-        <button
-          onClick={() => router.push('/client/profil')}
-          className="h-8 w-8 flex items-center justify-center rounded-xl bg-white/[0.04] text-white/40 active:bg-white/[0.08] transition-colors"
-          aria-label="Paramètres"
-        >
-          <Gear size={16} />
-        </button>
-      </div>
-
-      {/* Hero */}
-      <div className="flex items-center gap-3 px-4 pb-4 shrink-0">
-        <div className="w-12 h-12 rounded-full bg-[#111111] shrink-0 overflow-hidden flex items-center justify-center">
+      <div className="mx-auto flex w-full max-w-lg flex-col px-4 pb-24 pt-[104px]">
+        <div className="premium-panel premium-micrograin flex items-center gap-3 rounded-[24px] px-4 py-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#111111]">
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -93,43 +90,40 @@ export default function MetricsClientPage({ clientName, clientEmail, avatarIniti
               {avatarInitials}
             </span>
           )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[14px] font-barlow font-semibold text-white truncate">{clientName}</p>
-          <p className="text-[11px] text-white/40 truncate">{clientEmail}</p>
-        </div>
-        {streak > 0 && (
-          <div className="px-2.5 py-1 bg-[#222222] rounded-full shrink-0">
-            <span className="text-[11px] font-barlow-condensed font-bold text-[#f2f2f2]">
-              🔥 {streak}j
-            </span>
           </div>
-        )}
-      </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[14px] font-barlow font-semibold text-white">{clientName}</p>
+            <p className="truncate text-[11px] text-white/40">{clientEmail}</p>
+          </div>
+          {streak > 0 && (
+            <div className="premium-panel premium-micrograin shrink-0 rounded-full px-2.5 py-1">
+              <span className="text-[11px] font-barlow-condensed font-bold text-[#f2f2f2]">
+                🔥 {streak}{lang === 'fr' ? 'j' : 'd'}
+              </span>
+            </div>
+          )}
+        </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-2 px-4 pb-4 overflow-x-auto scrollbar-hide shrink-0">
-        {TABS.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.12em] transition-colors ${
-              tab === t.id
-                ? 'bg-[#f2f2f2] text-[#080808]'
-                : 'bg-white/[0.06] text-[#5a5a5a]'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+        <div className="scrollbar-hide mt-4 flex gap-2 overflow-x-auto pb-4">
+          {TABS.map(tabItem => (
+            <button
+              key={tabItem.id}
+              onClick={() => setTab(tabItem.id)}
+              className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.12em] transition-colors ${
+                tab === tabItem.id
+                  ? 'bg-[#f2f2f2] text-[#080808]'
+                  : 'premium-panel premium-micrograin text-[#8a8a8a]'
+              }`}
+            >
+              {t(tabItem.label as never)}
+            </button>
+          ))}
+        </div>
 
-      {/* Content */}
-      <div className="flex-1 px-4 pb-24">
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-20 bg-white/[0.04] rounded-2xl animate-pulse" />
+              <div key={i} className="premium-panel premium-micrograin h-20 animate-pulse rounded-2xl" />
             ))}
           </div>
         ) : (

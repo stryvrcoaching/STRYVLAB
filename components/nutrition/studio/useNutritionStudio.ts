@@ -1,22 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-
-export type TdeePreview = {
-  tdeeAdaptive: number;
-  tdeeReference: number;
-  deltaKcal: number;
-  confidence: string;
-  confidenceScore: number;
-  confidenceReasons: string[];
-  preview: Array<{
-    id: string;
-    name: string;
-    position: number;
-    current: { calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null };
-    proposed: { calories: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null };
-  }>;
-};
+import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from "react";
+import { readLocalStorage, writeLocalStorage } from "@/lib/client/browserStorage";
 import type { MacroOverrides } from "./MacroSliders";
 import {
   calculateMacros,
@@ -38,6 +23,12 @@ import {
 } from "@/lib/nutrition/types";
 import type { BMRSource } from "@/lib/nutrition/calculators";
 import type { CycleState } from "@/lib/cycle/cycleEngine";
+import type { CyclePhaseObservation } from "@/lib/cycle/cycle-phase-observations";
+import {
+  DEFAULT_CYCLE_SYNC_PROFILE,
+  normalizeCycleSyncProfile,
+  type CycleSyncProfile,
+} from "@/lib/nutrition/cycle-sync-profile";
 import type { TrainingWeekSchedule } from "@/lib/nutrition/training-week-schedule";
 import { buildNutritionDataQualitySummary } from "@/lib/nutrition/dataQuality";
 import {
@@ -51,6 +42,12 @@ import {
   transformationPhaseToMacroGoal,
   type TransformationPhase,
 } from "@/lib/coach/transformationPhase";
+import type { TdeeEstimationStatus } from "@/lib/nutrition/tdee-quality";
+import {
+  buildPhaseProtocolPreview,
+  type PhaseProtocolPreview,
+  type ProtocolMacroTarget,
+} from "@/lib/nutrition/phase-protocol-recalibration";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -139,6 +136,28 @@ export interface TdeeHistoryEntry {
   confidence?: 'high' | 'medium' | 'low'
   confidence_score?: number
   confidence_reasons?: string[]
+  window_days?: number
+  tdee_lower?: number
+  tdee_upper?: number
+  complete_days?: number
+  context_changed?: boolean
+}
+
+type TdeeDataSource = 'weight_delta' | 'formula_proxy' | null
+type TdeeStabilityStatus = 'stable' | 'watch' | 'action' | null
+
+function dedupeTdeeHistoryByDisplayedDate(entries: TdeeHistoryEntry[]) {
+  const seen = new Set<string>()
+  const deduped: TdeeHistoryEntry[] = []
+
+  for (const entry of entries) {
+    const key = new Date(entry.calculated_at).toLocaleDateString('en-CA')
+    if (seen.has(key)) continue
+    seen.add(key)
+    deduped.push(entry)
+  }
+
+  return deduped
 }
 
 export type ScheduleSlotDraft = {
@@ -175,6 +194,10 @@ export function useNutritionStudio(
   existingProtocol?: NutritionProtocol,
 ) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dataModeStorageKey = useMemo(
+    () => `nutrition_studio_data_mode:${clientId}`,
+    [clientId],
+  );
 
   const [clientData, setClientData] = useState<NutritionClientData | null>(
     null,
@@ -233,48 +256,56 @@ export function useNutritionStudio(
     ],
   );
 
-  const setTransformationPhaseWithPreset = useCallback(
-    (newPhase: TransformationPhase) => {
-      setTransformationPhase(newPhase);
-      const bf = biometricsConfig.body_fat_pct ?? clientData?.body_fat_pct ?? null;
-      const weeklyFrequency = trainingConfig.weeklyFrequency;
-      const mappedGoal = transformationPhaseToMacroGoal(newPhase);
-      setGoal(mappedGoal);
-      setCalorieAdjustPct(
-        computePhaseDrivenCalorieAdjustPct({
-          phase: newPhase,
-          bodyFat: bf,
-          weeklyFrequency,
-          basePreset: computeSmartPreset,
-        }),
-      );
-    },
-    [
-      biometricsConfig.body_fat_pct,
-      clientData?.body_fat_pct,
-      trainingConfig.weeklyFrequency,
-    ],
-  );
-
   const [macroOverrides, setMacroOverrides] = useState<MacroOverrides>({
     protein_g: null,
     fat_g: null,
     carbs_g: null,
   });
   const [cycleSyncEnabled, setCycleSyncEnabled] = useState<boolean>(false);
+  const [cycleSyncProfile, setCycleSyncProfile] = useState<CycleSyncProfile>(DEFAULT_CYCLE_SYNC_PROFILE);
+  const [cyclePhaseObservations, setCyclePhaseObservations] = useState<CyclePhaseObservation[]>([]);
   const [hydrationClimate, setHydrationClimate] =
     useState<HydrationClimate>("temperate");
   const [hydrationPhase, setHydrationPhase] = useState(100); // 0–200, 100 = baseline
   // Separate ref for the base hydration (before phase factor) — updated by debounced recalc
   const baseHydrationLitersRef = useRef<number | null>(null);
   const [days, setDays] = useState<DayDraft[]>([
-    emptyDayDraft("Jour entraînement"),
-    emptyDayDraft("Jour repos"),
+    { ...emptyDayDraft("Jour entraînement"), role: "training" },
+    { ...emptyDayDraft("Jour repos"), role: "rest" },
   ]);
   const [activeDayIndex, setActiveDayIndex] = useState(0);
   const [macroResult, setMacroResult] = useState<MacroResult | null>(null);
+  const [phaseSyncBaseTarget, setPhaseSyncBaseTarget] = useState<ProtocolMacroTarget | null>(null);
   // Calories after goal factor but before calorieAdjustPct — used by the adjustment slider display
   const [goalCalories, setGoalCalories] = useState<number | null>(null);
+
+  const captureProtocolTarget = useCallback(() => {
+    if (macroResult && !phaseSyncBaseTarget) {
+      setPhaseSyncBaseTarget({ calories: macroResult.calories, protein: macroResult.macros.p, carbs: macroResult.macros.c, fat: macroResult.macros.f });
+    }
+  }, [macroResult, phaseSyncBaseTarget]);
+
+  const setCalorieAdjustPctWithProtocolSync = useCallback((value: number) => {
+    captureProtocolTarget();
+    setCalorieAdjustPct(value);
+  }, [captureProtocolTarget]);
+
+  const setMacroOverridesWithProtocolSync = useCallback((value: MacroOverrides) => {
+    captureProtocolTarget();
+    setMacroOverrides(value);
+  }, [captureProtocolTarget]);
+
+  const setTransformationPhaseWithPreset = useCallback(
+    (newPhase: TransformationPhase) => {
+      captureProtocolTarget();
+      setTransformationPhase(newPhase);
+      const bf = biometricsConfig.body_fat_pct ?? clientData?.body_fat_pct ?? null;
+      const mappedGoal = transformationPhaseToMacroGoal(newPhase);
+      setGoal(mappedGoal);
+      setCalorieAdjustPct(computePhaseDrivenCalorieAdjustPct({ phase: newPhase, bodyFat: bf, weeklyFrequency: trainingConfig.weeklyFrequency, basePreset: computeSmartPreset }));
+    },
+    [biometricsConfig.body_fat_pct, captureProtocolTarget, clientData?.body_fat_pct, trainingConfig.weeklyFrequency],
+  );
   const [hydrationLiters, setHydrationLiters] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -284,14 +315,29 @@ export function useNutritionStudio(
   );
   const [tdeeAdaptive, setTdeeAdaptive] = useState<number | null>(null);
   const [tdeeAdaptiveAt, setTdeeAdaptiveAt] = useState<Date | null>(null);
-  const [tdeeDataSource, setTdeeDataSource] = useState<'weight_delta' | 'formula_proxy' | null>(null);
+  const [tdeeAdaptiveLower, setTdeeAdaptiveLower] = useState<number | null>(null);
+  const [tdeeAdaptiveUpper, setTdeeAdaptiveUpper] = useState<number | null>(null);
+  const [tdeeObserved, setTdeeObserved] = useState<number | null>(null);
+  const [tdeeObservedLower, setTdeeObservedLower] = useState<number | null>(null);
+  const [tdeeObservedUpper, setTdeeObservedUpper] = useState<number | null>(null);
+  const [tdeeActionableStreak, setTdeeActionableStreak] = useState(0);
+  const [tdeeDataSource, setTdeeDataSource] = useState<TdeeDataSource>(null);
   const [tdeeHistory, setTdeeHistory] = useState<TdeeHistoryEntry[]>([]);
+  const [tdeeStabilityStatus, setTdeeStabilityStatus] = useState<TdeeStabilityStatus>(null);
+  const [tdeeLastSkipReason, setTdeeLastSkipReason] = useState<string | null>(null);
+  const [tdeeLastSuccessAt, setTdeeLastSuccessAt] = useState<Date | null>(null);
+  const [tdeeProtocolStartDate, setTdeeProtocolStartDate] = useState<string | null>(null);
+  const [tdeeEstimationStatus, setTdeeEstimationStatus] = useState<TdeeEstimationStatus>('collecting');
+  const [tdeeDataQualityScore, setTdeeDataQualityScore] = useState<number | null>(null);
+  const [tdeeDataQualityReasons, setTdeeDataQualityReasons] = useState<string[]>([]);
+  const [tdeeError, setTdeeError] = useState<string | null>(null);
   const [applyingAdaptive, setApplyingAdaptive] = useState(false);
   const [tdeeAutoEnabled, setTdeeAutoEnabled] = useState<boolean>(existingProtocol?.tdee_auto_enabled ?? false);
   const [tdeeAdaptiveActive, setTdeeAdaptiveActive] = useState<boolean>(existingProtocol?.tdee_adaptive_active ?? false);
-  const [tdeePreview, setTdeePreview] = useState<TdeePreview | null>(null);
-  const [applyingTdeeConfirm, setApplyingTdeeConfirm] = useState(false);
-  const [dataMode, setDataMode] = useState<NutritionDataMode>("bilan");
+  const [dataMode, setDataMode] = useState<NutritionDataMode>(() => {
+    const stored = readLocalStorage(`nutrition_studio_data_mode:${clientId}`);
+    return stored === "realtime" ? "realtime" : "bilan";
+  });
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<
     string | null
   >(null);
@@ -302,7 +348,7 @@ export function useNutritionStudio(
     Array<{ id: string; date: string; status: string; submitted_at: string }>
   >([]);
   const [dataSource, setDataSource] = useState<
-    Record<string, "selected" | "fallback">
+    Record<string, "selected" | "fallback" | "manual" | "estimated">
   >({});
   const [anchorDate, setAnchorDate] = useState<string | null>(null);
   const [realtimeWindowDays, setRealtimeWindowDays] = useState<number>(7);
@@ -317,6 +363,15 @@ export function useNutritionStudio(
   const [scheduleSlots, setScheduleSlots] = useState<ScheduleSlotDraft[]>([]);
   const [cycleState, setCycleState] = useState<CycleState | null>(null);
 
+  useEffect(() => {
+    writeLocalStorage(dataModeStorageKey, dataMode);
+  }, [dataMode, dataModeStorageKey]);
+
+  useEffect(() => {
+    const stored = readLocalStorage(dataModeStorageKey);
+    setDataMode(stored === "realtime" ? "realtime" : "bilan");
+  }, [dataModeStorageKey]);
+
   // ── Fetch client data ──────────────────────────────────────────────────────
   useEffect(() => {
     setClientLoading(true);
@@ -325,6 +380,9 @@ export function useNutritionStudio(
       typeof window !== "undefined" ? window.location.origin : "",
     );
     url.searchParams.set("mode", dataMode);
+    if (existingProtocol?.id) {
+      url.searchParams.set("protocolId", existingProtocol.id);
+    }
     if (dataMode === "bilan" && selectedSubmissionId) {
       url.searchParams.set("submissionId", selectedSubmissionId);
     }
@@ -346,9 +404,22 @@ export function useNutritionStudio(
         setRealtimeWindowDays(
           typeof d.realtimeWindowDays === "number" ? d.realtimeWindowDays : 7,
         );
-        if (d.tdeeAdaptive != null) setTdeeAdaptive(d.tdeeAdaptive);
-        if (d.tdeeAdaptiveAt) setTdeeAdaptiveAt(new Date(d.tdeeAdaptiveAt));
-        if (d.tdeeDataSource) setTdeeDataSource(d.tdeeDataSource);
+        setTdeeAdaptive(typeof d.tdeeAdaptive === 'number' ? d.tdeeAdaptive : null);
+        setTdeeAdaptiveAt(d.tdeeAdaptiveAt ? new Date(d.tdeeAdaptiveAt) : null);
+        setTdeeAdaptiveLower(typeof d.tdeeAdaptiveLower === 'number' ? d.tdeeAdaptiveLower : null);
+        setTdeeAdaptiveUpper(typeof d.tdeeAdaptiveUpper === 'number' ? d.tdeeAdaptiveUpper : null);
+        setTdeeObserved(typeof d.tdeeObserved === 'number' ? d.tdeeObserved : null);
+        setTdeeObservedLower(typeof d.tdeeObservedLower === 'number' ? d.tdeeObservedLower : null);
+        setTdeeObservedUpper(typeof d.tdeeObservedUpper === 'number' ? d.tdeeObservedUpper : null);
+        setTdeeActionableStreak(typeof d.tdeeActionableStreak === 'number' ? d.tdeeActionableStreak : 0);
+        setTdeeDataSource((d.tdeeDataSource ?? null) as TdeeDataSource);
+        setTdeeStabilityStatus((d.tdeeStabilityStatus ?? null) as TdeeStabilityStatus);
+        setTdeeLastSkipReason(d.tdeeLastSkipReason ?? null);
+        setTdeeLastSuccessAt(d.tdeeLastSuccessAt ? new Date(d.tdeeLastSuccessAt) : null);
+        setTdeeProtocolStartDate(d.tdeeProtocolStartDate ?? null);
+        setTdeeEstimationStatus((d.tdeeEstimationStatus ?? 'collecting') as TdeeEstimationStatus);
+        setTdeeDataQualityScore(typeof d.tdeeDataQualityScore === 'number' ? d.tdeeDataQualityScore : null);
+        setTdeeDataQualityReasons(Array.isArray(d.tdeeDataQualityReasons) ? d.tdeeDataQualityReasons : []);
         if (d.trainingWeekSchedule) {
           setTrainingWeekSchedule(d.trainingWeekSchedule);
         } else {
@@ -395,22 +466,51 @@ export function useNutritionStudio(
       })
       .then(() => {
         // Load TDEE history for current client
-        fetch(`/api/clients/${clientId}/nutrition-tdee-history`)
-          .then(r => r.ok ? r.json() : [])
-          .then(setTdeeHistory)
+        const historyUrl = new URL(
+          `/api/clients/${clientId}/nutrition-tdee-history`,
+          typeof window !== "undefined" ? window.location.origin : "",
+        );
+        if (existingProtocol?.id) {
+          historyUrl.searchParams.set("protocolId", existingProtocol.id);
+        }
+        fetch(historyUrl.toString())
+          .then(r => r.ok ? r.json() : { history: [] })
+          .then((historyData) => {
+            setTdeeHistory(
+              dedupeTdeeHistoryByDisplayedDate(
+                Array.isArray(historyData?.history) ? historyData.history : [],
+              ),
+            );
+            setTdeeStabilityStatus((historyData?.stabilityStatus ?? null) as TdeeStabilityStatus);
+            setTdeeLastSkipReason(historyData?.lastSkipReason ?? null);
+            setTdeeEstimationStatus((historyData?.estimationStatus ?? 'collecting') as TdeeEstimationStatus);
+            setTdeeDataQualityScore(typeof historyData?.dataQualityScore === 'number' ? historyData.dataQualityScore : null);
+            setTdeeDataQualityReasons(Array.isArray(historyData?.dataQualityReasons) ? historyData.dataQualityReasons : []);
+            setTdeeAdaptive(typeof historyData?.clientTdee === 'number' ? historyData.clientTdee : null);
+            setTdeeAdaptiveAt(historyData?.clientTdeeAt ? new Date(historyData.clientTdeeAt) : null);
+            setTdeeAdaptiveLower(typeof historyData?.clientTdeeLower === 'number' ? historyData.clientTdeeLower : null);
+            setTdeeAdaptiveUpper(typeof historyData?.clientTdeeUpper === 'number' ? historyData.clientTdeeUpper : null);
+            setTdeeObserved(typeof historyData?.observedTdee === 'number' ? historyData.observedTdee : null);
+            setTdeeObservedLower(typeof historyData?.observedTdeeLower === 'number' ? historyData.observedTdeeLower : null);
+            setTdeeObservedUpper(typeof historyData?.observedTdeeUpper === 'number' ? historyData.observedTdeeUpper : null);
+            setTdeeActionableStreak(typeof historyData?.actionableStreak === 'number' ? historyData.actionableStreak : 0);
+          })
           .catch(() => {})
         // Load cycle state (best-effort, non-blocking)
         fetch(`/api/clients/${clientId}/cycle/status`)
           .then(r => r.ok ? r.json() : { cycleState: null })
-          .then(d => setCycleState(d.cycleState ?? null))
+          .then(d => {
+            setCycleState(d.cycleState ?? null)
+            setCyclePhaseObservations(Array.isArray(d.phaseObservations) ? d.phaseObservations : [])
+          })
           .catch(() => {})
       })
       .catch(() => {})
       .finally(() => setClientLoading(false));
-  }, [clientId, dataMode, selectedSubmissionId]);
+  }, [clientId, dataMode, selectedSubmissionId, existingProtocol?.id]);
 
   // ── Load existing protocol days ────────────────────────────────────────────
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (existingProtocol?.days?.length) {
       setDays(existingProtocol.days.map(dayDraftFromDb));
       setProtocolName(existingProtocol.name);
@@ -430,34 +530,25 @@ export function useNutritionStudio(
     if (existingProtocol?.cycle_sync_enabled !== undefined) {
       setCycleSyncEnabled(existingProtocol.cycle_sync_enabled);
     }
+    if (existingProtocol?.cycle_sync_profile) {
+      setCycleSyncProfile(normalizeCycleSyncProfile(existingProtocol.cycle_sync_profile));
+    }
     if (existingProtocol?.tdee_auto_enabled !== undefined) {
       setTdeeAutoEnabled(existingProtocol.tdee_auto_enabled);
     }
     if (existingProtocol?.tdee_adaptive_active !== undefined) {
       setTdeeAdaptiveActive(existingProtocol.tdee_adaptive_active);
     }
+    if (existingProtocol?.tdee_adaptive != null) {
+      setTdeeAdaptive(existingProtocol.tdee_adaptive);
+    }
+    if (existingProtocol?.tdee_adaptive_at) {
+      setTdeeAdaptiveAt(new Date(existingProtocol.tdee_adaptive_at));
+    }
+    if (existingProtocol?.tdee_data_source) {
+      setTdeeDataSource(existingProtocol.tdee_data_source);
+    }
   }, [existingProtocol]);
-
-  // ── Auto-recalc TDEE on page load if tdee_auto_enabled ────────────────────
-  // Fires once when existingProtocol arrives and tdee_auto_enabled is true.
-  // Uses a ref so it doesn't re-fire on every existingProtocol update.
-  const autoRecalcFiredRef = useRef(false);
-  useEffect(() => {
-    if (autoRecalcFiredRef.current) return;
-    if (!existingProtocol?.id) return;
-    if (!existingProtocol.tdee_auto_enabled) return;
-    autoRecalcFiredRef.current = true;
-    // Silently recalculate — errors are non-blocking
-    fetch(`/api/clients/${clientId}/nutrition-protocols/${existingProtocol.id}/apply-adaptive-tdee`, { method: 'POST' })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data?.tdeeAdaptive != null) {
-          setTdeeAdaptive(data.tdeeAdaptive);
-          setTdeeAdaptiveAt(new Date());
-        }
-      })
-      .catch(() => {})
-  }, [existingProtocol, clientId]);
 
   // ── Debounced recalculation ────────────────────────────────────────────────
   useEffect(() => {
@@ -576,6 +667,7 @@ export function useNutritionStudio(
     trainingConfig,
     lifestyleConfig,
     hydrationClimate,
+    hydrationPhase,
     dataMode,
     dataSource,
     tdeeAdaptiveActive,
@@ -865,6 +957,21 @@ export function useNutritionStudio(
   }, [clientData, macroResult, coherenceScore.score, days, dataMode, dataSource]);
 
   const canShare = !shareIssues.some((issue) => issue.severity === "blocking");
+  const phaseProtocolPreview = useMemo<PhaseProtocolPreview | null>(() => {
+    if (!phaseSyncBaseTarget || !macroResult) return null;
+    const nextTarget = { calories: macroResult.calories, protein: macroResult.macros.p, carbs: macroResult.macros.c, fat: macroResult.macros.f };
+    if (JSON.stringify(nextTarget) === JSON.stringify(phaseSyncBaseTarget)) return null;
+    return buildPhaseProtocolPreview({ days, previousTarget: phaseSyncBaseTarget, nextTarget });
+  }, [days, macroResult, phaseSyncBaseTarget]);
+
+  const applyPhaseProtocolPreview = useCallback(() => {
+    if (!phaseProtocolPreview) return;
+    setDays(phaseProtocolPreview.days);
+    setPhaseSyncBaseTarget(null);
+  }, [phaseProtocolPreview]);
+
+  const dismissPhaseProtocolPreview = useCallback(() => setPhaseSyncBaseTarget(null), []);
+
   const updateDay = useCallback((index: number, patch: Partial<DayDraft>) => {
     setDays((prev) =>
       prev.map((d, i) => (i === index ? { ...d, ...patch } : d)),
@@ -925,6 +1032,7 @@ export function useNutritionStudio(
       name: protocolName,
       schedule_start_date: scheduleStartDate,
       cycle_sync_enabled: cycleSyncEnabled,
+      cycle_sync_profile: cycleSyncProfile,
       schedule_slots: scheduleSlots
         .filter((slot) => slot.protocol_day_position >= 0 && slot.protocol_day_position < days.length)
         .map((slot) => ({
@@ -933,6 +1041,7 @@ export function useNutritionStudio(
           protocol_day_position: slot.protocol_day_position,
         })),
       days: days.map((d, i) => ({
+        id: d.dbId,
         name: d.name,
         position: i,
         calories: d.calories ? Number(d.calories) : null,
@@ -940,12 +1049,14 @@ export function useNutritionStudio(
         carbs_g: d.carbs_g ? Number(d.carbs_g) : null,
         fat_g: d.fat_g ? Number(d.fat_g) : null,
         hydration_ml: d.hydration_ml ? Number(d.hydration_ml) : null,
+        role: d.role,
         carb_cycle_type: d.carb_cycle_type || null,
         cycle_sync_phase: d.cycle_sync_phase || null,
         recommendations: d.recommendations || null,
+        meal_plan: d.meal_plan ?? [],
       })),
     }),
-    [protocolName, scheduleStartDate, scheduleSlots, days, cycleSyncEnabled],
+    [protocolName, scheduleStartDate, scheduleSlots, days, cycleSyncEnabled, cycleSyncProfile],
   );
 
   const save = useCallback(async (): Promise<string | null> => {
@@ -959,7 +1070,7 @@ export function useNutritionStudio(
       };
       const currentId = savedProtocolId ?? existingProtocol?.id;
       if (currentId) {
-        await fetch(
+        const response = await fetch(
           `/api/clients/${clientId}/nutrition-protocols/${currentId}`,
           {
             method: "PATCH",
@@ -967,6 +1078,10 @@ export function useNutritionStudio(
             body: JSON.stringify(payload),
           },
         );
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || "La sauvegarde du protocole a échoué.");
+        }
         return currentId;
       } else {
         const r = await fetch(`/api/clients/${clientId}/nutrition-protocols`, {
@@ -974,6 +1089,10 @@ export function useNutritionStudio(
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        if (!r.ok) {
+          const errorText = await r.text();
+          throw new Error(errorText || "La création du protocole a échoué.");
+        }
         const d = await r.json();
         const newId = d.protocol?.id ?? null;
         if (newId) setSavedProtocolId(newId);
@@ -982,7 +1101,7 @@ export function useNutritionStudio(
     } finally {
       setSaving(false);
     }
-  }, [buildPayload, clientId, existingProtocol, savedProtocolId]);
+  }, [buildPayload, clientId, existingProtocol, goalCalories, savedProtocolId]);
 
   const share = useCallback(async () => {
     if (!canShare) {
@@ -996,9 +1115,13 @@ export function useNutritionStudio(
     try {
       const id = await save();
       if (!id) return;
-      await fetch(`/api/clients/${clientId}/nutrition-protocols/${id}/share`, {
+      const response = await fetch(`/api/clients/${clientId}/nutrition-protocols/${id}/share`, {
         method: "POST",
       });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Le partage du protocole a échoué.");
+      }
     } finally {
       setSharing(false);
     }
@@ -1009,42 +1132,77 @@ export function useNutritionStudio(
     const currentId = savedProtocolId ?? existingProtocol?.id;
     if (!currentId) return;
     setApplyingAdaptive(true);
-    setTdeePreview(null);
+    setTdeeError(null);
     try {
       const res = await fetch(
         `/api/clients/${clientId}/nutrition-protocols/${currentId}/apply-adaptive-tdee`,
         { method: 'POST' }
       );
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const text = await res.text();
+        let message = 'Le recalcul du TDEE adaptatif a échoué.';
+        try {
+          const parsed = JSON.parse(text);
+          message = parsed.detail ?? parsed.error ?? message;
+        } catch {
+          if (text.trim()) message = text;
+        }
+        throw new Error(message);
+      }
       const data = await res.json();
+      if (tdeeAdaptiveActive && data.tdeeAdaptive !== tdeeAdaptive) {
+        captureProtocolTarget();
+      }
       setTdeeAdaptive(data.tdeeAdaptive);
-      setTdeeAdaptiveAt(new Date());
-      setTdeePreview(data);
-      fetch(`/api/clients/${clientId}/nutrition-tdee-history`)
-        .then(r => r.ok ? r.json() : [])
-        .then(setTdeeHistory)
+      setTdeeAdaptiveAt(data.tdeeAdaptiveAt ? new Date(data.tdeeAdaptiveAt) : null);
+      setTdeeAdaptiveLower(typeof data.tdeeLower === 'number' && data.tdeeAdaptive != null ? data.tdeeLower : null);
+      setTdeeAdaptiveUpper(typeof data.tdeeUpper === 'number' && data.tdeeAdaptive != null ? data.tdeeUpper : null);
+      setTdeeObserved(typeof data.tdeeObserved === 'number' ? data.tdeeObserved : null);
+      setTdeeObservedLower(typeof data.tdeeLower === 'number' ? data.tdeeLower : null);
+      setTdeeObservedUpper(typeof data.tdeeUpper === 'number' ? data.tdeeUpper : null);
+      setTdeeActionableStreak(typeof data.tdeeActionableStreak === 'number' ? data.tdeeActionableStreak : 0);
+      setTdeeStabilityStatus((data.tdeeStabilityStatus ?? null) as TdeeStabilityStatus);
+      setTdeeEstimationStatus((data.tdeeEstimationStatus ?? 'collecting') as TdeeEstimationStatus);
+      setTdeeDataQualityScore(typeof data.tdeeDataQualityScore === 'number' ? data.tdeeDataQualityScore : null);
+      setTdeeDataQualityReasons(Array.isArray(data.tdeeDataQualityReasons) ? data.tdeeDataQualityReasons : []);
+      setTdeeLastSuccessAt(data.tdeeAdaptiveAt ? new Date(data.tdeeAdaptiveAt) : null);
+      setTdeeLastSkipReason(null);
+      const historyUrl = new URL(
+        `/api/clients/${clientId}/nutrition-tdee-history`,
+        typeof window !== "undefined" ? window.location.origin : "",
+      );
+      if (existingProtocol?.id) {
+        historyUrl.searchParams.set("protocolId", existingProtocol.id);
+      }
+      fetch(historyUrl.toString())
+        .then(r => r.ok ? r.json() : { history: [] })
+        .then((historyData) => {
+          setTdeeHistory(
+            dedupeTdeeHistoryByDisplayedDate(
+              Array.isArray(historyData?.history) ? historyData.history : [],
+            ),
+          );
+          setTdeeStabilityStatus((historyData?.stabilityStatus ?? null) as TdeeStabilityStatus);
+          setTdeeLastSkipReason(historyData?.lastSkipReason ?? null);
+          setTdeeEstimationStatus((historyData?.estimationStatus ?? 'collecting') as TdeeEstimationStatus);
+          setTdeeDataQualityScore(typeof historyData?.dataQualityScore === 'number' ? historyData.dataQualityScore : null);
+          setTdeeDataQualityReasons(Array.isArray(historyData?.dataQualityReasons) ? historyData.dataQualityReasons : []);
+          setTdeeAdaptive(typeof historyData?.clientTdee === 'number' ? historyData.clientTdee : null);
+          setTdeeAdaptiveAt(historyData?.clientTdeeAt ? new Date(historyData.clientTdeeAt) : null);
+          setTdeeAdaptiveLower(typeof historyData?.clientTdeeLower === 'number' ? historyData.clientTdeeLower : null);
+          setTdeeAdaptiveUpper(typeof historyData?.clientTdeeUpper === 'number' ? historyData.clientTdeeUpper : null);
+          setTdeeObserved(typeof historyData?.observedTdee === 'number' ? historyData.observedTdee : null);
+          setTdeeObservedLower(typeof historyData?.observedTdeeLower === 'number' ? historyData.observedTdeeLower : null);
+          setTdeeObservedUpper(typeof historyData?.observedTdeeUpper === 'number' ? historyData.observedTdeeUpper : null);
+          setTdeeActionableStreak(typeof historyData?.actionableStreak === 'number' ? historyData.actionableStreak : 0);
+        })
         .catch(() => {});
+    } catch (error) {
+      setTdeeError(error instanceof Error ? error.message : 'Le recalcul du TDEE adaptatif a échoué.');
     } finally {
       setApplyingAdaptive(false);
     }
-  }, [clientId, savedProtocolId, existingProtocol]);
-
-  // Step 2: Confirm — actually rescale protocol days
-  const confirmApplyTdee = useCallback(async () => {
-    const currentId = savedProtocolId ?? existingProtocol?.id;
-    if (!currentId || !tdeePreview) return;
-    setApplyingTdeeConfirm(true);
-    try {
-      const res = await fetch(
-        `/api/clients/${clientId}/nutrition-protocols/${currentId}/apply-adaptive-tdee`,
-        { method: 'PUT' }
-      );
-      if (!res.ok) throw new Error(await res.text());
-      setTdeePreview(null);
-    } finally {
-      setApplyingTdeeConfirm(false);
-    }
-  }, [clientId, savedProtocolId, existingProtocol, tdeePreview]);
+  }, [captureProtocolTarget, clientId, existingProtocol, savedProtocolId, tdeeAdaptive, tdeeAdaptiveActive]);
 
   const onTdeeAutoToggle = useCallback(async (enabled: boolean) => {
     const currentId = savedProtocolId ?? existingProtocol?.id;
@@ -1060,13 +1218,21 @@ export function useNutritionStudio(
   const onTdeeAdaptiveActiveToggle = useCallback(async (enabled: boolean) => {
     const currentId = savedProtocolId ?? existingProtocol?.id;
     if (!currentId) return;
-    setTdeeAdaptiveActive(enabled);
-    await fetch(`/api/clients/${clientId}/nutrition-protocols/${currentId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tdee_adaptive_active: enabled }),
-    });
-  }, [clientId, savedProtocolId, existingProtocol]);
+    if (enabled && !tdeeAdaptiveActive && tdeeAdaptive != null) {
+      captureProtocolTarget();
+    }
+    try {
+      const response = await fetch(`/api/clients/${clientId}/nutrition-protocols/${currentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tdee_adaptive_active: enabled }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      setTdeeAdaptiveActive(enabled);
+    } catch (error) {
+      setTdeeError(error instanceof Error ? error.message : "La mise à jour du TDEE adaptatif a échoué.");
+    }
+  }, [captureProtocolTarget, clientId, existingProtocol, savedProtocolId, tdeeAdaptive, tdeeAdaptiveActive]);
 
   return {
     clientData,
@@ -1080,8 +1246,12 @@ export function useNutritionStudio(
     transformationPhase,
     setTransformationPhase,
     setTransformationPhaseWithPreset,
+    phaseProtocolPreview,
+    applyPhaseProtocolPreview,
+    dismissPhaseProtocolPreview,
     calorieAdjustPct,
     setCalorieAdjustPct,
+    setCalorieAdjustPctWithProtocolSync,
     proteinOverride,
     setProteinOverride,
     trainingConfig,
@@ -1092,8 +1262,12 @@ export function useNutritionStudio(
     setBiometricsConfig,
     macroOverrides,
     setMacroOverrides,
+    setMacroOverridesWithProtocolSync,
     cycleSyncEnabled,
     setCycleSyncEnabled,
+    cycleSyncProfile,
+    setCycleSyncProfile,
+    cyclePhaseObservations,
     hydrationClimate,
     setHydrationClimate,
     hydrationPhase,
@@ -1129,10 +1303,25 @@ export function useNutritionStudio(
     shareIssues,
     canShare,
     dataSource,
+    setDataSource,
     tdeeAdaptive,
     tdeeAdaptiveAt,
+    tdeeAdaptiveLower,
+    tdeeAdaptiveUpper,
+    tdeeObserved,
+    tdeeObservedLower,
+    tdeeObservedUpper,
+    tdeeActionableStreak,
     tdeeDataSource,
     tdeeHistory,
+    tdeeStabilityStatus,
+    tdeeLastSkipReason,
+    tdeeLastSuccessAt,
+    tdeeProtocolStartDate,
+    tdeeEstimationStatus,
+    tdeeDataQualityScore,
+    tdeeDataQualityReasons,
+    tdeeError,
     applyAdaptiveTdee,
     applyingAdaptive,
     tdeeAdaptiveActive,

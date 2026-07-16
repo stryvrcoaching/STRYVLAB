@@ -3,6 +3,8 @@ import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
+const alertDateTimeSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/)
+
 function serviceClient() {
   return createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,6 +22,7 @@ const createSchema = z.object({
   client_id:             z.string().uuid().optional().nullable(),
   template_type:         z.string().max(100).optional().nullable(),
   notify_minutes_before: z.number().int().min(0).max(10080).optional().nullable(),
+  alert_at:              alertDateTimeSchema.optional().nullable(),
   linked_task_id:        z.string().uuid().optional().nullable(),
   // If provided, creates a linked task in the target board/column
   target_board_id:       z.string().uuid().optional(),
@@ -36,6 +39,7 @@ const updateSchema = z.object({
   client_id:             z.string().uuid().optional().nullable(),
   template_type:         z.string().max(100).optional().nullable(),
   notify_minutes_before: z.number().int().min(0).max(10080).optional().nullable(),
+  alert_at:              alertDateTimeSchema.optional().nullable(),
   is_completed:          z.boolean().optional(),
   linked_task_id:        z.string().uuid().optional().nullable(),
   linked_column_title:   z.string().optional().nullable(),
@@ -85,6 +89,7 @@ export async function POST(req: NextRequest) {
   if (eventFields.client_id !== undefined)             evInsert.client_id             = eventFields.client_id ?? null
   if (eventFields.template_type !== undefined)         evInsert.template_type         = eventFields.template_type ?? null
   if (eventFields.notify_minutes_before !== undefined) evInsert.notify_minutes_before = eventFields.notify_minutes_before ?? null
+  if (eventFields.alert_at !== undefined)              evInsert.alert_at              = eventFields.alert_at ?? null
   if (eventFields.linked_task_id !== undefined)        evInsert.linked_task_id        = eventFields.linked_task_id ?? null
 
   const { data: event, error: evErr } = await db
@@ -147,9 +152,11 @@ export async function POST(req: NextRequest) {
           { ...event, linked_task_id: task.id, linked_column_title: colTitle },
           { status: 201 }
         )
+      } else if (taskErr) {
+        console.error('[events-api] Failed to create linked Kanban task:', taskErr)
       }
-    } catch {
-      // Task creation failed — event still usable, just unlinked
+    } catch (e) {
+      console.error('[events-api] Catch block error during Kanban task creation:', e)
     }
   }
 
@@ -173,7 +180,7 @@ export async function PATCH(req: NextRequest) {
 
   // Build update payload — only send new sync columns if they were explicitly provided
   const { linked_task_id, linked_column_title, is_completed, event_time_end,
-          client_id, template_type, notify_minutes_before, ...coreFields } = body.data
+          client_id, template_type, notify_minutes_before, alert_at, ...coreFields } = body.data
   const updatePayload: Record<string, unknown> = { ...coreFields }
   if (linked_task_id !== undefined)        updatePayload.linked_task_id        = linked_task_id
   if (linked_column_title !== undefined)   updatePayload.linked_column_title   = linked_column_title
@@ -182,6 +189,7 @@ export async function PATCH(req: NextRequest) {
   if (client_id !== undefined)             updatePayload.client_id             = client_id
   if (template_type !== undefined)         updatePayload.template_type         = template_type
   if (notify_minutes_before !== undefined) updatePayload.notify_minutes_before = notify_minutes_before
+  if (alert_at !== undefined)              updatePayload.alert_at              = alert_at
 
   const { data, error } = await db
     .from('agenda_events')

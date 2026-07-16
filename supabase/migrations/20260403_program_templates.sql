@@ -13,7 +13,7 @@ create table public.coach_program_templates (
                 check (goal in ('hypertrophy', 'strength', 'endurance', 'fat_loss', 'recomp', 'maintenance', 'athletic')),
   level         text not null default 'intermediate'
                 check (level in ('beginner', 'intermediate', 'advanced', 'elite')),
-  frequency     int not null default 3 check (frequency between 1 and 7),  -- jours/semaine
+  frequency     int not null default 3 check (frequency between 0 and 7),  -- séances/semaine (0 si aucune journée planifiée)
   weeks         int not null default 8 check (weeks between 1 and 52),
 
   -- Tags musculaires (ex: ["Jambes","Dos","Pectoraux"])

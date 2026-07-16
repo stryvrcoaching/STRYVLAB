@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createServiceClient } from "@supabase/supabase-js"
 import { z } from "zod"
@@ -95,7 +96,7 @@ export async function PATCH(
 
   const { data: foodItem } = await db
     .from("food_items")
-    .select("id, name_fr, category_l1, category_l2, item_key, kcal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fiber_per_100g, source, is_verified")
+    .select("id, name_fr, category_l1, category_l2, icon_key, item_key, kcal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fiber_per_100g, source, is_verified")
     .eq("id", entry.food_item_id)
     .single()
 
@@ -117,6 +118,7 @@ export async function PATCH(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const meal = await recalcMealTotals(entry.meal_id, clientId)
+  revalidatePath("/client/nutrition")
   return NextResponse.json({ data, meal })
 }
 
@@ -150,5 +152,6 @@ export async function DELETE(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const meal = await recalcMealTotals(entry.meal_id, clientId)
+  revalidatePath("/client/nutrition")
   return NextResponse.json({ ok: true, meal })
 }

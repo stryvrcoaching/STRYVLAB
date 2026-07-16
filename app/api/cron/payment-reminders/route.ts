@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { sendPaymentReminderEmail } from '@/lib/email/mailer'
 
-// ─── POST /api/cron/payment-reminders ─────────────────────────────────────────
-// Called by Vercel Cron daily.
-// Sends reminder emails for pending payments due in 3 days.
-// Protected by CRON_SECRET header.
+// ─── /api/cron/payment-reminders ──────────────────────────────────────────────
+// Called by Vercel Cron daily. Sends one reminder for each pending payment on the
+// coach-selected number of days before its due date.
 
 function serviceClient() {
   return createServiceClient(
@@ -14,9 +13,16 @@ function serviceClient() {
   )
 }
 
-export async function POST(req: NextRequest) {
-  const secret = req.headers.get('x-cron-secret')
-  if (!secret || secret !== process.env.CRON_SECRET) {
+function isAuthorizedCronRequest(req: NextRequest) {
+  const secret = process.env.CRON_SECRET
+  if (!secret) return false
+
+  return req.headers.get('authorization') === `Bearer ${secret}`
+    || req.headers.get('x-cron-secret') === secret
+}
+
+async function runPaymentReminders(req: NextRequest) {
+  if (!isAuthorizedCronRequest(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -45,7 +51,9 @@ export async function POST(req: NextRequest) {
   defaultTargetDate.setDate(defaultTargetDate.getDate() + defaultDays)
   const defaultTargetDateStr = defaultTargetDate.toISOString().split('T')[0]
 
-  // Fetch pending payments in the J+1 → J+7 window not yet reminded
+  // Fetch pending payments in the J+1 → J+7 window not yet reminded. The due
+  // date is distinct from payment_date: the latter records when a payment was
+  // created or received and must never drive a payment reminder.
   const maxTarget = new Date(today)
   maxTarget.setDate(maxTarget.getDate() + 7)
   const minTarget = new Date(today)
@@ -54,14 +62,14 @@ export async function POST(req: NextRequest) {
   const { data: payments, error } = await db
     .from('subscription_payments')
     .select(`
-      id, amount_eur, payment_date, payment_method, coach_id, client_id,
+      id, amount_eur, due_date, payment_method, coach_id, client_id,
       subscription:client_subscriptions(
         formula:coach_formulas(name)
       )
     `)
     .eq('status', 'pending')
-    .gte('payment_date', minTarget.toISOString().split('T')[0])
-    .lte('payment_date', maxTarget.toISOString().split('T')[0])
+    .gte('due_date', minTarget.toISOString().split('T')[0])
+    .lte('due_date', maxTarget.toISOString().split('T')[0])
     .is('reminder_sent_at', null)
 
   if (error) {
@@ -76,7 +84,7 @@ export async function POST(req: NextRequest) {
   // Filter by each coach's configured delay
   const filteredPayments = payments.filter(p => {
     const targetDate = coachTargetDates[p.coach_id] ?? defaultTargetDateStr
-    return p.payment_date === targetDate
+    return p.due_date === targetDate
   })
 
   if (filteredPayments.length === 0) {
@@ -121,7 +129,7 @@ export async function POST(req: NextRequest) {
         coachName: coach.name,
         formulaName,
         amount: Number(payment.amount_eur),
-        dueDate: payment.payment_date,
+        dueDate: payment.due_date,
         paymentMethod: payment.payment_method,
         fromName: coach.name,
       })
@@ -142,4 +150,14 @@ export async function POST(req: NextRequest) {
     sent: sentCount,
     errors: errors.length > 0 ? errors : undefined,
   })
+}
+
+// Vercel Cron invokes scheduled routes with GET and an Authorization bearer
+// token. POST remains available for the existing internal/manual scheduler.
+export async function GET(req: NextRequest) {
+  return runPaymentReminders(req)
+}
+
+export async function POST(req: NextRequest) {
+  return runPaymentReminders(req)
 }

@@ -7,11 +7,20 @@ import {
   getNutritionProtocolPdfData,
 } from '@/lib/nutrition-protocol-pdf/server'
 import { sendNutritionProtocolPdfEmail } from '@/lib/email/mailer'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { createClientAppNotification } from '@/lib/notifications/create-client-app-notification'
 
 const bodySchema = z.object({
   message: z.string().max(5000).optional().nullable(),
   includeTracking: z.boolean().optional(),
 })
+
+function service() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export async function POST(
   req: NextRequest,
@@ -48,6 +57,19 @@ export async function POST(
       filename,
       fromName: data.coach.name,
     })
+
+    if (data.client?.id) {
+      await createClientAppNotification(service(), {
+        clientId: data.client.id,
+        coachId: user.id,
+        type: 'program_updated',
+        copyKey: 'nutrition.available',
+        actionUrl: '/client/nutrition',
+        pushKind: 'program',
+        pushTag: `stryv-nutrition-pdf-share-${protocolId}`,
+        payload: { protocol_id: protocolId },
+      })
+    }
 
     return NextResponse.json({ sent: true })
   } catch (error: any) {

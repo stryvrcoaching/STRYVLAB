@@ -1,4 +1,5 @@
 'use client'
+import { useClientT } from '@/components/client/ClientI18nProvider'
 import { NUTRITION_UI_COLORS } from '@/lib/nutrition/ui-colors'
 
 type DayPoint = {
@@ -19,24 +20,27 @@ const MACROS = [
   { key: 'fat_g',     color: NUTRITION_UI_COLORS.fat },
 ] as const
 
-const DOW_FR = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
-
-function getDow(iso: string): string {
+function getDow(iso: string, dayLabels: string[]): string {
   const [y, m, d] = iso.split('-').map(Number)
   const jsDay = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
-  return DOW_FR[(jsDay + 6) % 7]
+  return dayLabels[(jsDay + 6) % 7]
 }
 
 const BAR_H = 56
 
 export default function MacroWeekGrid({ trend }: { trend: DayPoint[] }) {
+  const { lang, t } = useClientT()
   const today = new Date().toISOString().slice(0, 10)
+  const dayLabels =
+    lang === 'es' ? ['L', 'M', 'X', 'J', 'V', 'S', 'D']
+    : lang === 'en' ? ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+    : ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
   return (
     <div className="bg-[#111111] rounded-2xl p-4">
       <div className="flex items-center justify-between mb-3">
         <span className="font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[11px] text-white/60">
-          Régularité · 7 jours
+          {t('nutrition.consistency')} · {t('programme.period.7d')}
         </span>
         <div className="flex items-center gap-2">
           {MACROS.map(m => (
@@ -90,7 +94,7 @@ export default function MacroWeekGrid({ trend }: { trend: DayPoint[] }) {
 
               {/* Day label */}
               <div className={`text-[9px] font-bold ${isToday ? 'text-[#f2f2f2]' : 'text-white/30'}`}>
-                {getDow(p.date)}
+                {getDow(p.date, dayLabels)}
               </div>
             </div>
           )

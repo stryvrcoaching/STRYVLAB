@@ -109,6 +109,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     oneRmSessionRes,
     progressionRes,
     metricsRes,
+    manualBodyDataRes,
     configRes,
     protocolRes,
     nutritionMealsRes,
@@ -116,7 +117,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     db
       .from("client_daily_checkins")
       .select(
-        "date, flow_type, sleep_hours, sleep_quality, energy_level, stress_level, muscle_soreness, rhr_morning, daily_steps",
+        "date, flow_type, sleep_hours, sleep_quality, energy_level, stress_level, muscle_soreness, rhr_morning, daily_steps, weight_kg",
       )
       .eq("client_id", params.clientId)
       .gte("date", checkinPeriodStartDate)
@@ -173,6 +174,13 @@ export async function GET(req: NextRequest, { params }: Params) {
       .limit(20),
 
     db
+      .from("coach_client_nutrition_manual_data")
+      .select("weight_kg, body_fat_pct, lean_mass_kg, updated_at")
+      .eq("client_id", params.clientId)
+      .eq("coach_id", user.id)
+      .maybeSingle(),
+
+    db
       .from("daily_checkin_configs")
       .select("days_of_week")
       .eq("client_id", params.clientId)
@@ -214,6 +222,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     muscle_soreness: number | null;
     rhr_morning: number | null;
     daily_steps: number | null;
+    weight_kg: number | null;
   }[];
 
   const rhrSeries = checkinRows
@@ -424,6 +433,53 @@ export async function GET(req: NextRequest, { params }: Params) {
         targetDate = r.value_text;
       }
     }
+  }
+
+  const manualBodyData = manualBodyDataRes.data as {
+    weight_kg: number | null;
+    body_fat_pct: number | null;
+    lean_mass_kg: number | null;
+    updated_at: string | null;
+  } | null;
+  const manualBodyDate = manualBodyData?.updated_at?.slice(0, 10) ?? null;
+
+  if (manualBodyDate && manualBodyDate <= evaluationDate) {
+    if (manualBodyData?.weight_kg != null) {
+      weightSeries.push({ date: manualBodyDate, value: Number(manualBodyData.weight_kg) });
+    }
+    if (manualBodyData?.body_fat_pct != null) {
+      bodyFatSeries.push({
+        date: manualBodyDate,
+        value: Number(manualBodyData.body_fat_pct),
+        source: "manual",
+      });
+    }
+    if (manualBodyData?.lean_mass_kg != null) {
+      leanMassSeries.push({ date: manualBodyDate, value: Number(manualBodyData.lean_mass_kg) });
+    }
+  }
+
+  const weightByDate = new Map(
+    weightSeries
+      .filter((point) => point.date <= evaluationDate)
+      .map((point) => [point.date, point]),
+  );
+  for (const row of checkinRows) {
+    if (row.weight_kg != null && row.date >= windowStartDate) {
+      weightByDate.set(row.date, { date: row.date, value: Number(row.weight_kg) });
+    }
+  }
+  weightSeries.splice(
+    0,
+    weightSeries.length,
+    ...Array.from(weightByDate.values()).sort((left, right) => left.date.localeCompare(right.date)),
+  );
+
+  for (const series of [weightSeries, bodyFatSeries, leanMassSeries, waistSeries]) {
+    const pointsInWindow = series
+      .filter((point) => point.date >= windowStartDate && point.date <= evaluationDate)
+      .sort((left, right) => left.date.localeCompare(right.date));
+    series.splice(0, series.length, ...pointsInWindow);
   }
 
   const latestBodyFat =

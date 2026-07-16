@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { validatePhotoMealResult } from "@/lib/nutrition/photo-log-validation"
+import { validatePhotoMealAnalysisEvidence, validatePhotoMealResult } from "@/lib/nutrition/photo-log-validation"
 
 describe("validatePhotoMealResult", () => {
   it("blocks empty plate results", () => {
@@ -180,5 +180,132 @@ describe("validatePhotoMealResult", () => {
     })
 
     expect(result.issues).toEqual([])
+  })
+
+  it("blocks food identities that are too generic to log safely", () => {
+    const result = validatePhotoMealResult({
+      analysis_mode: "plate",
+      components: [
+        {
+          name_fr: "Viande crue",
+          category_hint: "proteins",
+          quantity_g: 159,
+          quantity_source: "scale",
+          kcal_per_100g: 220,
+          protein_per_100g: 25,
+          carbs_per_100g: 0,
+          fat_per_100g: 13,
+          fiber_per_100g: 0,
+        },
+      ],
+    })
+
+    expect(result.issues.some((issue) => issue.includes("trop vague"))).toBe(true)
+  })
+
+  it("flags a detected meal total below the sum of separate weigh-ins", () => {
+    const issues = validatePhotoMealAnalysisEvidence({
+      meal_type: "breakfast",
+      analysis_mode: "plate",
+      scale_weight_g: 184,
+      scale_weight_confidence: 0.95,
+      manual_weight_g: null,
+      components: [],
+      scale_readings: [
+        { photo_index: 1, grams: 48, scope: "component", food_name: "Granola", confidence: 0.95 },
+        { photo_index: 2, grams: 70, scope: "component", food_name: "Lait", confidence: 0.95 },
+        { photo_index: 3, grams: 90, scope: "component", food_name: "Fruits", confidence: 0.95 },
+        { photo_index: 4, grams: 184, scope: "meal_total", food_name: "Bol final", confidence: 0.95 },
+      ],
+      ambiguity_tags: [],
+      leftovers_recommended: false,
+    })
+
+    expect(issues.some((issue) => issue.includes("incompatibles"))).toBe(true)
+  })
+
+  it("flags an implausibly small protein derived from a cumulative difference", () => {
+    const issues = validatePhotoMealAnalysisEvidence({
+      meal_type: "lunch",
+      analysis_mode: "plate",
+      scale_weight_g: 139,
+      scale_weight_confidence: 0.95,
+      manual_weight_g: null,
+      components: [
+        {
+          name_fr: "Poulet cuit",
+          category_hint: "proteins",
+          grams_estimate: 16,
+          kcal_per_100g: 239,
+          protein_per_100g: 27,
+          carbs_per_100g: 0,
+          fat_per_100g: 14,
+          fiber_per_100g: 0,
+          ambiguity_tags: [],
+          rationale: "Différence de poids entre riz seul et total",
+          component_confidence: 0.5,
+        },
+      ],
+      ambiguity_tags: [],
+      leftovers_recommended: false,
+    })
+
+    expect(issues.some((issue) => issue.includes("calculée par différence"))).toBe(true)
+  })
+
+  it("flags a leftovers timeline that contradicts the leftovers assessment", () => {
+    const issues = validatePhotoMealAnalysisEvidence({
+      meal_type: "lunch",
+      analysis_mode: "plate",
+      scale_weight_g: null,
+      scale_weight_confidence: null,
+      manual_weight_g: null,
+      components: [],
+      photo_timeline: [
+        { index: 1, role: "before_meal" },
+        { index: 2, role: "after_meal_leftovers" },
+      ],
+      leftovers_estimate: {
+        detected: false,
+        grams_estimate: null,
+        confidence: 0.8,
+      },
+      ambiguity_tags: [],
+      leftovers_recommended: false,
+    })
+
+    expect(issues.some((issue) => issue.includes("à la fois"))).toBe(true)
+  })
+
+  it("flags gram values in rationales that do not match extracted evidence", () => {
+    const issues = validatePhotoMealAnalysisEvidence({
+      meal_type: "lunch",
+      analysis_mode: "plate",
+      scale_weight_g: 139,
+      scale_weight_confidence: 0.95,
+      manual_weight_g: null,
+      components: [
+        {
+          name_fr: "Poulet",
+          category_hint: "proteins",
+          grams_estimate: 116,
+          kcal_per_100g: 200,
+          protein_per_100g: 27,
+          carbs_per_100g: 0,
+          fat_per_100g: 10,
+          fiber_per_100g: 0,
+          ambiguity_tags: [],
+          rationale: "Viande calculée depuis 239 g total et 123 g de riz.",
+        },
+      ],
+      scale_readings: [
+        { photo_index: 1, grams: 123, scope: "component", food_name: "Riz", confidence: 0.95 },
+        { photo_index: 2, grams: 139, scope: "meal_total", food_name: "Repas", confidence: 0.95 },
+      ],
+      ambiguity_tags: [],
+      leftovers_recommended: false,
+    })
+
+    expect(issues.some((issue) => issue.includes("incompatibles"))).toBe(true)
   })
 })

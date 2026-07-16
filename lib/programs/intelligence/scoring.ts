@@ -1,13 +1,16 @@
 import {
   resolveExerciseCoeff,
-  normalizeMuscleSlug,
+  normalizeMuscleSlug as normalizeLegacyMuscleSlug,
   muscleConflictsWithRestriction,
   getPrimaryMuscleFromCatalog,
+  getFiberTargetsFromCatalog,
 } from "./catalog-utils";
+import { normalizeMuscleSlug as normalizeCanonicalMuscle } from "./muscle-normalization";
 import {
   MUSCLE_TO_VOLUME_GROUP,
   getMuscleVolumeGroup,
-  getVolumeTargets,
+  getVolumeFocusTargets,
+  VOLUME_FOCUS_GROUPS,
 } from "./volume-targets";
 import type {
   BuilderSession,
@@ -23,6 +26,8 @@ import type {
   ProgramStats,
   SessionStats,
   SRAHeatmapWeek,
+  VolumeFocus,
+  VolumeFocusResult,
 } from "./types";
 
 // ─── Normalisation slugs biomech précis → slugs FR affichables ───────────────
@@ -152,21 +157,121 @@ const BIOMECH_TO_GROUP: Record<string, string> = {
   abductors: "abducteurs",
 };
 
+const MUSCLE_DISPLAY_NAMES: Record<string, string> = {
+  grand_pectoral: "Grand pectoral",
+  grand_pectoral_superieur: "Grand pectoral supérieur",
+  grand_pectoral_inferieur: "Grand pectoral inférieur",
+  petit_pectoral: "Petit pectoral",
+  grand_dorsal: "Grand dorsal",
+  trapeze_superieur: "Trapèze supérieur",
+  trapeze_moyen: "Trapèze moyen",
+  trapeze_inferieur: "Trapèze inférieur",
+  rhomboides: "Rhomboïdes",
+  lombaires: "Lombaires",
+  erecteurs_spinaux: "Érecteurs spinaux",
+  deltoide_anterieur: "Deltoïde antérieur",
+  deltoide_lateral: "Deltoïde latéral",
+  deltoide_posterieur: "Deltoïde postérieur",
+  biceps: "Biceps",
+  biceps_brachial: "Biceps brachial",
+  brachial: "Brachial",
+  triceps: "Triceps",
+  triceps_lateral: "Triceps latéral",
+  triceps_medial: "Triceps médial",
+  triceps_long: "Triceps long",
+  flechisseurs_avant_bras: "Fléchisseurs avant-bras",
+  extenseurs_avant_bras: "Extenseurs avant-bras",
+  quadriceps: "Quadriceps",
+  rectus_femoris: "Droit fémoral",
+  vaste_lateral: "Vaste latéral",
+  vaste_medial: "Vaste médial",
+  vaste_intermediaire: "Vaste intermédiaire",
+  ischio_jambiers: "Ischio-jambiers",
+  biceps_femoral: "Biceps fémoral",
+  semi_tendineux: "Semi-tendineux",
+  semi_membraneux: "Semi-membraneux",
+  grand_fessier: "Grand fessier",
+  moyen_fessier: "Moyen fessier",
+  petit_fessier: "Petit fessier",
+  adducteurs: "Adducteurs",
+  abducteurs: "Abducteurs",
+  mollet: "Mollets",
+  solea: "Soléaire",
+  gastrocnemien: "Gastrocnémien",
+  tibial_anterieur: "Tibial antérieur",
+  abdos: "Abdominaux",
+  obliques_externes: "Obliques externes",
+  obliques_internes: "Obliques internes",
+  transverse_abdominal: "Transverse abdominal",
+  dos_large: "Dos",
+  cardio: "Cardio",
+};
+
+function formatMuscleName(slug: string): string {
+  try {
+    const canonical = normalizeMuscleSlug(slug);
+    return MUSCLE_DISPLAY_NAMES[canonical] ?? "Muscle à qualifier";
+  } catch {
+    const normalized = normalizeFiberSlug(slug);
+    return (
+      MUSCLE_DISPLAY_NAMES[normalized] ??
+      BIOMECH_TO_FR[slug] ??
+      "Muscle à qualifier"
+    );
+  }
+}
+
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 // Fenêtres SRA en heures par groupe musculaire (niveau intermédiaire)
 // Sources : Schoenfeld 2010, Colquhoun 2018 (fréquence optimale)
 const SRA_WINDOWS: Record<string, number> = {
   quadriceps: 48,
+  rectus_femoris: 48,
+  vaste_lateral: 48,
+  vaste_medial: 48,
+  vaste_intermediaire: 48,
   fessiers: 48,
+  grand_fessier: 48,
+  moyen_fessier: 48,
+  petit_fessier: 48,
   "ischio-jambiers": 48,
+  ischio_jambiers: 48,
+  biceps_femoral: 48,
+  semi_tendineux: 48,
+  semi_membraneux: 48,
   dos: 48,
+  grand_dorsal: 48,
+  rhomboides: 48,
+  trapeze_superieur: 48,
+  trapeze_moyen: 48,
+  trapeze_inferieur: 48,
+  lombaires: 48,
+  erecteurs_spinaux: 48,
   pectoraux: 48,
+  grand_pectoral: 48,
+  grand_pectoral_superieur: 48,
+  grand_pectoral_inferieur: 48,
+  petit_pectoral: 48,
   epaules: 36,
+  deltoide_anterieur: 36,
+  deltoide_lateral: 36,
+  deltoide_posterieur: 36,
   biceps: 36,
+  biceps_brachial: 36,
+  brachial: 36,
   triceps: 36,
+  triceps_long: 36,
+  triceps_lateral: 36,
+  triceps_medial: 36,
   mollets: 24,
+  mollet: 24,
+  gastrocnemien: 24,
+  solea: 24,
   abdos: 24,
+  obliques_externes: 24,
+  obliques_internes: 24,
+  transverse_abdominal: 24,
 };
 const SRA_WINDOW_DEFAULT = 48;
 
@@ -259,14 +364,39 @@ const REQUIRED_PATTERNS: Record<string, string[]> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getCoeff(ex: BuilderExercise): number {
-  return resolveExerciseCoeff({
+type StimulusAdjustments = Record<string, number> | undefined;
+
+function normalizeMuscleSlug(slug: string): string {
+  try {
+    return normalizeCanonicalMuscle(slug);
+  } catch {
+    return normalizeLegacyMuscleSlug(slug);
+  }
+}
+
+const PATTERN_ALIASES: Record<string, string[]> = {
+  squat_pattern: ["squat"],
+  hip_hinge: ["hinge"],
+};
+
+function getPatternAdjustment(ex: BuilderExercise, adjustments?: StimulusAdjustments): number {
+  if (!adjustments) return 1;
+  const pattern = ex.movement_pattern ?? "";
+  const adjustment = adjustments[pattern] ?? PATTERN_ALIASES[pattern]
+    ?.map((alias) => adjustments[alias])
+    .find((value) => value != null) ?? 1;
+  return Math.max(0.5, Math.min(1.5, adjustment));
+}
+
+function getCoeff(ex: BuilderExercise, adjustments?: StimulusAdjustments): number {
+  const baseCoeff = resolveExerciseCoeff({
     name: ex.name,
     movement_pattern: ex.movement_pattern,
     primary_muscles: ex.primary_muscles,
     is_compound: ex.is_compound,
     primaryActivation: ex.primaryActivation ?? null,
   });
+  return Math.max(0.4, Math.min(1.2, baseCoeff * getPatternAdjustment(ex, adjustments)));
 }
 
 function getPattern(ex: BuilderExercise): string {
@@ -308,8 +438,12 @@ function inferHorizontalPushBias(ex: BuilderExercise): "incline" | "flat" | "dec
 }
 
 // Calcule le volume pondéré d'un exercice : sets × stimCoeff
-function weightedVolume(ex: BuilderExercise): number {
-  return ex.sets * getCoeff(ex);
+function weightedVolume(ex: BuilderExercise, adjustments?: StimulusAdjustments): number {
+  return ex.sets * getCoeff(ex, adjustments);
+}
+
+function weightedActivation(ex: BuilderExercise, activation: number, adjustments?: StimulusAdjustments): number {
+  return Math.max(0, Math.min(1.2, activation * getPatternAdjustment(ex, adjustments)));
 }
 
 // Norme un score 0–100 depuis un ratio
@@ -329,6 +463,7 @@ function hoursBetween(dayA: number | null, dayB: number | null): number | null {
 export function scoreBalance(
   sessions: BuilderSession[],
   meta: TemplateMeta,
+  adjustments?: StimulusAdjustments,
 ): { score: number; alerts: IntelligenceAlert[] } {
   const alerts: IntelligenceAlert[] = [];
 
@@ -339,7 +474,7 @@ export function scoreBalance(
   for (const session of sessions) {
     for (const ex of session.exercises) {
       const p = getPattern(ex);
-      const vol = weightedVolume(ex);
+      const vol = weightedVolume(ex, adjustments);
       if (PUSH_PATTERNS.has(p)) {
         pushVol += vol;
         pushSets += ex.sets;
@@ -397,6 +532,7 @@ export function scoreSRA(
   sessions: BuilderSession[],
   meta: TemplateMeta,
   profile?: IntelligenceProfile,
+  adjustments?: StimulusAdjustments,
 ): {
   score: number;
   alerts: IntelligenceAlert[];
@@ -407,6 +543,14 @@ export function scoreSRA(
   const sraMap: SRAPoint[] = [];
   const effectiveLevel = profile?.fitnessLevel ?? meta.level;
   const levelMult = SRA_LEVEL_MULTIPLIER[effectiveLevel] ?? 1.0;
+
+  function getRecoveryMuscles(ex: BuilderExercise): string[] {
+    const primary = ex.primaryMuscle ? [ex.primaryMuscle] : ex.primary_muscles;
+    const secondary = ex.secondaryMusclesDetail?.length
+      ? ex.secondaryMusclesDetail
+      : ex.secondary_muscles;
+    return Array.from(new Set([...primary, ...secondary].map(normalizeMuscleSlug)));
+  }
 
   // Collapse grouped exercises into combined slots before building the muscle map.
   // For each session, exercises sharing a group_id are merged into one virtual exercise
@@ -447,17 +591,14 @@ export function scoreSRA(
   > = {};
 
   sessions.forEach((session, si) => {
-    const collapsed = collapseGroups(session.exercises);
     const muscles = new Set<string>();
-    for (const ex of collapsed) {
-      ex.primary_muscles
-        .map(normalizeMuscleSlug)
-        .forEach((m) => muscles.add(m));
+    for (const ex of session.exercises) {
+      getRecoveryMuscles(ex).forEach((muscle) => muscles.add(muscle));
     }
     muscles.forEach((muscle) => {
       if (!muscleSessionMap[muscle]) muscleSessionMap[muscle] = [];
       muscleSessionMap[muscle].push({
-        sessionIndex: si,
+        sessionIndex: session.sourceSessionIndex ?? si,
         day: session.days_of_week?.[0] ?? session.day_of_week,
       });
     });
@@ -466,12 +607,14 @@ export function scoreSRA(
   let violations = 0;
   let totalChecks = 0;
 
-  for (const [muscle, occurrences] of Object.entries(muscleSessionMap)) {
+  for (const [muscle, rawOccurrences] of Object.entries(muscleSessionMap)) {
+    const occurrences = [...rawOccurrences].sort((a, b) => (a.day ?? 99) - (b.day ?? 99));
     const window = (SRA_WINDOWS[muscle] ?? SRA_WINDOW_DEFAULT) * levelMult;
 
-    for (let i = 1; i < occurrences.length; i++) {
-      const prev = occurrences[i - 1];
+    for (let i = 0; i < occurrences.length; i++) {
+      const prev = occurrences[(i - 1 + occurrences.length) % occurrences.length];
       const curr = occurrences[i];
+      if (occurrences.length < 2) continue;
       const hours = hoursBetween(prev.day, curr.day);
       totalChecks++;
 
@@ -484,7 +627,7 @@ export function scoreSRA(
       };
 
       if (hours !== null) {
-        const muscleName = muscle.charAt(0).toUpperCase() + muscle.slice(1);
+        const muscleName = formatMuscleName(muscle);
         if (hours <= window * 0.5) {
           point.violation = true;
           violations++;
@@ -531,8 +674,8 @@ export function scoreSRA(
         let totalVolume = 0;
         for (const session of sessions) {
           for (const ex of session.exercises) {
-            if (ex.primary_muscles.map(normalizeMuscleSlug).includes(muscle)) {
-              totalVolume += weightedVolume(ex);
+            if (getRecoveryMuscles(ex).includes(muscle)) {
+              totalVolume += weightedVolume(ex, adjustments);
             }
           }
         }
@@ -611,7 +754,7 @@ function isUnilateral(ex: BuilderExercise): boolean {
 
 export function scoreRedundancy(
   sessions: BuilderSession[],
-  morphoStimulusAdjustments?: Record<string, number>,
+  morphoStimulusAdjustments?: StimulusAdjustments,
 ): {
   score: number;
   alerts: IntelligenceAlert[];
@@ -674,8 +817,8 @@ export function scoreRedundancy(
         }
 
         // Coefficients proches (même registre d'intensité)
-        const coeffA = getCoeff(exA),
-          coeffB = getCoeff(exB);
+        const coeffA = getCoeff(exA, morphoStimulusAdjustments),
+          coeffB = getCoeff(exB, morphoStimulusAdjustments);
         if (Math.abs(coeffA - coeffB) >= 0.2) continue;
 
         // Si morpho a un boost unilatéral pour ce pattern et exactement un des deux est unilatéral,
@@ -772,7 +915,9 @@ export function scoreProgression(
     ? 20
     : alerts.some((a) => a.severity === "warning")
       ? 60
-      : 90;
+      : alerts.some((a) => a.severity === "info")
+        ? 90
+        : 100;
 
   return { score, alerts };
 }
@@ -780,13 +925,17 @@ export function scoreProgression(
 // ─── 5. Spécificité goal ──────────────────────────────────────────────────────
 
 // Score de spécificité 0–1 par exercice selon le goal
-function exerciseSpecificityScore(ex: BuilderExercise, goal: string): number {
+function exerciseSpecificityScore(
+  ex: BuilderExercise,
+  goal: string,
+  adjustments?: StimulusAdjustments,
+): number {
   const pattern = getPattern(ex);
   const repsStr = ex.reps ?? "";
   const repsLow = parseInt(repsStr.split("-")[0] ?? "0") || 0;
   const rir = ex.rir ?? 2;
   const restSec = ex.rest_sec ?? 90;
-  const coeff = getCoeff(ex);
+  const coeff = getCoeff(ex, adjustments);
 
   switch (goal) {
     case "hypertrophy": {
@@ -840,7 +989,7 @@ export function scoreSpecificity(
   sessions: BuilderSession[],
   meta: TemplateMeta,
   profile?: IntelligenceProfile,
-  morphoStimulusAdjustments?: Record<string, number>,
+  morphoStimulusAdjustments?: StimulusAdjustments,
 ): { score: number; alerts: IntelligenceAlert[] } {
   const alerts: IntelligenceAlert[] = [];
   const allExercises = sessions.flatMap((s) => s.exercises);
@@ -909,11 +1058,8 @@ export function scoreSpecificity(
   let totalWeight = 0,
     weightedSum = 0;
   allExercises.forEach((ex) => {
-    const baseCoeff = getCoeff(ex);
-    const morphoAdj =
-      morphoStimulusAdjustments?.[ex.movement_pattern ?? ""] ?? 1.0;
-    const coeff = Math.max(0.4, Math.min(1.2, baseCoeff * morphoAdj));
-    const specificity = exerciseSpecificityScore(ex, meta.goal);
+    const coeff = getCoeff(ex, morphoStimulusAdjustments);
+    const specificity = exerciseSpecificityScore(ex, meta.goal, morphoStimulusAdjustments);
     weightedSum += specificity * coeff;
     totalWeight += coeff;
 
@@ -1202,7 +1348,7 @@ function scoreJointLoad(
 ): { score: number; alerts: IntelligenceAlert[] } {
   const alerts: IntelligenceAlert[] = [];
 
-  if (!profile || profile.injuries.length === 0) return { score: 80, alerts };
+  if (!profile || profile.injuries.length === 0) return { score: 100, alerts };
 
   const injuredJoints = profile.injuries
     .map((inj) => ({
@@ -1218,12 +1364,12 @@ function scoreJointLoad(
       } => !!x.joint,
     );
 
-  if (injuredJoints.length === 0) return { score: 80, alerts };
+  if (injuredJoints.length === 0) return { score: 100, alerts };
 
   let scoreDeduction = 0;
   const allExercises = sessions.flatMap((s) => s.exercises);
   const totalSets = allExercises.reduce((sum, e) => sum + e.sets, 0);
-  if (totalSets === 0) return { score: 80, alerts };
+  if (totalSets === 0) return { score: 100, alerts };
 
   for (const { joint, severity } of injuredJoints) {
     const stressField =
@@ -1331,10 +1477,12 @@ export function scoreVolumeCoverage(
   sessions: BuilderSession[],
   meta: TemplateMeta,
   profile?: IntelligenceProfile,
+  adjustments?: StimulusAdjustments,
 ): {
   score: number;
   alerts: IntelligenceAlert[];
   volumeByMuscle: Record<string, number>;
+  volumeFocus: VolumeFocusResult[];
 } {
   const alerts: IntelligenceAlert[] = [];
   const volumeByMuscle: Record<string, number> = {};
@@ -1362,7 +1510,7 @@ export function scoreVolumeCoverage(
       const primaryGroup = getMuscleVolumeGroup(ex.primaryMuscle);
       if (primaryGroup) {
         volumeByMuscle[primaryGroup] =
-          (volumeByMuscle[primaryGroup] ?? 0) + ex.sets * ex.primaryActivation;
+          (volumeByMuscle[primaryGroup] ?? 0) + ex.sets * weightedActivation(ex, ex.primaryActivation, adjustments);
         trackRir(primaryGroup, ex.sets, ex.rir);
       }
 
@@ -1373,7 +1521,7 @@ export function scoreVolumeCoverage(
           const group = getMuscleVolumeGroup(muscle);
           if (group) {
             volumeByMuscle[group] =
-              (volumeByMuscle[group] ?? 0) + ex.sets * activation;
+              (volumeByMuscle[group] ?? 0) + ex.sets * weightedActivation(ex, activation, adjustments);
             trackRir(group, ex.sets, ex.rir);
           }
         });
@@ -1383,14 +1531,43 @@ export function scoreVolumeCoverage(
 
   // ── Score and emit alerts ─────────────────────────────────────────────────
   const trackedGroups = Object.keys(volumeByMuscle);
-  if (trackedGroups.length === 0) return { score: 100, alerts, volumeByMuscle };
+  const hasConfiguredObjective = Object.values(meta.volumeFocus ?? {}).some(
+    (mode) => mode !== 'off',
+  );
+  if (trackedGroups.length === 0 && !hasConfiguredObjective) {
+    return { score: 100, alerts, volumeByMuscle, volumeFocus: [] };
+  }
 
   let totalPenalty = 0;
+  const volumeFocus: VolumeFocusResult[] = [];
+  let scoreableFocusGroups = 0;
+  let underTargetGroups = 0;
 
-  for (const group of trackedGroups) {
-    const volume = volumeByMuscle[group];
-    const [mev, mav, mrv] = getVolumeTargets(group, goal, level);
-    const label = group.replace(/_/g, " ");
+  for (const focusGroup of VOLUME_FOCUS_GROUPS) {
+    const volume = focusGroup.groups.reduce(
+      (sum, group) => sum + (volumeByMuscle[group] ?? 0),
+      0,
+    );
+    const [mev, mav, mrv] = getVolumeFocusTargets(focusGroup.groups, goal, level);
+    const configuredMode = meta.volumeFocus?.[focusGroup.key];
+    const mode = (configuredMode ?? (volume > 0 ? 'progression' : 'off')) as VolumeFocus;
+    const targetMin = mode === 'priority' ? mav : mode === 'maintenance' ? Math.max(2, Math.ceil(mev * 0.5)) : mode === 'progression' ? mev : null;
+    const targetMax = mode === 'priority' ? mrv : mode === 'maintenance' ? mev : mode === 'progression' ? mav : null;
+    const label = focusGroup.label;
+
+    if (mode !== 'off' || volume > mrv) scoreableFocusGroups += 1;
+
+    volumeFocus.push({
+      key: focusGroup.key,
+      label,
+      mode,
+      volume,
+      mev,
+      mav,
+      mrv,
+      targetMin,
+      targetMax,
+    });
 
     if (volume > mrv) {
       totalPenalty += 20;
@@ -1401,7 +1578,7 @@ export function scoreVolumeCoverage(
         explanation: `${Math.round(volume)} sets équivalents/sem — dépasse le volume récupérable (MRV = ${mrv}). Risque de surentraînement.`,
         suggestion: `Réduisez le volume sur ce groupe à moins de ${mrv} sets équivalents/sem.`,
       });
-    } else if (volume > mav) {
+    } else if (mode !== 'priority' && volume > mav) {
       totalPenalty += 5;
       alerts.push({
         severity: "info",
@@ -1410,19 +1587,34 @@ export function scoreVolumeCoverage(
         explanation: `${Math.round(volume)} sets équivalents/sem — au-delà du volume adaptatif optimal (MAV = ${mav}). Gains marginaux décroissants.`,
         suggestion: `Réduisez légèrement le volume ou déplacez des séries vers un groupe sous-entraîné.`,
       });
-    } else if (volume < mev) {
-      totalPenalty += 15;
+    } else if (targetMin != null && volume < targetMin) {
+      const isPriority = mode === 'priority';
+      const isMaintenance = mode === 'maintenance';
+      const missing = Math.max(0, Math.ceil(targetMin - volume));
+      totalPenalty += isPriority ? 18 : isMaintenance ? 6 : 15;
+      underTargetGroups += 1;
       alerts.push({
-        severity: "warning",
-        code: "UNDER_MEV",
-        title: `Volume insuffisant : ${label}`,
-        explanation: `${Math.round(volume)} sets équivalents/sem — sous le minimum efficace (MEV = ${mev}). Stimulus insuffisant pour progresser.`,
-        suggestion: `Ajoutez ${mev - Math.round(volume)} sets équivalents/sem sur ce groupe musculaire.`,
+        severity: isMaintenance ? 'info' : 'warning',
+        code: isPriority ? 'PRIORITY_UNDER_TARGET' : isMaintenance ? 'MAINTENANCE_UNDER_TARGET' : 'UNDER_MEV',
+        title: isPriority ? `Priorité sous-ciblée : ${label}` : isMaintenance ? `Maintien non couvert : ${label}` : `Volume insuffisant : ${label}`,
+        explanation: isPriority
+          ? `${Math.round(volume)} séries équivalentes/sem — votre priorité vise la zone MAV (à partir de ${mav}).`
+          : isMaintenance
+            ? `${Math.round(volume)} séries équivalentes/sem — sous le seuil de maintien estimé (${targetMin}).`
+            : `${Math.round(volume)} séries équivalentes/sem — sous le minimum efficace (MEV = ${mev}) pour progresser.`,
+        suggestion: `Ajoutez environ ${missing} séries équivalentes/sem, ou ajustez l’objectif de ce groupe.`,
       });
 
       // Double-problem: under MEV + RIR too high → sets don't count as effective
-      const rirData = rirByGroup[group];
-      if (rirData && rirData.totalSets > 0) {
+      const rirData = focusGroup.groups.reduce(
+        (acc, group) => {
+          const data = rirByGroup[group];
+          if (!data) return acc;
+          return { totalSets: acc.totalSets + data.totalSets, weightedRir: acc.weightedRir + data.weightedRir };
+        },
+        { totalSets: 0, weightedRir: 0 },
+      );
+      if (!isMaintenance && rirData.totalSets > 0) {
         const avgRir = rirData.weightedRir / rirData.totalSets;
         if (avgRir > 3) {
           alerts.push({
@@ -1439,13 +1631,11 @@ export function scoreVolumeCoverage(
 
   // Penalty is proportional: each under-MEV group reduces score by (penalty / total groups),
   // but the base deduction is amplified by under-MEV ratio so a fully under-MEV program drops hard.
-  const underMevGroups = alerts.filter((a) => a.code === "UNDER_MEV").length;
-  const underMevRatio =
-    trackedGroups.length > 0 ? underMevGroups / trackedGroups.length : 0;
-  const penaltyReduced = totalPenalty / trackedGroups.length;
-  const amplification = 1 + underMevRatio * 2; // up to 3× if all groups under MEV
+  const underMevRatio = scoreableFocusGroups > 0 ? underTargetGroups / scoreableFocusGroups : 0;
+  const penaltyReduced = totalPenalty / Math.max(scoreableFocusGroups, 1);
+  const amplification = 1 + underMevRatio * 1.5;
   const score = clampScore(100 - penaltyReduced * amplification);
-  return { score, alerts, volumeByMuscle };
+  return { score, alerts, volumeByMuscle, volumeFocus };
 }
 
 // Poids des subscores dans le globalScore
@@ -1511,22 +1701,30 @@ function buildNarrative(
   return `Programme équilibré. Meilleur score : ${labels[bestKey]} (${bestVal}/100).`;
 }
 
-// Expand sessions by days_of_week: a session scheduled on 2 days = 2 occurrences for volume/balance/SRA
-// Each copy gets the specific day assigned so SRA can compute inter-session gap correctly
-function expandSessionsByDays(sessions: BuilderSession[]): BuilderSession[] {
+// Expand sessions by days_of_week: a session scheduled on 2 days = 2 occurrences for weekly metrics.
+// In cycle mode, sessions intentionally have no weekday and count once in their cycle order.
+function expandSessionsByDays(
+  sessions: BuilderSession[],
+  sessionMode: TemplateMeta["sessionMode"] = "day",
+): BuilderSession[] {
   try {
     const expanded: BuilderSession[] = [];
-    for (const session of sessions) {
+    for (const [sourceSessionIndex, session] of sessions.entries()) {
+      if (sessionMode === "cycle") {
+        expanded.push({ ...session, sourceSessionIndex });
+        continue;
+      }
       const days: (number | null)[] = session.days_of_week?.length
         ? session.days_of_week
-        : session.day_of_week
+        : session.day_of_week != null
           ? [session.day_of_week]
-          : [null];
+          : [];
       for (const day of days) {
         expanded.push({
           ...session,
           day_of_week: day,
           days_of_week: day ? [day] : [],
+          sourceSessionIndex,
         });
       }
     }
@@ -1547,8 +1745,13 @@ export function buildIntelligenceResult(
     ...s,
     exercises: s.exercises.filter((e) => e.name.trim() !== ""),
   }));
-  // Expand multi-day sessions so volume/balance/SRA counts each scheduled day
-  const expandedSessions = expandSessionsByDays(filteredSessions);
+  const activeSessions = meta.sessionMode === "cycle"
+    ? filteredSessions
+    : filteredSessions.filter((session) =>
+        (session.days_of_week?.length ?? 0) > 0 || session.day_of_week != null,
+      );
+  // Expand multi-day sessions so weekly metrics count each scheduled occurrence.
+  const expandedSessions = expandSessionsByDays(activeSessions, meta.sessionMode);
 
   const emptyProgramStats: ProgramStats = {
     totalSets: 0,
@@ -1558,7 +1761,7 @@ export function buildIntelligenceResult(
     sessionsStats: [],
   };
 
-  const hasExercises = filteredSessions.some((s) => s.exercises.length > 0);
+  const hasExercises = activeSessions.some((s) => s.exercises.length > 0);
   if (!hasExercises) {
     return {
       globalScore: 0,
@@ -1586,23 +1789,24 @@ export function buildIntelligenceResult(
     };
   }
 
-  const balanceResult = scoreBalance(expandedSessions, meta);
-  const sraResult = scoreSRA(expandedSessions, meta, profile);
+  const balanceResult = scoreBalance(expandedSessions, meta, morphoStimulusAdjustments);
+  const sraResult = scoreSRA(expandedSessions, meta, profile, morphoStimulusAdjustments);
   const redundancyResult = scoreRedundancy(
-    expandedSessions,
+    activeSessions,
     morphoStimulusAdjustments,
   );
-  const progressionResult = scoreProgression(filteredSessions, meta);
+  const supersetResult = scoreSuperset(activeSessions);
+  const progressionResult = scoreProgression(activeSessions, meta);
   const specificityResult = scoreSpecificity(
-    expandedSessions,
+    activeSessions,
     meta,
     profile,
     morphoStimulusAdjustments,
   );
-  const completenessResult = scoreCompleteness(expandedSessions, meta, profile);
+  const completenessResult = scoreCompleteness(activeSessions, meta, profile);
   const jointLoadResult = scoreJointLoad(expandedSessions, profile);
-  const coordinationResult = scoreCoordination(expandedSessions, meta);
-  const volumeResult = scoreVolumeCoverage(expandedSessions, meta);
+  const coordinationResult = scoreCoordination(activeSessions, meta);
+  const volumeResult = scoreVolumeCoverage(expandedSessions, meta, profile, morphoStimulusAdjustments);
 
   const subscores = {
     balance: balanceResult.score,
@@ -1625,6 +1829,7 @@ export function buildIntelligenceResult(
   const allAlerts = [
     ...balanceResult.alerts,
     ...sraResult.alerts,
+    ...supersetResult.alerts,
     ...redundancyResult.alerts,
     ...progressionResult.alerts,
     ...specificityResult.alerts,
@@ -1644,21 +1849,19 @@ export function buildIntelligenceResult(
     return scopedA - scopedB;
   });
 
-  // Distribution musculaire (volume pondéré par groupe) — sur sessions expandées (multi-day × occurrences)
+  // Radar distribution uses the same effective stimulus ledger as MEV/MAV/MRV.
   const distribution: MuscleDistribution = {};
-  for (const session of expandedSessions) {
-    for (const ex of session.exercises) {
-      const vol = weightedVolume(ex);
-      if (ex.primary_muscles.length > 0) {
-        ex.primary_muscles.forEach((m) => {
-          const norm = normalizeMuscleSlug(m);
-          distribution[norm] = (distribution[norm] ?? 0) + vol;
-        });
-      } else if (ex.primaryMuscle) {
-        const group = BIOMECH_TO_GROUP[ex.primaryMuscle];
-        if (group) distribution[group] = (distribution[group] ?? 0) + vol;
-      }
-    }
+  const radarGroupForVolumeGroup: Record<string, string> = {
+    quadriceps: "quadriceps", ischio: "ischio-jambiers",
+    fessiers_grand: "fessiers", fessiers_moyen: "fessiers", fessiers_petit: "fessiers",
+    mollets: "mollets", pectoraux_haut: "pectoraux", pectoraux_bas: "pectoraux",
+    epaules_ant: "epaules", epaules_lat: "epaules", epaules_post: "epaules",
+    triceps: "triceps", dos_grand_dorsal: "dos", dos_trapezes: "dos", dos_lombaires: "dos",
+    biceps: "biceps", abdos: "abdos",
+  };
+  for (const [group, volume] of Object.entries(volumeResult.volumeByMuscle)) {
+    const radarGroup = radarGroupForVolumeGroup[group];
+    if (radarGroup) distribution[radarGroup] = (distribution[radarGroup] ?? 0) + volume;
   }
 
   // Distribution patterns (volume brut) — sur sessions expandées
@@ -1684,7 +1887,7 @@ export function buildIntelligenceResult(
     return parseInt(reps.split("-")[0] ?? "0") || 0;
   }
 
-  const sessionsStats: SessionStats[] = filteredSessions.map((session) => {
+  const sessionsStats: SessionStats[] = activeSessions.map((session) => {
     const exs = session.exercises;
     const totalSets = exs.reduce((acc, e) => acc + e.sets, 0);
     const estimatedReps = exs.reduce(
@@ -1700,23 +1903,31 @@ export function buildIntelligenceResult(
     const muscleVolumes: Record<string, number> = {};
     const fiberVolumes: Record<string, number> = {};
     for (const ex of exs) {
-      const vol = weightedVolume(ex);
+      const vol = weightedVolume(ex, morphoStimulusAdjustments);
       ex.primary_muscles.forEach((m) => {
         const norm = normalizeMuscleSlug(m);
         muscleVolumes[norm] = (muscleVolumes[norm] ?? 0) + vol;
       });
-      // Faisceau précis biomech normalisé (gluteus_medius → moyen_fessier, etc.)
-      const resolvedPrimaryMuscle =
-        ex.primaryMuscle ?? getPrimaryMuscleFromCatalog(ex.name);
-      if (resolvedPrimaryMuscle) {
-        const fiberKey = normalizeFiberSlug(resolvedPrimaryMuscle);
-        fiberVolumes[fiberKey] = (fiberVolumes[fiberKey] ?? 0) + vol;
-      } else {
-        // Fallback: slug FR grossier normalisé (ischio-jambiers → ischio_jambiers)
-        ex.primary_muscles.forEach((m) => {
-          const fiberKey = normalizeFiberSlug(normalizeMuscleSlug(m));
+      const resolvedFiberTargets = getFiberTargetsFromCatalog(ex.name);
+      if (resolvedFiberTargets.length > 0) {
+        resolvedFiberTargets.forEach((fiber) => {
+          const fiberKey = normalizeFiberSlug(fiber);
           fiberVolumes[fiberKey] = (fiberVolumes[fiberKey] ?? 0) + vol;
         });
+      } else {
+        // Faisceau précis biomech normalisé (gluteus_medius → moyen_fessier, etc.)
+        const resolvedPrimaryMuscle =
+          ex.primaryMuscle ?? getPrimaryMuscleFromCatalog(ex.name);
+        if (resolvedPrimaryMuscle) {
+          const fiberKey = normalizeFiberSlug(resolvedPrimaryMuscle);
+          fiberVolumes[fiberKey] = (fiberVolumes[fiberKey] ?? 0) + vol;
+        } else {
+        // Fallback: slug FR grossier normalisé (ischio-jambiers → ischio_jambiers)
+          ex.primary_muscles.forEach((m) => {
+            const fiberKey = normalizeFiberSlug(normalizeMuscleSlug(m));
+            fiberVolumes[fiberKey] = (fiberVolumes[fiberKey] ?? 0) + vol;
+          });
+        }
       }
     }
 
@@ -1737,19 +1948,22 @@ export function buildIntelligenceResult(
     };
   });
 
-  const totalSets = sessionsStats.reduce((acc, s) => acc + s.totalSets, 0);
-  const totalEstimatedReps = sessionsStats.reduce(
-    (acc, s) => acc + s.estimatedReps,
+  const totalSets = expandedSessions.reduce(
+    (sum, session) => sum + session.exercises.reduce((sessionSum, ex) => sessionSum + ex.sets, 0),
+    0,
+  );
+  const totalEstimatedReps = expandedSessions.reduce(
+    (sum, session) => sum + session.exercises.reduce((sessionSum, ex) => sessionSum + ex.sets * parseRepsLow(ex.reps), 0),
     0,
   );
   const totalExercises = new Set(
-    filteredSessions.flatMap((s) => s.exercises.map((e) => e.name)),
+    activeSessions.flatMap((s) => s.exercises.map((e) => e.name)),
   ).size;
   const avgExercisesPerSession =
-    filteredSessions.length > 0
+    expandedSessions.length > 0
       ? Math.round(
-          filteredSessions.reduce((acc, s) => acc + s.exercises.length, 0) /
-            filteredSessions.length,
+          expandedSessions.reduce((acc, s) => acc + s.exercises.length, 0) /
+            expandedSessions.length,
         )
       : 0;
 
@@ -1774,5 +1988,6 @@ export function buildIntelligenceResult(
     sraHeatmap: sraResult.sraHeatmap,
     programStats,
     volumeByMuscle: volumeResult.volumeByMuscle,
+    volumeFocus: volumeResult.volumeFocus,
   };
 }

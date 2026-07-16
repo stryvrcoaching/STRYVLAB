@@ -9,6 +9,7 @@ export interface AdaptiveTdeeInput {
   caloriesSource: 'logs' | 'protocol'
   windowDays: number
   trackedDays?: number
+  excludedCurrentDay?: boolean
   // v2 signals
   gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say' | null
   cyclePhases?: string[]        // cycle_phase per day in window (for female clients)
@@ -26,6 +27,30 @@ export interface AdaptiveTdeeResult {
   // v2
   appliedLutealCorrection: boolean
   smoothedWeightUsed: boolean
+  weightSamplesUsed: number
+  outlierCount: number
+}
+
+function median(values: number[]) {
+  const sorted = [...values].sort((a, b) => a - b)
+  const middle = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[middle]
+}
+
+export function filterWeightOutliers(samples: WeightSample[]) {
+  if (samples.length < 5) return { samples, outlierCount: 0 }
+
+  const center = median(samples.map((sample) => sample.weight_kg))
+  const deviations = samples.map((sample) => Math.abs(sample.weight_kg - center))
+  const mad = median(deviations)
+  const threshold = Math.max(0.5, mad * 4)
+  const filtered = samples.filter((sample) => Math.abs(sample.weight_kg - center) <= threshold)
+
+  return filtered.length >= 4
+    ? { samples: filtered, outlierCount: samples.length - filtered.length }
+    : { samples, outlierCount: 0 }
 }
 
 export function linearRegression(samples: WeightSample[]): { slope: number; intercept: number } {
@@ -78,9 +103,11 @@ export function calcAdaptiveTdee(input: AdaptiveTdeeInput): AdaptiveTdeeResult {
     throw new Error('At least 2 weight samples required')
   }
 
+  const filtered = filterWeightOutliers(input.weightSamples)
+
   // v2 — smooth weights before regression to reduce daily noise
-  const smoothed = smoothWeightSamples(input.weightSamples)
-  const smoothedWeightUsed = smoothed.some((s, i) => s.weight_kg !== input.weightSamples[i]?.weight_kg)
+  const smoothed = smoothWeightSamples(filtered.samples)
+  const smoothedWeightUsed = smoothed.some((s, i) => s.weight_kg !== filtered.samples[i]?.weight_kg)
 
   // v2 — luteal correction for female clients
   const isFemale = input.gender === 'female'
@@ -122,14 +149,19 @@ export function calcAdaptiveTdee(input: AdaptiveTdeeInput): AdaptiveTdeeResult {
   }
 
   // Weight sample density
-  if (input.weightSamples.length < 4) {
+  if (filtered.samples.length < 4) {
     confidenceScore -= 50
-    confidenceReasons.push(`Seulement ${input.weightSamples.length} pesée(s) — minimum 4 recommandées`)
-  } else if (input.weightSamples.length < 6) {
+    confidenceReasons.push(`Seulement ${filtered.samples.length} pesée(s) exploitable(s) — minimum 4 recommandées`)
+  } else if (filtered.samples.length < 6) {
     confidenceScore -= 10
-    confidenceReasons.push(`${input.weightSamples.length} pesées — couverture partielle`)
+    confidenceReasons.push(`${filtered.samples.length} pesées exploitables — couverture partielle`)
   } else {
-    confidenceReasons.push(`${input.weightSamples.length} pesées — couverture solide`)
+    confidenceReasons.push(`${filtered.samples.length} pesées exploitables — couverture solide`)
+  }
+
+  if (filtered.outlierCount > 0) {
+    confidenceScore -= Math.min(10, filtered.outlierCount * 5)
+    confidenceReasons.push(`${filtered.outlierCount} pesée(s) aberrante(s) écartée(s) avant le calcul de tendance`)
   }
 
   // Nutritional tracking compliance
@@ -142,12 +174,16 @@ export function calcAdaptiveTdee(input: AdaptiveTdeeInput): AdaptiveTdeeResult {
     }
   }
 
+  if (input.excludedCurrentDay) {
+    confidenceReasons.push("Journée en cours exclue jusqu'à clôture pour éviter un biais d'apport partiel")
+  }
+
   // v2 — window anchoring bonus
   if (input.anchoredToProtocol) {
     confidenceScore += 5
-    confidenceReasons.push("Fenêtre ancrée sur le début du protocole — données homogènes")
+    confidenceReasons.push("Fenêtre homogène depuis un changement de contexte nutritionnel")
   } else {
-    confidenceReasons.push("Fenêtre non ancrée — peut inclure des données pré-protocole")
+    confidenceReasons.push("Fenêtre glissante client — indépendante du protocole en cours")
   }
 
   // v2 — cycle signal quality for female clients
@@ -173,6 +209,10 @@ export function calcAdaptiveTdee(input: AdaptiveTdeeInput): AdaptiveTdeeResult {
     confidenceReasons.push(`Fenêtre ${input.windowDays}j — durée optimale`)
   }
 
+  if (input.excludedCurrentDay) {
+    confidenceScore = Math.min(confidenceScore, 95)
+  }
+
   const confidence: 'high' | 'medium' | 'low' =
     confidenceScore >= 80 ? 'high' : confidenceScore >= 55 ? 'medium' : 'low'
 
@@ -185,5 +225,7 @@ export function calcAdaptiveTdee(input: AdaptiveTdeeInput): AdaptiveTdeeResult {
     confidenceReasons,
     appliedLutealCorrection,
     smoothedWeightUsed,
+    weightSamplesUsed: filtered.samples.length,
+    outlierCount: filtered.outlierCount,
   }
 }

@@ -53,7 +53,7 @@ export default function SwipeButton({
 
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, []);
+  }, [KNOB_SIZE, PADDING]);
 
   /* -----------------------------
      CORE LOGIC
@@ -67,7 +67,7 @@ export default function SwipeButton({
     // Clamp values (0 to maxDrag)
     x = Math.max(0, Math.min(x, maxDrag.current));
     setDragX(x);
-  }, []);
+  }, [KNOB_SIZE, PADDING]);
 
   const handleDragStart = (clientX: number) => {
     if (state === "success") return;

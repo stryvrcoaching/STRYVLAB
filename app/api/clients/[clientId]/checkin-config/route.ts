@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { coachOwnsClient } from '@/lib/security/client-resource-access'
 
 function service() {
   return createServiceClient(
@@ -16,16 +17,6 @@ async function getCoach(supabase: ReturnType<typeof createServerClient>) {
   return user
 }
 
-async function ownsClient(coachId: string, clientId: string) {
-  const { data } = await service()
-    .from('coach_clients')
-    .select('id')
-    .eq('id', clientId)
-    .eq('coach_id', coachId)
-    .single()
-  return !!data
-}
-
 // GET /api/clients/[clientId]/checkin-config
 export async function GET(
   _req: NextRequest,
@@ -35,11 +26,12 @@ export async function GET(
   const coach = await getCoach(supabase)
   if (!coach) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  if (!(await ownsClient(coach.id, params.clientId))) {
+  const db = service()
+  if (!(await coachOwnsClient({ db, coachUserId: coach.id, clientId: params.clientId }))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { data, error } = await service()
+  const { data, error } = await db
     .from('daily_checkin_configs')
     .select('*')
     .eq('client_id', params.clientId)
@@ -71,14 +63,15 @@ export async function POST(
   const coach = await getCoach(supabase)
   if (!coach) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  if (!(await ownsClient(coach.id, params.clientId))) {
+  const db = service()
+  if (!(await coachOwnsClient({ db, coachUserId: coach.id, clientId: params.clientId }))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const body = bodySchema.safeParse(await req.json())
   if (!body.success) return NextResponse.json({ error: body.error }, { status: 400 })
 
-  const { data, error } = await service()
+  const { data, error } = await db
     .from('daily_checkin_configs')
     .upsert(
       {

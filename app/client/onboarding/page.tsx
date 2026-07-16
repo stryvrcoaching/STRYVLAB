@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, Eye, EyeOff, XCircle, ArrowRight, Dumbbell, Activity, Target, CheckSquare, BarChart2, MessageSquare, LineChart, Utensils, Bell, UserCircle } from 'lucide-react'
@@ -109,7 +110,18 @@ function OnboardingFlow() {
     const { data: { user } } = await supabase.auth.getUser()
     const name = user?.user_metadata?.first_name ?? user?.email?.split('@')[0] ?? ''
     setFirstName(name)
-    setStep('password')  // password first, then language selector
+    setStep('language')
+  }
+
+  function routeToApp(nextCheckinsEnabled: boolean) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('onboarding_tour_done', 'false')
+    }
+    if (nextCheckinsEnabled) {
+      router.push('/client/checkin/onboarding')
+      return
+    }
+    router.push('/client')
   }
 
   useEffect(() => {
@@ -183,14 +195,14 @@ function OnboardingFlow() {
       const checkinsData = await checkinsRes.json().catch(() => null)
       setCheckinsEnabled(!!checkinsData?.active)
     }
-    // Show language selector before welcome screens
-    setStep('language')
+    setStep('welcome')
+    setLoading(false)
   }
 
   // ─── Exchanging ───────────────────────────────────────────────────────────
   if (step === 'exchanging') {
     return (
-      <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center p-6">
+      <div className="min-h-dvh bg-[#0d0d0d] flex items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="text-center">
           <Loader2 size={32} className="animate-spin text-[#f2f2f2] mx-auto mb-4" />
           <p className="text-base font-semibold text-white mb-1">{t('onboarding.verifying')}</p>
@@ -203,7 +215,7 @@ function OnboardingFlow() {
   // ─── Error ─────────────────────────────────────────────────────────────────
   if (step === 'error') {
     return (
-      <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center p-6">
+      <div className="min-h-dvh bg-[#0d0d0d] flex items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="bg-white/[0.02] rounded-xl p-8 max-w-sm w-full text-center">
           <XCircle size={44} className="text-red-400 mx-auto mb-4" />
           <h2 className="text-base font-bold text-white mb-2">{t('onboarding.error.title')}</h2>
@@ -229,16 +241,14 @@ function OnboardingFlow() {
 
     const handleLanguageSelect = async (langCode: ClientLang) => {
       setSelectedLang(langCode)
-      // Update language in provider context and localStorage
       setLang(langCode)
-      // Proceed to welcome screens
-      setTimeout(() => setStep('welcome'), 300)
+      setTimeout(() => setStep('password'), 250)
     }
 
     return (
-      <div className="min-h-screen bg-[#0d0d0d] flex flex-col items-center justify-center p-6">
+      <div className="min-h-dvh bg-[#0d0d0d] flex flex-col items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="mb-12 flex flex-col items-center gap-3">
-          <img src="/logo/logo-stryvr-silver.png" alt="STRYVR" className="w-12 h-12 object-contain" />
+          <Image src="/logo/logo-stryvr-silver.png" alt="STRYVR" width={48} height={48} className="w-12 h-12 object-contain" />
         </div>
 
         <div className="w-full max-w-sm">
@@ -274,9 +284,9 @@ function OnboardingFlow() {
   // ─── Password ──────────────────────────────────────────────────────────────
   if (step === 'password') {
     return (
-      <div className="min-h-screen bg-[#0d0d0d] flex flex-col items-center justify-center p-6">
+      <div className="min-h-dvh bg-[#0d0d0d] flex flex-col items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="mb-8 flex flex-col items-center gap-3">
-          <img src="/logo/logo-stryvr-silver.png" alt="STRYVR" className="w-12 h-12 object-contain" />
+          <Image src="/logo/logo-stryvr-silver.png" alt="STRYVR" width={48} height={48} className="w-12 h-12 object-contain" />
         </div>
 
         <div className="bg-white/[0.02] rounded-xl p-6 w-full max-w-sm">
@@ -364,22 +374,17 @@ function OnboardingFlow() {
 
     const goNext = () => {
       if (isLast) {
-        localStorage.setItem('onboarding_tour_done', 'false')
-        if (checkinsEnabled) {
-          router.push('/client/checkin/onboarding')
-        } else {
-          router.push('/client')
-        }
+        routeToApp(checkinsEnabled)
       } else {
         setWelcomeIndex((i) => i + 1)
       }
     }
 
     return (
-      <div className="min-h-screen bg-[#0d0d0d] flex flex-col">
+      <div className="min-h-dvh bg-[#0d0d0d] flex flex-col overflow-x-hidden">
         {/* Logo */}
         <div className="flex items-center justify-center pt-12 pb-6">
-          <img src="/logo/logo-stryvr-silver.png" alt="STRYVR" className="w-8 h-8 object-contain" />
+          <Image src="/logo/logo-stryvr-silver.png" alt="STRYVR" width={32} height={32} className="w-8 h-8 object-contain" />
         </div>
 
         {/* Content — centered vertically on screen 0, top-aligned on others */}
@@ -444,8 +449,7 @@ function OnboardingFlow() {
           {!isLast && !isFirst && (
             <button
               onClick={() => {
-                localStorage.setItem('onboarding_tour_done', 'false')
-                router.push('/client')
+                routeToApp(checkinsEnabled)
               }}
               className="w-full mt-3 py-2 text-[11px] text-white/25 hover:text-white/45 transition-colors text-center"
             >
@@ -464,7 +468,7 @@ export default function OnboardingPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center">
+        <div className="min-h-dvh bg-[#0d0d0d] flex items-center justify-center overflow-x-hidden">
           <Loader2 size={32} className="animate-spin text-[#f2f2f2]" />
         </div>
       }

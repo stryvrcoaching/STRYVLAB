@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { parse } from 'csv-parse/sync'
+import { deriveFiberTargets, type FiberCatalogEntry } from '../lib/programs/intelligence/exercise-fibers'
 
 const CATALOG_PATH = path.join(process.cwd(), 'data/exercise-catalog.json')
 const LIBRARY_PATH = path.join(process.cwd(), 'public/bibliotheque_exercices')
@@ -26,6 +27,25 @@ interface CsvRow {
   constraint_profile: string
 }
 
+interface CatalogRecord extends Record<string, unknown>, FiberCatalogEntry {
+  slug: string
+  plane?: string | null
+  mechanic?: string | null
+  unilateral?: boolean
+  primaryMuscle?: string | null
+  primaryActivation?: number | null
+  secondaryMuscles?: string[]
+  secondaryActivations?: number[]
+  stabilizers?: string[]
+  jointStressSpine?: number | null
+  jointStressKnee?: number | null
+  jointStressShoulder?: number | null
+  globalInstability?: number | null
+  coordinationDemand?: number | null
+  constraintProfile?: string | null
+  fiberTargets?: string[]
+}
+
 function toSlug(name: string): string {
   return name
     .toLowerCase()
@@ -49,16 +69,22 @@ function slugMatch(csvName: string, catalogSlugs: Set<string>): string | null {
 
   // 3-word prefix match
   const prefix = direct.split('-').slice(0, 3).join('-')
-  const candidates = [...catalogSlugs].filter(s => s.startsWith(prefix))
+  const candidates = Array.from(catalogSlugs).filter(s => s.startsWith(prefix))
   if (candidates.length === 1) return candidates[0]
 
   return null
 }
 
 async function main() {
-  const catalog: Record<string, unknown>[] = JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf-8'))
+  const catalog = JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf-8')) as CatalogRecord[]
   const idMap: Record<string, string> = JSON.parse(fs.readFileSync(ID_MAP_PATH, 'utf-8'))
-  const catalogBySlug = new Map(catalog.map(e => [(e as { slug: string }).slug, e]))
+  const catalogById = new Map(catalog.map(entry => [entry.id, entry] as const))
+  const catalogBySlug = new Map<string, CatalogRecord[]>()
+  for (const entry of catalog) {
+    const existing = catalogBySlug.get(entry.slug) ?? []
+    existing.push(entry)
+    catalogBySlug.set(entry.slug, existing)
+  }
   const catalogSlugs = new Set(catalogBySlug.keys())
 
   const groups = fs.readdirSync(LIBRARY_PATH).filter(f =>
@@ -77,17 +103,24 @@ async function main() {
 
     for (const row of rows) {
       // Priority 1: manual map
-      let slug = idMap[row.exercise_id] ?? null
+      let slug: string | null = idMap[row.exercise_id] ?? null
 
       // Priority 2: auto slug match
       if (!slug) slug = slugMatch(row.name, catalogSlugs)
 
-      if (!slug || !catalogBySlug.has(slug)) {
+      if (!slug) {
         unmatched.push(`[${group}] ${row.exercise_id} | ${row.name}`)
         continue
       }
 
-      const entry = catalogBySlug.get(slug) as Record<string, unknown>
+      const entry =
+        catalogById.get(`${group}__${slug}`) ??
+        (catalogBySlug.get(slug)?.length === 1 ? catalogBySlug.get(slug)?.[0] : null)
+
+      if (!entry) {
+        unmatched.push(`[${group}] ${row.exercise_id} | ${row.name}`)
+        continue
+      }
 
       // Merge biomech fields
       entry.plane = row.plane || null
@@ -104,9 +137,14 @@ async function main() {
       entry.globalInstability = row.global_instability ? parseInt(row.global_instability) : null
       entry.coordinationDemand = row.coordination_demand ? parseInt(row.coordination_demand) : null
       entry.constraintProfile = row.constraint_profile || null
+      entry.fiberTargets = deriveFiberTargets(entry)
 
       matched++
     }
+  }
+
+  for (const entry of catalog) {
+    entry.fiberTargets = deriveFiberTargets(entry)
   }
 
   fs.writeFileSync(CATALOG_PATH, JSON.stringify(catalog, null, 2))

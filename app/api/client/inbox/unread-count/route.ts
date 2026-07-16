@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 
+import { getClientAppBadgeCount } from '@/lib/client/appBadgeCount'
 import { getClientInboxUnreadCount } from '@/lib/client/inbox'
 
 function svc() {
@@ -23,5 +24,13 @@ export async function GET() {
     .maybeSingle()
 
   const counts = await getClientInboxUnreadCount(svc(), user.id, client?.id ?? null)
+  try {
+    if (client?.id) {
+      const total = await getClientAppBadgeCount(svc(), client.id)
+      return NextResponse.json({ ...counts, total })
+    }
+  } catch (e) {
+    // ignore and return base counts
+  }
   return NextResponse.json(counts)
 }

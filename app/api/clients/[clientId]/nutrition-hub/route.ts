@@ -21,6 +21,12 @@ import {
   type NutritionHubInsightInput,
 } from "@/lib/coach/nutritionHub";
 import { fetchActiveSmoothingPlanForCoach } from "@/lib/nutrition/smoothing/fetch";
+import {
+  buildCoachSmoothingState,
+  ensureCoachSmoothingRecommendationNotification,
+} from "@/lib/nutrition/smoothing/coach-service";
+import { applySmoothingOverlay } from "@/lib/nutrition/smoothing/apply-overlay";
+import { fetchClientTdeeState } from "@/lib/nutrition/tdee-state";
 
 const querySchema = z.object({
   window: z.enum(["3", "7", "14", "30"]).default("7"),
@@ -123,11 +129,12 @@ export async function GET(
     { data: waterLogs, error: waterError },
     { data: tdeeHistory, error: tdeeError },
     activeSmoothingPlan,
+    clientTdeeState,
   ] = await Promise.all([
       db
         .from("nutrition_protocols")
         .select(
-          "schedule_start_date, tdee_adaptive, tdee_adaptive_at, tdee_data_source, nutrition_protocol_days(position, name, calories, protein_g, carbs_g, fat_g, hydration_ml, carb_cycle_type), nutrition_protocol_schedule_slots(week_index, dow, protocol_day_position)",
+          "id, name, schedule_start_date, tdee_adaptive, tdee_adaptive_at, tdee_data_source, nutrition_protocol_days(position, name, calories, protein_g, carbs_g, fat_g, hydration_ml, carb_cycle_type), nutrition_protocol_schedule_slots(week_index, dow, protocol_day_position)",
         )
         .eq("client_id", clientId)
         .eq("status", "shared")
@@ -157,6 +164,7 @@ export async function GET(
         .gte("calculated_at", earliestRange.start.toISOString())
         .order("calculated_at", { ascending: true }),
       fetchActiveSmoothingPlanForCoach(db as any, user.id, clientId),
+      fetchClientTdeeState(db as any, clientId),
     ]);
 
   if (protocolError || mealsError || waterError || tdeeError) {
@@ -265,7 +273,7 @@ export async function GET(
           ? "partial"
           : "complete";
 
-    const target = {
+    let target = {
       calories: protocolDay?.calories != null ? Number(protocolDay.calories) : null,
       protein_g: protocolDay?.protein_g != null ? Number(protocolDay.protein_g) : null,
       carbs_g: protocolDay?.carbs_g != null ? Number(protocolDay.carbs_g) : null,
@@ -275,6 +283,25 @@ export async function GET(
           ? Number(protocolDay.hydration_ml)
           : null,
     };
+
+    const smoothingDay = smoothingByDate.get(dateKey);
+    if (smoothingDay && target.calories != null) {
+      const overlay = applySmoothingOverlay({
+        kcal: target.calories,
+        protein_g: target.protein_g ?? 0,
+        carbs_g: target.carbs_g ?? 0,
+        fat_g: target.fat_g ?? 0,
+        water_ml: target.hydration_ml ?? 0,
+      }, [smoothingDay]);
+
+      target = {
+        calories: overlay.target.kcal,
+        protein_g: overlay.target.protein_g,
+        carbs_g: overlay.target.carbs_g,
+        fat_g: overlay.target.fat_g,
+        hydration_ml: overlay.target.water_ml,
+      };
+    }
 
     return { mealsForDay, hydration_ml, dayKind, completeness, target };
   }
@@ -373,6 +400,27 @@ export async function GET(
   });
 
   const summary = buildNutritionHubSummary(days);
+  const smoothingRecommendation = await buildCoachSmoothingState({
+    db,
+    coachId: user.id,
+    clientId,
+    date: today,
+  });
+  void ensureCoachSmoothingRecommendationNotification({
+    db,
+    coachId: user.id,
+    clientId,
+    protocolId: smoothingRecommendation.protocolId,
+    sourceDate: today,
+    proposal: activeSmoothingPlan ? {
+      eligible: false,
+      thresholdKcal: smoothingRecommendation.proposal.thresholdKcal,
+      rawDeltaKcal: smoothingRecommendation.proposal.rawDeltaKcal,
+      smoothableDeltaKcal: 0,
+      direction: null,
+      recommendedDurationDays: null,
+    } : smoothingRecommendation.proposal,
+  }).catch(() => {});
   const dataQuality = {
     validDays: days.filter((day) => day.completeness === "complete").length,
     partialDays: days.filter((day) => day.completeness === "partial").length,
@@ -402,9 +450,9 @@ export async function GET(
     insights: buildNutritionHubInsights(insightInputs),
     agenda,
     energy: {
-      protocolTdee: (protocol as any)?.tdee_adaptive ?? null,
-      protocolTdeeAt: (protocol as any)?.tdee_adaptive_at ?? null,
-      tdeeDataSource: (protocol as any)?.tdee_data_source ?? null,
+      clientTdee: clientTdeeState?.current_tdee ?? (protocol as any)?.tdee_adaptive ?? null,
+      clientTdeeAt: clientTdeeState?.current_tdee_at ?? (protocol as any)?.tdee_adaptive_at ?? null,
+      tdeeDataSource: clientTdeeState?.source ?? (protocol as any)?.tdee_data_source ?? null,
       tdeeHistory: ((tdeeHistory ?? []) as any[]).map((point) => ({
         calculated_at: point.calculated_at,
         tdee_adaptive: Number(point.tdee_adaptive ?? 0),
@@ -440,5 +488,18 @@ export async function GET(
           })),
         }
       : null,
+    smoothingRecommendation:
+      !activeSmoothingPlan && smoothingRecommendation.proposal.eligible
+        ? {
+            date: smoothingRecommendation.date,
+            protocolId: smoothingRecommendation.protocolId,
+            protocolName: smoothingRecommendation.protocolName,
+            proposal: smoothingRecommendation.proposal,
+            previewDays: smoothingRecommendation.previewDays,
+            actionUrl: smoothingRecommendation.protocolId
+              ? `/coach/clients/${clientId}/protocoles/nutrition/${smoothingRecommendation.protocolId}/edit?smoothingDate=${smoothingRecommendation.date}&tab=builder`
+              : `/coach/clients/${clientId}/protocoles/nutrition`,
+          }
+        : null,
   });
 }

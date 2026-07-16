@@ -41,8 +41,9 @@ export async function GET(req: NextRequest) {
   const { data: events, error } = await db
     .from('progression_events')
     .select(`
-      id, exercise_id, session_log_id,
+      id, exercise_id, exercise_name, exercise_key, session_log_id,
       sets_completed, reps_per_set, weight_kg, rir_values,
+      eligible_sets_count, set_types, target_rir_values, rep_max_values,
       trigger_type, previous_weight_kg, new_weight_kg, increment_applied,
       created_at,
       program_exercises ( name )
@@ -63,10 +64,11 @@ export async function GET(req: NextRequest) {
   }>()
 
   for (const ev of (events ?? [])) {
-    const name = (ev.program_exercises as any)?.name ?? 'Exercice inconnu'
+    const name = ev.exercise_name ?? (ev.program_exercises as any)?.name ?? 'Exercice inconnu'
+    const groupKey = ev.exercise_key ?? ev.exercise_id
 
-    if (!map.has(ev.exercise_id)) {
-      map.set(ev.exercise_id, {
+    if (!map.has(groupKey)) {
+      map.set(groupKey, {
         exercise_id: ev.exercise_id,
         exercise_name: name,
         events: [],
@@ -75,7 +77,7 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    const group = map.get(ev.exercise_id)!
+    const group = map.get(groupKey)!
     group.events.push(ev)
 
     if (ev.trigger_type === 'overload') {

@@ -37,6 +37,12 @@ export type FoodCompatibility = {
   suggestedAlternatives?: FoodItem[]
 }
 
+const MACRO_ENERGY = {
+  protein: 4,
+  carbs: 4,
+  fat: 9,
+} as const
+
 function roundToStep(value: number, step = 5): number {
   if (!Number.isFinite(value) || value <= 0) return 0
   return Math.max(step, Math.round(value / step) * step)
@@ -53,6 +59,97 @@ function toEstimated(item: FoodItem, grams: number) {
   const fat = Math.round(item.fat_per_100g * factor * 10) / 10
   const calories = Math.round(item.kcal_per_100g * factor)
   return { calories, protein, carbs, fat }
+}
+
+function scaleRemainingTarget(value: number, fraction: number): number {
+  return value > 0 ? value * fraction : value
+}
+
+function getOverflowPenaltyMultiplier(remainingBefore: number): number {
+  if (remainingBefore <= 0) return 0.8
+  if (remainingBefore <= 10) return 1.25
+  if (remainingBefore <= 20) return 1.15
+  return 1.05
+}
+
+function getMacroValue(
+  estimated: ReturnType<typeof toEstimated>,
+  macro: AdvisorMacroKey,
+): number {
+  if (macro === 'protein') return estimated.protein
+  if (macro === 'carbs') return estimated.carbs
+  return estimated.fat
+}
+
+function evaluateCandidateScore({
+  remainingTargets,
+  estimated,
+  priorityMacro,
+}: {
+  remainingTargets: Pick<NutritionMacros, 'protein_g' | 'carbs_g' | 'fat_g'>
+  estimated: ReturnType<typeof toEstimated>
+  priorityMacro?: AdvisorMacroKey
+}) {
+  const macroMap = {
+    protein: remainingTargets.protein_g,
+    carbs: remainingTargets.carbs_g,
+    fat: remainingTargets.fat_g,
+  } as const
+
+  let benefit = 0
+  let harm = 0
+  const covered = { protein: 0, carbs: 0, fat: 0 }
+  const addedOverflow = { protein: 0, carbs: 0, fat: 0 }
+
+  for (const macro of ['protein', 'carbs', 'fat'] as const) {
+    const remainingBefore = macroMap[macro]
+    const intake = getMacroValue(estimated, macro)
+    const deficitBefore = Math.max(remainingBefore, 0)
+    const deficitAfter = Math.max(remainingBefore - intake, 0)
+    const overflowBefore = Math.max(-remainingBefore, 0)
+    const overflowAfter = Math.max(-(remainingBefore - intake), 0)
+    const coveredAmount = deficitBefore - deficitAfter
+    const overflowAdded = overflowAfter - overflowBefore
+    const rewardMultiplier = priorityMacro === macro ? 1.1 : 1
+    const penaltyMultiplier = getOverflowPenaltyMultiplier(remainingBefore)
+    const energy = MACRO_ENERGY[macro]
+
+    covered[macro] = coveredAmount
+    addedOverflow[macro] = overflowAdded
+    benefit += coveredAmount * energy * rewardMultiplier
+    harm += overflowAdded * energy * penaltyMultiplier
+  }
+
+  return {
+    covered,
+    addedOverflow,
+    benefit,
+    harm,
+    score: benefit - harm,
+  }
+}
+
+function getPrimaryCoveredMacro(covered: Record<AdvisorMacroKey, number>): AdvisorMacroKey | null {
+  return (['protein', 'carbs', 'fat'] as const)
+    .filter(macro => covered[macro] > 0)
+    .sort((a, b) => {
+      const energyDelta = covered[b] * MACRO_ENERGY[b] - covered[a] * MACRO_ENERGY[a]
+      if (energyDelta !== 0) return energyDelta
+      return covered[b] - covered[a]
+    })[0] ?? null
+}
+
+function getCoveredMacroConflictWarning(
+  remainingTargets: Pick<NutritionMacros, 'protein_g' | 'carbs_g' | 'fat_g'>,
+  estimated: ReturnType<typeof toEstimated>,
+): string | undefined {
+  if (remainingTargets.fat_g <= 0 && estimated.fat >= 8) {
+    return "Cet aliment ajoute des lipides alors qu'ils sont deja couverts."
+  }
+  if (remainingTargets.carbs_g <= 0 && estimated.carbs >= 12) {
+    return 'Cet aliment ajoute des glucides alors que cet objectif est deja couvert.'
+  }
+  return undefined
 }
 
 export function isCompletionMode(
@@ -82,76 +179,80 @@ export function suggestFoodQuantity({
   applyMealFraction?: boolean
 }): SuggestedFoodQuantity | null {
   const foodProfile = buildFoodMetabolicProfile(food)
-  const resolvedPriority = priorityMacro ?? getDominantMacroProfile(food)
-  if (!resolvedPriority) return null
-
-  const densityByMacro = {
-    protein: food.protein_per_100g,
-    carbs: food.carbs_per_100g,
-    fat: food.fat_per_100g,
-  } as const
-
   const fraction = applyMealFraction ? getMealFraction(remainingTargets) : 1.0
-  const completion = applyMealFraction && isCompletionMode(remainingTargets)
-
-  const remainingByMacro = {
-    protein: remainingTargets.protein_g * fraction,
-    carbs: remainingTargets.carbs_g * fraction,
-    fat: remainingTargets.fat_g * fraction,
+  const adjustedRemainingTargets = {
+    protein_g: scaleRemainingTarget(remainingTargets.protein_g, fraction),
+    carbs_g: scaleRemainingTarget(remainingTargets.carbs_g, fraction),
+    fat_g: scaleRemainingTarget(remainingTargets.fat_g, fraction),
   } as const
+  const resolvedPriority = priorityMacro ?? getDominantMacroProfile(food) ?? undefined
+  const end = Math.max(5, roundToStep(foodProfile.maxPortionG))
 
-  // Completion mode: min-grams across non-zero macros to avoid any overflow
-  if (completion) {
-    const options: Array<{ rawG: number; macro: AdvisorMacroKey }> = []
-    if (densityByMacro.protein > 0 && remainingByMacro.protein > 0)
-      options.push({ rawG: (remainingByMacro.protein / densityByMacro.protein) * 100, macro: 'protein' })
-    if (densityByMacro.carbs > 0 && remainingByMacro.carbs > 0)
-      options.push({ rawG: (remainingByMacro.carbs / densityByMacro.carbs) * 100, macro: 'carbs' })
-    if (densityByMacro.fat > 0 && remainingByMacro.fat > 0)
-      options.push({ rawG: (remainingByMacro.fat / densityByMacro.fat) * 100, macro: 'fat' })
-    if (options.length === 0) return null
-    const best = options.reduce((a, b) => (a.rawG <= b.rawG ? a : b))
-    const tooSmall = best.rawG < foodProfile.minPortionG
-    const grams = roundToStep(clampGrams(best.rawG, foodProfile.minPortionG, foodProfile.maxPortionG))
+  let best:
+    | {
+        grams: number
+        estimated: ReturnType<typeof toEstimated>
+        evaluation: ReturnType<typeof evaluateCandidateScore>
+      }
+    | null = null
+
+  for (let grams = 0; grams <= end; grams += 5) {
     const estimated = toEstimated(food, grams)
-    const bounded = best.rawG > foodProfile.maxPortionG
-    return {
-      grams,
-      macroFilled: best.macro,
-      estimatedMacros: estimated,
-      warning: tooSmall
-        ? "Ton repas couvre bien les besoins — ajout optionnel."
-        : bounded
-          ? "Portion plafonnee pour rester realiste sur cet aliment."
-          : undefined,
+    const evaluation = evaluateCandidateScore({
+      remainingTargets: adjustedRemainingTargets,
+      estimated,
+      priorityMacro: resolvedPriority,
+    })
+
+    if (
+      !best ||
+      evaluation.score > best.evaluation.score ||
+      (
+        evaluation.score === best.evaluation.score &&
+        evaluation.harm < best.evaluation.harm
+      ) ||
+      (
+        evaluation.score === best.evaluation.score &&
+        evaluation.harm === best.evaluation.harm &&
+        evaluation.benefit > best.evaluation.benefit
+      )
+    ) {
+      best = { grams, estimated, evaluation }
     }
   }
 
-  // Normal mode: fill dominant macro with fraction cap
-  let macroToFill: AdvisorMacroKey | null = resolvedPriority
-  if (remainingByMacro[macroToFill] <= 0 || densityByMacro[macroToFill] <= 0) {
-    const fallback = (['protein', 'carbs', 'fat'] as const)
-      .filter(m => remainingByMacro[m] > 0 && densityByMacro[m] > 0)
-      .sort((a, b) => remainingByMacro[b] * densityByMacro[b] - remainingByMacro[a] * densityByMacro[a])[0]
-    macroToFill = fallback ?? null
+  if (!best || best.grams <= 0 || best.evaluation.score <= 0 || best.evaluation.benefit <= 0) {
+    return null
   }
 
-  if (!macroToFill) return null
+  const macroFilled = getPrimaryCoveredMacro(best.evaluation.covered)
+  if (!macroFilled) return null
 
-  const rawGrams = (remainingByMacro[macroToFill] / densityByMacro[macroToFill]) * 100
-  const grams = roundToStep(clampGrams(rawGrams, foodProfile.minPortionG, foodProfile.maxPortionG))
-  const estimated = toEstimated(food, grams)
-
-  let warning: string | undefined
-  if (rawGrams > foodProfile.maxPortionG) {
-    warning = "Portion plafonnee pour rester realiste sur cet aliment."
-  } else if (remainingTargets.fat_g <= 0 && estimated.fat >= 8) {
-    warning = "Cet aliment ajoute des lipides alors qu'ils sont deja couverts."
-  } else if (remainingTargets.carbs_g <= 0 && estimated.carbs >= 12) {
-    warning = 'Cet aliment ajoute des glucides alors que cet objectif est deja couvert.'
+  let warning = getCoveredMacroConflictWarning(remainingTargets, best.estimated)
+  if (!warning) {
+    const overflowMacro = (['protein', 'carbs', 'fat'] as const).find(macro => {
+      if (best.evaluation.addedOverflow[macro] <= 0) return false
+      if (macro !== macroFilled) return true
+      const remainingForMacro = macro === 'protein'
+        ? remainingTargets.protein_g
+        : macro === 'carbs'
+          ? remainingTargets.carbs_g
+          : remainingTargets.fat_g
+      return remainingForMacro <= 0
+    })
+    if (overflowMacro) {
+      const labels = {
+        protein: 'proteines',
+        carbs: 'glucides',
+        fat: 'lipides',
+      } as const
+      warning = `Cette portion aide surtout pour le reste, mais ajoute aussi un peu de ${labels[overflowMacro]}.`
+    } else if (best.grams < foodProfile.minPortionG) {
+      warning = "Ton repas couvre bien les besoins — ajout optionnel."
+    }
   }
 
-  return { grams, macroFilled: macroToFill, estimatedMacros: estimated, warning }
+  return { grams: best.grams, macroFilled, estimatedMacros: best.estimated, warning }
 }
 
 export function evaluateFoodCompatibility({
@@ -219,7 +320,22 @@ export function suggestQuantityForItem(
   remaining: Pick<NutritionMacros, 'protein_g' | 'carbs_g' | 'fat_g'>,
 ): ComposeAdvisorSuggestion | null {
   const next = suggestFoodQuantity({ food: item, remainingTargets: remaining, applyMealFraction: true })
-  if (!next) return null
+  if (!next) {
+    const dominant = getDominantMacroProfile(item) ?? 'protein'
+    return {
+      grams: 0,
+      macro: dominant,
+      reason: "Cet aliment n'aide pas assez les besoins restants sans aggraver les macros deja couverts.",
+      warning: "Mieux vaut choisir un aliment qui cible davantage les macros encore manquants.",
+      preview: {
+        kcal: 0,
+        protein_g: 0,
+        carbs_g: 0,
+        fat_g: 0,
+        water_ml: 0,
+      },
+    }
+  }
 
   const label = next.macroFilled === 'protein'
     ? 'proteines'

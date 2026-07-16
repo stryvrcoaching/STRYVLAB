@@ -288,7 +288,7 @@ export function buildNutritionHubInsights(
       id: "protein-low",
       severity: "alert",
       title: "Protéines insuffisantes",
-      message: `Protéines sous cible ${lowProteinDays} jours sur la fenêtre observée.`,
+      message: `Apport en protéines sous la cible sur ${lowProteinDays} jours de la période observée.`,
     });
   }
 
@@ -324,8 +324,8 @@ export function buildNutritionHubInsights(
     insights.push({
       id: "off-day-over",
       severity: "watch",
-      title: "Dépassement les jours off",
-      message: `Surconsommation repérée sur ${offDayOverages} jours off.`,
+      title: "Apports trop élevés les jours de repos",
+      message: `Surconsommation repérée sur ${offDayOverages} jours de repos.`,
     });
   }
 

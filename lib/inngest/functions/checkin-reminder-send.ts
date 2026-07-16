@@ -1,5 +1,7 @@
 import { inngest } from '@/lib/inngest/client'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { createClientAppNotification } from '@/lib/notifications/create-client-app-notification'
+import { computePhysiologicalDateInTimezone } from '@/lib/client/checkin/timeWindows'
 
 function service() {
   return createServiceClient(
@@ -8,31 +10,19 @@ function service() {
   )
 }
 
-const MOMENT_LABELS: Record<string, { title: string; body: string; url: string }> = {
+const CHECKIN_COPY = {
   morning: {
-    title: 'Check-in du matin',
-    body: "Comment s'est passée ta nuit ?",
-    url: '/client/checkin/morning',
+    copyKey: 'checkin.morning',
   },
   evening: {
-    title: 'Check-in du soir',
-    body: 'Comment tu te sens ce soir ?',
-    url: '/client/checkin/evening',
+    copyKey: 'checkin.evening',
   },
-}
+} as const
 
 export const checkinReminderSendFunction = inngest.createFunction(
   { id: 'checkin-reminder-send', retries: 1, triggers: [{ cron: '* * * * *' }] },
   async ({ step }) => {
     await step.run('send-push-reminders', async () => {
-      const vapidPublic = process.env.VAPID_PUBLIC_KEY
-      const vapidPrivate = process.env.VAPID_PRIVATE_KEY
-      const vapidSubject = process.env.VAPID_SUBJECT
-
-      if (!vapidPublic || !vapidPrivate || !vapidSubject) {
-        return { sent: 0, reason: 'vapid_not_configured' }
-      }
-
       const { data: schedules } = await service()
         .from('daily_checkin_schedules')
         .select('client_id, moment, scheduled_time, timezone')
@@ -50,20 +40,6 @@ export const checkinReminderSendFunction = inngest.createFunction(
         new Set((configs ?? []).map((c) => c.client_id as string))
       )
       if (activeIds.length === 0) return { sent: 0 }
-
-      const { data: clients } = await service()
-        .from('coach_clients')
-        .select('id, push_token')
-        .in('id', activeIds)
-        .not('push_token', 'is', null)
-
-      if (!clients || clients.length === 0) return { sent: 0 }
-
-      const pushMap = new Map(clients.map((c) => [c.id as string, c.push_token as string]))
-
-      // Dynamic import to avoid bundling web-push in non-cron paths
-      const webpush = await import('web-push').then((m) => m.default ?? m)
-      webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate)
 
       const configByClient = new Map(
         (configs ?? []).map((c) => [c.client_id as string, (c.days_of_week as number[]) ?? []])
@@ -108,23 +84,39 @@ export const checkinReminderSendFunction = inngest.createFunction(
         const scheduled = String(schedule.scheduled_time).slice(0, 5)
         if (![current, minusOne, plusOne].includes(scheduled)) continue
 
-        const token = pushMap.get(schedule.client_id as string)
-        if (!token) continue
+        const moment =
+          schedule.moment as keyof typeof CHECKIN_COPY
+        const config = CHECKIN_COPY[moment]
+        if (!config) continue
 
-        const payload = MOMENT_LABELS[schedule.moment as string]
-        if (!payload) continue
+        const date = computePhysiologicalDateInTimezone(now, timezone)
+
+        const db = service()
+        const tag = `stryv-checkin-${clientId}-${moment}-${date}`
+        const { data: existing } = await db
+          .from('coach_client_notifications')
+          .select('id')
+          .eq('client_id', clientId)
+          .eq('type', 'system_reminder')
+          .contains('payload', { event: 'checkin_reminder', date, moment })
+          .limit(1)
+
+        if (existing?.length) continue
 
         try {
-          await webpush.sendNotification(
-            JSON.parse(token),
-            JSON.stringify(payload)
-          )
+          await createClientAppNotification(db, {
+            clientId,
+            coachId: null,
+            type: 'system_reminder',
+            copyKey: config.copyKey,
+            actionUrl: `/client?openCheckin=${moment}&date=${encodeURIComponent(date)}`,
+            payload: { event: 'checkin_reminder', date, moment, push_tag: tag },
+            pushKind: 'checkin',
+            pushTag: tag,
+          })
           sent++
         } catch {
-          await service()
-            .from('coach_clients')
-            .update({ push_token: null })
-            .eq('id', schedule.client_id)
+          // A failed push must not stop reminders for other clients.
         }
       }
 

@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { AlertCircle } from "lucide-react";
 import AssessmentForm from "@/components/assessments/form/AssessmentForm";
 import { BlockConfig, type ResponseMap } from "@/types/assessment";
+import { extractTemplateBlocks } from "@/lib/assessments/templateSnapshot";
 
 interface SubmissionData {
   id: string;
   status: string;
   filled_by: string;
-  template_snapshot: BlockConfig[];
+  template_snapshot: BlockConfig[] | { name?: string | null; blocks?: BlockConfig[] | null };
   client: { first_name: string; last_name: string };
   responses?: Array<{
     block_id: string;
@@ -68,7 +70,10 @@ export default function BilanPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-surface font-sans flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+        <div className="flex flex-col items-center gap-5">
+          <Image src="/logo/logo-stryvr-silver.png" alt="STRYVR" width={40} height={40} className="h-10 w-10 object-contain" />
+          <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+        </div>
       </div>
     );
   }
@@ -77,6 +82,7 @@ export default function BilanPage() {
     return (
       <div className="min-h-screen bg-surface font-sans flex items-center justify-center p-6">
         <div className="bg-surface rounded-card shadow-soft-out p-10 text-center max-w-sm w-full">
+          <Image src="/logo/logo-stryvr-silver.png" alt="STRYVR" width={40} height={40} className="mx-auto mb-5 h-10 w-10 object-contain" />
           <AlertCircle size={48} className="text-red-400 mx-auto mb-4" />
           <h2 className="text-lg font-bold text-primary mb-2">Lien invalide</h2>
           <p className="text-sm text-secondary">{error}</p>
@@ -90,7 +96,7 @@ export default function BilanPage() {
   return (
     <AssessmentForm
       submissionId={data.id}
-      blocks={data.template_snapshot}
+      blocks={extractTemplateBlocks(data.template_snapshot)}
       token={token}
       clientName={`${data.client.first_name} ${data.client.last_name}`}
       isCoach={false}

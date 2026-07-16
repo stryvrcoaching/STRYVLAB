@@ -3,15 +3,17 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ct, type ClientLang } from "@/lib/i18n/clientTranslations"
+import { useClientT } from "@/components/client/ClientI18nProvider"
 import ChatTodayStrip from "./ChatTodayStrip"
 import ChatConversation from "./ChatConversation"
 import ChatInputBar from "./ChatInputBar"
 import { type ChatMessage, type InteractiveMetadata } from "./ChatBubble"
 import { ActiveCheckinFlow, type CheckinFlowHandle } from "./checkin/CheckinFlow"
-import { MORNING_FLOW, EVENING_FLOW, type CheckinData } from "@/lib/client/checkin/flows"
+import { buildCheckinReadyCopy, getCheckinFlow, type CheckinData } from "@/lib/client/checkin/flows"
 import { determineSlotForClick } from "@/lib/client/checkin/checkinEngine"
-import { getPendingSlots, type PendingSlot } from "@/lib/client/checkin/pendingCheckins"
+import { type CheckinAvailability, type PendingSlot } from "@/lib/client/checkin/pendingCheckins"
 import { emitClientInboxUpdated } from "@/lib/client/inboxEvents"
+import { sendClientMutation } from "@/lib/client/offline-mutations"
 import {
   clearCheckinDraft,
   loadCheckinDraft,
@@ -64,6 +66,7 @@ type TodayData = {
     evening: boolean
     pendingCount?: number
     activeWindow?: 'morning' | 'evening' | null
+    availability?: CheckinAvailability
     sessions?: { flow_type: string; completed_at: string | null; date?: string }[]
   }
   calories: { logged: number; target: number }
@@ -71,10 +74,12 @@ type TodayData = {
 }
 
 export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitial: initialCoachInitial, clientFirstName, lang = 'fr' }: ChatPageProps) {
+  const { lang: providerLang, t } = useClientT()
+  const currentLang = providerLang || lang
   const QUICK_SUGGESTIONS = [
-    ct(lang, 'chat.qs1'),
-    ct(lang, 'chat.qs2'),
-    ct(lang, 'chat.qs3'),
+    ct(currentLang, 'chat.qs1'),
+    ct(currentLang, 'chat.qs2'),
+    ct(currentLang, 'chat.qs3'),
   ]
 
   // Client-side fetch overrides SSR props — ensures fresh signed URL and avoids stale data
@@ -82,6 +87,8 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
   const [coachInitial, setCoachInitial] = useState<string | null>(initialCoachInitial ?? null)
 
   useEffect(() => {
+    if (initialAvatarUrl || initialCoachInitial) return
+
     fetch('/api/client/coach-info')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
@@ -90,7 +97,7 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
         if (data.initial)   setCoachInitial(data.initial)
       })
       .catch(() => {})
-  }, [])
+  }, [initialAvatarUrl, initialCoachInitial])
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -112,11 +119,26 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
     setMessages(prev => [...prev, msg])
   }, [])
 
+  const getInteractiveOptionLabel = useCallback((messageId: string, value: number) => {
+    const message = messages.find((entry) => entry.id === messageId)
+    const options = message?.metadata?.options ?? []
+    return options.find((option) => option.value === value)?.label ?? String(value)
+  }, [messages])
+
   const updateMessage = useCallback((id: string, metaPatch: Partial<InteractiveMetadata>) => {
     setMessages(prev => prev.map(m => {
       if (m.id !== id) return m
       return { ...m, metadata: { ...(m.metadata ?? {}), ...metaPatch } as InteractiveMetadata }
     }))
+  }, [])
+
+  const refreshTodayStrip = useCallback(() => {
+    return fetch('/api/client/chat/today-strip')
+      .then(r => r.ok ? r.json() : null)
+      .then((todayRaw) => {
+        if (todayRaw) setTodayData(todayRaw)
+      })
+      .catch(() => {})
   }, [])
 
   const handleFlowComplete = useCallback(async (
@@ -142,13 +164,14 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
       }
       if (json.remaining !== undefined) setRemaining(json.remaining)
       // Refresh today strip to update check-in status
-      fetch('/api/client/chat/today-strip').then(r => r.json()).then(setTodayData).catch(() => {})
+      refreshTodayStrip()
+      emitClientInboxUpdated()
     } catch {
       // Silent fail — check-in was saved
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [refreshTodayStrip])
 
   const handleMessagesSeen = useCallback(async (messageIds: string[]) => {
     if (messageIds.length === 0) return
@@ -162,10 +185,11 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
     emitClientInboxUpdated()
 
     try {
-      await fetch('/api/client/inbox/seen', {
+      await sendClientMutation({
+        kind: 'notification',
+        url: '/api/client/inbox/seen',
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chatMessageIds: messageIds }),
+        body: { chatMessageIds: messageIds },
       })
       emitClientInboxUpdated()
     } catch {
@@ -174,12 +198,11 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
   }, [])
 
   const refreshChatData = useCallback(() => {
-    return Promise.all([
-      fetch('/api/client/chat/messages').then(r => r.json()),
-      fetch('/api/client/chat/today-strip').then(r => r.json()),
-    ]).then(([msgData, todayRaw]) => {
+    return fetch('/api/client/chat/messages')
+      .then(r => r.json())
+      .then((msgData) => {
       setMessages(msgData.messages ?? [])
-      setTodayData(todayRaw)
+      setTodayData(msgData.todayStrip ?? null)
       setInitialized(true)
     }).catch(() => setInitialized(true))
   }, [])
@@ -225,19 +248,24 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
       { flow_type: 'evening', completed_at: todayData.checkin?.evening ? 'done' : null },
     ]
 
-    const slot = determineSlotForClick(new Date(), timezone, sessionRows)
+    const slot = determineSlotForClick(
+      new Date(),
+      timezone,
+      sessionRows,
+      todayData.checkin.availability,
+    )
     if (!slot) {
       setMessages(prev => [...prev, {
         id: `done-${Date.now()}`,
         role: 'assistant',
-        content: 'Check-ins à jour ✓ Reviens plus tard !',
+        content: t('chat.checkin.uptodate'),
         message_type: 'text',
         created_at: new Date().toISOString(),
       }])
       return
     }
     startCheckinSlot(slot)
-  }, [todayData, startCheckinSlot])
+  }, [todayData, startCheckinSlot, t])
 
   const hasSessionToday = Boolean(todayData?.sessions?.length)
 
@@ -248,11 +276,12 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
       const flowType = meta?.flow_type
 
       if (value === 2) {
+        const selectedLabel = getInteractiveOptionLabel(messageId, value)
         updateMessage(messageId, { answered: true })
         const res = await fetch('/api/client/chat/checkin-action', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message_id: messageId, action: 'defer' }),
+          body: JSON.stringify({ message_id: messageId, action: 'defer', selected_label: selectedLabel }),
         }).catch(() => {})
         const payload = res && 'json' in res ? await res.json().catch(() => null) : null
         const persisted = Array.isArray(payload?.messages) ? payload.messages as ChatMessage[] : []
@@ -262,14 +291,14 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
           addMessage({
             id: `defer-${Date.now()}`,
             role: 'user',
-            content: 'Plus tard',
+            content: selectedLabel,
             message_type: 'quick_reply',
             created_at: new Date().toISOString(),
           })
           addMessage({
             id: `defer-followup-${Date.now()}`,
             role: 'assistant',
-            content: meta?.defer_message || 'Très bien. Quand tu es prêt, clique sur le bouton Check-in juste au-dessus.',
+            content: meta?.defer_message || buildCheckinReadyCopy(currentLang, (flowType as 'morning' | 'evening') ?? 'morning').deferMessage,
             message_type: 'text',
             created_at: new Date().toISOString(),
           })
@@ -278,11 +307,12 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
       }
 
       if (value === 1 && flowType) {
+        const selectedLabel = getInteractiveOptionLabel(messageId, value)
         updateMessage(messageId, { answered: true })
         const res = await fetch('/api/client/chat/checkin-action', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message_id: messageId, action: 'mark_answered' }),
+          body: JSON.stringify({ message_id: messageId, action: 'mark_answered', selected_label: selectedLabel }),
         }).catch(() => {})
         const payload = res && 'json' in res ? await res.json().catch(() => null) : null
         const persisted = Array.isArray(payload?.messages) ? payload.messages as ChatMessage[] : []
@@ -292,15 +322,19 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
           addMessage({
             id: `ready-${Date.now()}`,
             role: 'user',
-            content: 'Oui',
+            content: selectedLabel,
             message_type: 'quick_reply',
             created_at: new Date().toISOString(),
           })
         }
         const timezone = todayData?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
         const sessions = todayData?.checkin?.sessions ?? []
-        const pending = getPendingSlots(new Date(), timezone, sessions)
-        const slot = pending.find(p => p.flow_type === flowType) ?? pending[0]
+        const slot = determineSlotForClick(
+          new Date(),
+          timezone,
+          sessions,
+          todayData?.checkin?.availability,
+        )
         if (slot) startCheckinSlot(slot)
         return
       }
@@ -311,8 +345,60 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
       handleCheckinClick()
       return
     }
-    flowHandle?.handleInteract(messageId, key, value)
-  }, [flowHandle, handleCheckinClick, updateMessage, messages, addMessage, startCheckinSlot, todayData])
+
+    if (flowHandle) {
+      flowHandle.handleInteract(messageId, key, value)
+      return
+    }
+
+    const selectedLabel = getInteractiveOptionLabel(messageId, value)
+    updateMessage(messageId, { answered: true })
+    setIsLoading(true)
+    try {
+      const res = await fetch('/api/client/chat/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: selectedLabel,
+          message_type: 'quick_reply',
+          parent_message_id: messageId,
+          responds_to_message_id: messageId,
+          metadata: {
+            key,
+            value,
+          },
+        }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setMessages(prev => [
+          ...prev,
+          data.userMessage,
+          ...(data.botMessage ? [data.botMessage] : []),
+        ])
+        if (data.remaining !== undefined) setRemaining(data.remaining)
+      } else {
+        addMessage({
+          id: `reply-${Date.now()}`,
+          role: 'user',
+          content: selectedLabel,
+          message_type: 'quick_reply',
+          created_at: new Date().toISOString(),
+        })
+      }
+    } catch {
+      addMessage({
+        id: `reply-${Date.now()}`,
+        role: 'user',
+        content: selectedLabel,
+        message_type: 'quick_reply',
+        created_at: new Date().toISOString(),
+      })
+    } finally {
+      setIsLoading(false)
+    }
+    return
+  }, [flowHandle, handleCheckinClick, updateMessage, messages, addMessage, startCheckinSlot, todayData, getInteractiveOptionLabel, currentLang])
 
   const handleSkip = useCallback((messageId: string, key: string) => {
     flowHandle?.handleSkip(messageId, key)
@@ -423,13 +509,16 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
   return (
     <div
       className="fixed inset-x-0 top-0 flex flex-col bg-[#0d0d0d]"
-      style={{ bottom: "calc(96px + env(safe-area-inset-bottom, 0px))" }}
+      style={{
+        paddingTop: "env(safe-area-inset-top, 0px)",
+        bottom: "calc(var(--client-bottom-nav-reserved) + 12px)",
+      }}
     >
       {/* Active flow — renders null, manages flow state */}
       {activeSlot && (
         <ActiveCheckinFlow
           key={flowKey}
-          flow={activeSlot.flow_type === 'morning' ? MORNING_FLOW : EVENING_FLOW}
+          flow={getCheckinFlow(activeSlot.flow_type, currentLang)}
           hasSessionToday={hasSessionToday}
           clientFirstName={clientFirstName}
           initialProgress={draftProgress?.slot.date === activeSlot.date && draftProgress?.slot.flow_type === activeSlot.flow_type
@@ -453,7 +542,11 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
         />
       )}
 
-      <ChatTodayStrip onCheckinClick={handleCheckinClick} />
+      <ChatTodayStrip
+        data={todayData}
+        onCheckinClick={handleCheckinClick}
+        onRefresh={refreshTodayStrip}
+      />
 
       {isEmpty ? (
         <div className="flex-1 flex flex-col items-center justify-center px-6 gap-5 overflow-hidden">
@@ -476,11 +569,11 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
           >
             <p className="text-[17px] font-barlow font-semibold text-white leading-snug">
               {clientFirstName
-                ? ct(lang, 'chat.greeting', { name: clientFirstName })
-                : ct(lang, 'chat.greetingAnon')}
+                ? ct(currentLang, 'chat.greeting', { name: clientFirstName })
+                : ct(currentLang, 'chat.greetingAnon')}
             </p>
             <p className="text-[13px] text-[#5a5a5a] font-barlow mt-1">
-              {ct(lang, 'chat.subtitle')}
+              {ct(currentLang, 'chat.subtitle')}
             </p>
           </motion.div>
 
@@ -524,7 +617,7 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
             className="shrink-0 overflow-hidden"
           >
             <div className="px-4 py-2 text-center text-[11px] text-[#5a5a5a] font-barlow bg-[#111111]">
-              Limite journalière atteinte · Reviens demain
+              {ct(currentLang, 'chat.dailyLimitReached')} · {ct(currentLang, 'chat.comeBackTomorrow')}
             </div>
           </motion.div>
         )}

@@ -131,6 +131,30 @@ describe('computeTransformationScore', () => {
     expect(result.insufficientData).toBe(true)
   })
 
+  it('returns explicit insufficient_data analysis state when no signal is interpretable', () => {
+    const result = computeTransformationScore(makeInput({
+      checkin: { field_averages: {}, response_rate: null, configured_days_count: 0 },
+      performance: {
+        analysis: {
+          exercises: [],
+          global_overreaching: false,
+        },
+        sessionsCount: 0,
+        weeklyFrequency: 4,
+      },
+      bodyData: {
+        weightSeries: [],
+        bodyFatSeries: [],
+        leanMassSeries: [],
+        trainingGoal: 'hypertrophy',
+      },
+    }))
+    expect(result.analysisState).toBe('insufficient_data')
+    expect(result.analysisStateReason).toContain('aucun check-in coach')
+    expect(result.analysisStateReason).toContain('aucune séance loggée')
+    expect(result.analysisStateReason).toContain('aucun bilan corporel')
+  })
+
   it('redistributes weights when a dimension has insufficient data', () => {
     const input = makeInput({
       bodyData: { weightSeries: [], bodyFatSeries: [], leanMassSeries: [], trainingGoal: 'hypertrophy' },
@@ -192,6 +216,27 @@ describe('computeTransformationScore', () => {
     expect(recoveryAlert?.severity).toBe('high')
   })
 
+  it('keeps performance analyzable when exercises have overload signals and exposes explanations', () => {
+    const result = computeTransformationScore(makeInput({
+      performance: {
+        analysis: {
+          exercises: [
+            { completion_rate: 0.95, avg_rir: 1.5, overloads_last_4_weeks: 2, stagnation: false, overreaching: false },
+            { completion_rate: 0.9, avg_rir: 2, overloads_last_4_weeks: 1, stagnation: false, overreaching: false },
+          ],
+          global_overreaching: false,
+        },
+        sessionsCount: 4,
+        weeklyFrequency: 4,
+      },
+    }))
+
+    expect(result.dimensions.performance.score).toBeGreaterThan(70)
+    expect(result.dimensions.performance.explanation).toContain('événements de surcharge')
+    expect(result.dimensions.performance.metrics?.some((metric) => metric.label === 'Exercices avec événement de surcharge')).toBe(true)
+    expect(result.dimensions.performance.metrics?.some((metric) => metric.label === 'Règle de surcharge suivie')).toBe(true)
+  })
+
   it('returns no high-severity alerts for a perfect client', () => {
     const perfect = makeInput({
       checkin: {
@@ -212,6 +257,7 @@ describe('computeTransformationScore', () => {
     })
     const result = computeTransformationScore(perfect)
     expect(result.alerts.filter(a => a.severity === 'high').length).toBe(0)
+    expect(result.analysisState).toBe('ready')
   })
 
   it('alerts are sorted high → medium → low', () => {

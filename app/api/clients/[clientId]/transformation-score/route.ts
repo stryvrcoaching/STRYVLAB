@@ -21,6 +21,7 @@ import {
   type SetLogEntry,
 } from '@/lib/performance/analyzer'
 import { resolveCanonicalExerciseKey, resolveCanonicalExerciseName } from '@/lib/training/exerciseHistoryKey'
+import { resolveClientAccessRole } from '@/lib/security/client-resource-access'
 
 function service() {
   return createServiceClient(
@@ -44,12 +45,15 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   const { data: clientData } = await db
     .from('coach_clients')
-    .select('id, transformation_phase, training_goal, weekly_frequency, score_weights_config, gender')
+    .select('id, user_id, coach_id, transformation_phase, training_goal, weekly_frequency, score_weights_config, gender')
     .eq('id', params.clientId)
-    .eq('coach_id', user.id)
     .single()
 
   if (!clientData) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  if (!resolveClientAccessRole(clientData, user.id)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const url = new URL(req.url)
   const parsed = querySchema.safeParse({ window: url.searchParams.get('window') ?? 7 })
@@ -70,7 +74,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   const [checkinRes, sessionRes, progressionRes, metricsRes, configRes] = await Promise.all([
     db.from('client_daily_checkins')
-      .select('date, flow_type, sleep_hours, sleep_quality, energy_level, stress_level, muscle_soreness, hunger_level')
+      .select('date, flow_type, sleep_hours, sleep_quality, energy_level, stress_level, muscle_soreness, hunger_level, weight_kg')
       .eq('client_id', params.clientId)
       .gte('date', periodStartDate)
       .order('date', { ascending: true }),
@@ -96,7 +100,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     db.from('daily_checkin_configs')
       .select('days_of_week')
       .eq('client_id', params.clientId)
-      .eq('coach_id', user.id)
+      .eq('coach_id', clientData.coach_id)
       .maybeSingle(),
   ])
 
@@ -222,6 +226,21 @@ export async function GET(req: NextRequest, { params }: Params) {
       if (r.field_key === 'lean_mass_kg') leanMassSeries.push({ date, value: r.value_number })
     }
   }
+
+  const weightByDate = new Map(weightSeries.map((point) => [point.date, point]))
+  for (const row of checkinRows) {
+    if (row.weight_kg != null) {
+      weightByDate.set(String(row.date), {
+        date: String(row.date),
+        value: Number(row.weight_kg),
+      })
+    }
+  }
+  weightSeries.splice(
+    0,
+    weightSeries.length,
+    ...Array.from(weightByDate.values()).sort((left, right) => left.date.localeCompare(right.date)),
+  )
 
   const latestBodyFat = bodyFatSeries.length > 0
     ? bodyFatSeries[bodyFatSeries.length - 1].value

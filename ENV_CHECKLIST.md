@@ -16,6 +16,8 @@
 - [ ] `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` = `pk_live_xxxxx` (pas `pk_test_`)
 - [ ] `STRIPE_SECRET_KEY` = `sk_live_xxxxx` (pas `sk_test_`)
 - [ ] `STRIPE_WEBHOOK_SECRET` = `whsec_xxxxx`
+- [ ] `STRIPE_CONNECT_CLIENT_ID` = `ca_xxxxx` (encaissements clients coach)
+- [ ] `STRIPE_CONNECT_CLIENT_ID` = `ca_xxxxx` (encaissements clients coach)
 - [ ] `STRIPE_PRICE_TIER1_RAPPORT` = `price_xxxxx` (Price ID LIVE)
 - [ ] `STRIPE_PRICE_TIER2_PROTOCOL` = `price_xxxxx` (Price ID LIVE)
 - [ ] `STRIPE_PRICE_TIER3_COACHING` = `price_xxxxx` (Price ID LIVE)
@@ -40,6 +42,12 @@
 
 ## 📝 Où Trouver Chaque Variable
 
+### Stripe Connect (encaissements clients coach)
+1. Active Stripe Connect sur le compte plateforme.
+2. Dans les réglages Connect, déclare l’URL de retour : `https://ton-domaine.com/api/stripe/connect/callback`.
+3. Ajoute `STRIPE_CONNECT_CLIENT_ID` dans les variables d’environnement.
+4. Crée un endpoint webhook Connect distinct avant d’activer les premiers coachs.
+
 ### Supabase
 1. Va sur [supabase.com](https://supabase.com) → Ton projet
 2. Settings → API
@@ -51,6 +59,12 @@
 3. Developers → API Keys → Copie les clés LIVE
 4. Products → Copie les Price IDs des produits LIVE
 5. Developers → Webhooks → Crée/modifie endpoint → Copie Signing Secret
+
+### Stripe Connect (encaissements clients coach)
+1. Active Stripe Connect sur le compte plateforme.
+2. Dans les réglages Connect, déclare l’URL de retour : `https://ton-domaine.com/api/stripe/connect/callback`.
+3. Ajoute `STRIPE_CONNECT_CLIENT_ID` dans les variables d’environnement.
+4. Crée un endpoint webhook Connect distinct avant d’activer les premiers coachs.
 
 ### Resend
 1. Va sur [resend.com](https://resend.com)
@@ -147,6 +161,8 @@ Une fois toutes les variables configurées dans Vercel :
 
 
 
+# Purge des comptes
 
-
+- `ACCOUNT_PURGE_ENABLED=false` lors de la migration et du premier déploiement.
+- Passer à `true` uniquement après validation d’un compte de test résilié, du manifeste Storage et des alertes de revue légale.
 

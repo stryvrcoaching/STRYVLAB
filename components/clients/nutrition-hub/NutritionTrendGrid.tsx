@@ -11,25 +11,10 @@ import {
   YAxis,
 } from "recharts";
 import { NUTRITION_UI_COLORS } from "@/lib/nutrition/ui-colors";
-import NutritionEnergyAnalytics from "./NutritionEnergyAnalytics";
+import NutritionEnergyAnalytics, { type NutritionEnergyTrendPoint } from "./NutritionEnergyAnalytics";
 import NutritionMetricSpotlight from "./NutritionMetricSpotlight";
 
-type TrendPoint = {
-  date: string;
-  consumed: {
-    calories: number;
-    protein_g: number;
-    hydration_ml: number;
-    carbs_g?: number;
-    fat_g?: number;
-  };
-  target: {
-    calories: number | null;
-    protein_g: number | null;
-    hydration_ml: number | null;
-    carbs_g?: number | null;
-    fat_g?: number | null;
-  };
+type TrendPoint = NutritionEnergyTrendPoint & {
   dayKind?: "training" | "off" | "unknown";
 };
 
@@ -42,8 +27,8 @@ type TooltipRow = {
 type NutritionTrendVariant = "summary" | "macros" | "hydration";
 
 type EnergyData = {
-  protocolTdee: number | null;
-  protocolTdeeAt: string | null;
+  clientTdee: number | null;
+  clientTdeeAt: string | null;
   tdeeDataSource: string | null;
   tdeeHistory: Array<{
     calculated_at: string;
@@ -163,13 +148,16 @@ function PremiumTooltip({
   const rows = buildRows(point);
 
   return (
-    <div className="min-w-[220px] rounded-2xl border border-white/[0.08] bg-[#121212]/96 p-3 shadow-[0_20px_50px_rgba(0,0,0,0.45)] backdrop-blur-md">
-      <p className="text-[11px] font-semibold capitalize text-white/88">
+    <div className="min-w-[228px] max-w-[260px] rounded-[22px] border border-white/[0.1] bg-[linear-gradient(180deg,rgba(24,24,24,0.98),rgba(16,16,16,0.96))] p-3.5 shadow-[0_24px_60px_rgba(0,0,0,0.48)] backdrop-blur-xl">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/42">
         {point.rawDate ? formatFullDate(point.rawDate) : label}
       </p>
-      <div className="mt-3 space-y-2">
+      <div className="mt-3 space-y-2.5">
         {rows.map((row) => (
-          <div key={row.label} className="flex items-center justify-between gap-4 text-[12px]">
+          <div
+            key={row.label}
+            className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.04] bg-white/[0.03] px-2.5 py-2 text-[12px]"
+          >
             <div className="flex items-center gap-2 text-white/62">
               <span
                 className="h-2.5 w-2.5 rounded-full"
@@ -199,9 +187,13 @@ function TrendChart({
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data}>
           <CartesianGrid stroke="#ffffff12" vertical={false} />
-          <XAxis dataKey="date" stroke="#ffffff55" tickLine={false} axisLine={false} />
-          <YAxis stroke="#ffffff55" tickLine={false} axisLine={false} />
-          <Tooltip content={<PremiumTooltip buildRows={tooltipRows} />} />
+          <XAxis dataKey="date" stroke="#ffffff55" tickLine={false} axisLine={false} fontSize={11} />
+          <YAxis stroke="#ffffff55" tickLine={false} axisLine={false} fontSize={11} />
+          <Tooltip
+            cursor={{ stroke: "rgba(255,255,255,0.18)", strokeDasharray: "4 4" }}
+            wrapperStyle={{ outline: "none" }}
+            content={<PremiumTooltip buildRows={tooltipRows} />}
+          />
           {lines.map((line) => (
             <Line
               key={line.key}
@@ -228,10 +220,12 @@ function ComparisonCard({
   calories: number;
 }) {
   return (
-    <div className="rounded-[18px] border border-white/[0.06] bg-white/[0.04] p-3">
+    <div className="rounded-[20px] border border-white/[0.06] bg-white/[0.05] p-4 min-h-[136px] flex flex-col justify-between">
       <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">{title}</p>
-      <p className="mt-2 text-lg font-semibold text-white">{days} jours</p>
-      <p className="mt-2 text-[12px] text-white/46">{calories} kcal moyennes consommées</p>
+      <div className="space-y-2">
+        <p className="text-[26px] font-semibold leading-none text-white">{days} jours</p>
+        <p className="text-[12px] text-white/50">{calories} kcal moyennes consommées</p>
+      </div>
     </div>
   );
 }
@@ -248,15 +242,17 @@ function HydrationComparisonCard({
   achievement: number | null;
 }) {
   return (
-    <div className="rounded-[18px] border border-white/[0.06] bg-white/[0.04] p-3">
+    <div className="rounded-[20px] border border-white/[0.06] bg-white/[0.05] p-4 min-h-[136px] flex flex-col justify-between">
       <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">{title}</p>
-      <p className="mt-2 text-lg font-semibold text-white">{days} jours</p>
-      <p className="mt-2 text-[12px] text-white/75">{hydration} ml moyens</p>
-      <p className="mt-1 text-[12px] text-white/46">
+      <div className="space-y-2">
+        <p className="text-[26px] font-semibold leading-none text-white">{days} jours</p>
+        <p className="text-[12px] text-white/75">{hydration} ml moyens</p>
+        <p className="text-[12px] text-white/46">
         {achievement !== null
           ? `${achievement}% de la cible hydrique`
           : "Cible hydrique non disponible"}
-      </p>
+        </p>
+      </div>
     </div>
   );
 }
@@ -310,7 +306,7 @@ function SummaryCards({
             color: COLORS.calories,
           },
           {
-            label: "Objectif calories",
+            label: "Cible calories",
             value: `${Math.round(point.targetCalories)} kcal`,
             color: COLORS.target,
           },
@@ -333,7 +329,7 @@ function SummaryCards({
             color: COLORS.protein,
           },
           {
-            label: "Objectif protéines",
+            label: "Cible protéines",
             value: `${Math.round(point.targetProtein)} g`,
             color: COLORS.target,
           },
@@ -356,8 +352,54 @@ function SummaryCards({
             color: COLORS.hydration,
           },
           {
-            label: "Objectif hydratation",
+            label: "Cible hydratation",
             value: `${Math.round(point.targetHydration)} ml`,
+            color: COLORS.target,
+          },
+        ]}
+      />
+
+      <ChartCard
+        label="Glucides"
+        value="Précision glucidique"
+        detail="Vérifie si la disponibilité énergétique suit la cible sur la fenêtre active."
+        data={data}
+        lines={[
+          { key: "consumedCarbs", color: COLORS.carbs, width: 2.5 },
+          { key: "targetCarbs", color: COLORS.target, width: 2 },
+        ]}
+        tooltipRows={(point) => [
+          {
+            label: "Glucides consommés",
+            value: `${Math.round(point.consumedCarbs)} g`,
+            color: COLORS.carbs,
+          },
+          {
+            label: "Cible glucides",
+            value: `${Math.round(point.targetCarbs)} g`,
+            color: COLORS.target,
+          },
+        ]}
+      />
+
+      <ChartCard
+        label="Lipides"
+        value="Stabilité lipidique"
+        detail="Suit la constance lipidique et les écarts utiles pour la lecture coach."
+        data={data}
+        lines={[
+          { key: "consumedFat", color: COLORS.fat, width: 2.5 },
+          { key: "targetFat", color: COLORS.target, width: 2 },
+        ]}
+        tooltipRows={(point) => [
+          {
+            label: "Lipides consommés",
+            value: `${Math.round(point.consumedFat)} g`,
+            color: COLORS.fat,
+          },
+          {
+            label: "Cible lipides",
+            value: `${Math.round(point.targetFat)} g`,
             color: COLORS.target,
           },
         ]}
@@ -368,7 +410,7 @@ function SummaryCards({
         value={`${trainingDays.length} / ${offDays.length}`}
         detail="Comparer rapidement la réalité nutritionnelle entre jours d’entraînement et jours de repos."
       >
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 xl:gap-4">
           <ComparisonCard
             title="Jours d’entraînement"
             days={trainingDays.length}
@@ -404,7 +446,7 @@ function MacroCards({ data }: { data: ReturnType<typeof chartRows> }) {
             color: COLORS.calories,
           },
           {
-            label: "Objectif calories",
+            label: "Cible calories",
             value: `${Math.round(point.targetCalories)} kcal`,
             color: COLORS.target,
           },
@@ -427,7 +469,7 @@ function MacroCards({ data }: { data: ReturnType<typeof chartRows> }) {
             color: COLORS.protein,
           },
           {
-            label: "Objectif protéines",
+            label: "Cible protéines",
             value: `${Math.round(point.targetProtein)} g`,
             color: COLORS.target,
           },
@@ -450,7 +492,7 @@ function MacroCards({ data }: { data: ReturnType<typeof chartRows> }) {
             color: COLORS.carbs,
           },
           {
-            label: "Objectif glucides",
+            label: "Cible glucides",
             value: `${Math.round(point.targetCarbs)} g`,
             color: COLORS.target,
           },
@@ -473,7 +515,7 @@ function MacroCards({ data }: { data: ReturnType<typeof chartRows> }) {
             color: COLORS.fat,
           },
           {
-            label: "Objectif lipides",
+            label: "Cible lipides",
             value: `${Math.round(point.targetFat)} g`,
             color: COLORS.target,
           },
@@ -515,7 +557,7 @@ function HydrationCards({
             color: COLORS.hydration,
           },
           {
-            label: "Objectif hydratation",
+            label: "Cible hydratation",
             value: `${Math.round(point.targetHydration)} ml`,
             color: COLORS.target,
           },
@@ -528,7 +570,7 @@ function HydrationCards({
           value={`${trainingDays.length} / ${offDays.length}`}
           detail="Cette lecture aide à voir si l’hydratation décroche surtout les jours d’entraînement, quand les besoins pratiques sont souvent plus élevés."
         >
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2 xl:gap-4">
             <HydrationComparisonCard
               title="Jours d’entraînement"
               days={trainingDays.length}
@@ -549,26 +591,26 @@ function HydrationCards({
           value={`${doubleUnderDays} jours liés`}
           detail="Ici, on ne cherche pas une causalité automatique. On repère simplement les journées où l’hydratation et les glucides décrochent ensemble, car ce duo peut compliquer l’exécution autour des séances."
         >
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-[18px] border border-white/[0.06] bg-white/[0.04] p-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:gap-4">
+            <div className="rounded-[20px] border border-white/[0.06] bg-white/[0.05] p-4 min-h-[136px] flex flex-col justify-between">
               <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">
                 Hydratation sous cible
               </p>
-              <p className="mt-2 text-lg font-semibold text-white">
+              <p className="text-[26px] font-semibold leading-none text-white">
                 {underHydrationDays} jours
               </p>
-              <p className="mt-2 text-[12px] text-white/46">
+              <p className="text-[12px] text-white/46">
                 Fenêtre active avec au moins 10% d’écart sous la cible hydrique.
               </p>
             </div>
-            <div className="rounded-[18px] border border-white/[0.06] bg-white/[0.04] p-3">
+            <div className="rounded-[20px] border border-white/[0.06] bg-white/[0.05] p-4 min-h-[136px] flex flex-col justify-between">
               <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">
                 Double sous-cible
               </p>
-              <p className="mt-2 text-lg font-semibold text-white">
+              <p className="text-[26px] font-semibold leading-none text-white">
                 {doubleUnderDays} jours
               </p>
-              <p className="mt-2 text-[12px] text-white/46">
+              <p className="text-[12px] text-white/46">
                 Jours où l’hydratation et les glucides passent ensemble sous la zone attendue.
               </p>
             </div>
@@ -613,10 +655,14 @@ export default function NutritionTrendGrid({
   return (
     <section className="space-y-4">
       {energy ? <NutritionEnergyAnalytics points={points} energy={energy} /> : null}
-      <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
+      {rightRail ? (
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.92fr)]">
+          <SummaryCards data={data} trainingDays={trainingDays} offDays={offDays} />
+          <div className="space-y-4">{rightRail}</div>
+        </div>
+      ) : (
         <SummaryCards data={data} trainingDays={trainingDays} offDays={offDays} />
-        {rightRail ? <div className="space-y-4">{rightRail}</div> : null}
-      </div>
+      )}
     </section>
   );
 }

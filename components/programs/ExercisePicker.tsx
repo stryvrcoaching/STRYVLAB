@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
-import Image from "next/image";
 import { Search, X, SlidersHorizontal, Check, Plus, ChevronDown } from "lucide-react";
 import exerciseCatalog from "@/data/exercise-catalog.json";
 import CustomExerciseModal from "@/components/programs/CustomExerciseModal";
+import {
+  deriveFiberTargets,
+  FIBERS_BY_GROUP as EXERCISE_FIBERS_BY_GROUP,
+  FIBER_LABELS as EXERCISE_FIBER_LABELS,
+} from "@/lib/programs/intelligence/exercise-fibers";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,6 +32,7 @@ interface CatalogEntry {
   primaryMuscle?: string | null;
   primaryActivation?: number | null;
   secondaryMuscles?: string[];
+  fiberTargets?: string[];
   secondaryActivations?: number[];
   stabilizers?: string[];
   jointStressSpine?: number | null;
@@ -83,6 +88,7 @@ const MUSCLE_LABELS: Record<string, string> = {
   "avant-bras": "Avant-bras",
   adducteurs: "Adducteurs",
   abducteurs: "Abducteurs",
+  cardio: "Cardio",
 };
 
 const PATTERN_LABELS: Record<string, string> = {
@@ -96,6 +102,9 @@ const PATTERN_LABELS: Record<string, string> = {
   knee_flexion: "Flexion genou",
   knee_extension: "Extension genou",
   calf_raise: "Mollets",
+  wrist_flexion: "Flexion poignet",
+  wrist_extension: "Extension poignet",
+  forearm_rotation: "Rotation avant-bras",
   elbow_flexion: "Biceps",
   elbow_extension: "Triceps",
   lateral_raise: "Élévation lat.",
@@ -109,63 +118,8 @@ const PATTERN_LABELS: Record<string, string> = {
   shoulder_rotation: "Rotation épaule",
   scapular_retraction: "Rétraction scap.",
   scapular_protraction: "Protraction scap.",
+  cardio: "Cardio",
 };
-
-// Faisceaux anatomiquement liés à chaque groupe musculaire (map statique, indépendante du catalogue)
-const FIBERS_BY_GROUP: Record<string, string[]> = {
-  fessiers:          ['gluteus_maximus', 'gluteus_medius', 'gluteus_minimus'],
-  epaules:           ['anterior_deltoid', 'medial_deltoid', 'posterior_deltoid', 'rotator_cuff', 'subscapularis'],
-  pectoraux:         ['pectoralis_major', 'pectoralis_major_upper', 'pectoralis_major_lower', 'pectoralis_minor'],
-  dos:               ['latissimus_dorsi', 'lats', 'upper_back', 'rhomboids', 'trapezius', 'trapezius_upper', 'trapezius_middle', 'trapezius_lower', 'traps', 'upper_traps', 'spine_erectors'],
-  biceps:            ['biceps_brachii', 'brachialis'],
-  triceps:           ['triceps_brachii'],
-  quadriceps:        ['quadriceps', 'rectus_femoris', 'vastus_lateralis', 'vastus_medialis'],
-  'ischio-jambiers': ['hamstrings', 'biceps_femoris', 'semimembranosus', 'semitendinosus'],
-  mollets:           ['gastrocnemius', 'soleus'],
-  abdos:             ['rectus_abdominis', 'lower_abs', 'obliques', 'transverse_abdominis', 'core', 'core_global'],
-  lombaires:         ['spine_erectors'],
-  'avant-bras':        ['brachioradialis', 'extensor_carpi_radialis', 'extensor_carpi_ulnaris', 'flexor_carpi_radialis', 'flexor_carpi_ulnaris', 'palmaris_longus', 'pronator_teres', 'supinator', 'wrist_flexors', 'wrist_extensors', 'finger_flexors', 'grip_flexors', 'pronators_supinators', 'forearm_flexors', 'forearm_stabilizers', 'wrist_stabilizers'],
-  adducteurs:        ['adductors'],
-  abducteurs:        ['abductors'],
-}
-
-// Faisceau précis EN → label FR (même mapping que BIOMECH_TO_FR + FIBER_LABEL_FR côté scoring)
-const FIBER_LABELS: Record<string, string> = {
-  // Fessiers
-  gluteus_maximus: 'Grand fessier', gluteus_medius: 'Moyen fessier', gluteus_minimus: 'Petit fessier', glutes: 'Fessiers',
-  // Ischio-jambiers
-  hamstrings: 'Ischio-jambiers', biceps_femoris: 'Biceps fémoral', semimembranosus: 'Semi-membraneux', semitendinosus: 'Semi-tendineux',
-  // Quadriceps
-  quadriceps: 'Quadriceps', rectus_femoris: 'Droit fémoral', vastus_lateralis: 'Vaste latéral', vastus_medialis: 'Vaste médial',
-  // Dos
-  latissimus_dorsi: 'Grand dorsal', lats: 'Grand dorsal', upper_back: 'Dos sup.', rhomboids: 'Rhomboïdes',
-  trapezius: 'Trapèze', trapezius_upper: 'Trapèze sup.', trapezius_middle: 'Trapèze moy.', trapezius_lower: 'Trapèze inf.',
-  traps: 'Trapèze', upper_traps: 'Trapèze sup.', spine_erectors: 'Érecteurs rachis',
-  // Pectoraux
-  pectoralis_major: 'Grand pectoral', pectoralis_major_upper: 'Grand pect. sup.', pectoralis_major_lower: 'Grand pect. inf.', pectoralis_minor: 'Petit pectoral',
-  // Épaules
-  deltoid_anterior: 'Deltoïde ant.', deltoid_lateral: 'Deltoïde lat.', deltoid_posterior: 'Deltoïde post.',
-  anterior_deltoid: 'Deltoïde ant.', medial_deltoid: 'Deltoïde lat.', posterior_deltoid: 'Deltoïde post.',
-  rotator_cuff: 'Coiffe rotateurs', subscapularis: 'Subscapulaire',
-  // Bras
-  biceps_brachii: 'Biceps', brachialis: 'Brachial ant.', triceps_brachii: 'Triceps',
-  // Avant-bras
-  brachioradialis: 'Brachio-radial', extensor_carpi_radialis: 'Ext. carpi rad.', extensor_carpi_ulnaris: 'Ext. carpi uln.',
-  flexor_carpi_radialis: 'Fléch. carpi rad.', flexor_carpi_ulnaris: 'Fléch. carpi uln.',
-  palmaris_longus: 'Palmaire long', pronator_teres: 'Rond pronateur', supinator: 'Supinateur',
-  wrist_flexors: 'Fléch. poignet', wrist_extensors: 'Ext. poignet',
-  finger_flexors: 'Fléch. doigts', grip_flexors: 'Fléch. grip',
-  pronators_supinators: 'Pronateurs/Supinateurs', forearm_flexors: 'Fléch. avant-bras',
-  forearm_stabilizers: 'Stab. avant-bras', wrist_stabilizers: 'Stab. poignet',
-  // Mollets
-  gastrocnemius: 'Gastrocnémien', soleus: 'Soléaire',
-  // Core
-  rectus_abdominis: 'Droit abdominal', lower_abs: 'Abdominaux inf.', obliques: 'Obliques',
-  transverse_abdominis: 'Transverse', core: 'Sangle abdominale', core_global: 'Sangle abdominale',
-  // Autres stabilisateurs
-  hip_flexors: 'Fléch. hanche', adductors: 'Adducteurs', abductors: 'Abducteurs',
-  knee: 'Genou', ankle: 'Cheville', calves: 'Mollets',
-}
 
 // Termes de recherche FR → slugs EN du catalogue (pour la recherche textuelle par muscle)
 const SEARCH_MUSCLE_ALIASES: Array<{ terms: string[]; slugs: string[] }> = [
@@ -191,6 +145,7 @@ const SEARCH_MUSCLE_ALIASES: Array<{ terms: string[]; slugs: string[] }> = [
   { terms: ['adducteur', 'adducteurs', 'interieur cuisse', 'intérieur cuisse'], slugs: ['adductors'] },
   { terms: ['abducteur', 'abducteurs', 'exterieur cuisse', 'extérieur cuisse'], slugs: ['abductors'] },
   { terms: ['flechisseur', 'flechisseurs hanche', 'psoas', 'hip flexor'], slugs: ['hip_flexors'] },
+  { terms: ['cardio', 'endurance', 'rameur', 'velo', 'course', 'tapis', 'stepper'], slugs: ['cardio'] },
 ]
 
 const EQUIPMENT_LABELS: Record<string, string> = {
@@ -235,6 +190,7 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
   const [filterFiber, setFilterFiber] = useState<string>('')
   const [customExercises, setCustomExercises] = useState<CatalogEntry[]>([])
   const [showCustomModal, setShowCustomModal] = useState(false)
+  const [brokenImageIds, setBrokenImageIds] = useState<Set<string>>(new Set())
 
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -295,6 +251,14 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
     ...customExercises,
   ], [customExercises])
 
+  const fiberTargetsByExerciseId = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    allExercises.forEach((entry) => {
+      map[entry.id] = deriveFiberTargets(entry);
+    });
+    return map;
+  }, [allExercises]);
+
   // All unique values for filter dropdowns
   const allPatterns = useMemo(() => {
     const s = new Set<string>();
@@ -342,18 +306,15 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
         const muscles = (e.muscles ?? []).map(normalize)
         const pattern = (e.pattern ?? []).map((p: string) => normalize(PATTERN_LABELS[p] ?? p)).join(' ')
         const equip = (e.equipment ?? []).map(eq => normalize(EQUIPMENT_LABELS[eq] ?? eq))
-        const pm = e.primaryMuscle ?? ''
-        const secondaries = e.secondaryMuscles ?? []
-        const stabilizers = e.stabilizers ?? []
-        const allBiomechSlugs = [pm, ...secondaries, ...stabilizers].filter(Boolean)
-        const allFiberLabels = allBiomechSlugs.map(s => normalize(FIBER_LABELS[s] ?? s))
+        const allFiberSlugs = fiberTargetsByExerciseId[e.id] ?? []
+        const allFiberLabels = allFiberSlugs.map(s => normalize(EXERCISE_FIBER_LABELS[s] ?? s))
         const textMatch =
           name.includes(q) || slug.includes(q) || group.includes(q) ||
           muscles.some(m => m.includes(q)) || pattern.includes(q) ||
           equip.some(eq => eq.includes(q)) ||
           allFiberLabels.some(l => l.includes(q))
         const aliasMatch = matchedSlugs.size > 0 &&
-          allBiomechSlugs.some(s => matchedSlugs.has(s))
+          allFiberSlugs.some(s => matchedSlugs.has(s))
         return textMatch || aliasMatch
       })
     }
@@ -364,12 +325,7 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
 
     if (filterFiber) {
       results = results.filter((e) => {
-        const allSlugs = [
-          e.primaryMuscle ?? '',
-          ...(e.secondaryMuscles ?? []),
-          ...(e.stabilizers ?? []),
-        ].filter(Boolean)
-        return allSlugs.includes(filterFiber)
+        return (fiberTargetsByExerciseId[e.id] ?? []).includes(filterFiber)
       })
     }
 
@@ -405,6 +361,7 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
     filterCompound,
     filterType,
     allExercises,
+    fiberTargetsByExerciseId,
   ]);
 
   const activeFiltersCount = [
@@ -420,45 +377,77 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
   const availableFibers = useMemo(() => {
     const counts: Record<string, number> = {}
     allExercises.forEach((e) => {
-      const allSlugs = [
-        e.primaryMuscle ?? '',
-        ...(e.secondaryMuscles ?? []),
-        ...(e.stabilizers ?? []),
-      ].filter(Boolean)
-      allSlugs.forEach(s => { counts[s] = (counts[s] ?? 0) + 1 })
+      ;(fiberTargetsByExerciseId[e.id] ?? []).forEach((fiber) => {
+        counts[fiber] = (counts[fiber] ?? 0) + 1
+      })
     })
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .map(([slug]) => slug)
-      .filter(s => FIBER_LABELS[s])
-  }, [allExercises])
+      .filter(s => EXERCISE_FIBER_LABELS[s])
+  }, [allExercises, fiberTargetsByExerciseId])
 
-  // Faisceaux affichés dans le filtre : map statique si groupe sélectionné, sinon tous les slugs connus
+  // Faisceaux affichés dans le filtre : ordre métier par groupe, mais uniquement si des exercices existent.
   const adaptedFibers = useMemo(() => {
-    if (filterMuscle && FIBERS_BY_GROUP[filterMuscle]) {
-      return FIBERS_BY_GROUP[filterMuscle].filter(s => FIBER_LABELS[s])
+    if (filterMuscle && EXERCISE_FIBERS_BY_GROUP[filterMuscle]) {
+      const counts: Record<string, number> = {}
+      allExercises
+        .filter((entry) => entry.muscleGroup === filterMuscle)
+        .forEach((entry) => {
+          ;(fiberTargetsByExerciseId[entry.id] ?? []).forEach((fiber) => {
+            counts[fiber] = (counts[fiber] ?? 0) + 1
+          })
+        })
+      return EXERCISE_FIBERS_BY_GROUP[filterMuscle].filter((fiber) => (counts[fiber] ?? 0) > 0)
     }
-    // Pas de groupe sélectionné : tous les faisceaux du catalogue triés par fréquence
     return availableFibers
-  }, [filterMuscle, availableFibers])
+  }, [filterMuscle, availableFibers, allExercises, fiberTargetsByExerciseId])
 
   // Adaptive: patterns limited to those present in exercises matching current muscleGroup + fiber filters
   const adaptedPatterns = useMemo(() => {
     let base = allExercises
     if (filterMuscle) base = base.filter(e => e.muscleGroup === filterMuscle)
     if (filterFiber) base = base.filter(e => {
-      const allSlugs = [e.primaryMuscle ?? '', ...(e.secondaryMuscles ?? []), ...(e.stabilizers ?? [])].filter(Boolean)
-      return allSlugs.includes(filterFiber)
+      return (fiberTargetsByExerciseId[e.id] ?? []).includes(filterFiber)
     })
     const seen = new Set<string>()
     base.forEach(e => e.pattern.forEach((p: string) => seen.add(p)))
     return allPatterns.filter(p => seen.has(p))
-  }, [allExercises, filterMuscle, filterFiber, allPatterns])
+  }, [allExercises, filterMuscle, filterFiber, allPatterns, fiberTargetsByExerciseId])
+
+  function selectExercise(exercise: CatalogEntry) {
+    onSelect({
+      name: exercise.name,
+      gifUrl: exercise.gifUrl,
+      movementPattern: exercise.movementPattern ?? null,
+      equipment: exercise.equipment ?? [],
+      isCompound: exercise.isCompound ?? false,
+      primaryMuscles: exercise.primaryMuscle
+        ? [exercise.primaryMuscle]
+        : exercise.muscles ?? [],
+      secondaryMuscles: exercise.secondaryMuscles ?? [],
+      plane: exercise.plane ?? null,
+      mechanic: exercise.mechanic ?? null,
+      unilateral: exercise.unilateral ?? false,
+      primaryMuscle: exercise.primaryMuscle ?? null,
+      primaryActivation: exercise.primaryActivation ?? null,
+      secondaryMusclesDetail: exercise.secondaryMuscles ?? [],
+      secondaryActivations: exercise.secondaryActivations ?? [],
+      stabilizers: exercise.stabilizers ?? [],
+      jointStressSpine: exercise.jointStressSpine ?? null,
+      jointStressKnee: exercise.jointStressKnee ?? null,
+      jointStressShoulder: exercise.jointStressShoulder ?? null,
+      globalInstability: exercise.globalInstability ?? null,
+      coordinationDemand: exercise.coordinationDemand ?? null,
+      constraintProfile: exercise.constraintProfile ?? null,
+    })
+    onClose()
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div
-        className="bg-[#181818] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-3xl flex flex-col"
+        className="bg-[#181818] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-5xl flex flex-col"
         style={{ maxHeight: "92vh" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -506,7 +495,7 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
         {/* Filters panel */}
         {showFilters && (
           <div className="px-4 py-3 border-b border-[0.3px] border-white/[0.06] shrink-0 space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {/* Groupe musculaire */}
               <div className="space-y-1">
                 <label className="text-[9px] font-bold text-white/30 uppercase tracking-[0.12em]">Groupe musculaire</label>
@@ -514,7 +503,7 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
                   <select
                     value={filterMuscle}
                     onChange={(e) => { setFilterMuscle(e.target.value); setFilterFiber(""); setFilterPattern(""); }}
-                    className={`w-full appearance-none pl-3 pr-7 h-8 rounded-lg text-[12px] outline-none focus:ring-1 focus:ring-[#1f8a65]/40 cursor-pointer transition-colors ${filterMuscle ? 'bg-[#1f8a65]/10 text-[#1f8a65]' : 'bg-white/[0.04] text-white/80'}`}
+                    className={`w-full appearance-none pl-3 pr-8 h-10 rounded-lg text-[13px] outline-none focus:ring-1 focus:ring-[#1f8a65]/40 cursor-pointer transition-colors ${filterMuscle ? 'bg-[#1f8a65]/10 text-[#1f8a65]' : 'bg-white/[0.04] text-white/80'}`}
                   >
                     <option value="">Tous</option>
                     {availableMuscleGroups.map((v) => (
@@ -534,11 +523,11 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
                   <select
                     value={filterFiber}
                     onChange={(e) => { setFilterFiber(e.target.value); setFilterPattern(""); }}
-                    className={`w-full appearance-none pl-3 pr-7 h-8 rounded-lg text-[12px] outline-none focus:ring-1 focus:ring-[#1f8a65]/40 cursor-pointer transition-colors ${filterFiber ? 'bg-[#1f8a65]/10 text-[#1f8a65]' : 'bg-white/[0.04] text-white/80'}`}
+                    className={`w-full appearance-none pl-3 pr-8 h-10 rounded-lg text-[13px] outline-none focus:ring-1 focus:ring-[#1f8a65]/40 cursor-pointer transition-colors ${filterFiber ? 'bg-[#1f8a65]/10 text-[#1f8a65]' : 'bg-white/[0.04] text-white/80'}`}
                   >
                     <option value="">Tous</option>
                     {adaptedFibers.map((s) => (
-                      <option key={s} value={s}>{FIBER_LABELS[s]}</option>
+                      <option key={s} value={s}>{EXERCISE_FIBER_LABELS[s]}</option>
                     ))}
                   </select>
                   <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
@@ -552,7 +541,7 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
                   <select
                     value={filterPattern}
                     onChange={(e) => setFilterPattern(e.target.value)}
-                    className={`w-full appearance-none pl-3 pr-7 h-8 rounded-lg text-[12px] outline-none focus:ring-1 focus:ring-[#1f8a65]/40 cursor-pointer transition-colors ${filterPattern ? 'bg-[#1f8a65]/10 text-[#1f8a65]' : 'bg-white/[0.04] text-white/80'}`}
+                    className={`w-full appearance-none pl-3 pr-8 h-10 rounded-lg text-[13px] outline-none focus:ring-1 focus:ring-[#1f8a65]/40 cursor-pointer transition-colors ${filterPattern ? 'bg-[#1f8a65]/10 text-[#1f8a65]' : 'bg-white/[0.04] text-white/80'}`}
                   >
                     <option value="">Tous</option>
                     {adaptedPatterns.map((p) => (
@@ -570,7 +559,7 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
                   <select
                     value={filterEquipment}
                     onChange={(e) => setFilterEquipment(e.target.value)}
-                    className={`w-full appearance-none pl-3 pr-7 h-8 rounded-lg text-[12px] outline-none focus:ring-1 focus:ring-[#1f8a65]/40 cursor-pointer transition-colors ${filterEquipment ? 'bg-[#1f8a65]/10 text-[#1f8a65]' : 'bg-white/[0.04] text-white/80'}`}
+                    className={`w-full appearance-none pl-3 pr-8 h-10 rounded-lg text-[13px] outline-none focus:ring-1 focus:ring-[#1f8a65]/40 cursor-pointer transition-colors ${filterEquipment ? 'bg-[#1f8a65]/10 text-[#1f8a65]' : 'bg-white/[0.04] text-white/80'}`}
                   >
                     <option value="">Tous</option>
                     {allEquipment.map((eq) => (
@@ -588,7 +577,7 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
                   <select
                     value={filterCompound}
                     onChange={(e) => setFilterCompound(e.target.value as "all" | "compound" | "isolation")}
-                    className={`w-full appearance-none pl-3 pr-7 h-8 rounded-lg text-[12px] outline-none focus:ring-1 focus:ring-[#1f8a65]/40 cursor-pointer transition-colors ${filterCompound !== 'all' ? 'bg-[#1f8a65]/10 text-[#1f8a65]' : 'bg-white/[0.04] text-white/80'}`}
+                    className={`w-full appearance-none pl-3 pr-8 h-10 rounded-lg text-[13px] outline-none focus:ring-1 focus:ring-[#1f8a65]/40 cursor-pointer transition-colors ${filterCompound !== 'all' ? 'bg-[#1f8a65]/10 text-[#1f8a65]' : 'bg-white/[0.04] text-white/80'}`}
                   >
                     <option value="all">Tous</option>
                     <option value="compound">Polyarticulaire</option>
@@ -605,7 +594,7 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
                   <select
                     value={filterType}
                     onChange={(e) => setFilterType(e.target.value as "all" | "pedagogique")}
-                    className={`w-full appearance-none pl-3 pr-7 h-8 rounded-lg text-[12px] outline-none focus:ring-1 focus:ring-[#1f8a65]/40 cursor-pointer transition-colors ${filterType !== 'all' ? 'bg-[#1f8a65]/10 text-[#1f8a65]' : 'bg-white/[0.04] text-white/80'}`}
+                    className={`w-full appearance-none pl-3 pr-8 h-10 rounded-lg text-[13px] outline-none focus:ring-1 focus:ring-[#1f8a65]/40 cursor-pointer transition-colors ${filterType !== 'all' ? 'bg-[#1f8a65]/10 text-[#1f8a65]' : 'bg-white/[0.04] text-white/80'}`}
                   >
                     <option value="all">Exercices</option>
                     <option value="pedagogique">Démos pédagogiques</option>
@@ -675,7 +664,7 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
             onClose={() => setShowCustomModal(false)}
             onCreated={(ex) => {
               const newEntry: CatalogEntry = {
-                id: `custom-${Date.now()}`,
+                id: ex.id,
                 name: ex.name,
                 slug: ex.name.toLowerCase().replace(/\s+/g, '-'),
                 gifUrl: ex.mediaUrl,
@@ -696,15 +685,9 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
                 coordinationDemand: ex.coordinationDemand,
                 constraintProfile: ex.constraintProfile,
               }
-              setCustomExercises(prev => [...prev, newEntry])
-              // Clear any active filters that could hide the new exercise
-              setFilterMuscle('')
-              setFilterPattern('')
-              setFilterEquipment('')
-              setFilterCompound('all')
-              setSearch('')
-              setSourceFilter('custom')
+              setCustomExercises(prev => [...prev.filter((entry) => entry.id !== newEntry.id), newEntry])
               setShowCustomModal(false)
+              selectExercise(newEntry)
             }}
           />
         )}
@@ -725,48 +708,21 @@ export default function ExercisePicker({ onSelect, onClose }: Props) {
                 <button
                   key={exercise.id}
                   type="button"
-                  onClick={() => {
-                    onSelect({
-                      name: exercise.name,
-                      gifUrl: exercise.gifUrl,
-                      movementPattern: exercise.movementPattern ?? null,
-                      equipment: exercise.equipment ?? [],
-                      isCompound: exercise.isCompound ?? false,
-                      // Priorité : primaryMuscle anatomique précis (ex: 'traps') > muscles[] générique (ex: 'dos')
-                      primaryMuscles: exercise.primaryMuscle
-                        ? [exercise.primaryMuscle]
-                        : exercise.muscles ?? [],
-                      secondaryMuscles: exercise.secondaryMuscles ?? [],
-                      plane: exercise.plane ?? null,
-                      mechanic: exercise.mechanic ?? null,
-                      unilateral: exercise.unilateral ?? false,
-                      primaryMuscle: exercise.primaryMuscle ?? null,
-                      primaryActivation: exercise.primaryActivation ?? null,
-                      secondaryMusclesDetail: exercise.secondaryMuscles ?? [],
-                      secondaryActivations: exercise.secondaryActivations ?? [],
-                      stabilizers: exercise.stabilizers ?? [],
-                      jointStressSpine: exercise.jointStressSpine ?? null,
-                      jointStressKnee: exercise.jointStressKnee ?? null,
-                      jointStressShoulder: exercise.jointStressShoulder ?? null,
-                      globalInstability: exercise.globalInstability ?? null,
-                      coordinationDemand: exercise.coordinationDemand ?? null,
-                      constraintProfile: exercise.constraintProfile ?? null,
-                    })
-                  }}
+                  onClick={() => selectExercise(exercise)}
                   onMouseEnter={() => setHoveredId(exercise.id)}
                   onMouseLeave={() => setHoveredId(null)}
                   className="group relative flex flex-col bg-[#0a0a0a] rounded-2xl overflow-hidden hover:bg-white/[0.04] active:scale-[0.98] transition-all text-left"
                 >
                   {/* GIF */}
                   <div className="relative w-full aspect-square bg-black/5 overflow-hidden">
-                    {exercise.gifUrl ? (
-                      <Image
+                    {exercise.gifUrl && !brokenImageIds.has(exercise.id) ? (
+                      <img
                         src={exercise.gifUrl}
                         alt={exercise.name}
-                        fill
-                        sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
-                        className="object-cover"
-                        unoptimized
+                        loading="lazy"
+                        decoding="async"
+                        onError={() => setBrokenImageIds((previous) => new Set(previous).add(exercise.id))}
+                        className="h-full w-full object-cover"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-[#0a0a0a]">

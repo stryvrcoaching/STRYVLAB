@@ -11,7 +11,12 @@ import ProgramTemplateBuilder from "@/components/programs/ProgramTemplateBuilder
 import AssignTemplateModal from "@/components/programs/AssignTemplateModal";
 import StudioPerformancePanel from "@/components/programs/studio/StudioPerformancePanel";
 import NutritionAlignModal from "@/components/programs/NutritionAlignModal";
+import ProgramPdfModal from "@/components/programs/ProgramPdfModal";
 import { type ClientProfile } from "@/lib/matching/template-matcher";
+import ContextDocsMenu from "@/components/docs/ContextDocsMenu";
+import { getDocsForAudienceAndContext } from "@/lib/docs/registry";
+import HeaderIconButton from "@/components/layout/HeaderIconButton";
+import { publishClientImpact } from "@/lib/coach/client-impact-events";
 
 interface Program {
   id: string;
@@ -39,6 +44,11 @@ export default function EntrainementPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [alignModalProgram, setAlignModalProgram] = useState<Program | null>(null);
   const [alignSource, setAlignSource] = useState<"save" | "toggle" | null>(null);
+  const [pdfProgram, setPdfProgram] = useState<Program | null>(null);
+  const workoutStudioDocs = useMemo(
+    () => getDocsForAudienceAndContext("coach", "workout-studio"),
+    [],
+  );
 
   // Bloquer le scroll de la page quand le builder est ouvert
   useEffect(() => {
@@ -73,25 +83,19 @@ export default function EntrainementPage() {
   const listTopBarRight = useMemo(
     () => (
       <div className="flex items-center gap-2">
-        <button
+        <ContextDocsMenu docs={workoutStudioDocs} compact />
+        <HeaderIconButton
           onClick={() => setShowPerformanceRail((value) => !value)}
-          className={`flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-bold uppercase tracking-[0.1em] transition-all active:scale-[0.98] ${
-            showPerformanceRail
-              ? "bg-[#1f8a65]/12 text-[#7fe2bf] hover:bg-[#1f8a65]/20"
-              : "bg-white/[0.04] text-white/60 hover:bg-white/[0.08] hover:text-white/80"
-          }`}
-        >
-          <Activity size={12} />
-          Performance
-        </button>
-        <button
+          icon={<Activity size={12} />}
+          label="Afficher le rail performance"
+          active={showPerformanceRail}
+        />
+        <HeaderIconButton
           onClick={() => setShowAssignModal(true)}
-          className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white/[0.04] text-white/60 text-[12px] font-bold uppercase tracking-[0.1em] hover:bg-white/[0.08] hover:text-white/80 transition-all active:scale-[0.98]"
-        >
-          <Library size={12} />
-          Assigner un template
-        </button>
-        <button
+          icon={<Library size={12} />}
+          label="Assigner un template"
+        />
+        <HeaderIconButton
           onClick={async () => {
             const res = await fetch("/api/programs", {
               method: "POST",
@@ -110,27 +114,25 @@ export default function EntrainementPage() {
               });
             }
           }}
-          className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[#1f8a65] text-white text-[12px] font-bold uppercase tracking-[0.1em] hover:bg-[#217356] transition-all active:scale-[0.98]"
-        >
-          <Plus size={12} />
-          Nouveau programme
-        </button>
+          icon={<Plus size={12} />}
+          label="Nouveau programme"
+          variant="accent"
+        />
       </div>
     ),
-    [clientId, showPerformanceRail],
+    [clientId, showPerformanceRail, workoutStudioDocs],
   );
 
   // Builder left node — back button + client info
   const builderTopBarLeft = useMemo(
     () => (
       <div className="flex items-center gap-2">
-        <button
+        <HeaderIconButton
           onClick={() => setSelectedProgram(null)}
-          className="h-8 w-8 flex items-center justify-center rounded-lg bg-white/[0.04] border-[0.3px] border-white/[0.06] text-white/50 hover:bg-white/[0.06] hover:text-white/80 transition-all shrink-0"
-          aria-label="Retour"
-        >
-          <ArrowLeft size={15} />
-        </button>
+          icon={<ArrowLeft size={15} />}
+          label="Retour"
+          className="shrink-0"
+        />
         <ClientTopBarLeft pageLabel="Workout Studio" client={client} />
       </div>
     ),
@@ -160,6 +162,7 @@ export default function EntrainementPage() {
             topBarLeft={builderTopBarLeft}
             noFullscreen
             onSaved={(saved) => {
+              publishClientImpact({ clientId, kind: "refresh" });
               if (saved?.is_client_visible) {
                 setAlignModalProgram({ ...selectedProgram!, ...saved });
                 setAlignSource("save");
@@ -186,6 +189,7 @@ export default function EntrainementPage() {
                   setAlignModalProgram(p as Program);
                   setAlignSource("toggle");
                 }}
+                onRequestPdf={(p) => setPdfProgram(p as Program)}
               />
               {showPerformanceRail && (
                 <aside className="rounded-2xl border border-white/[0.06] bg-[#181818] p-4">
@@ -240,6 +244,20 @@ export default function EntrainementPage() {
             if (alignSource === "save") setSelectedProgram(null);
             setRefreshKey((k) => k + 1);
           }}
+        />
+      )}
+
+      {pdfProgram && (
+        <ProgramPdfModal
+          mode="program"
+          entityId={pdfProgram.id}
+          title={pdfProgram.name}
+          programClient={{
+            firstName: client.first_name,
+            lastName: client.last_name,
+            email: client.email ?? null,
+          }}
+          onClose={() => setPdfProgram(null)}
         />
       )}
     </main>

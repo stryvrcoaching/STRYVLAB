@@ -1,8 +1,9 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { joinWaitlist, WaitlistResult } from '../actions';
+import { trackProductEvent } from '@/lib/analytics/browser';
 
 type FormState =
   | { type: 'idle' }
@@ -12,6 +13,7 @@ type FormState =
 export function BetaForm() {
   const [state, setState] = useState<FormState>({ type: 'idle' });
   const [isPending, startTransition] = useTransition();
+  const startedRef = useRef(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -20,6 +22,16 @@ export function BetaForm() {
     startTransition(async () => {
       const result: WaitlistResult = await joinWaitlist(formData);
       if (result.success) {
+        await trackProductEvent({
+          eventName: 'lead_submitted',
+          source: 'stryvr-landing',
+          featureKey: 'beta_waitlist',
+          pagePath: '/stryvr',
+          properties: {
+            already_exists: result.alreadyExists,
+            lead_type: 'beta_waitlist',
+          },
+        });
         setState({ type: 'success', firstName, alreadyExists: result.alreadyExists });
       } else {
         setState({ type: 'error', message: result.error });
@@ -53,7 +65,20 @@ export function BetaForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+    <form
+      onSubmit={handleSubmit}
+      onFocusCapture={() => {
+        if (startedRef.current) return;
+        startedRef.current = true;
+        void trackProductEvent({
+          eventName: 'form_started',
+          source: 'stryvr-landing',
+          featureKey: 'beta_waitlist',
+          pagePath: '/stryvr',
+        });
+      }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 0 }}
+    >
       {/* Inputs row */}
       <div style={{ display: 'flex', gap: 1, backgroundColor: 'rgba(255,255,255,0.06)' }}>
         <input

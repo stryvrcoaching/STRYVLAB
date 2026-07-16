@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { insertClientNotification } from '@/lib/notifications/insert-client-notification'
+import { awardProgression, trainingPointsForPrescribedSessions } from '@/lib/rewards/progression'
 import { inngest } from '@/lib/inngest/client'
 import { z } from 'zod'
 
@@ -54,6 +54,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { completed, duration_min, notes, exercise_notes, set_logs } = parsed.data
 
   const db = service()
+  let pointsEarned = 0
 
   // Mettre à jour le session log
   const patch: Record<string, unknown> = {}
@@ -70,20 +71,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       .eq('client_id', (client as { id: string }).id)
   }
 
-  // Double progression — évaluation automatique quand la séance est complétée
-  if (completed) {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
-    fetch(`${baseUrl}/api/progression/evaluate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-internal-secret': process.env.INTERNAL_API_SECRET ?? '',
-      },
-      body: JSON.stringify({ session_log_id: params.logId }),
-    }).catch(err => console.warn('[progression] evaluate failed silently:', err))
-    // Fire-and-forget — non bloquant sur la réponse client
-  }
-
   // Notif coach quand la séance est complétée
   if (completed) {
     const { data: log } = await db
@@ -97,38 +84,38 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       (log?.coach_clients as any)?.first_name,
       (log?.coach_clients as any)?.last_name,
     ].filter(Boolean).join(' ') || 'Le client'
+    const sessionName = log?.session_name ?? 'Séance'
 
     if (coachId) {
-      await insertClientNotification(db, {
-        coachId,
-        clientId: (client as { id: string }).id,
-        type:     'session_reminder',
-        message:  `${clientName} a complété la séance "${log?.session_name ?? 'Séance'}".`,
-      })
-    }
-
-    // Award session points once per session log completion
-    const { data: existingSessionPoints } = await db
-      .from('client_points')
-      .select('id')
-      .eq('client_id', (client as { id: string }).id)
-      .eq('action_type', 'session')
-      .eq('reference_id', params.logId)
-      .maybeSingle()
-
-    if (!existingSessionPoints) {
-      await db.from('client_points').insert({
+      await db.from('coach_notifications').insert({
+        coach_id: coachId,
         client_id: (client as { id: string }).id,
-        action_type: 'session',
-        points: 25,
-        reference_id: params.logId,
-      })
-
-      await inngest.send({
-        name: 'points/level.update',
-        data: { client_id: (client as { id: string }).id },
+        category: 'training',
+        subcategory: 'session_completed',
+        priority: 3,
+        status: 'pending',
+        email_sent: false,
+        title: 'Séance complétée',
+        body: `${clientName} a terminé la séance "${sessionName}".`,
+        payload: {
+          session_log_id: params.logId,
+          session_name: sessionName,
+          action_url: `/coach/clients/${(client as { id: string }).id}/data/performances`,
+        },
       })
     }
+
+    const progression = await awardProgression(db, {
+      clientId: (client as { id: string }).id,
+      action: 'training',
+      // The default corresponds to a three-session prescribed week. A later
+      // prescription-aware evaluator can pass the exact weekly session count.
+      basePoints: trainingPointsForPrescribedSessions(3),
+      sourceKey: `session:${params.logId}`,
+      referenceId: params.logId,
+      metadata: { completion: 'full', prescribed_sessions_reference: 3 },
+    })
+    pointsEarned = progression?.already_awarded ? 0 : progression?.awarded_points ?? 0
 
     // Insert smart_agenda_events (fire and forget)
     const { data: sessionLog } = await db
@@ -169,5 +156,28 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
   }
 
-  return NextResponse.json({ success: true })
+  // Double progression — déclenchée après persistance des set logs pour éviter
+  // d'évaluer une séance complétée avec des séries encore incomplètes en base.
+  if (completed) {
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+    fetch(`${baseUrl}/api/progression/evaluate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': process.env.INTERNAL_API_SECRET ?? '',
+      },
+      body: JSON.stringify({ session_log_id: params.logId }),
+    }).catch(err => console.warn('[progression] evaluate failed silently:', err))
+    // Fire-and-forget — non bloquant sur la réponse client
+
+    void inngest.send({
+      name: 'training/session.completed',
+      data: {
+        client_id: (client as { id: string }).id,
+        session_log_id: params.logId,
+      },
+    }).catch(err => console.warn('[training notifications] enqueue failed silently:', err))
+  }
+
+  return NextResponse.json({ success: true, points_earned: pointsEarned })
 }

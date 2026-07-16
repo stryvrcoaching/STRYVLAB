@@ -5,19 +5,13 @@ import { Coffee, Sun, Moon, Apple, Pencil, Sparkles } from "lucide-react"
 import { NUTRITION_UI_COLORS } from "@/lib/nutrition/ui-colors"
 import type { SmartNutritionPrep } from "@/components/client/smart/SmartNutritionPrepList"
 import type { SmartPrepSlot } from "@/lib/nutrition/simulation-state"
+import { useClientT } from "@/components/client/ClientI18nProvider"
 
 const SLOT_ICON: Record<SmartPrepSlot, React.ElementType> = {
   breakfast: Coffee,
   lunch: Sun,
   dinner: Moon,
   snack: Apple,
-}
-
-const SLOT_LABEL: Record<SmartPrepSlot, string> = {
-  breakfast: "P.Déj",
-  lunch: "Déjeuner",
-  dinner: "Dîner",
-  snack: "Collation",
 }
 
 function MacroStrip({ p, g, f }: { p: number; g: number; f: number }) {
@@ -41,9 +35,11 @@ function PrepRow({
   onEdit: (prep: SmartNutritionPrep) => void
   onValidated: () => void
 }) {
+  const { t } = useClientT()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const Icon = SLOT_ICON[prep.meal_slot] ?? Apple
+  const slotLabel = t(`compose.slot.${prep.meal_slot}` as const)
 
   async function handleValidate() {
     setBusy(true)
@@ -52,7 +48,7 @@ function PrepRow({
     if (res.ok) {
       onValidated()
     } else {
-      setError("Erreur — réessaie")
+      setError(t('nutrition.prep.retryError'))
       setBusy(false)
     }
   }
@@ -61,17 +57,17 @@ function PrepRow({
     <div className="flex flex-col gap-1.5 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
       <div className="flex items-center gap-3">
         {/* Slot icon */}
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#818cf8]/10 shrink-0">
-          <Icon size={14} className="text-[#818cf8]" />
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/[0.06] shrink-0">
+          <Icon size={14} className="text-white/70" />
         </div>
 
         {/* Title + slot */}
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-semibold text-white truncate leading-tight">
-            {prep.title || "Repas composé"}
+            {prep.title || t('nutrition.prep.composedMeal')}
           </p>
           <p className="text-[10px] text-white/35 uppercase tracking-[0.10em]">
-            {SLOT_LABEL[prep.meal_slot]} · {Math.round(prep.total_calories)} kcal
+            {slotLabel} · {Math.round(prep.total_calories)} kcal
           </p>
         </div>
 
@@ -101,7 +97,7 @@ function PrepRow({
             disabled={busy}
             className="h-7 px-2.5 rounded-lg bg-[#f2f2f2] text-[#080808] text-[10px] font-barlow-condensed font-bold uppercase tracking-wide active:scale-[0.97] transition-all disabled:opacity-50"
           >
-            {busy ? "…" : "Valider"}
+            {busy ? "…" : t('ui.validate')}
           </button>
         </div>
       </div>
@@ -127,6 +123,7 @@ interface Props {
 }
 
 export default function TodayPrepsSection({ preps, date, onEdit, onValidated }: Props) {
+  const { t } = useClientT()
   const todayPreps = preps.filter(
     p => p.status === "planned" && p.physiological_date === date
   )
@@ -137,9 +134,9 @@ export default function TodayPrepsSection({ preps, date, onEdit, onValidated }: 
     <div className="flex flex-col gap-2">
       {/* Section header */}
       <div className="flex items-center gap-2 px-0.5">
-        <Sparkles size={12} className="text-[#818cf8]" />
-        <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.16em] text-[#818cf8]">
-          Planifié aujourd&apos;hui
+        <Sparkles size={12} className="text-white/62" />
+        <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.16em] text-white/62">
+          {t('nutrition.prep.todayPlanned')}
         </p>
         <span className="ml-auto text-[10px] text-white/25">{todayPreps.length} prep{todayPreps.length > 1 ? "s" : ""}</span>
       </div>

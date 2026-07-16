@@ -12,7 +12,7 @@ import {
 } from '@/lib/training/sessionLogUtils'
 
 const setLogSchema = z.object({
-  exercise_id: z.string().uuid(),
+  exercise_id: z.string().uuid().nullable().optional(),
   exercise_name: z.string().min(1),
   set_number: z.number().int().positive(),
   side: z.enum(['left', 'right', 'bilateral']).optional().default('bilateral'),
@@ -74,13 +74,67 @@ export async function POST(req: NextRequest) {
 
   // Vérifier que program_session_id existe encore (évite la FK constraint violation)
   let resolvedSessionId: string | null = program_session_id ?? null
+  let workoutAssignmentId: string | null = null
+  let programWeekId: string | null = null
+  let programWeekPosition: number | null = null
+  let prescriptionSnapshot: Record<string, unknown> | null = null
   if (resolvedSessionId) {
-    const { data: sessionExists } = await db
+    const { data: sessionContext } = await db
       .from('program_sessions')
-      .select('id')
+      .select('*, program_exercises(*)')
       .eq('id', resolvedSessionId)
       .maybeSingle()
-    if (!sessionExists) resolvedSessionId = null
+    if (!sessionContext) {
+      resolvedSessionId = null
+    } else if ((sessionContext as any).program_id) {
+      const { data: ownedProgram } = await db
+        .from('programs')
+        .select('id')
+        .eq('id', (sessionContext as any).program_id)
+        .eq('client_id', client.id)
+        .maybeSingle()
+
+      if (!ownedProgram) {
+        return NextResponse.json({ error: 'Cette séance ne correspond pas au programme du client' }, { status: 403 })
+      }
+
+      const { data: assignment } = await db
+        .from('client_workout_program_assignments')
+        .select('id')
+        .eq('client_id', client.id)
+        .eq('program_id', ownedProgram.id)
+        .is('ended_at', null)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      workoutAssignmentId = assignment?.id ?? null
+      programWeekId = (sessionContext as any).program_week_id ?? null
+      if (programWeekId) {
+        const { data: week } = await db
+          .from('program_weeks')
+          .select('position')
+          .eq('id', programWeekId)
+          .eq('program_id', ownedProgram.id)
+          .maybeSingle()
+        programWeekPosition = week?.position ?? null
+      }
+
+      const exercises = Array.isArray((sessionContext as any).program_exercises)
+        ? [...(sessionContext as any).program_exercises].sort(
+          (first: any, second: any) => Number(first.position ?? 0) - Number(second.position ?? 0),
+        )
+        : []
+      prescriptionSnapshot = {
+        schema_version: 1,
+        captured_at: new Date().toISOString(),
+        program_id: ownedProgram.id,
+        session: {
+          ...(sessionContext as Record<string, unknown>),
+          program_exercises: exercises,
+        },
+      }
+    }
   }
 
   // Idempotent — retourner le draft existant si un log incomplet existe déjà pour cette séance
@@ -100,7 +154,7 @@ export async function POST(req: NextRequest) {
       if (Array.isArray(set_logs) && set_logs.length > 0) {
         const rows = set_logs.map((s: z.infer<typeof setLogSchema>) => ({
           session_log_id: existingLog.id,
-          exercise_id: s.exercise_id,
+          exercise_id: s.exercise_id ?? null,
           exercise_name: s.exercise_name,
           set_number: s.set_number,
           planned_reps: s.planned_reps ?? null,
@@ -137,6 +191,10 @@ export async function POST(req: NextRequest) {
     .insert({
       client_id: client.id,
       program_session_id: resolvedSessionId,
+      workout_assignment_id: workoutAssignmentId,
+      program_week_id: programWeekId,
+      program_week_position: programWeekPosition,
+      prescription_snapshot: prescriptionSnapshot,
       session_name,
       exercise_notes: exercise_notes ?? {},
     })
@@ -151,6 +209,10 @@ export async function POST(req: NextRequest) {
       .insert({
         client_id: client.id,
         program_session_id: null,
+        workout_assignment_id: workoutAssignmentId,
+        program_week_id: programWeekId,
+        program_week_position: programWeekPosition,
+        prescription_snapshot: prescriptionSnapshot,
         session_name,
         exercise_notes: exercise_notes ?? {},
       })
@@ -169,7 +231,7 @@ export async function POST(req: NextRequest) {
   if (Array.isArray(set_logs) && set_logs.length > 0) {
     const rows = set_logs.map((s: z.infer<typeof setLogSchema>) => ({
       session_log_id: sessionLog.id,
-      exercise_id: s.exercise_id,
+      exercise_id: s.exercise_id ?? null,
       exercise_name: s.exercise_name,
       set_number: s.set_number,
       planned_reps: s.planned_reps ?? null,
@@ -227,6 +289,7 @@ export async function GET(req: NextRequest) {
     .from('client_session_logs')
     .select(`
       id, session_name, logged_at, completed_at, duration_min, notes, created_at,
+      session_kind, flex_session_id, relation_to_planned_workout,
       client_set_logs (
         id, exercise_name, set_number, planned_reps, actual_reps, actual_weight_kg, completed, rpe, notes
       )

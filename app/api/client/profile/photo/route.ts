@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { validateImageUpload } from '@/lib/security/image-upload'
+import { checkDistributedRateLimit, rateLimitResponse } from '@/lib/security/public-rate-limit'
+
+const MAX_PROFILE_PHOTO_BYTES = 5 * 1024 * 1024
 
 export async function POST(req: NextRequest) {
   const supabase = createClient()
@@ -20,42 +24,58 @@ export async function POST(req: NextRequest) {
 
   if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 })
 
+  const rateLimit = await checkDistributedRateLimit({
+    db: service,
+    req,
+    scope: 'client_profile_photo_upload',
+    subject: String(client.id),
+    maxRequests: 20,
+    windowSeconds: 10 * 60,
+  })
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit)
+
+  const declaredLength = Number(req.headers.get('content-length') ?? '0')
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_PROFILE_PHOTO_BYTES + 128_000) {
+    return NextResponse.json({ error: 'Fichier trop volumineux' }, { status: 413 })
+  }
+
   const formData = await req.formData()
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-  const path = `${client.id}/avatar.${ext}`
-
   const arrayBuffer = await file.arrayBuffer()
+  const validation = validateImageUpload({
+    file,
+    buffer: arrayBuffer,
+    maxBytes: MAX_PROFILE_PHOTO_BYTES,
+  })
+
+  if (!validation.ok) {
+    return NextResponse.json({ error: validation.error }, { status: 400 })
+  }
+
+  const path = `${client.id}/avatar`
   const buffer = Buffer.from(arrayBuffer)
 
   // Upsert — overwrite existing avatar
   const { error: uploadError } = await service.storage
     .from('profile-photos')
     .upload(path, buffer, {
-      contentType: file.type,
+      contentType: validation.image.mime,
       upsert: true,
     })
 
-  if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
+  if (uploadError) return NextResponse.json({ error: 'Upload impossible' }, { status: 500 })
 
-  // Get signed URL (valid 10 years — effectively permanent for profile photos)
-  const { data: signed } = await service.storage
-    .from('profile-photos')
-    .createSignedUrl(path, 60 * 60 * 24 * 365 * 10)
-
-  if (!signed?.signedUrl) {
-    return NextResponse.json({ error: 'Could not generate signed URL' }, { status: 500 })
-  }
-
-  // Save URL to coach_clients
-  await service
+  const protectedUrl = `/api/clients/${client.id}/profile-photo`
+  const { error: profileError } = await service
     .from('coach_clients')
-    .update({ profile_photo_url: signed.signedUrl, updated_at: new Date().toISOString() })
+    .update({ profile_photo_url: protectedUrl, updated_at: new Date().toISOString() })
     .eq('id', client.id)
 
-  return NextResponse.json({ url: signed.signedUrl })
+  if (profileError) return NextResponse.json({ error: 'Profil impossible à mettre à jour' }, { status: 500 })
+
+  return NextResponse.json({ url: protectedUrl }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 export async function DELETE(req: NextRequest) {
@@ -87,10 +107,12 @@ export async function DELETE(req: NextRequest) {
       .remove(files.map((f) => `${client.id}/${f.name}`))
   }
 
-  await service
+  const { error: profileError } = await service
     .from('coach_clients')
     .update({ profile_photo_url: null, updated_at: new Date().toISOString() })
     .eq('id', client.id)
 
-  return NextResponse.json({ ok: true })
+  if (profileError) return NextResponse.json({ error: 'Profil impossible à mettre à jour' }, { status: 500 })
+
+  return NextResponse.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } })
 }

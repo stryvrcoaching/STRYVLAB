@@ -3,6 +3,40 @@ import { buildPhotoMealFinalResult, resolvePhotoMealSessionStatus } from "@/lib/
 import type { PhotoMealAnalysisSummary } from "@/lib/nutrition/photo-log-types"
 
 describe("buildPhotoMealFinalResult", () => {
+  it("keeps receipt items as serving-based entries without plate clarifications", () => {
+    const result = buildPhotoMealFinalResult({
+      analysis: {
+        meal_type: "lunch",
+        analysis_mode: "receipt",
+        source_context: "restaurant_receipt_v1",
+        scale_weight_g: null,
+        scale_weight_confidence: null,
+        manual_weight_g: null,
+        components: [{
+          name_fr: "Big Mac",
+          category_hint: "extras",
+          grams_estimate: 100,
+          quantity_unit: "serving",
+          kcal_per_100g: 503,
+          protein_per_100g: 26,
+          carbs_per_100g: 42,
+          fat_per_100g: 25,
+          fiber_per_100g: 3,
+          ambiguity_tags: [],
+          nutrition_source: "catalog_fallback",
+        }],
+        ambiguity_tags: [],
+        leftovers_recommended: false,
+      },
+      answers: {},
+    })
+
+    expect(result.ready_to_log).toBe(true)
+    expect(result.pending_question).toBeNull()
+    expect(result.components[0]?.quantity_unit).toBe("serving")
+    expect(result.components[0]?.quantity_g).toBe(100)
+  })
+
   it("marks an empty plate analysis as not ready to log", () => {
     const analysis: PhotoMealAnalysisSummary = {
       meal_type: "dinner",

@@ -197,6 +197,49 @@ export default function ProfilLoading() {
               </div>
             </Card>
 
+            {/* Accès client */}
+            <Card>
+              <Pulse className="h-2 w-24 mb-4" />
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-7 h-7 rounded-full bg-white/[0.04] animate-pulse shrink-0" />
+                <Pulse className="h-3 w-28" />
+                <Pulse className="h-5 w-12 rounded-lg ml-auto" />
+              </div>
+              <Pulse className="h-2.5 w-full mb-1.5" />
+              <Pulse className="h-2.5 w-3/4 mb-4" />
+              <Pulse className="h-10 w-full rounded-xl mb-2" />
+              <div className="flex gap-2">
+                <Pulse className="h-8 flex-1 rounded-lg" />
+                <Pulse className="h-8 flex-1 rounded-lg" />
+              </div>
+            </Card>
+
+            {/* Formules & abonnement */}
+            <Card>
+              <div className="flex items-center justify-between mb-4">
+                <Pulse className="h-2 w-40" />
+                <Pulse className="h-5 w-14 rounded-lg" />
+              </div>
+              <div className="space-y-2">
+                {[0, 1].map(i => (
+                  <div key={i} className="bg-white/[0.03] animate-pulse rounded-xl px-3 py-3 h-14" />
+                ))}
+              </div>
+            </Card>
+
+            {/* Tags */}
+            <Card>
+              <div className="flex items-center justify-between mb-3">
+                <Pulse className="h-2 w-12" />
+                <Pulse className="h-5 w-14 rounded-lg" />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[60, 80, 52, 70, 64].map((w, i) => (
+                  <Pulse key={i} className="h-6 rounded-full" style={{ width: `${w}px` }} />
+                ))}
+              </div>
+            </Card>
+
             {/* Zone dangereuse */}
             <div className="bg-red-950/20 border-[0.3px] border-red-500/20 rounded-2xl px-4 py-3 flex items-center justify-between">
               <Pulse className="h-2 w-28" />
@@ -228,52 +271,6 @@ export default function ProfilLoading() {
               </div>
             </div>
 
-            {/* Accès client card */}
-            <Card>
-              <Pulse className="h-2 w-24 mb-4" />
-              {/* Status row: icon + label + badge */}
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-7 h-7 rounded-full bg-white/[0.04] animate-pulse shrink-0" />
-                <Pulse className="h-3 w-28" />
-                <Pulse className="h-5 w-12 rounded-lg ml-auto" />
-              </div>
-              {/* Description text */}
-              <Pulse className="h-2.5 w-full mb-1.5" />
-              <Pulse className="h-2.5 w-3/4 mb-4" />
-              {/* Primary action button */}
-              <Pulse className="h-10 w-full rounded-xl mb-2" />
-              {/* Secondary buttons */}
-              <div className="flex gap-2">
-                <Pulse className="h-8 flex-1 rounded-lg" />
-                <Pulse className="h-8 flex-1 rounded-lg" />
-              </div>
-            </Card>
-
-            {/* Formules & abonnement card */}
-            <Card>
-              <div className="flex items-center justify-between mb-4">
-                <Pulse className="h-2 w-40" />
-                <Pulse className="h-5 w-14 rounded-lg" />
-              </div>
-              <div className="space-y-2">
-                {[0, 1].map(i => (
-                  <div key={i} className="bg-white/[0.03] animate-pulse rounded-xl px-3 py-3 h-14" />
-                ))}
-              </div>
-            </Card>
-
-            {/* Tags card */}
-            <Card>
-              <div className="flex items-center justify-between mb-3">
-                <Pulse className="h-2 w-12" />
-                <Pulse className="h-5 w-14 rounded-lg" />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {[60, 80, 52, 70, 64].map((w, i) => (
-                  <Pulse key={i} className="h-6 rounded-full" style={{ width: `${w}px` }} />
-                ))}
-              </div>
-            </Card>
           </div>
         </div>
       </div>

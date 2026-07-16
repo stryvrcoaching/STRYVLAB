@@ -160,7 +160,14 @@ export function analyzeExercisePerformance(
     return { exercises: [], global_overreaching: false, analysis_period_weeks: weeksBack }
   }
 
-  const now = new Date()
+  const latestSessionTs = sessions
+    .map((session) => new Date(session.logged_at).getTime())
+    .filter((value) => Number.isFinite(value))
+  const latestOverloadTs = overloadEvents
+    .map((event) => new Date(event.created_at).getTime())
+    .filter((value) => Number.isFinite(value))
+  const latestObservedTs = Math.max(...latestSessionTs, ...latestOverloadTs)
+  const now = Number.isFinite(latestObservedTs) ? new Date(latestObservedTs) : new Date()
   const periodStart = weeksAgo(weeksBack, now)
   const fourWeeksAgo = weeksAgo(4, now)
 

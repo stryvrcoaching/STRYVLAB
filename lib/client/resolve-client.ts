@@ -21,29 +21,48 @@ export async function resolveClientFromUser(
   select = 'id'
 ): Promise<ResolvedClient | null> {
   const selection = select.includes('timezone') ? select : `${select}, timezone`
+  const normalizedEmail = email?.trim().toLowerCase()
 
-  const { data: clientById } = await service
+  const { data: clientById, error: clientByIdError } = await service
     .from('coach_clients')
     .select(selection)
     .eq('user_id', userId)
-    .single()
+    .maybeSingle()
+
+  if (clientByIdError) {
+    console.error(`[resolve-client] error looking up client by user_id=${userId}:`, clientByIdError)
+  }
 
   let client = clientById as unknown as ResolvedClient | null
 
-  if (!client && email) {
+  if (client) {
+    return client
+  }
+
+  await service
+    .from('coach_profiles')
+    .select('id')
+    .eq('coach_id', userId)
+    .maybeSingle()
+
+  // Permettre aussi aux coachs de se relier a un compte client de test via leur email.
+  // Le fallback reste borne a une correspondance email exacte sur coach_clients.
+  if (!client && normalizedEmail) {
     const { data: byEmail } = await service
       .from('coach_clients')
       .select(selection)
-      .eq('email', email)
-      .is('user_id', null)
-      .single()
+      .ilike('email', normalizedEmail)
+      .limit(1)
+      .maybeSingle()
 
     if (byEmail) {
       const resolved = byEmail as unknown as ResolvedClient
-      await service
-        .from('coach_clients')
-        .update({ user_id: userId })
-        .eq('id', resolved.id)
+      if (resolved.user_id !== userId) {
+        await service
+          .from('coach_clients')
+          .update({ user_id: userId })
+          .eq('id', resolved.id)
+      }
       client = resolved
     }
   }

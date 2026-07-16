@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { stripe, BILLING_TO_STRIPE } from "@/lib/stripe/client";
+import {
+  getCoachConnectAccount,
+  syncCoachConnectAccount,
+} from "@/lib/stripe/connect";
 
 function db() {
   return createServiceClient(
@@ -49,6 +53,32 @@ export async function POST(req: NextRequest) {
 
   const service = db();
 
+  // STRYV lab is a SaaS platform: the coach is the merchant of record and
+  // Checkout must run on the coach's own connected Stripe account.
+  let connectedAccountId: string;
+  try {
+    const connectAccount = await getCoachConnectAccount(user.id);
+    if (!connectAccount.accountId) {
+      return NextResponse.json(
+        { error: "Connectez d’abord votre compte Stripe pour encaisser vos clients." },
+        { status: 409 },
+      );
+    }
+
+    const status = await syncCoachConnectAccount(user.id, connectAccount.accountId);
+    if (!status.chargesEnabled) {
+      return NextResponse.json(
+        { error: "Votre compte Stripe doit être finalisé avant d’encaisser un client." },
+        { status: 409 },
+      );
+    }
+
+    connectedAccountId = connectAccount.accountId;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Impossible de vérifier votre compte Stripe.";
+    return NextResponse.json({ error: message }, { status: 503 });
+  }
+
   // 1. Récupère formula + vérification ownership
   const { data: formula, error: fErr } = await service
     .from("coach_formulas")
@@ -63,7 +93,7 @@ export async function POST(req: NextRequest) {
   // 2. Récupère client
   const { data: client, error: cErr } = await service
     .from("coach_clients")
-    .select("id, first_name, last_name, email, stripe_customer_id")
+    .select("id, first_name, last_name, email, stripe_customer_id, stripe_connected_account_id")
     .eq("id", client_id)
     .eq("coach_id", user.id)
     .single();
@@ -77,8 +107,12 @@ export async function POST(req: NextRequest) {
     );
 
   // 3. Crée/récupère Stripe Product + Price pour la formule
-  let stripeProductId = formula.stripe_product_id;
-  let stripePriceId = formula.stripe_price_id;
+  let stripeProductId = formula.stripe_connected_account_id === connectedAccountId
+    ? formula.stripe_product_id
+    : null;
+  let stripePriceId = formula.stripe_connected_account_id === connectedAccountId
+    ? formula.stripe_price_id
+    : null;
 
   if (!stripeProductId || !stripePriceId) {
     // Créer le Product Stripe
@@ -89,7 +123,7 @@ export async function POST(req: NextRequest) {
         formula_id: formula.id,
         coach_id: user.id,
       },
-    });
+    }, { stripeAccount: connectedAccountId });
     stripeProductId = product.id;
 
     // Créer le Price Stripe
@@ -110,7 +144,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const price = await stripe.prices.create(priceParams);
+    const price = await stripe.prices.create(priceParams, { stripeAccount: connectedAccountId });
     stripePriceId = price.id;
 
     // Persiste sur la formule
@@ -119,12 +153,15 @@ export async function POST(req: NextRequest) {
       .update({
         stripe_product_id: stripeProductId,
         stripe_price_id: stripePriceId,
+        stripe_connected_account_id: connectedAccountId,
       })
       .eq("id", formula.id);
   }
 
   // 4. Crée/récupère Stripe Customer pour le client
-  let stripeCustomerId = client.stripe_customer_id;
+  let stripeCustomerId = client.stripe_connected_account_id === connectedAccountId
+    ? client.stripe_customer_id
+    : null;
 
   if (!stripeCustomerId) {
     const customer = await stripe.customers.create({
@@ -134,12 +171,15 @@ export async function POST(req: NextRequest) {
         client_id: client.id,
         coach_id: user.id,
       },
-    });
+    }, { stripeAccount: connectedAccountId });
     stripeCustomerId = customer.id;
 
     await service
       .from("coach_clients")
-      .update({ stripe_customer_id: stripeCustomerId })
+      .update({
+        stripe_customer_id: stripeCustomerId,
+        stripe_connected_account_id: connectedAccountId,
+      })
       .eq("id", client.id);
   }
 
@@ -148,9 +188,9 @@ export async function POST(req: NextRequest) {
   const isOneTime = formula.billing_cycle === "one_time";
 
   const sessionParams: Parameters<typeof stripe.checkout.sessions.create>[0] = {
-    payment_method_types: ["card"],
     line_items: [{ price: stripePriceId!, quantity: 1 }],
     mode: isOneTime ? "payment" : "subscription",
+    customer: stripeCustomerId,
     success_url: `${baseUrl}/coach/clients/${client_id}?tab=formules&stripe=success`,
     cancel_url: `${baseUrl}/coach/clients/${client_id}?tab=formules&stripe=cancelled`,
     metadata: {
@@ -177,7 +217,9 @@ export async function POST(req: NextRequest) {
     };
   }
 
-  const session = await stripe.checkout.sessions.create(sessionParams);
+  const session = await stripe.checkout.sessions.create(sessionParams, {
+    stripeAccount: connectedAccountId,
+  });
 
   // 6. Stocke l'ID de session sur l'abonnement si fourni
   if (subscription_id) {

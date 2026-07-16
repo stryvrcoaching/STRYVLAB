@@ -5,6 +5,7 @@ import { CheckCircle2 } from 'lucide-react'
 import BodyMap from '../BodyMap'
 import { TRAINING_ACCENT } from '@/lib/nutrition/ui-colors'
 import type { MuscleGroup } from '@/lib/client/muscleDetection'
+import { useClientT } from '@/components/client/ClientI18nProvider'
 
 type Props = {
   date: string
@@ -20,17 +21,19 @@ type Props = {
   musclePills?: string[]
 }
 
-function fmt(iso: string): string {
-  return new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+function fmt(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'short' })
     .format(new Date(iso + 'T00:00:00'))
 }
 
 export default function SmartWorkoutHero(p: Props) {
+  const { lang, t } = useClientT()
+  const locale = lang === 'es' ? 'es-ES' : lang === 'en' ? 'en-GB' : 'fr-FR'
   return (
     <div className="bg-[#111111] rounded-2xl p-4">
       <div className="flex items-center justify-between mb-3">
-        <span className="font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[10px] text-white/40">Séance du jour</span>
-        <span className="text-[11px] text-white/40">{fmt(p.date)}</span>
+        <span className="font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[10px] text-white/40">{t('workout.today')}</span>
+        <span className="text-[11px] text-white/40">{fmt(p.date, locale)}</span>
       </div>
 
       {p.state === 'scheduled' && p.sessionName && (
@@ -38,7 +41,7 @@ export default function SmartWorkoutHero(p: Props) {
           <div className="flex gap-3 items-start">
             <div className="flex-1 min-w-0">
               <div className="text-[22px] font-black tracking-[-0.02em] text-white leading-tight">{p.sessionName}</div>
-              <div className="text-[11px] text-white/50 mt-1">{p.exerciseCount} exercices · ~{p.estimatedMinutes} min</div>
+              <div className="text-[11px] text-white/50 mt-1">{t('workout.exercisesCount', { n: p.exerciseCount ?? 0 })} · ~{p.estimatedMinutes} min</div>
               {p.musclePills && p.musclePills.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {p.musclePills.slice(0, 3).map(pill => (
@@ -62,7 +65,7 @@ export default function SmartWorkoutHero(p: Props) {
               href={p.sessionLogHref}
               className="mt-4 flex w-full items-center justify-center h-11 rounded-xl bg-[#f2f2f2] text-[#080808] text-[11px] font-black uppercase tracking-[0.1em] active:scale-[0.98] transition-transform"
             >
-              Démarrer →
+              {t('workout.start')} →
             </Link>
           )}
         </>
@@ -74,15 +77,15 @@ export default function SmartWorkoutHero(p: Props) {
             <CheckCircle2 size={18} style={{ color: TRAINING_ACCENT }} />
           </div>
           <div className="flex-1">
-            <div className="text-[12px] text-white font-semibold">Séance terminée</div>
+            <div className="text-[12px] text-white font-semibold">{t('workout.completed')}</div>
             <div className="text-[10px] text-white/40">{p.performanceSummary}</div>
           </div>
-          {p.recapHref && <Link href={p.recapHref} className="text-[11px] text-[#f2f2f2]">Voir →</Link>}
+          {p.recapHref && <Link href={p.recapHref} className="text-[11px] text-[#f2f2f2]">{t('workout.see')} →</Link>}
         </div>
       )}
 
       {p.state === 'rest' && (
-        <p className="text-[12px] text-white/55">Jour de repos 💤</p>
+        <p className="text-[12px] text-white/55">{t('workout.restDay')}</p>
       )}
     </div>
   )

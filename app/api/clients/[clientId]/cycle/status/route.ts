@@ -3,6 +3,7 @@ import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { getCycleStateFromLogs } from '@/lib/cycle/cycleEngine'
 import type { CycleLog } from '@/lib/cycle/cycleEngine'
+import { buildCyclePhaseObservations } from '@/lib/cycle/cycle-phase-observations'
 
 function serviceClient() {
   return createServiceClient(
@@ -69,5 +70,16 @@ export async function GET(
     bilanValue,
   )
 
-  return NextResponse.json({ cycleState }, { status: 200 })
+  const { data: checkins } = await db
+    .from('client_daily_checkins')
+    .select('cycle_phase, energy_level, hunger_level, stress_level')
+    .eq('client_id', clientId)
+    .not('cycle_phase', 'is', null)
+    .order('date', { ascending: false })
+    .limit(180)
+
+  return NextResponse.json({
+    cycleState,
+    phaseObservations: buildCyclePhaseObservations(checkins ?? []),
+  }, { status: 200 })
 }

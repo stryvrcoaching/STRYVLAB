@@ -10,7 +10,12 @@ import {
   EyeOff,
   Star,
 } from "lucide-react";
-import { BlockConfig, FieldConfig } from "@/types/assessment";
+import {
+  BlockConfig,
+  FieldConfig,
+  type ConditionOperator,
+  type InputType,
+} from "@/types/assessment";
 
 interface Props {
   block: BlockConfig;
@@ -21,6 +26,53 @@ interface Props {
   onDragStart: (index: number) => void;
   onDragOver: (index: number) => void;
   onDrop: () => void;
+}
+
+const INPUT_TYPE_LABELS: Record<InputType, string> = {
+  number: "Réponse numérique",
+  text: "Réponse courte",
+  textarea: "Réponse longue",
+  scale_1_10: "Échelle de 1 à 10",
+  single_choice: "Choix unique",
+  multiple_choice: "Choix multiple",
+  boolean: "Oui / Non",
+  date: "Date",
+  photo_upload: "Téléversement de photo",
+  meal_journal: "Journal alimentaire",
+};
+
+const CONDITION_OPERATOR_LABELS: Record<ConditionOperator, string> = {
+  eq: "est égal à",
+  neq: "est différent de",
+  includes: "contient",
+  not_empty: "est renseigné",
+};
+
+function formatFieldType(field: FieldConfig) {
+  const base = INPUT_TYPE_LABELS[field.input_type] ?? field.input_type;
+  return field.unit ? `${base} · ${field.unit}` : base;
+}
+
+function formatCondition(field: FieldConfig, fieldLabelMap: Map<string, string>) {
+  if (!field.show_if) return null;
+
+  const operator = CONDITION_OPERATOR_LABELS[field.show_if.operator];
+  const sourceLabel =
+    fieldLabelMap.get(field.show_if.field_key) ?? field.show_if.field_key;
+  if (field.show_if.operator === "not_empty") {
+    return `S'affiche si « ${sourceLabel} » ${operator}.`;
+  }
+
+  return `S'affiche si « ${sourceLabel} » ${operator} « ${field.show_if.value ?? ""} ».`;
+}
+
+function formatHelper(helper?: string) {
+  if (!helper) return null;
+  const compact = helper
+    .replace(/\s+/g, " ")
+    .replace(/📏/g, "")
+    .trim();
+  return compact;
 }
 
 export default function BlockCard({
@@ -83,6 +135,7 @@ export default function BlockCard({
 
   const visibleCount = block.fields.filter((f) => f.visible).length;
   const requiredCount = block.fields.filter((f) => f.required).length;
+  const fieldLabelMap = new Map(block.fields.map((field) => [field.key, field.label]));
 
   return (
     <div
@@ -204,10 +257,53 @@ export default function BlockCard({
                     </span>
                   )}
                 </div>
-                <p className="text-[10px] text-white/40">
-                  {field.input_type}
-                  {field.unit ? ` · ${field.unit}` : ""}
+                <p className="mt-0.5 text-[10px] font-medium text-[#7fe0b8]">
+                  {formatFieldType(field)}
                 </p>
+                <div className="mt-2 rounded-xl bg-white/[0.03] px-3 py-2.5">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-white/28">
+                    Question affichée
+                  </p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-white/72">
+                    {field.label}
+                  </p>
+
+                  {field.options?.length ? (
+                    <div className="mt-2">
+                      <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-white/28">
+                        Réponses proposées
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {field.options.map((option) => (
+                          <span
+                            key={`${field.key}-${option}`}
+                            className="rounded-full border border-white/[0.06] bg-white/[0.04] px-2 py-1 text-[10px] text-white/62"
+                          >
+                            {option}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {field.placeholder ? (
+                    <p className="mt-2 text-[10px] leading-relaxed text-white/48">
+                      Placeholder : {field.placeholder}
+                    </p>
+                  ) : null}
+
+                  {formatHelper(field.helper) ? (
+                    <p className="mt-2 text-[10px] leading-relaxed text-white/48">
+                      {formatHelper(field.helper)}
+                    </p>
+                  ) : null}
+
+                  {formatCondition(field, fieldLabelMap) ? (
+                    <p className="mt-2 text-[10px] leading-relaxed text-amber-300/85">
+                      {formatCondition(field, fieldLabelMap)}
+                    </p>
+                  ) : null}
+                </div>
               </div>
 
               {/* Required toggle — uniquement si visible */}

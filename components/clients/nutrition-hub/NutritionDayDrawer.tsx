@@ -58,7 +58,7 @@ export default function NutritionDayDrawer({
               Calories
             </p>
             <p className="mt-2 text-sm" style={{ color: NUTRITION_UI_COLORS.calories }}>
-              {row.consumed.calories} / {row.target.calories ?? "N/A"} kcal
+              {row.consumed.calories} / {row.target.calories ?? "—"} kcal
             </p>
           </div>
           <div>
@@ -84,7 +84,7 @@ export default function NutritionDayDrawer({
               Hydratation
             </p>
             <p className="mt-2 text-sm" style={{ color: NUTRITION_UI_COLORS.water }}>
-              {row.consumed.hydration_ml} / {row.target.hydration_ml ?? "N/A"} ml
+              {row.consumed.hydration_ml} / {row.target.hydration_ml ?? "—"} ml
             </p>
           </div>
         </div>

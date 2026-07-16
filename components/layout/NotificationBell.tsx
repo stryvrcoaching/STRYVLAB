@@ -1,99 +1,66 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Bell, CheckCheck, X } from "lucide-react";
-
+import { useEffect, useRef, useState } from "react";
+import { Bell, CheckCheck, Salad, Dumbbell, ClipboardList, HeartPulse, Activity, MessageSquare, CreditCard, ShieldAlert, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-interface Notification {
+type Notification = {
   id: string;
-  type: string;
-  message: string;
-  read: boolean;
-  created_at: string;
-  client_id: string | null;
-  submission_id?: string | null;
-}
+  source: "coach" | "legacy" | "shared";
+  clientId: string;
+  clientName: string;
+  title: string | null;
+  body: string | null;
+  category: string;
+  categoryLabel: string;
+  eventLabel: string | null;
+  actionUrl: string;
+  createdAt: string;
+};
 
-const TYPE_ICONS: Record<string, string> = {
-  assessment_completed: "📋",
-  assessment_sent: "📤",
-  program_updated: "💪",
-  program_assigned: "💪",
-  session_reminder: "🏋️",
-  bilan_received: "📋",
+const ICONS: Record<string, typeof Bell> = {
+  nutrition: Salad,
+  training: Dumbbell,
+  assessment: ClipboardList,
+  recovery: HeartPulse,
+  progress: Activity,
+  feedback: MessageSquare,
+  engagement: Dumbbell,
+  admin: CreditCard,
+  critical: ShieldAlert,
+  system: Bell,
 };
 
 function timeAgo(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (diff < 60) return "À l'instant";
-  if (diff < 3600) return `${Math.floor(diff / 60)}min`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-  return `${Math.floor(diff / 86400)}j`;
+  if (diff < 3600) return `${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} h`;
+  return `${Math.floor(diff / 86400)} j`;
 }
 
 export default function NotificationBell(_props: { topBarMode?: boolean } = {}) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const isFetchingRef = useRef(false);
   const router = useRouter();
 
-  const unread = notifications.filter((n) => !n.read);
-
   async function fetchNotifications() {
-    // Debounce: skip if already fetching
-    if (isFetchingRef.current) return;
-
-    isFetchingRef.current = true;
-    try {
-      const res = await fetch("/api/assessments/notify");
-      if (res.ok) {
-        const data = await res.json();
-        // On mappe pour inclure submission_id si présent
-        setNotifications(
-          (data.notifications ?? []).map((n: any) => ({
-            ...n,
-            submission_id: n.submission_id ?? null,
-          })),
-        );
-      }
-    } finally {
-      isFetchingRef.current = false;
-    }
+    const res = await fetch("/api/coach/inbox", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json().catch(() => ({ notifications: [] }));
+    setNotifications(data.notifications ?? []);
   }
 
   useEffect(() => {
-    fetchNotifications();
-
-    // Polling interval: 60 seconds instead of 30
-    const iv = setInterval(fetchNotifications, 60_000);
-
-    // Stop polling when tab is hidden
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        clearInterval(iv);
-      } else {
-        fetchNotifications();
-        // Resume polling when tab becomes visible
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      clearInterval(iv);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
+    void fetchNotifications();
+    const iv = setInterval(() => void fetchNotifications(), 60_000);
+    return () => clearInterval(iv);
   }, []);
 
-  // Fermer au clic extérieur
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
+    function handleClick(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setOpen(false);
       }
     }
@@ -101,69 +68,60 @@ export default function NotificationBell(_props: { topBarMode?: boolean } = {}) 
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  async function markAllRead() {
-    const ids = unread.map((n) => n.id);
-    if (!ids.length) return;
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    await fetch("/api/assessments/notify", {
+  async function markMany(ids?: string[]) {
+    const body = ids?.length ? { ids } : { markAll: true };
+    await fetch("/api/coach/inbox", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids }),
+      body: JSON.stringify(body),
     });
+    setNotifications((prev) => ids?.length ? prev.filter((n) => !ids.includes(n.id)) : []);
   }
 
-  async function markRead(id: string) {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    );
-    await fetch("/api/assessments/notify", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: [id] }),
-    });
+  function handleOpenNotification(notification: Notification) {
+    router.push(notification.actionUrl);
   }
 
   return (
     <div className="relative" ref={containerRef}>
-      {/* Bouton cloche */}
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          const next = !open
+          setOpen(next)
+          if (next) void fetchNotifications()
+        }}
         className={`relative flex h-8 w-8 items-center justify-center rounded-lg transition-all ${
-          open
-            ? "bg-white/[0.08] text-white/80"
-            : "text-white/35 hover:bg-white/[0.06] hover:text-white/70"
+          open ? "bg-white/[0.08] text-white/80" : "text-white/35 hover:bg-white/[0.06] hover:text-white/70"
         }`}
         title="Notifications"
       >
         <Bell size={15} strokeWidth={1.75} />
-        {unread.length > 0 && (
+        {notifications.length > 0 && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
-            {unread.length > 9 ? "9+" : unread.length}
+            {notifications.length > 9 ? "9+" : notifications.length}
           </span>
         )}
       </button>
 
-      {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-[#181818] border-subtle rounded-2xl z-50 overflow-hidden">
-          {/* Header */}
+        <div className="absolute right-0 top-full mt-2 w-[30rem] max-w-[calc(100vw-1.5rem)] bg-[#181818] border-subtle rounded-2xl z-50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3">
             <span className="text-[12px] font-bold text-white">
               Notifications
-              {unread.length > 0 && (
+              {notifications.length > 0 && (
                 <span className="ml-2 px-1.5 py-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full">
-                  {unread.length}
+                  {notifications.length}
                 </span>
               )}
             </span>
             <div className="flex items-center gap-2">
-              {unread.length > 0 && (
+              {notifications.length > 0 && (
                 <button
-                  onClick={markAllRead}
+                  onClick={() => void markMany(notifications.map((notification) => notification.id))}
                   className="flex items-center gap-1 text-[11px] text-[#1f8a65] font-medium hover:text-white transition-colors"
                 >
                   <CheckCheck size={11} />
-                  Tout lire
+                  Tout marquer comme lu
                 </button>
               )}
               <button
@@ -177,60 +135,62 @@ export default function NotificationBell(_props: { topBarMode?: boolean } = {}) 
 
           <div className="h-px bg-white/[0.07]" />
 
-          {/* Liste */}
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-96 overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 gap-2">
                 <Bell size={18} className="text-white/20" />
                 <p className="text-[12px] text-white/30">Aucune notification</p>
               </div>
             ) : (
-              notifications.map((n, i) => (
-                <button
-                  key={n.id}
-                  onClick={() => {
-                    if (!n.read) markRead(n.id);
-                    // Redirection selon le type et l’id de ressource
-                    if (n.type === "session_reminder" && n.client_id) {
-                      router.push(`/coach/clients/${n.client_id}/data/performances`);
-                    } else if (n.submission_id) {
-                      if (n.type === "assessment_completed") {
-                        if (n.client_id) {
-                          router.push(`/coach/clients/${n.client_id}/bilans/${n.submission_id}`);
-                        } else {
-                          router.push(`/coach/clients`);
-                        }
-                      } else if (n.type === "payment_received") {
-                        router.push(`/coach/paiements/${n.submission_id}`);
-                      } else if (n.type === "program_assigned") {
-                        router.push(`/coach/programmes/${n.submission_id}`);
-                      }
-                    }
-                  }}
-                  className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors ${
-                    i < notifications.length - 1
-                      ? "border-b border-white/[0.05]"
-                      : ""
-                  } ${n.read ? "opacity-40" : "hover:bg-white/[0.04]"}`}
-                >
-                  <span className="text-base shrink-0 mt-0.5 leading-none">
-                    {TYPE_ICONS[n.type] ?? "🔔"}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className={`text-[12px] leading-snug ${n.read ? "text-white/50" : "text-white/90 font-medium"}`}
-                    >
-                      {n.message}
-                    </p>
-                    <p className="text-[10px] text-white/30 mt-0.5">
-                      {timeAgo(n.created_at)}
-                    </p>
+              notifications.map((notification, index) => {
+                const Icon = ICONS[notification.category] ?? Bell;
+                return (
+                  <div
+                    key={notification.id}
+                    className={`px-4 py-3 flex items-start gap-3 ${
+                      index < notifications.length - 1 ? "border-b border-white/[0.05]" : ""
+                    }`}
+                  >
+                    <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.05] text-white/70 shrink-0">
+                      <Icon size={14} />
+                    </span>
+                    <div className="min-w-0 flex-1 pr-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/40">
+                          {notification.categoryLabel}
+                        </p>
+                      </div>
+                      <p className="mt-1 text-[11px] font-semibold leading-snug text-white/90 whitespace-normal break-words">
+                        {notification.title ?? "Notification"}
+                      </p>
+                      {notification.body ? (
+                        <p className="mt-1 text-[10.5px] leading-relaxed text-white/55 whitespace-normal break-words">
+                          {notification.body}
+                        </p>
+                      ) : null}
+                      <div className="mt-1.5 flex items-center gap-2 text-[10px] text-white/30">
+                        <span>{notification.clientName}</span>
+                        <span>•</span>
+                        <span>{timeAgo(notification.createdAt)}</span>
+                      </div>
+                    </div>
+                    <div className="shrink-0 flex flex-col items-end gap-1.5">
+                      <button
+                        onClick={() => handleOpenNotification(notification)}
+                        className="rounded-lg bg-white/[0.06] px-2 py-1 text-[9.5px] font-semibold text-white/80 hover:bg-white/[0.1]"
+                      >
+                        Ouvrir
+                      </button>
+                      <button
+                        onClick={() => void markMany([notification.id])}
+                        className="rounded-lg bg-[#1f8a65]/14 px-2 py-1 text-[9.5px] font-semibold text-[#8ef0c7] hover:bg-[#1f8a65]/22"
+                      >
+                        Marquer lu
+                      </button>
+                    </div>
                   </div>
-                  {!n.read && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#1f8a65] shrink-0 mt-1.5" />
-                  )}
-                </button>
-              ))
+                );
+              })
             )}
           </div>
         </div>

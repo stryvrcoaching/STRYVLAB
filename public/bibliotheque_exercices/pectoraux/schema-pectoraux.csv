@@ -25,3 +25,50 @@ CHEST-023,Hex-press-a-la-smith-machine,horizontal_push,sagittal,compound,false,p
 CHEST-024,Hyght-dumbell-fly,fly,sagittal,isolation,false,pectoralis_major,0.8,anterior_deltoid,0.2,scapula,4,1,5,4,4,free_weight_arc
 CHEST-025,Pec-deck-butterfly-exercice-musculation,fly,sagittal,isolation,false,pectoralis_major,0.85,anterior_deltoid,0.15,scapula,2,1,3,2,2,machine_stability
 CHEST-026,Pompe-musculation,horizontal_push,sagittal,compound,false,pectoralis_major,0.65,triceps|anterior_deltoid,0.2|0.15,core,5,1,6,7,7,bodyweight_instability
+CHEST-027,Pousse de médecine ball avec course,full_body_push,sagittal,compound,false,pectoralis_major,0.9,triceps_brachii|core,0.25|0.15,core|shoulders,2,2,3,5,6,medicine_ball
+CHEST-028,Pompes archer,horizontal_push,sagittal,compound,true,pectoralis_major,0.75,triceps_brachii,0.2,shoulders,1,1,3,5,4,bodyweight_basic
+CHEST-029,Dips sur banc (genoux fléchis),elbow_extension,sagittal,compound,false,triceps_brachii,0.8,shoulders|pectoralis_major,0.2|0.1,core,1,1,3,2,3,bodyweight_basic
+CHEST-030,Dips au sol,elbow_extension,sagittal,compound,false,triceps_brachii,0.75,shoulders|pectoralis_major,0.2|0.1,core,1,1,3,2,3,bodyweight_basic
+CHEST-031,Body-up,elbow_extension,sagittal,compound,true,triceps_brachii,0.8,shoulders|pectoralis_major,0.1|0.1,core,1,1,3,3,5,bodyweight_basic
+CHEST-032,Dips de poitrine,vertical_push,sagittal,compound,false,pectoralis_major,0.8,triceps_brachii,0.3,shoulders,2,1,3,4,5,bodyweight_basic
+CHEST-033,Dips de poitrine (sur cage dip-pull-up),vertical_push,sagittal,compound,false,pectoralis_major,0.8,triceps_brachii,0.3,shoulders,2,1,3,4,5,bodyweight_basic
+CHEST-034,Dips de poitrine sur barre droite,vertical_push,sagittal,compound,false,pectoralis_major,0.8,triceps_brachii,0.3,shoulders,2,1,3,4,5,bodyweight_basic
+CHEST-035,Pompes avec tapotement de poitrine (hommes),horizontal_push,sagittal,compound,false,pectoralis_major,0.8,triceps_brachii|core,0.25|0.2,shoulders,2,1,3,5,6,bodyweight_basic
+CHEST-036,Pompe claque,horizontal_push,sagittal,compound,false,pectoralis_major,0.9,triceps_brachii|core,0.25|0.2,shoulders,2,1,3,5,6,bodyweight_basic
+CHEST-037,Pompes horloges,horizontal_push,transverse,compound,false,pectoralis_major,0.7,triceps_brachii|deltoids,0.3|0.2,core|shoulders,2,1,3,4,5,bodyweight_basic
+CHEST-038,Pompes serrées,horizontal_push,sagittal,compound,false,triceps_brachii,0.75,pectoralis_major|deltoids,0.25|0.2,core,2,1,3,4,5,bodyweight_basic
+CHEST-039,Pompes serrées (sur les genoux),horizontal_push,sagittal,compound,false,triceps_brachii,0.65,pectoralis_major|deltoids,0.2|0.15,core,1,2,2,3,4,bodyweight_basic
+CHEST-040,Pompes déclinées,horizontal_push,sagittal,compound,false,pectoralis_major,0.75,triceps_brachii|deltoids,0.2|0.2,core,2,1,3,4,5,bodyweight_basic
+CHEST-041,Pompes diamant,horizontal_push,sagittal,compound,false,triceps_brachii,0.75,pectoralis_major,0.2,core,2,1,3,4,5,bodyweight_basic
+CHEST-042,Pompes avec chute,horizontal_push,sagittal,compound,false,pectoralis_major,0.8,triceps_brachii|deltoids,0.3|0.2,core|shoulders,2,1,3,3,4,bodyweight_basic
+CHEST-043,Dips sur les coudes,elbow_extension,sagittal,compound,false,triceps_brachii,0.8,shoulders|pectoralis_major,0.2|0.1,core,1,1,3,3,4,bodyweight_basic
+CHEST-044,Presse de gamme étendue sur le sol avec kettlebell,vertical_push,sagittal,isolation,true,pectoralis_major,0.75,triceps|core,0.2|0.1,shoulders,2,2,2,4,4,bodyweight_basic
+CHEST-045,Développé couché avec kettlebell à un bras,horizontal_push,sagittal,isolation,true,pectoralis_major,0.7,triceps_brachii|core,0.2|0.1,core|shoulders,2,1,3,2,4,free_weight_complex
+CHEST-046,Pompes plyométriques avec kettlebell,horizontal_push,sagittal,compound,false,pectoralis_major,0.8,triceps_brachii|core,0.25|0.2,core|shoulders,2,1,3,4,6,free_weight_complex
+CHEST-047,Dips impossibles,vertical_push,sagittal,compound,false,triceps_brachii,0.85,shoulders|pectoralis_major,0.25|0.2,core,2,1,3,5,4,bodyweight_basic
+CHEST-048,Pompes inclinées à prise serrée,horizontal_push,sagittal,compound,false,triceps_brachii,0.9,pectoralis_major,0.15,core,2,1,3,3,4,bodyweight_basic
+CHEST-049,Pompes inclinées avec saut de profondeur,vertical_push,sagittal,compound,false,pectoralis_major,0.85,triceps_brachii|shoulders,0.25|0.2,core,2,1,3,5,6,bodyweight_basic
+CHEST-050,Pompes inclinées,horizontal_push,sagittal,compound,false,pectoralis_major,0.85,triceps_brachii,0.2,core,2,1,3,4,5,bodyweight_basic
+CHEST-051,Pompes inclinées (sur boîte),horizontal_push,sagittal,compound,false,pectoralis_major,0.85,triceps_brachii,0.2,core,2,1,3,4,5,bodyweight_basic
+CHEST-052,Pompes inclinées prise inverse,vertical_push,sagittal,compound,false,pectoralis_major,0.7,triceps_brachii|anterior_deltoid,0.3|0.25,core,2,1,2,4,3,bodyweight_basic
+CHEST-053,Pompe scapulaire inclinée,horizontal_push,sagittal,compound,false,pectoraux,0.65,pectoralis_major|triceps_brachii,0.15|0.1,core,1,1,3,3,4,bodyweight_basic
+CHEST-054,Squeeze isométrique des pectoraux,core_stability,transverse,isolation,false,pectoralis_major,0.75,none,,core,1,1,1,2,1,bodyweight_basic
+CHEST-055,pompes à genoux (homme),horizontal_push,sagittal,compound,false,pectoralis_major,0.85,triceps_brachii|anterior_deltoid,0.2|0.15,core,2,2,3,4,4,bodyweight_basic
+CHEST-056,dips coréens,vertical_push,sagittal,compound,false,pectoralis_major,0.9,triceps_brachii,0.2,shoulders,2,1,4,7,5,bodyweight_basic
+CHEST-057,Pompe hindoue modifiée (homme),horizontal_push,sagittal,compound,false,pectoralis_major,0.85,triceps_brachii|shoulders,0.2|0.15,core,2,1,3,4,5,bodyweight_basic
+CHEST-058,Dips avec un bras,vertical_push,sagittal,compound,true,triceps_brachii,0.6,shoulders,0.2,core,2,1,3,6,5,bodyweight_basic
+CHEST-059,Pompe plyométrique,vertical_push,sagittal,compound,false,pectoralis_major,0.9,triceps_brachii|deltoids,0.25|0.2,core,2,1,3,3,6,bodyweight_basic
+CHEST-060,Push et Pull poids du corps,mobility_stability,sagittal,compound,false,pectoralis_major,0.75,triceps_brachii|shoulders,0.25|0.2,core,2,1,3,4,5,bodyweight_basic
+CHEST-061,pompe profonde,horizontal_push,sagittal,compound,false,pectoralis_major,0.8,triceps_brachii|deltoids,0.3|0.2,core,2,1,3,4,5,bodyweight_basic
+CHEST-062,pullover autour avec haltère,horizontal_pull,sagittal,isolation,false,pectoralis_major,0.7,lats|deltoids,0.2|0.1,core,2,1,2,4,5,free_weight_complex
+CHEST-063,développé couché avec haltères,horizontal_push,sagittal,compound,false,pectoralis_major,0.85,triceps_brachii|deltoids,0.3|0.2,core,1,1,3,3,5,free_weight_complex
+CHEST-064,Développé serré avec haltères,vertical_push,sagittal,compound,false,triceps_brachii,0.75,pectoralis_major,0.1,core,2,1,2,3,4,free_weight_complex
+CHEST-065,Développé serré avec haltères,vertical_push,sagittal,compound,false,triceps_brachii,0.75,pectoralis_major,0.1,core,2,1,2,3,4,free_weight_complex
+CHEST-066,Développé couché décliné avec haltères,horizontal_push,sagittal,compound,false,pectoralis_major_lower,0.8,triceps_brachii|anterior_deltoid,0.2|0.15,core,2,1,3,4,4,free_weight_complex
+CHEST-067,Pompes déclines avec haltères,horizontal_push,sagittal,compound,false,pectoralis_major_lower,0.8,triceps_brachii|anterior_deltoid,0.15|0.1,core,2,1,3,4,4,free_weight_complex
+CHEST-068,Extension triceps décliné avec haltères,elbow_extension,sagittal,isolation,true,triceps_brachii,0.8,,,core,2,1,3,4,3,free_weight_complex
+CHEST-069,Développé marteau incliné sur ballon suisse avec haltères,vertical_push,sagittal,compound,false,triceps_brachii,0.9,anterior_deltoid,0.2|0.1,core,2,1,2,5,5,free_weight_complex
+CHEST-070,Press couché avec haltères,elbow_extension,sagittal,isolation,false,triceps_brachii,0.85,,,core,2,1,2,3,4,bodyweight_basic
+CHEST-071,Développé couché avec câble,horizontal_push,sagittal,compound,false,pectoralis_major,0.75,deltoids|triceps_brachii,0.2|0.15,core,2,1,3,5,4,cable_constant
+CHEST-072,Presse à câbles en déclin à un bras,vertical_push,sagittal,compound,true,pectoralis_major,0.8,triceps_brachii|anterior_deltoid,0.2|0.15,core,2,1,3,4,3,cable_constant
+CHEST-073,Presse à câbles en déclin,vertical_push,sagittal,compound,false,pectoralis_major,0.85,triceps_brachii|anterior_deltoid,0.25|0.15,core,2,1,3,5,4,cable_constant

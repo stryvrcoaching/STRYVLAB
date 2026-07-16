@@ -1,6 +1,7 @@
 import { inngest } from '@/lib/inngest/client'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { getLevelFromPoints } from '@/lib/checkins'
+import { createClientAppNotification } from '@/lib/notifications/create-client-app-notification'
 
 function service() {
   return createServiceClient(
@@ -15,6 +16,14 @@ export const pointsLevelUpdateFunction = inngest.createFunction(
     const { client_id } = event.data as { client_id: string }
 
     await step.run('update-total-and-level', async () => {
+      const { data: existingStreak } = await service()
+        .from('client_streaks')
+        .select('level')
+        .eq('client_id', client_id)
+        .maybeSingle()
+      
+      const oldLevel = existingStreak?.level
+
       const { data: rows } = await service()
         .from('client_points')
         .select('points')
@@ -28,7 +37,31 @@ export const pointsLevelUpdateFunction = inngest.createFunction(
         .update({ total_points: total, level })
         .eq('client_id', client_id)
 
-      return { total, level }
+      if (oldLevel && oldLevel !== level) {
+        // Find the coach for this client
+        const { data: coachData } = await service()
+          .from('coach_clients')
+          .select('coach_id, user_id')
+          .eq('id', client_id)
+          .maybeSingle()
+
+        if (coachData?.coach_id) {
+          // Insert a level_up notification for the client
+          await createClientAppNotification(service(), {
+            clientId: client_id,
+            coachId: coachData.coach_id,
+            type: 'system_reminder',
+            copyKey: 'level.up',
+            copyParams: { level },
+            actionUrl: '/client/profil',
+            payload: { event: 'level_up', new_level: level, old_level: oldLevel },
+            pushKind: 'system',
+            pushTag: `stryv-level-up-${level}`,
+          })
+        }
+      }
+
+      return { total, level, oldLevel }
     })
   }
 )

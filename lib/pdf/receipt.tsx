@@ -11,6 +11,8 @@ import {
 } from '@react-pdf/renderer'
 import React from 'react'
 
+const STRYVR_SILVER_LOGO = `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://stryvlab.com'}/logo/logo-stryvr-silver.png`
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -138,6 +140,11 @@ export interface ReceiptData {
   coachName: string
   coachEmail: string
   coachLogoUrl?: string | null
+  companyName?: string | null
+  billingCountry?: string | null
+  businessRegistrationNumber?: string | null
+  vatNumber?: string | null
+  address?: string | null
   clientName: string
   clientEmail: string
   formulaName: string
@@ -161,6 +168,12 @@ function ReceiptDocument({ data }: { data: ReceiptData }) {
   const dateFormatted = new Date(data.date).toLocaleDateString('fr-FR', {
     day: 'numeric', month: 'long', year: 'numeric',
   })
+  const businessDetails = [
+    data.companyName && data.companyName !== data.coachName ? data.companyName : null,
+    data.address,
+    data.businessRegistrationNumber ? `N° d'immatriculation : ${data.businessRegistrationNumber}` : null,
+    data.vatNumber ? `N° TVA : ${data.vatNumber}` : null,
+  ].filter(Boolean)
 
   return (
     <Document>
@@ -168,15 +181,16 @@ function ReceiptDocument({ data }: { data: ReceiptData }) {
         {/* ── Header ── */}
         <View style={styles.header}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            {data.coachLogoUrl && (
-              <PDFImage
-                src={data.coachLogoUrl}
-                style={{ width: 40, height: 40, objectFit: 'contain' }}
-              />
-            )}
+            <PDFImage
+              src={data.coachLogoUrl || STRYVR_SILVER_LOGO}
+              style={{ width: 40, height: 40, objectFit: 'contain' }}
+            />
             <View>
               <Text style={styles.coachName}>{data.coachName}</Text>
               <Text style={styles.coachEmail}>{data.coachEmail}</Text>
+              {businessDetails.map((detail) => (
+                <Text key={detail} style={styles.coachEmail}>{detail}</Text>
+              ))}
             </View>
           </View>
           <View style={styles.receiptTitle}>

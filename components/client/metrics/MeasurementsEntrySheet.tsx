@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Info } from 'lucide-react'
 import { useClientT } from '../ClientI18nProvider'
+import useBodyScrollLock from '@/components/client/useBodyScrollLock'
 
 interface Field {
   key: string
@@ -38,6 +39,7 @@ interface Props {
 
 export default function MeasurementsEntrySheet({ open, onClose, onSaved }: Props) {
   const { t, ta } = useClientT()
+  useBodyScrollLock(open)
   const [inputs, setInputs] = useState<Record<string, string>>({})
   const [openGuides, setOpenGuides] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
@@ -111,8 +113,8 @@ export default function MeasurementsEntrySheet({ open, onClose, onSaved }: Props
           />
 
           <motion.div
-            className="fixed bottom-0 left-0 right-0 z-[60] flex flex-col rounded-t-2xl"
-            style={{ background: '#111111', maxHeight: '88vh' }}
+            className="fixed bottom-0 left-0 right-0 z-[80] flex flex-col rounded-t-2xl"
+            style={{ background: '#111111', maxHeight: '88dvh' }}
             initial={{ y: '100%' }}
             animate={{ y: 0, transition: { type: 'spring', stiffness: 300, damping: 30 } }}
             exit={{ y: '100%', transition: { duration: 0.2, ease: 'easeIn' } }}
@@ -140,7 +142,7 @@ export default function MeasurementsEntrySheet({ open, onClose, onSaved }: Props
             </div>
 
             {/* Scrollable field list */}
-            <div className="flex-1 overflow-y-auto px-5 space-y-1.5 pb-4">
+            <div className="flex-1 overflow-y-auto px-5 space-y-1.5 pb-6">
               {fields.map((f, i) => {
                 const filled = Number.isFinite(Number(inputs[f.key])) && Number(inputs[f.key]) > 0
                 const guideOpen = openGuides.has(f.key)
@@ -221,7 +223,10 @@ export default function MeasurementsEntrySheet({ open, onClose, onSaved }: Props
             </div>
 
             {/* Footer */}
-            <div className="shrink-0 px-5 pb-8 pt-3 border-t border-white/[0.05]">
+            <div
+              className="shrink-0 px-5 pt-3 border-t border-white/[0.05]"
+              style={{ paddingBottom: '16px' }}
+            >
               {error && (
                 <p className="text-[11px] text-white/50 text-center mb-2">{error}</p>
               )}
@@ -232,10 +237,10 @@ export default function MeasurementsEntrySheet({ open, onClose, onSaved }: Props
                 style={{ background: '#f2f2f2', color: '#080808' }}
               >
                 {saving
-                  ? 'Enregistrement…'
+                  ? t('meas.saving')
                   : filledCount > 0
-                    ? `Enregistrer${filledCount > 1 ? ` (${filledCount})` : ''}`
-                    : 'Enregistrer'}
+                    ? `${t('meas.save')}${filledCount > 1 ? ` (${filledCount})` : ''}`
+                    : t('meas.save')}
               </button>
             </div>
           </motion.div>

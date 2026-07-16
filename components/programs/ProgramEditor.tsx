@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
+import useSWR from 'swr'
+import { calculateHRZones } from '@/lib/formulas'
 import { Plus, Trash2, ChevronDown, ChevronUp, Save, Loader2, GripVertical, ImagePlus, X, Library, TrendingUp } from 'lucide-react'
 import Image from 'next/image'
 import ExercisePicker from './ExercisePicker'
@@ -37,6 +39,8 @@ interface Exercise {
   weight_increment_kg: number
   primary_muscles: string[]
   secondary_muscles: string[]
+  execution_type?: 'reps_rir' | 'time_rpe' | 'distance_rpe'
+  target_hr_zone?: string | null
 }
 
 interface Session {
@@ -65,7 +69,7 @@ interface Props {
 }
 
 function emptyExercise(position: number): Exercise {
-  return { name: '', sets: 3, reps: '8-12', rest_sec: 90, rir: 2, notes: '', position, image_url: null, target_rir: 2, weight_increment_kg: 2.5, primary_muscles: [], secondary_muscles: [] }
+  return { name: '', sets: 3, reps: '8-12', rest_sec: 90, rir: 2, notes: '', position, image_url: null, target_rir: 2, weight_increment_kg: 2.5, primary_muscles: [], secondary_muscles: [], execution_type: 'reps_rir', target_hr_zone: null }
 }
 
 function emptySession(position: number): Session {
@@ -73,6 +77,17 @@ function emptySession(position: number): Session {
 }
 
 export default function ProgramEditor({ clientId, initial, onSaved, onCancel }: Props) {
+  const { data: clientRes } = useSWR(`/api/clients/${clientId}`, (url) => fetch(url).then(r => r.json()))
+  const client = clientRes?.client
+
+  const hrZones = useMemo(() => {
+    if (!client) return null
+    const dob = client.date_of_birth
+    const gender = client.gender === 'female' ? 'female' : 'male'
+    const age = dob ? new Date().getFullYear() - new Date(dob).getFullYear() : 30
+    return calculateHRZones({ age, gender })
+  }, [client])
+
   const [program, setProgram] = useState<Program>(() =>
     initial
       ? {
@@ -89,6 +104,8 @@ export default function ProgramEditor({ clientId, initial, onSaved, onCancel }: 
                 weight_increment_kg: e.weight_increment_kg ?? 2.5,
                 primary_muscles: e.primary_muscles ?? [],
                 secondary_muscles: e.secondary_muscles ?? [],
+                execution_type: e.execution_type ?? 'reps_rir',
+                target_hr_zone: e.target_hr_zone ?? null,
               })),
           })),
         }
@@ -338,6 +355,24 @@ export default function ProgramEditor({ clientId, initial, onSaved, onCancel }: 
                         <Trash2 size={13} />
                       </button>
                     </div>
+                    {/* Selector of execution type */}
+                    <div className="flex gap-1.5 my-1.5 border-b border-white/[0.04] pb-1.5">
+                      {(['reps_rir', 'time_rpe', 'distance_rpe'] as const).map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => updateExercise(si, ei, { execution_type: t })}
+                          className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors ${
+                            (ex.execution_type ?? 'reps_rir') === t
+                              ? 'bg-accent text-white'
+                              : 'bg-white/[0.04] text-white/45 hover:text-white'
+                          }`}
+                        >
+                          {t === 'reps_rir' ? 'Renforcement' : t === 'time_rpe' ? 'HIIT/Temps' : 'Distance'}
+                        </button>
+                      ))}
+                    </div>
+
                     {/* Ligne 1 — prescription de base */}
                     <div className="grid grid-cols-4 gap-2">
                       <div>
@@ -351,11 +386,13 @@ export default function ProgramEditor({ clientId, initial, onSaved, onCancel }: 
                         />
                       </div>
                       <div>
-                        <label className="text-[9px] font-bold text-white/45 uppercase block mb-0.5">Reps</label>
+                        <label className="text-[9px] font-bold text-white/45 uppercase block mb-0.5">
+                          {(ex.execution_type ?? 'reps_rir') === 'time_rpe' ? 'Durée' : (ex.execution_type ?? 'reps_rir') === 'distance_rpe' ? 'Distance' : 'Reps'}
+                        </label>
                         <input
                           value={ex.reps}
                           onChange={e => updateExercise(si, ei, { reps: e.target.value })}
-                          placeholder="8-12"
+                          placeholder={(ex.execution_type ?? 'reps_rir') === 'time_rpe' ? '30s' : (ex.execution_type ?? 'reps_rir') === 'distance_rpe' ? '2 km' : '8-12'}
                           className="w-full bg-[#181818] rounded px-2 py-1 text-xs font-mono text-white outline-none focus:ring-1 focus:ring-accent/40"
                         />
                       </div>
@@ -370,50 +407,96 @@ export default function ProgramEditor({ clientId, initial, onSaved, onCancel }: 
                         />
                       </div>
                       <div>
-                        <label className="text-[9px] font-bold text-white/45 uppercase block mb-0.5">RIR</label>
+                        <label className="text-[9px] font-bold text-white/45 uppercase block mb-0.5">
+                          {(ex.execution_type ?? 'reps_rir') === 'reps_rir' ? 'RIR' : 'RPE'}
+                        </label>
                         <input
                           type="number"
                           min={0}
-                          max={5}
-                          value={ex.rir ?? ''}
-                          onChange={e => updateExercise(si, ei, { rir: parseInt(e.target.value) ?? null })}
+                          max={(ex.execution_type ?? 'reps_rir') === 'reps_rir' ? 5 : 10}
+                          step={0.5}
+                          value={((ex.execution_type ?? 'reps_rir') === 'reps_rir' ? ex.rir : ex.target_rir) ?? ''}
+                          onChange={e => {
+                            const val = Number(e.target.value)
+                            if ((ex.execution_type ?? 'reps_rir') === 'reps_rir') {
+                              updateExercise(si, ei, { rir: isNaN(val) ? null : val })
+                            } else {
+                              updateExercise(si, ei, { target_rir: isNaN(val) ? null : val, rir: null })
+                            }
+                          }}
+                          placeholder={(ex.execution_type ?? 'reps_rir') === 'reps_rir' ? '2' : '8'}
                           className="w-full bg-[#181818] rounded px-2 py-1 text-xs font-mono text-white outline-none focus:ring-1 focus:ring-accent/40"
                         />
                       </div>
                     </div>
 
+                    {/* Target HR Zone recommendation for cardio/HIIT */}
+                    {ex.execution_type && ex.execution_type !== 'reps_rir' && (
+                      <div className="pt-1.5 border-t border-white/[0.04] mt-1">
+                        <label className="text-[9px] font-bold text-white/45 uppercase block mb-1">
+                          Zone Cardiaque Recommandée
+                        </label>
+                        <select
+                          value={ex.target_hr_zone ?? ''}
+                          onChange={e => updateExercise(si, ei, { target_hr_zone: e.target.value || null })}
+                          className="w-full bg-[#181818] text-white text-xs rounded px-2 py-1 outline-none focus:ring-1 focus:ring-accent/40 border border-white/[0.04]"
+                        >
+                          <option value="">— Sans zone spécifique —</option>
+                          {hrZones ? hrZones.zones.map(z => (
+                            <option key={z.zone} value={`Zone ${z.zone}`}>
+                              Zone {z.zone} ({z.name}) : {z.bpm} BPM
+                            </option>
+                          )) : (
+                            <>
+                              <option value="Zone 1">Zone 1 (Récupération Active)</option>
+                              <option value="Zone 2">Zone 2 (Endurance de Base)</option>
+                              <option value="Zone 3">Zone 3 (Aérobie)</option>
+                              <option value="Zone 4">Zone 4 (Seuil Lactique)</option>
+                              <option value="Zone 5">Zone 5 (VO2 Max)</option>
+                              <option value="Zone 6">Zone 6 (Anaérobie)</option>
+                            </>
+                          )}
+                        </select>
+                      </div>
+                    )}
+
                     {/* Ligne 2 — double progression */}
-                    <div className="flex items-center gap-1.5 pt-1">
-                      <TrendingUp size={10} className="text-accent shrink-0" />
-                      <span className="text-[9px] font-bold text-accent uppercase tracking-wider">Progression</span>
-                      <div className="flex-1 h-px bg-accent/20" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[9px] font-bold text-white/45 uppercase block mb-0.5">RIR Cible</label>
-                        <input
-                          type="number"
-                          min={0}
-                          max={5}
-                          value={ex.target_rir ?? ''}
-                          onChange={e => updateExercise(si, ei, { target_rir: e.target.value === '' ? null : parseInt(e.target.value) })}
-                          placeholder="2"
-                          className="w-full bg-[#181818] rounded px-2 py-1 text-xs font-mono text-white outline-none focus:ring-1 focus:ring-violet-400/40"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[9px] font-bold text-white/45 uppercase block mb-0.5">Incrément (kg)</label>
-                        <input
-                          type="number"
-                          min={0.5}
-                          max={10}
-                          step={0.5}
-                          value={ex.weight_increment_kg}
-                          onChange={e => updateExercise(si, ei, { weight_increment_kg: parseFloat(e.target.value) || 2.5 })}
-                          className="w-full bg-[#181818] rounded px-2 py-1 text-xs font-mono text-white outline-none focus:ring-1 focus:ring-violet-400/40"
-                        />
-                      </div>
-                    </div>
+                    {(!ex.execution_type || ex.execution_type === 'reps_rir') && (
+                      <>
+                        <div className="flex items-center gap-1.5 pt-1">
+                          <TrendingUp size={10} className="text-accent shrink-0" />
+                          <span className="text-[9px] font-bold text-accent uppercase tracking-wider">Progression</span>
+                          <div className="flex-1 h-px bg-accent/20" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[9px] font-bold text-white/45 uppercase block mb-0.5">RIR Cible</label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={5}
+                              step={0.5}
+                              value={ex.target_rir ?? ''}
+                              onChange={e => updateExercise(si, ei, { target_rir: e.target.value === '' ? null : Number(e.target.value) })}
+                              placeholder="2"
+                              className="w-full bg-[#181818] rounded px-2 py-1 text-xs font-mono text-white outline-none focus:ring-1 focus:ring-violet-400/40"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[9px] font-bold text-white/45 uppercase block mb-0.5">Incrément (kg)</label>
+                            <input
+                              type="number"
+                              min={0.5}
+                              max={10}
+                              step={0.5}
+                              value={ex.weight_increment_kg}
+                              onChange={e => updateExercise(si, ei, { weight_increment_kg: parseFloat(e.target.value) || 2.5 })}
+                              className="w-full bg-[#181818] rounded px-2 py-1 text-xs font-mono text-white outline-none focus:ring-1 focus:ring-violet-400/40"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
                     {/* ── Muscles ── */}
                     <div className="border-t border-white/[0.06] pt-2 flex flex-col gap-1.5">
                       <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/40">Muscles principaux</p>

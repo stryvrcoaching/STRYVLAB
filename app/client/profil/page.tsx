@@ -2,14 +2,32 @@ import { createClient } from "@/utils/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { resolveClientFromUser } from "@/lib/client/resolve-client";
-import { listClientNotificationItems } from "@/lib/client/inbox";
 import ClientTopBar from "@/components/client/ClientTopBar";
 import ProfilAccordion from "@/components/client/profile/ProfilAccordion";
 import { ct, type ClientLang } from "@/lib/i18n/clientTranslations";
+import { resolveClientLanguage } from "@/lib/client/resolve-language";
 import { getCycleStateFromLogs } from "@/lib/cycle/cycleEngine";
 import type { CycleState, CycleLog } from "@/lib/cycle/cycleEngine";
 
-export const metadata = { title: "Mon profil" };
+export async function generateMetadata() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { title: ct("fr", "profil.title") };
+  }
+
+  const service = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+  const client = await resolveClientFromUser(user.id, user.email, service, "id");
+  const lang = client ? await resolveClientLanguage(service, client.id) : "fr";
+
+  return { title: ct(lang, "profil.title") };
+}
 
 export default async function ClientProfilPage() {
   const supabase = createClient();
@@ -32,7 +50,7 @@ export default async function ClientProfilPage() {
 
   const isFemale = (client as any)?.gender === "female";
 
-  const [{ data: prefs }, notifData, { data: streakData }, cycleLogsResult, cycleBilanResult] =
+  const [{ data: prefs }, { data: streakData }, cycleLogsResult, cycleBilanResult] =
     await Promise.all([
       client
         ? service
@@ -42,12 +60,9 @@ export default async function ClientProfilPage() {
             .single()
         : Promise.resolve({ data: null }),
       client
-        ? listClientNotificationItems(service, user.id, client.id, false)
-        : Promise.resolve([]),
-      client
         ? service
             .from("client_streaks")
-            .select("current_streak, longest_streak, total_points, level")
+            .select("current_streak, longest_streak, total_points, spent_points, level")
             .eq("client_id", client.id)
             .maybeSingle()
         : Promise.resolve({ data: null }),
@@ -86,6 +101,18 @@ export default async function ClientProfilPage() {
     notif_session_reminder: true,
     notif_bilan_received: true,
     notif_program_updated: true,
+    notif_checkin_reminder: true,
+    notif_hydration_reminder: true,
+    notif_meal_reminder: true,
+    notif_protein_reminder: true,
+    notif_coach_messages: true,
+    notif_progress_updates: true,
+    training_reminder_times: ['08:00', '18:00'],
+    hydration_reminder_first_time: '09:00',
+    hydration_reminder_count: 3,
+    meal_reminder_breakfast_time: '10:30',
+    meal_reminder_lunch_time: '14:30',
+    protein_reminder_time: '20:00',
   };
 
   const lang: ClientLang = ["fr", "en", "es"].includes(
@@ -95,9 +122,6 @@ export default async function ClientProfilPage() {
     : "fr";
   const dateLocale =
     lang === "fr" ? "fr-FR" : lang === "es" ? "es-ES" : "en-GB";
-
-  const notifications = notifData ?? [];
-  const unreadCount = notifications.filter((n: (typeof notifications)[number]) => !n.read_at).length;
 
   let cycleState: CycleState | null = null;
   if (isFemale && client) {
@@ -111,7 +135,7 @@ export default async function ClientProfilPage() {
   ).toLocaleDateString(dateLocale, { month: "long", year: "numeric" });
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d] font-barlow">
+    <div className="min-h-dvh bg-[#0d0d0d] font-barlow overflow-x-hidden">
       <ClientTopBar
         section={ct(lang, "profil.section")}
         title={ct(lang, "profil.title")}
@@ -133,7 +157,7 @@ export default async function ClientProfilPage() {
         }
       />
 
-      <main className="max-w-lg mx-auto px-4 pt-[88px] pb-24">
+      <main className="max-w-lg mx-auto px-4 pt-[104px] pb-24">
         <ProfilAccordion
           clientId={client?.id ?? ""}
           profilePhotoUrl={client?.profile_photo_url ?? null}
@@ -159,13 +183,23 @@ export default async function ClientProfilPage() {
             height_unit: preferences.height_unit as "cm" | "ft",
             language: preferences.language as "fr" | "en" | "es",
           }}
-          notifications={notifications}
           notifPrefs={{
             notif_session_reminder: preferences.notif_session_reminder,
             notif_bilan_received: preferences.notif_bilan_received,
             notif_program_updated: preferences.notif_program_updated,
+            notif_checkin_reminder: preferences.notif_checkin_reminder,
+            notif_hydration_reminder: preferences.notif_hydration_reminder,
+            notif_meal_reminder: preferences.notif_meal_reminder,
+            notif_protein_reminder: preferences.notif_protein_reminder,
+            notif_coach_messages: preferences.notif_coach_messages,
+            notif_progress_updates: preferences.notif_progress_updates,
+            training_reminder_times: preferences.training_reminder_times,
+            hydration_reminder_first_time: preferences.hydration_reminder_first_time,
+            hydration_reminder_count: preferences.hydration_reminder_count,
+            meal_reminder_breakfast_time: preferences.meal_reminder_breakfast_time,
+            meal_reminder_lunch_time: preferences.meal_reminder_lunch_time,
+            protein_reminder_time: preferences.protein_reminder_time,
           }}
-          unreadCount={unreadCount}
           streak={streakData ?? null}
           cycleState={cycleState}
         />

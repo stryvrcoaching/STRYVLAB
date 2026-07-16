@@ -32,8 +32,24 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
   }
 
-  const coachId = user.id;
   const db = serviceClient();
+  const { data: coachProfile } = await db
+    .from('coach_profiles')
+    .select('id')
+    .eq('coach_id', user.id)
+    .maybeSingle()
+
+  const { data: clientRecord } = await db
+    .from('coach_clients')
+    .select('id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (clientRecord && !coachProfile) {
+    return NextResponse.json({ error: 'Accès coach refusé' }, { status: 403 });
+  }
+
+  const coachId = user.id;
 
   // Toutes les requêtes en parallèle
   const [
@@ -60,17 +76,22 @@ export async function GET(_req: NextRequest) {
       .select('id, status, coach_id, client_id, price_override_eur, coach_formulas(name, price_eur, billing_cycle), coach_clients(first_name, last_name)')
       .eq('coach_id', coachId),
 
-    db.from('user_profiles')
-      .select('first_name')
-      .eq('id', coachId)
-      .single(),
+    db.from('coach_profiles')
+      .select('full_name, brand_name')
+      .eq('coach_id', coachId)
+      .maybeSingle(),
   ]);
 
   const clients = clientsRes.data ?? [];
   const submissions = submissionsRes.data ?? [];
   const payments = paymentsRes.data ?? [];
   const subscriptions = subscriptionsRes.data ?? [];
-  const coachFirstName: string = profileRes.data?.first_name ?? '';
+  const coachFullName: string | null = profileRes.data?.full_name ?? null;
+  const coachBrandName: string | null = profileRes.data?.brand_name ?? null;
+  const coachFirstName: string =
+    coachFullName?.trim().split(/\s+/)[0] ??
+    coachBrandName?.trim() ??
+    '';
 
   // ── MRR ──────────────────────────────────────────────────────────────────
   let mrr = 0;

@@ -114,8 +114,8 @@ function AccountSetupContent() {
           <button onClick={() => setMethod('magic')} className={`flex-1 px-4 py-2.5 rounded-full text-sm font-medium transition-all ${method === 'magic' ? 'bg-green-600 text-white shadow-lg' : 'text-gray-600 hover:text-gray-900'}`}>
             Lien email
           </button>
-          <button onClick={() => setMethod('password')} className={`flex-1 px-4 py-2.5 rounded-full text-sm font-medium transition-all ${method === 'password' ? 'bg-green-600 text-white shadow-lg' : 'text-gray-600 hover:text-gray-900'}`}>
-            Mot de passe
+          <button disabled className="flex-1 cursor-not-allowed rounded-full px-4 py-2.5 text-sm font-medium text-gray-400" title="Utilisez le lien sécurisé envoyé par e-mail">
+            Mot de passe désactivé
           </button>
         </div>
 

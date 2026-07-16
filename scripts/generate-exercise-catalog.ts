@@ -1,5 +1,5 @@
 /**
- * Script de génération du catalogue d'exercices depuis les GIFs
+ * Script de génération du catalogue d'exercices depuis les médias
  * Run: npx ts-node --project tsconfig.json scripts/generate-exercise-catalog.ts
  *
  * Corrections v2 (2026-04-17) :
@@ -19,6 +19,7 @@
 
 import fs from 'fs'
 import path from 'path'
+import { parse } from 'csv-parse/sync'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,16 @@ interface ExerciseEntry {
   stimulus_coefficient: number
 }
 
+interface CsvRow {
+  exercise_id: string
+  name: string
+}
+
+const ID_MAP_PATH = path.join(process.cwd(), 'scripts', 'exercise-id-map.json')
+const EXERCISE_ID_MAP: Record<string, string> = fs.existsSync(ID_MAP_PATH)
+  ? JSON.parse(fs.readFileSync(ID_MAP_PATH, 'utf-8'))
+  : {}
+
 // ─── Name formatting ─────────────────────────────────────────────────────────
 
 const PEDAGOGIQUE_SLUGS = new Set([
@@ -50,7 +61,7 @@ const PEDAGOGIQUE_SLUGS = new Set([
 ])
 
 function slugToName(slug: string): string {
-  const base = slug.replace(/\.gif$/, '')
+  const base = slug.replace(/\.[^.]+$/, '')
   let name = base.replace(/-/g, ' ')
 
   name = name.replace(/\s+exercice musculation$/i, '')
@@ -127,10 +138,70 @@ function slugToName(slug: string): string {
   return name
 }
 
+function toSlug(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
 // ─── Equipment inference ──────────────────────────────────────────────────────
+
+const SLUG_EQUIPMENT_MANUAL: Record<string, string[]> = {
+  // Biceps
+  'curl-zottman': ['dumbbell'],
+  'curl-biceps-alterne-sur-banc-incline': ['dumbbell'],
+  'curl-concentre': ['dumbbell'],
+  'drag-curl': ['barbell'],
+  'spider-curl': ['barbell'],
+  'waiter-curl': ['dumbbell'],
+  'bent-over-row-prise-disque': ['dumbbell'],
+  // Cardio
+  'rameur': ['machine'],
+  'stepper': ['machine'],
+  'tapis-de-course-inclinaison': ['machine'],
+  'velo-elliptique': ['machine'],
+  'velo-stationnaire': ['machine'],
+  // Dos / Pull
+  'souleve-de-terre': ['barbell'],
+  'souleve-de-terre-sumo': ['barbell'],
+  'souleve-de-terre-roumain': ['barbell'],
+  'souleve-de-terre-jambes-tendues': ['barbell'],
+  'souleve-de-terre-avec-deficit': ['barbell'],
+  'rack-pull': ['barbell'],
+  'tirage-horizontal-prise-large': ['machine', 'cable'],
+  'tirage-vertical-poitrine': ['machine', 'cable'],
+  'tirage-vertical-prise-inversee': ['machine', 'cable'],
+  'tirage-vertical-prise-serree': ['machine', 'cable'],
+  'rowing-poitrine-appuyee-coudes-ouverts': ['dumbbell'],
+  // Epaules
+  'developpe-arnold-exercice-musculation': ['dumbbell'],
+  'developpe-militaire-exercice-musculation': ['barbell'],
+  'elevation-frontale-banc-incline': ['dumbbell'],
+  'elevations-frontales-exercice-musculation': ['dumbbell'],
+  'elevations-laterales-exercice-musculation': ['dumbbell'],
+  'face-pull': ['cable'],
+  'oiseau-assis-sur-banc': ['dumbbell'],
+  'presse-epaule-exercice-musculation': ['machine'],
+  // Fessiers / Leg
+  'hips-thrust': ['barbell'],
+  'good-morning-exercice': ['barbell'],
+  'kickback-banc': ['dumbbell'],
+  'hack-squat': ['machine'],
+  'hack-squat-inverse': ['machine'],
+  'hack-squat-flexion-complete': ['machine'],
+  'squat-goblet-exercice-musculation': ['dumbbell'],
+  'thruster': ['barbell'],
+  'trap-3-raise-banc-incline': ['dumbbell'],
+};
 
 function inferEquipment(slug: string): string[] {
   const s = slug.toLowerCase()
+  if (SLUG_EQUIPMENT_MANUAL[s]) {
+    return SLUG_EQUIPMENT_MANUAL[s]
+  }
   const equip: string[] = []
 
   if (s.includes('haltere') || s.includes('halteres') || s.includes('dumbbell') || s.includes('dumbell')) {
@@ -205,6 +276,7 @@ function inferEquipment(slug: string): string[] {
   if (s.includes('ez') || s.includes('barre-ez')) equip.push('ez_bar')
   if (s.includes('barre-front')) equip.push('barbell')
   if (s.includes('renegade-row') && !equip.includes('dumbbell')) equip.push('dumbbell')
+  if (s.includes('step') && !equip.includes('bodyweight')) equip.push('bodyweight')
 
   if (s.includes('valise') && !equip.includes('dumbbell')) {
     equip.push('dumbbell')
@@ -292,7 +364,8 @@ function inferPattern(slug: string, muscleGroup: string): string[] {
     s.includes('chin-up') || s.includes('pull-over') || s.includes('pullover') ||
     s.includes('face-pull') || s.includes('oiseau') || s.includes('sled-pull') ||
     s.includes('elevation-laterale') || s.includes('elevations-laterales') ||
-    s.includes('elevation-en-y') || s.includes('ecarte-arriere') ||
+    s.includes('elevation-en-y') || s.includes('y-raise') || s.includes('trap-3-raise') ||
+    s.includes('ecarte-arriere') || s.includes('reverse-fly') ||
     s.includes('pec-deck-inverse') || s.includes('rotation-externe') ||
     s.includes('passage-depaule') || s.includes('shrug') || s.includes('tirage-menton')
   ) patterns.push('pull')
@@ -318,12 +391,13 @@ function inferPattern(slug: string, muscleGroup: string): string[] {
     s.includes('air-squat') || s.includes('cossack') || s.includes('curtsy-lunge') ||
     s.includes('leg-extension') || s.includes('leg-curl') ||
     s.includes('extension-mollets') || s.includes('extensions-mollets') || s.includes('extensions-des-mollets') ||
-    s.includes('box-pistol') ||
+    s.includes('tibial-raise') || s.includes('dorsiflexion-cheville') || s.includes('marche-sur-talons') ||
+    s.includes('abduction-hanche') || s.includes('clamshell') || s.includes('hip-hike') || s.includes('box-pistol') ||
     s.includes('marche-avec-elastique')
   ) patterns.push('legs')
 
   if (
-    s.includes('marche-du-fermier') || s.includes('zercher-carry') ||
+    s.includes('marche-du-fermier') || s.includes('farmer-walk') || s.includes('zercher-carry') ||
     s.includes('sled-push') || s.includes('sled-pull') || s.includes('fentes-marchees')
   ) patterns.push('carry')
 
@@ -342,7 +416,11 @@ function inferPattern(slug: string, muscleGroup: string): string[] {
   ) patterns.push('core')
 
   if (patterns.length === 0) {
-    patterns.push(muscleGroup === 'abdos' ? 'core' : 'pull')
+    if (muscleGroup === 'cardio') {
+      patterns.push('cardio')
+    } else {
+      patterns.push(muscleGroup === 'abdos' ? 'core' : 'pull')
+    }
   }
 
   return Array.from(new Set(patterns))
@@ -523,6 +601,9 @@ function inferMovementPattern(slug: string, muscleGroup: string): string {
       s.includes('touche-talon'))
     return 'core_rotation'
 
+  if (s.includes('pronation-supination'))
+    return 'forearm_rotation'
+
   if (s.includes('planche') || s.includes('gainage') || s.includes('hollow') ||
       s.includes('dead-bug') || s.includes('mountain-climber') || s.includes('bear-plank') ||
       s.includes('chinese-plank') || s.includes('bird-dog') || s.includes('superman') ||
@@ -531,11 +612,12 @@ function inferMovementPattern(slug: string, muscleGroup: string): string {
 
   // ── CALF ──
   if (s.includes('extension-mollets') || s.includes('extensions-mollets') ||
-      s.includes('extensions-des-mollets'))
+      s.includes('extensions-des-mollets') || s.includes('tibial-raise') ||
+      s.includes('dorsiflexion-cheville') || s.includes('marche-sur-talons'))
     return 'calf_raise'
 
   // ── CARRY ──
-  if (s.includes('marche-du-fermier') || s.includes('sled-push') ||
+  if (s.includes('marche-du-fermier') || s.includes('farmer-walk') || s.includes('sled-push') ||
       s.includes('sled-pull') || s.includes('fentes-marchees'))
     return 'carry'
 
@@ -554,7 +636,7 @@ function inferMovementPattern(slug: string, muscleGroup: string): string {
 
   // ── HIP ABDUCTION ──
   if (s.includes('abducteur') || s.includes('abduction-hanche') || s.includes('hip-abduction') ||
-      s.includes('clamshell') || s.includes('fire-hydrant'))
+      s.includes('clamshell') || s.includes('fire-hydrant') || s.includes('hip-hike'))
     return 'hip_abduction'
 
   // ── HIP ADDUCTION ──
@@ -569,7 +651,7 @@ function inferMovementPattern(slug: string, muscleGroup: string): string {
 
   // ── SCAPULAR RETRACTION ──
   if (s.includes('retraction') || s.includes('face-pull') || s.includes('band-pull-apart') ||
-      s.includes('w-raise') || s.includes('y-raise'))
+      s.includes('w-raise') || s.includes('y-raise') || s.includes('trap-3-raise'))
     return 'scapular_retraction'
 
   // ── SCAPULAR PROTRACTION ──
@@ -624,7 +706,8 @@ function inferMovementPattern(slug: string, muscleGroup: string): string {
   if (s.includes('rowing') || s.includes('tirage-horizontal') ||
       s.includes('seal-row') || s.includes('renegade-row') ||
       s.includes('oiseau') || s.includes('ecarte-arriere') ||
-      s.includes('pec-deck-inverse') || s.includes('passage-depaule'))
+      s.includes('pec-deck-inverse') || s.includes('passage-depaule') ||
+      s.includes('reverse-fly'))
     return 'horizontal_pull'
 
   // ── ELBOW FLEXION (curl) ──
@@ -670,8 +753,10 @@ function inferMovementPattern(slug: string, muscleGroup: string): string {
     quadriceps: 'squat_pattern',
     fessiers: 'hip_hinge',
     'ischio-jambiers': 'knee_flexion',
+    'avant-bras': 'wrist_flexion',
     mollets: 'calf_raise',
     abdos: 'core_anti_flex',
+    cardio: 'cardio',
   }
   return fallbacks[muscleGroup] ?? 'core_anti_flex'
 }
@@ -883,6 +968,10 @@ function inferStimulusCoeff(slug: string, movementPattern: string, isCompound: b
       base = 0.65
       break
 
+    case 'cardio':
+      base = 0.00
+      break
+
     default:
       base = 0.50
   }
@@ -894,6 +983,54 @@ function inferStimulusCoeff(slug: string, movementPattern: string, isCompound: b
 
 const BASE_DIR = path.join(process.cwd(), 'public', 'bibliotheque_exercices')
 const OUTPUT = path.join(process.cwd(), 'data', 'exercise-catalog.json')
+const FALLBACK_MEDIA_URL = '/bibliotheque_exercices/_placeholders/exercice-sans-media.svg'
+const MEDIA_EXTENSIONS = new Set(['.gif', '.png', '.jpg', '.jpeg', '.webp', '.avif'])
+const MEDIA_PRIORITY = new Map([
+  ['.gif', 0],
+  ['.webp', 1],
+  ['.png', 2],
+  ['.jpg', 3],
+  ['.jpeg', 4],
+  ['.avif', 5],
+])
+const MEDIA_SLUG_OVERRIDES: Record<string, string> = {}
+const EXPLICIT_NAME_OVERRIDES: Record<string, string> = {
+  'curl-inverse-a-la-poulie': 'Curl inversé à la poulie basse',
+  'elevation-en-t-incline-avec-halteres': 'Élévation en T incliné avec haltères',
+  'elevation-en-y-sur-banc-incline-avec-halteres': 'Élévation en Y sur banc incliné avec haltères',
+  'extension-triceps-corde-poulie-haute-banc-incline': 'Extension triceps corde poulie haute banc incliné',
+  'face-pull-poulie-haute-corde': 'Face pull poulie haute corde',
+  'trap-3-raise-banc-incline': 'Trap-3 raise banc incliné',
+  'rowing-poitrine-appuyee-coudes-ouverts': 'Rowing poitrine appuyée coudes ouverts',
+  'reverse-fly-poulie-basse-vers-haut': 'Reverse fly poulie basse vers haut',
+  'tibial-raise-debout-contre-mur': 'Tibial raise debout contre mur',
+  'tibial-raise-machine': 'Tibial raise machine',
+  'dorsiflexion-cheville-elastique-assis': 'Dorsiflexion cheville élastique assis',
+  'dorsiflexion-cheville-poulie-basse': 'Dorsiflexion cheville poulie basse',
+  'marche-sur-talons': 'Marche sur talons',
+  'abduction-hanche-allonge-lateral': 'Abduction hanche allongé latéral',
+  'clamshell-elastique': 'Clamshell élastique',
+  'hip-hike-sur-step': 'Hip hike sur step',
+}
+
+function stripExtension(file: string): string {
+  return file.replace(/\.[^.]+$/, '')
+}
+
+function getMediaPriority(file: string): number {
+  return MEDIA_PRIORITY.get(path.extname(file).toLowerCase()) ?? 99
+}
+
+function slugMatch(name: string, availableSlugs: Set<string>): string | null {
+  const direct = toSlug(name)
+  if (availableSlugs.has(direct)) return direct
+
+  const prefix = direct.split('-').slice(0, 3).join('-')
+  const candidates = Array.from(availableSlugs).filter(s => s.startsWith(prefix))
+  if (candidates.length === 1) return candidates[0]
+
+  return null
+}
 
 const catalog: ExerciseEntry[] = []
 const seen = new Set<string>()
@@ -904,10 +1041,30 @@ const dirs = fs.readdirSync(BASE_DIR).filter(d => {
 
 for (const dir of dirs) {
   const dirPath = path.join(BASE_DIR, dir)
-  const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.gif'))
+  const files = fs
+    .readdirSync(dirPath)
+    .filter(f => MEDIA_EXTENSIONS.has(path.extname(f).toLowerCase()))
 
+  const selected = new Map<string, string>()
   for (const file of files) {
-    const slug = file.replace(/\.gif$/, '')
+    const rawSlug = toSlug(stripExtension(file))
+    const slug = MEDIA_SLUG_OVERRIDES[rawSlug] ?? rawSlug
+    const existing = selected.get(slug)
+    const shouldReplace =
+      !existing ||
+      getMediaPriority(file) < getMediaPriority(existing) ||
+      (getMediaPriority(file) === getMediaPriority(existing) && file < existing)
+    if (shouldReplace) {
+      selected.set(slug, file)
+    }
+  }
+
+  const mediaSlugs = new Set(selected.keys())
+
+  for (const file of Array.from(selected.values()).sort()) {
+    const base = stripExtension(file)
+    const rawSlug = toSlug(base)
+    const slug = MEDIA_SLUG_OVERRIDES[rawSlug] ?? rawSlug
     const isPedagogique = PEDAGOGIQUE_SLUGS.has(slug)
 
     const id = `${dir}__${slug}`
@@ -915,7 +1072,7 @@ for (const dir of dirs) {
     seen.add(id)
 
     const gifUrl = `/bibliotheque_exercices/${dir}/${file}`
-    const name = slugToName(file)
+    const name = EXPLICIT_NAME_OVERRIDES[slug] ?? slugToName(base)
     const equipment = inferEquipment(slug)
     const pattern = inferPattern(slug, dir)
     const movementPattern = inferMovementPattern(slug, dir)
@@ -938,6 +1095,51 @@ for (const dir of dirs) {
       stimulus_coefficient,
     })
   }
+
+  const csvFile = fs.readdirSync(dirPath).find(f => f.endsWith('.csv'))
+  if (!csvFile) continue
+
+  const rows: CsvRow[] = parse(fs.readFileSync(path.join(dirPath, csvFile), 'utf-8'), {
+    columns: true,
+    skip_empty_lines: true,
+  })
+
+  for (const row of rows) {
+    const csvSlug = toSlug(row.name)
+    const mappedSlug = EXERCISE_ID_MAP[row.exercise_id]
+    const matchedMediaSlug = slugMatch(row.name, mediaSlugs)
+    const slug =
+      mappedSlug ??
+      matchedMediaSlug ??
+      csvSlug
+    const id = `${dir}__${slug}`
+    if (seen.has(id)) continue
+
+    const isPedagogique = PEDAGOGIQUE_SLUGS.has(slug)
+    const name = EXPLICIT_NAME_OVERRIDES[slug] ?? row.name
+    const equipment = inferEquipment(slug)
+    const pattern = inferPattern(slug, dir)
+    const movementPattern = inferMovementPattern(slug, dir)
+    const isCompound = inferIsCompound(slug)
+    const muscles = inferMuscles(slug, dir)
+    const stimulus_coefficient = inferStimulusCoeff(slug, movementPattern, isCompound)
+
+    catalog.push({
+      id,
+      name,
+      slug,
+      gifUrl: FALLBACK_MEDIA_URL,
+      muscleGroup: dir,
+      exerciseType: isPedagogique ? 'pedagogique' : 'exercise',
+      pattern,
+      movementPattern,
+      equipment,
+      isCompound,
+      muscles,
+      stimulus_coefficient,
+    })
+    seen.add(id)
+  }
 }
 
 fs.writeFileSync(OUTPUT, JSON.stringify(catalog, null, 2))
@@ -955,7 +1157,7 @@ for (const ex of catalog) {
   if (ex.movementPattern === 'horizontal_pull' && (ex.slug.includes('elevation-laterale') || ex.slug.includes('elevations-laterales'))) {
     anomalies.push(`WARN: horizontal_pull + elevation-laterale → ${ex.slug}`)
   }
-  if (ex.stimulus_coefficient < 0.1 || ex.stimulus_coefficient > 1.0) {
+  if (ex.movementPattern !== 'cardio' && (ex.stimulus_coefficient < 0.1 || ex.stimulus_coefficient > 1.0)) {
     anomalies.push(`WARN: stimulus_coefficient hors range → ${ex.slug} = ${ex.stimulus_coefficient}`)
   }
 }

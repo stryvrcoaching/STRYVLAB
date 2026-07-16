@@ -412,8 +412,12 @@ export default function StudioPerformancePanel({
       anchorExerciseNames.map((name) => name.trim().toLowerCase()).filter(Boolean),
     );
 
-    const source = data.keyExercises.length > 0
-      ? data.keyExercises.map((exercise) => ({
+    const keyExercisesWithHistory = data.keyExercises.filter(
+      (exercise) => exercise.exposureCount > 0 || exercise.performedVolume > 0,
+    );
+
+    const source = keyExercisesWithHistory.length > 0
+      ? keyExercisesWithHistory.map((exercise) => ({
           name: exercise.name,
           sessions: exercise.sessions,
           exposureCount: exercise.exposureCount,

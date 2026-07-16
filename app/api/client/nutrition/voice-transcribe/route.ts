@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createServiceClient } from "@supabase/supabase-js"
 import OpenAI from "openai"
+import { checkDistributedRateLimit, rateLimitResponse } from "@/lib/security/public-rate-limit"
 
 function service() {
   return createServiceClient(
@@ -19,23 +20,8 @@ async function resolveClientId(userId: string): Promise<string | null> {
   return data?.id ?? null
 }
 
-// ── In-memory rate limit (10 req/min per clientId) ───────────────────────────
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
-
-function checkRateLimit(clientId: string): boolean {
-  const now = Date.now()
-  const entry = rateLimitMap.get(clientId)
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(clientId, { count: 1, resetAt: now + 60_000 })
-    return true
-  }
-  if (entry.count >= 10) return false
-  entry.count++
-  return true
-}
-
 const WHISPER_PROMPT =
-  "nutrition sportive, whey protéine, Nutri Muscle, créatine, BCAA, caséine, isolat, grammes, millilitres, kcal, lipides, glucides"
+  "nutrition sportive, whey protéine, QNT Life, Light Digest Whey Protein, shaker, poudre de protéines, créatine, BCAA, caséine, isolat, grammes, millilitres, lait demi-écrémé, bibliothèque d'aliments perso, kcal, lipides, glucides"
 
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024 // 25MB Whisper limit
 
@@ -47,9 +33,15 @@ export async function POST(req: NextRequest) {
   const clientId = await resolveClientId(user.id)
   if (!clientId) return NextResponse.json({ error: "Client not found" }, { status: 404 })
 
-  if (!checkRateLimit(clientId)) {
-    return NextResponse.json({ error: "rate_limit", retry_after: 60 }, { status: 429 })
-  }
+  const rateLimit = await checkDistributedRateLimit({
+    db: service(),
+    req,
+    scope: "client_nutrition_voice_transcribe",
+    subject: clientId,
+    maxRequests: 10,
+    windowSeconds: 60,
+  })
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit)
 
   let formData: FormData
   try {

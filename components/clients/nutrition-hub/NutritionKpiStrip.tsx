@@ -20,16 +20,16 @@ const KPI_CONFIG: Array<{
   displayKey?: keyof NutritionHubSummary;
   label: string;
 }> = [
+  { key: "nutritionScore", label: "Score global nutrition" },
   { key: "adherenceCalories", displayKey: "achievedCalories", label: "Calories" },
   { key: "adherenceProtein", displayKey: "achievedProtein", label: "Protéines" },
   { key: "adherenceCarbs", displayKey: "achievedCarbs", label: "Glucides" },
   { key: "adherenceFat", displayKey: "achievedFat", label: "Lipides" },
   { key: "adherenceHydration", displayKey: "achievedHydration", label: "Hydratation" },
-  { key: "nutritionScore", label: "Score global nutrition" },
 ];
 
 function formatPercent(value: number | null) {
-  return value == null ? "N/A" : `${Math.round(value * 100)}%`;
+  return value == null ? "—" : `${Math.round(value * 100)}%`;
 }
 
 function getValueTone(value: number | null) {

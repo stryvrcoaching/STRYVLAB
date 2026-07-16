@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 
@@ -31,6 +32,8 @@ export async function PATCH(_req: NextRequest, { params }: { params: { id: strin
   if (params.id.startsWith('legacy_')) {
     const realId = params.id.replace('legacy_', '')
     await svc().from('client_notifications').update({ read: true }).eq('id', realId).eq('target_user_id', userId)
+    revalidatePath('/client')
+    revalidatePath('/client/profil')
     return NextResponse.json({ ok: true })
   }
 
@@ -44,7 +47,25 @@ export async function PATCH(_req: NextRequest, { params }: { params: { id: strin
     .eq('client_id', clientId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  revalidatePath('/client')
+  revalidatePath('/client/profil')
   return NextResponse.json({ ok: true })
+}
+
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const clientId = await getClientId()
+  if (!clientId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data, error } = await svc()
+    .from('coach_client_notifications')
+    .select('id, type, title, body, payload, read_at, created_at')
+    .eq('id', params.id)
+    .eq('client_id', clientId)
+    .maybeSingle()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!data) return NextResponse.json({ error: 'Notification introuvable' }, { status: 404 })
+  return NextResponse.json({ notification: data })
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {

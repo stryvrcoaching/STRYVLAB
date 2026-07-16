@@ -28,7 +28,7 @@ function makeQueryBuilder(result: { data: unknown; error: unknown } = { data: nu
     _result: result,
   }
   const chainMethods = ['select', 'insert', 'update', 'upsert', 'delete',
-    'eq', 'neq', 'in', 'is', 'order', 'limit', 'gte', 'lte', 'contains']
+    'eq', 'neq', 'in', 'is', 'not', 'or', 'order', 'limit', 'gte', 'lte', 'contains', 'ilike']
   for (const m of chainMethods) {
     builder[m] = vi.fn().mockReturnValue(builder)
   }
@@ -65,9 +65,26 @@ export function createSupabaseMocks() {
   // ── Service client (DB operations) ───────────────────────────
   // We track the latest query builder so tests can inspect calls
   let currentBuilder = makeQueryBuilder()
+  const storageBucketMock = {
+    upload: vi.fn().mockResolvedValue({ data: {}, error: null }),
+    createSignedUploadUrl: vi.fn().mockResolvedValue({ data: { signedUrl: "https://example.com/upload", token: "upload-token" }, error: null }),
+    createSignedUrl: vi.fn().mockResolvedValue({ data: { signedUrl: "https://example.com/signed.jpg" }, error: null }),
+    download: vi.fn().mockResolvedValue({
+      data: new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0x00])], { type: "image/jpeg" }),
+      error: null,
+    }),
+    remove: vi.fn().mockResolvedValue({ data: null, error: null }),
+  }
+  const storageMock = {
+    getBucket: vi.fn().mockResolvedValue({ data: { id: "nutrition-photo-logs" }, error: null }),
+    createBucket: vi.fn().mockResolvedValue({ data: {}, error: null }),
+    from: vi.fn().mockReturnValue(storageBucketMock),
+  }
 
   const serviceMock = {
     from: vi.fn().mockImplementation(() => currentBuilder),
+    rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+    storage: storageMock,
     auth: {
       admin: {
         getUserById: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
@@ -89,6 +106,7 @@ export function createSupabaseMocks() {
   function setServiceResult(data: unknown, error: unknown = null) {
     currentBuilder = makeQueryBuilder({ data, error })
     serviceMock.from.mockReturnValue(currentBuilder)
+    serviceMock.rpc.mockResolvedValue({ data: null, error: null })
   }
 
   /**
@@ -110,6 +128,17 @@ export function createSupabaseMocks() {
     vi.clearAllMocks()
     currentBuilder = makeQueryBuilder()
     serviceMock.from.mockReturnValue(currentBuilder)
+    storageMock.getBucket.mockResolvedValue({ data: { id: "nutrition-photo-logs" }, error: null })
+    storageMock.createBucket.mockResolvedValue({ data: {}, error: null })
+    storageMock.from.mockReturnValue(storageBucketMock)
+    storageBucketMock.upload.mockResolvedValue({ data: {}, error: null })
+    storageBucketMock.createSignedUploadUrl.mockResolvedValue({ data: { signedUrl: "https://example.com/upload", token: "upload-token" }, error: null })
+    storageBucketMock.createSignedUrl.mockResolvedValue({ data: { signedUrl: "https://example.com/signed.jpg" }, error: null })
+    storageBucketMock.download.mockResolvedValue({
+      data: new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0x00])], { type: "image/jpeg" }),
+      error: null,
+    })
+    storageBucketMock.remove.mockResolvedValue({ data: null, error: null })
     serverMock.auth.getUser.mockResolvedValue({
       data: { user: { id: 'coach-123', email: 'coach@test.com', user_metadata: { first_name: 'Test' } } },
       error: null,

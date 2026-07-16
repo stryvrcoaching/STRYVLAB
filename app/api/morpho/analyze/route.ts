@@ -8,6 +8,7 @@ import { buildAnalysisPrompt } from '@/lib/morpho/buildAnalysisPrompt'
 import { calculateStimulusAdjustments } from '@/lib/morpho/adjustments'
 import { isMorphoV2 } from '@/lib/morpho/types'
 import type { MorphoAnalysisResult, MorphoAnalysisResultV2 } from '@/lib/morpho/types'
+import { checkDistributedRateLimit, rateLimitResponse } from '@/lib/security/public-rate-limit'
 
 export const maxDuration = 60
 
@@ -49,6 +50,16 @@ export async function POST(req: NextRequest) {
   if (!clientRow) {
     return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
   }
+
+  const rateLimit = await checkDistributedRateLimit({
+    db,
+    req,
+    scope: 'coach_morpho_analyze',
+    subject: user.id,
+    maxRequests: 5,
+    windowSeconds: 60 * 60,
+  })
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit)
 
   // Récupérer les photos et leurs storage_path + source
   const { data: photos } = await db

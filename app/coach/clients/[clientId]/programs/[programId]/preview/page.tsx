@@ -3,7 +3,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronLeft, Clock, RotateCcw, Eye } from "lucide-react";
+import { ChevronLeft, Clock, RotateCcw, Eye, Heart } from "lucide-react";
 import ProgressionToggle from "@/components/programs/ProgressionToggle";
 
 const DAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -30,7 +30,7 @@ export default async function ProgramPreviewPage({ params }: Params) {
       program_sessions (
         id, name, day_of_week, position, notes,
         program_exercises (
-          id, name, sets, reps, rest_sec, rir, notes, position, image_url
+          id, name, sets, reps, rest_sec, rir, notes, position, image_url, execution_type, target_hr_zone, target_rir
         )
       )
     `,
@@ -179,10 +179,16 @@ export default async function ProgramPreviewPage({ params }: Params) {
                             {ex.rest_sec}s
                           </span>
                         )}
-                        {ex.rir !== null && ex.rir !== undefined && (
+                        {((ex.execution_type ?? 'reps_rir') === 'reps_rir' ? ex.rir : ex.target_rir) != null && (
                           <span className="flex items-center gap-0.5 text-[10px] text-secondary">
                             <RotateCcw size={9} />
-                            RIR {ex.rir}
+                            {(ex.execution_type ?? 'reps_rir') === 'reps_rir' ? `RIR ${ex.rir}` : `RPE ${ex.target_rir}`}
+                          </span>
+                        )}
+                        {ex.target_hr_zone && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-rose-400 bg-rose-500/10 px-1 py-0.5 rounded font-medium">
+                            <Heart size={9} className="fill-rose-400" />
+                            {ex.target_hr_zone}
                           </span>
                         )}
                       </div>

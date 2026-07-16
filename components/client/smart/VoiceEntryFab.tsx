@@ -1,15 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect } from "react"
 import { Mic, Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
-import dynamic from "next/dynamic"
 import { useClientT } from "@/components/client/ClientI18nProvider"
-
-const VoiceLogSheet = dynamic(() => import("@/components/client/smart/VoiceLogSheet"), { ssr: false })
-const MealLogSheet = dynamic(() => import("@/components/client/smart/MealLogSheet"), { ssr: false })
-const MealMethodSheet = dynamic(() => import("@/components/client/smart/MealMethodSheet"), { ssr: false })
-import type { MealMethodAction } from "@/components/client/smart/MealMethodSheet"
+import { prefetchNutritionRoutes, warmNutritionFlows } from "@/lib/client/prefetch-nutrition-flows"
 
 interface VoiceEntryFabProps {
   lang?: string
@@ -17,21 +12,16 @@ interface VoiceEntryFabProps {
   currentDate?: string
 }
 
-export default function VoiceEntryFab({ lang = "fr", onSuccess, currentDate }: VoiceEntryFabProps) {
+export default function VoiceEntryFab({ currentDate }: VoiceEntryFabProps) {
   const { t } = useClientT()
   const router = useRouter()
-  const [voiceOpen, setVoiceOpen] = useState(false)
-  const [mealOpen, setMealOpen] = useState(false)
-  const [mealMethodOpen, setMealMethodOpen] = useState(false)
-  const [quickInputMode, setQuickInputMode] = useState<"voice" | "text">("voice")
-  const [mealComposerMode, setMealComposerMode] = useState<"standard" | "guide" | "simulation">("standard")
-  const [mealEntryMode, setMealEntryMode] = useState<"default" | "search" | "favorites" | "categories">("default")
 
-  function handleSuccess() {
-    onSuccess?.()
-    // Delay refresh so AnimatePresence exit animation completes first
-    setTimeout(() => router.refresh(), 350)
-  }
+  useEffect(() => {
+    const cancelWarmup = warmNutritionFlows(router, currentDate)
+    return () => {
+      cancelWarmup?.()
+    }
+  }, [currentDate, router])
 
   return (
     <>
@@ -42,7 +32,13 @@ export default function VoiceEntryFab({ lang = "fr", onSuccess, currentDate }: V
       >
         {/* + Repas */}
         <button
-          onClick={() => setMealMethodOpen(true)}
+          onMouseEnter={() => prefetchNutritionRoutes(router, currentDate)}
+          onTouchStart={() => prefetchNutritionRoutes(router, currentDate)}
+          onFocus={() => prefetchNutritionRoutes(router, currentDate)}
+          onClick={() => {
+            const query = currentDate ? `?date=${encodeURIComponent(currentDate)}` : ""
+            router.push(`/client/nutrition/log${query}`)
+          }}
           className="flex items-center justify-center h-11 w-11 rounded-[18px] transition-all active:scale-[0.93] shadow-[0_8px_24px_rgba(0,0,0,0.2)]"
           style={{ background: '#f2f2f2', color: '#080808' }}
           aria-label={t('ui.add.meal')}
@@ -52,60 +48,19 @@ export default function VoiceEntryFab({ lang = "fr", onSuccess, currentDate }: V
 
         {/* Mic vocal */}
         <button
-          onClick={() => { setQuickInputMode("voice"); setVoiceOpen(true) }}
+          onClick={() => {
+            const params = new URLSearchParams({ input: "voice" })
+            if (currentDate) params.set("date", currentDate)
+            router.push(`/client/nutrition/log?${params.toString()}`)
+          }}
           className="flex items-center justify-center h-11 w-11 rounded-[18px] transition-all active:scale-[0.93] shadow-[0_8px_24px_rgba(0,0,0,0.2)]"
           style={{ background: '#1a1a1a', color: '#808080' }}
-          aria-label="Saisie vocale"
+          aria-label={t('chat.input.voice.start')}
         >
           <Mic size={20} />
         </button>
       </div>
 
-      <MealMethodSheet
-        open={mealMethodOpen}
-        onClose={() => setMealMethodOpen(false)}
-        onSelect={(method: MealMethodAction) => {
-          setMealMethodOpen(false)
-          if (method === "track_voice_text") {
-            setQuickInputMode("voice")
-            setVoiceOpen(true)
-          } else if (method === "compose_guide" || method === "compose_simulation") {
-            router.push(currentDate ? `/client/nutrition/compose?date=${currentDate}` : "/client/nutrition/compose")
-          } else {
-            if (method === "track_search") {
-              setMealEntryMode("search")
-              setMealComposerMode("standard")
-            } else if (method === "track_favorites") {
-              setMealEntryMode("favorites")
-              setMealComposerMode("standard")
-            } else if (method === "track_categories") {
-              setMealEntryMode("categories")
-              setMealComposerMode("standard")
-            } else {
-              setMealEntryMode("default")
-              setMealComposerMode("standard")
-            }
-            setMealOpen(true)
-          }
-        }}
-      />
-
-      <VoiceLogSheet
-        open={voiceOpen}
-        onClose={() => setVoiceOpen(false)}
-        onSuccess={() => { setVoiceOpen(false); handleSuccess() }}
-        lang={lang}
-        initialInputMode={quickInputMode}
-      />
-
-      <MealLogSheet
-        open={mealOpen}
-        composerMode={mealComposerMode}
-        entryMode={mealEntryMode}
-        intent={mealComposerMode === "standard" ? "track" : "compose"}
-        onClose={() => { setMealOpen(false); setMealComposerMode("standard"); setMealEntryMode("default") }}
-        onSuccess={() => { setMealOpen(false); setMealComposerMode("standard"); setMealEntryMode("default"); handleSuccess() }}
-      />
     </>
   )
 }

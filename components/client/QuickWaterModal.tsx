@@ -1,231 +1,337 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
-import { X, Droplets, Plus, Minus, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { Coffee, Drop, Leaf, Trash, X } from '@phosphor-icons/react'
+import { DRINK_PRESETS, type DrinkType } from '@/lib/client/nutrition/drinks'
 import { useClientT } from '@/components/client/ClientI18nProvider'
-import { NUTRITION_UI_COLORS } from '@/lib/nutrition/ui-colors'
+import useBodyScrollLock from '@/components/client/useBodyScrollLock'
+import { sendClientMutation } from '@/lib/client/offline-mutations'
 
-const QUICK_AMOUNTS = [150, 250, 330, 500]
+type WaterLog = {
+  id: string
+  amount_ml: number
+  caffeine_mg?: number | null
+  drink_type?: DrinkType | null
+  logged_at: string
+}
 
-type WaterLog = { id: string; amount_ml: number; logged_at: string }
-
-interface Props {
+type QuickWaterModalProps = {
   open: boolean
   onClose: () => void
-  onLogged?: (ml: number) => void
-  onDeleted?: (ml: number) => void
+  onLogged?: (amountMl: number) => void
+  onDeleted?: (amountMl: number) => void
   date?: string
 }
 
+const PRESETS = [150, 250, 330, 500]
+
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  const lang = typeof window !== 'undefined' ? (localStorage.getItem('client_lang') ?? 'fr') : 'fr'
+  try {
+    return new Intl.DateTimeFormat(lang === 'es' ? 'es-ES' : lang === 'en' ? 'en-US' : 'fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
+  } catch {
+    return ''
+  }
 }
 
-export default function QuickWaterModal({ open, onClose, onLogged, onDeleted, date }: Props) {
+function isCaffeineType(type?: DrinkType | null): boolean {
+  return type === 'espresso' || type === 'coffee' || type === 'lungo' || type === 'tea'
+}
+
+
+const WATER_SHEET_EXCLUDED_TYPES = new Set(['espresso', 'coffee', 'lungo', 'tea'])
+
+function isPureWaterLog(log: WaterLog): boolean {
+  const drinkType = String(log.drink_type ?? 'water')
+  const caffeineMg = Number(log.caffeine_mg ?? 0)
+
+  return !WATER_SHEET_EXCLUDED_TYPES.has(drinkType) && caffeineMg <= 0
+}
+
+function LogIcon({ log }: { log: WaterLog }) {
+  const type = log.drink_type ?? 'water'
+
+  if (type === 'tea') {
+    return <Leaf size={16} className="text-emerald-400/80" />
+  }
+
+  if (isCaffeineType(type)) {
+    return <Coffee size={16} className="text-[#c08457]" />
+  }
+
+  return <Drop size={16} className="text-blue-500" />
+}
+
+function logLabel(log: WaterLog): string {
+  const lang = typeof window !== 'undefined' ? (localStorage.getItem('client_lang') ?? 'fr') : 'fr'
+  const type = log.drink_type ?? 'water'
+
+  if (type === 'water') return `${Math.round(log.amount_ml)} ml`
+
+  const preset = DRINK_PRESETS[type]
+  const fallback = lang === 'es' ? 'Bebida' : lang === 'en' ? 'Drink' : 'Boisson'
+  return `${preset?.label ?? fallback} · ${Math.round(log.amount_ml)} ml`
+}
+
+export default function QuickWaterModal({
+  open,
+  onClose,
+  onLogged,
+  onDeleted,
+  date,
+}: QuickWaterModalProps) {
   const { t } = useClientT()
-  const router = useRouter()
-  const [ml, setMl] = useState(250)
-  const [saving, setSaving] = useState(false)
-  const [done, setDone] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  useBodyScrollLock(open)
+  const [mounted, setMounted] = useState(false)
   const [logs, setLogs] = useState<WaterLog[]>([])
+  const [amountMl, setAmountMl] = useState(250)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const totalMl = useMemo(
+    () => logs.reduce((sum, log) => sum + Number(log.amount_ml ?? 0), 0),
+    [logs],
+  )
+
+  useEffect(() => {
+    setMounted(true)
+    return () => setMounted(false)
+  }, [])
 
   useEffect(() => {
     if (!open) return
-    const url = new URL('/api/client/water', window.location.origin)
-    if (date) url.searchParams.set('date', date)
-    url.searchParams.set('kind', 'water')
-    fetch(url)
-      .then(r => r.json())
-      .then(d => setLogs(d.logs ?? []))
-      .catch(() => {})
-  }, [open, date])
 
-  async function log() {
-    if (saving) return
-    setSaving(true)
-    setError(null)
-    onLogged?.(ml)
+    let cancelled = false
+    setLoading(true)
 
-    try {
-      const res = await fetch('/api/client/water', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount_ml: ml, date }),
+    // Hydratation = tous les volumes hydratants du jour.
+    // Ça aligne le total du sheet avec la page nutrition.
+    const params = new URLSearchParams({ kind: 'water' })
+    if (date) params.set('date', date)
+
+    fetch(`/api/client/water?${params.toString()}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (cancelled) return
+        const rows = ((json?.data ?? json?.logs ?? []) as WaterLog[])
+        setLogs(rows.filter(isPureWaterLog))
+      })
+      .catch(() => {
+        if (!cancelled) setLogs([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
       })
 
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}))
-        setError(json.error ?? t('water.error'))
-        setSaving(false)
-        return
+    return () => {
+      cancelled = true
+    }
+  }, [open, date])
+
+  if (!open || !mounted) return null
+
+  async function logWater() {
+    if (saving) return
+
+    setSaving(true)
+
+    try {
+      const body: Record<string, unknown> = {
+        amount_ml: amountMl,
+        drink_type: 'water',
+        caffeine_mg: 0,
       }
 
-      const payload = await res.json().catch(() => ({}))
-      const newLog: WaterLog = {
-        id: payload.id ?? crypto.randomUUID(),
-        amount_ml: ml,
-        logged_at: payload.logged_at ?? new Date().toISOString(),
-      }
-      setLogs(prev => [...prev, newLog])
-      setDone(true)
-      setTimeout(() => {
-        setDone(false)
-        setSaving(false)
-        router.refresh()
-      }, 700)
-    } catch {
-      setError(t('water.error'))
+      if (date) body.date = date
+
+      const result = await sendClientMutation({
+        kind: 'water',
+        url: '/api/client/water',
+        method: 'POST',
+        body,
+      })
+
+      const json = await result.response?.json().catch(() => null)
+      if (!result.queued && !result.response?.ok) throw new Error(json?.error ?? t('water.error'))
+
+      const nextLog = json?.data as WaterLog | undefined
+
+      setLogs(prev => [
+        nextLog?.id
+          ? nextLog
+          : {
+              id: `tmp-${Date.now()}`,
+              amount_ml: amountMl,
+              caffeine_mg: 0,
+              drink_type: 'water',
+              logged_at: new Date().toISOString(),
+            },
+        ...prev,
+      ])
+
+      if (!result.queued) onLogged?.(amountMl)
+    } catch (err) {
+      console.error('[QuickWaterModal] logWater failed', err)
+    } finally {
       setSaving(false)
     }
   }
 
   async function deleteLog(log: WaterLog) {
+    if (deletingId) return
+
     setDeletingId(log.id)
+
     try {
       const res = await fetch(`/api/client/water/${log.id}`, { method: 'DELETE' })
-      if (res.ok) {
-        setLogs(prev => prev.filter(l => l.id !== log.id))
-        onDeleted?.(log.amount_ml)
-        router.refresh()
-      }
+      if (!res.ok) throw new Error('delete failed')
+
+      setLogs(prev => prev.filter(entry => entry.id !== log.id))
+      onDeleted?.(Number(log.amount_ml ?? 0))
+    } catch (err) {
+      console.error('[QuickWaterModal] deleteLog failed', err)
     } finally {
       setDeletingId(null)
     }
   }
 
-  const totalMl = logs.reduce((s, l) => s + l.amount_ml, 0)
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-[2px]" onClick={onClose} />
 
-  return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+      <div
+        className="client-native-bottom-sheet fixed left-0 right-0 bottom-0 z-[70] rounded-t-[28px] bg-[#0d0d0d] shadow-2xl"
+        style={{
+          maxHeight: '88dvh',
+          display: 'flex',
+          flexDirection: 'column',
+          paddingBottom: 'var(--client-modal-bottom-padding)',
+        }}
+      >
+        <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-white/[0.10]" />
+
+        <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-4">
+          <p className="text-[15px] font-barlow-condensed font-bold uppercase tracking-[0.12em] text-white">
+            {t('nutrition.hydration')}
+          </p>
+
+          <button
             onClick={onClose}
-            className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-[2px]"
-          />
-          <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0, transition: { type: 'spring', stiffness: 300, damping: 30 } }}
-            exit={{ y: '100%', transition: { duration: 0.2, ease: 'easeIn' } }}
-            className="fixed bottom-0 left-0 right-0 z-[90] rounded-t-2xl"
-            style={{ background: '#0d0d0d', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
+            className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/[0.06] text-white/40 active:bg-white/[0.08]"
+            aria-label={t('ui.close')}
           >
-            {/* Header */}
-            <div className="relative flex items-center justify-between px-5 pt-5 pb-4 shrink-0">
-              <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-white/[0.10]" />
-              <p className="text-[15px] font-barlow-condensed font-bold uppercase tracking-[0.12em] text-white">
-                {t('water.title')}
-              </p>
-              <button
-                onClick={onClose}
-                className="h-8 w-8 flex items-center justify-center rounded-xl bg-white/[0.06] text-white/40 hover:text-white/70 transition-colors"
-              >
-                <X size={14} />
-              </button>
-            </div>
+            <X size={15} />
+          </button>
+        </div>
 
-            {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto min-h-0 px-5 pb-8">
+        <div className="flex-1 overflow-y-auto px-5 pb-3">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/32">
+              {t('common.today')}
+            </p>
 
-              {/* Log history */}
-              {logs.length > 0 && (
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.14em] text-white/30">Aujourd'hui</p>
-                    <p className="text-[11px] font-bold tabular-nums" style={{ color: NUTRITION_UI_COLORS.water }}>
-                      {(totalMl / 1000).toFixed(1)} L total
+            <p className="text-[12px] font-bold tabular-nums text-blue-500">
+              {t('water.totalLiters', { n: (totalMl / 1000).toFixed(1) })}
+            </p>
+          </div>
+
+          <div className="max-h-[132px] overflow-y-auto space-y-2 pr-1">
+            {loading ? (
+              <div className="rounded-2xl bg-white/[0.035] px-4 py-3">
+                <p className="text-[12px] text-white/35">{t('common.loading')}</p>
+              </div>
+            ) : logs.length === 0 ? (
+              <div className="rounded-2xl bg-white/[0.035] px-4 py-3">
+                <p className="text-[12px] text-white/32">{t('common.empty')}</p>
+              </div>
+            ) : (
+              logs.map(log => (
+                <div key={log.id} className="flex items-center gap-3 rounded-2xl bg-white/[0.045] px-4 py-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/[0.06]">
+                    <LogIcon log={log} />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[14px] font-black text-white">
+                      {logLabel(log)}
+                      <span className="ml-2 text-[12px] font-semibold text-white/28">
+                        {formatTime(log.logged_at)}
+                      </span>
                     </p>
                   </div>
-                  <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
-                    {logs.map(log => (
-                      <div
-                        key={log.id}
-                        className="flex items-center justify-between bg-white/[0.03] rounded-xl px-3 py-2"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Droplets size={12} style={{ color: NUTRITION_UI_COLORS.water }} className="opacity-60" />
-                          <span className="text-[13px] font-bold text-white tabular-nums">{log.amount_ml} ml</span>
-                          <span className="text-[10px] text-white/25">{formatTime(log.logged_at)}</span>
-                        </div>
-                        <button
-                          onClick={() => deleteLog(log)}
-                          disabled={deletingId === log.id}
-                          className="h-7 w-7 flex items-center justify-center rounded-lg bg-white/[0.06] text-white/40 hover:text-white/70 active:scale-95 transition-all disabled:opacity-40"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="h-px bg-white/[0.06] mt-3 mb-4" />
-                </div>
-              )}
 
-              {/* Quick pills */}
-              <div className="grid grid-cols-4 gap-2 mb-4">
-                {QUICK_AMOUNTS.map(a => (
                   <button
-                    key={a}
-                    onClick={() => setMl(a)}
-                    className={`h-10 rounded-xl text-[12px] font-bold transition-all active:scale-95 ${
-                      ml === a
-                        ? 'bg-white/[0.10] text-white'
-                        : 'bg-white/[0.04] text-white/40'
-                    }`}
+                    onClick={() => deleteLog(log)}
+                    disabled={deletingId === log.id}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/35 active:scale-95 disabled:opacity-40"
+                    aria-label={t('journal.deleteTitle')}
                   >
-                    {a}ml
+                    <Trash size={15} />
                   </button>
-                ))}
-              </div>
-
-              {/* Fine-tune */}
-              <div className="flex items-center gap-3 mb-5">
-                <button
-                  onClick={() => setMl(m => Math.max(50, m - 50))}
-                  className="h-10 w-10 flex items-center justify-center bg-white/[0.06] rounded-xl text-white active:scale-95 shrink-0"
-                >
-                  <Minus size={15} />
-                </button>
-                <div className="flex-1 text-center">
-                  <p className="text-[28px] font-black text-white leading-none tabular-nums">{ml}</p>
-                  <p className="text-[10px] text-white/30 font-barlow-condensed uppercase tracking-wider mt-0.5">millilitres</p>
                 </div>
+              ))
+            )}
+          </div>
+
+          <div className="my-4 h-px bg-white/[0.07]" />
+
+          <div className="grid grid-cols-4 gap-2">
+            {PRESETS.map(preset => {
+              const active = amountMl === preset
+
+              return (
                 <button
-                  onClick={() => setMl(m => Math.min(2000, m + 50))}
-                  className="h-10 w-10 flex items-center justify-center bg-white/[0.06] rounded-xl text-white active:scale-95 shrink-0"
+                  key={preset}
+                  onClick={() => setAmountMl(preset)}
+                  className={`h-11 rounded-xl text-[12px] font-barlow font-bold transition-colors ${
+                    active ? 'bg-white/[0.13] text-white' : 'bg-white/[0.04] text-white/38'
+                  }`}
                 >
-                  <Plus size={15} />
+                  {preset}ml
                 </button>
-              </div>
+              )
+            })}
+          </div>
 
-              {error && (
-                <p className="text-[11px] text-red-400 text-center mb-3">{error}</p>
-              )}
+          <div className="mt-3 flex items-center justify-between">
+            <button
+              onClick={() => setAmountMl(value => Math.max(50, value - 50))}
+              className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/[0.06] text-[24px] leading-none text-white active:scale-95"
+            >
+              −
+            </button>
 
-              <button
-                onClick={log}
-                disabled={saving && !done}
-                className={`w-full h-12 flex items-center justify-center gap-2 rounded-xl font-barlow-condensed font-bold uppercase tracking-[0.14em] text-[12px] transition-all active:scale-[0.98] ${
-                  done
-                    ? 'bg-white/[0.06] text-white/50'
-                    : 'disabled:opacity-60'
-                }`}
-                style={done ? undefined : { background: '#f2f2f2', color: '#080808' }}
-              >
-                <Droplets size={15} />
-                {done ? t('water.logged', { ml: String(ml) }) : saving ? t('water.saving') : t('water.log', { ml: String(ml) })}
-              </button>
+            <div className="text-center">
+              <p className="text-[34px] font-black leading-none tabular-nums text-white">
+                {amountMl}
+              </p>
+              <p className="mt-1 text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.16em] text-white/30">
+                {t('water.milliliters')}
+              </p>
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+
+            <button
+              onClick={() => setAmountMl(value => Math.min(5000, value + 50))}
+              className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/[0.06] text-[24px] leading-none text-white active:scale-95"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div className="shrink-0 px-5 pt-2 pb-4">
+          <button
+            onClick={logWater}
+            disabled={saving}
+            className="h-11 w-full rounded-xl bg-[#f2f2f2] font-barlow-condensed text-[12px] font-black uppercase tracking-[0.14em] text-[#080808] active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            {saving ? t('common.saving') : t('common.add')}
+          </button>
+        </div>
+      </div>
+    </>,
+    document.body,
   )
 }

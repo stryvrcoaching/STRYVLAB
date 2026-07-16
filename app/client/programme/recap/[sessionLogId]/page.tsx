@@ -9,8 +9,10 @@ import { ct, type ClientLang } from '@/lib/i18n/clientTranslations'
 import { getPrimaryMuscleFromCatalog, getSecondaryMusclesFromCatalog } from '@/lib/programs/intelligence/catalog-utils'
 import RecapNavButtons from './RecapNavButtons'
 import FeedbackThread from '@/components/client/smart/FeedbackThread'
+import { computeRobustAverageRestSec } from '@/lib/training/restMetrics'
+import PointsEarnedOverlay from '@/components/client/PointsEarnedOverlay'
 
-export default async function SessionRecapPage({ params }: { params: { sessionLogId: string } }) {
+export default async function SessionRecapPage({ params, searchParams }: { params: { sessionLogId: string }; searchParams?: { points?: string } }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/client/login')
@@ -45,6 +47,7 @@ export default async function SessionRecapPage({ params }: { params: { sessionLo
     .single()
 
   if (!sessionLog) notFound()
+  const pointsEarned = Number(searchParams?.points ?? 0)
 
   const allSets = (sessionLog.client_set_logs ?? []) as any[]
   const completedSets = allSets.filter((s: any) => s.completed)
@@ -59,9 +62,7 @@ export default async function SessionRecapPage({ params }: { params: { sessionLo
   const restTimes = completedSets
     .filter((s: any) => s.rest_sec_actual != null)
     .map((s: any) => s.rest_sec_actual as number)
-  const avgRestSec = restTimes.length
-    ? Math.round(restTimes.reduce((a: number, b: number) => a + b, 0) / restTimes.length)
-    : null
+  const avgRestSec = computeRobustAverageRestSec(restTimes)
 
   // ── Exercices groupés ──
   const exerciseMap: Record<string, { name: string; sets: any[] }> = {}
@@ -134,10 +135,14 @@ export default async function SessionRecapPage({ params }: { params: { sessionLo
   const volumeDelta = prevVolume > 0 ? Math.round(((totalVolume - prevVolume) / prevVolume) * 100) : null
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d] font-barlow pb-10">
+    <div className="min-h-dvh bg-[#0d0d0d] font-barlow pb-10 overflow-x-hidden">
+      <PointsEarnedOverlay open={pointsEarned > 0} points={pointsEarned} />
 
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-[#0d0d0d]">
+      <header
+        className="sticky top-0 z-40 bg-[#0d0d0d]"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      >
         <div className="flex items-center gap-3 px-4 py-3">
           <RecapNavButtons icon href="/client/programme" />
           <div>
@@ -155,7 +160,10 @@ export default async function SessionRecapPage({ params }: { params: { sessionLo
           <div>
             <p className="text-[13px] font-bold text-white">{ct(lang, 'recap.sessionRecorded')}</p>
             <p className="text-[11px] text-white/40 mt-0.5">
-              {completedSets.length} série{completedSets.length > 1 ? 's' : ''} complétée{completedSets.length > 1 ? 's' : ''}
+              {ct(lang, 'recap.completedSets', {
+                n: completedSets.length,
+                pl: completedSets.length > 1 ? 's' : '',
+              })}
               {sessionLog.duration_min ? ` · ${sessionLog.duration_min}min` : ''}
             </p>
           </div>
@@ -184,7 +192,7 @@ export default async function SessionRecapPage({ params }: { params: { sessionLo
             <StatCard
               label={ct(lang, 'recap.duration')}
               value={`${sessionLog.duration_min}min`}
-              sub={avgRestSec !== null ? `repos moy. ${avgRestSec >= 60 ? `${Math.floor(avgRestSec / 60)}m${avgRestSec % 60 > 0 ? `${avgRestSec % 60}s` : ''}` : `${avgRestSec}s`}` : undefined}
+              sub={avgRestSec !== null ? `${ct(lang, 'recap.avgRest.short')} ${avgRestSec >= 60 ? `${Math.floor(avgRestSec / 60)}m${avgRestSec % 60 > 0 ? `${avgRestSec % 60}s` : ''}` : `${avgRestSec}s`}` : undefined}
               icon={<Clock size={11} />}
             />
           ) : avgRestSec !== null ? (
@@ -220,8 +228,11 @@ export default async function SessionRecapPage({ params }: { params: { sessionLo
                     <div className="flex-1 min-w-0">
                       <p className="text-[12px] font-semibold text-white/80 truncate">{name}</p>
                       <p className="text-[10px] text-white/35 mt-0.5">
-                        {sets.length} série{sets.length > 1 ? 's' : ''} · {totalRepsEx} reps
-                        {maxW > 0 ? ` · ${maxW}kg max` : ''}
+                        {ct(lang, 'recap.completedSets', {
+                          n: sets.length,
+                          pl: sets.length > 1 ? 's' : '',
+                        })} · {totalRepsEx} {ct(lang, 'recap.perEx.reps').toLowerCase()}
+                        {maxW > 0 ? ` · ${maxW}kg ${ct(lang, 'recap.maxShort')}` : ''}
                       </p>
                     </div>
                     {delta !== null && (

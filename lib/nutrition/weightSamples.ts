@@ -1,26 +1,48 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { WeightSample } from './adaptiveTdee'
+import type { TdeeDailyIntake } from './tdee-model-v2'
 
-const MIN_WINDOW_DAYS = 7  // below this, regression is unreliable
+export const MIN_WINDOW_DAYS = 14  // below this, regression is unreliable
+
+function currentIsoDateUtc() {
+  return new Date().toISOString().slice(0, 10)
+}
 
 /**
- * Find the date when the current protocol was shared with the client.
- * Uses metric_annotations (label LIKE 'Protocole nutritionnel%') as the
- * most reliable signal — this is written automatically when coach shares.
- * Falls back to null if not found.
+ * Find the date when the current protocol was activated for the client.
+ * Uses assignment history as the source of truth.
+ * Falls back to metric_annotations only for legacy data.
  */
 export async function resolveProtocolStartDate(
   db: SupabaseClient,
   clientId: string,
   protocolName: string,
+  protocolId?: string,
 ): Promise<string | null> {
+  if (protocolId) {
+    const { data: exactAssignment } = await db
+      .from('client_nutrition_protocol_assignments')
+      .select('started_at')
+      .eq('client_id', clientId)
+      .eq('protocol_id', protocolId)
+      .order('started_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if ((exactAssignment as any)?.started_at) {
+      return String((exactAssignment as any).started_at).slice(0, 10)
+    }
+  }
+
+  if (!protocolName) return null
+
   const { data } = await db
     .from('metric_annotations')
     .select('event_date')
     .eq('client_id', clientId)
     .eq('event_type', 'nutrition')
     .ilike('label', `Protocole nutritionnel%${protocolName}%`)
-    .order('event_date', { ascending: false })
+    .order('event_date', { ascending: true })
     .limit(1)
     .maybeSingle()
 
@@ -31,7 +53,7 @@ export async function resolveProtocolStartDate(
  * Collect weight samples from all available sources, deduplicated by date.
  *
  * Window anchoring (priority order):
- *   1. Since protocol share date (metric_annotations) — avoids mixing pre/post diet data
+ *   1. Since protocol assignment start — avoids mixing pre/post diet data
  *   2. Adaptive fallback: tries targetWindowDays → 21d → 30d if not enough samples
  *
  * If the anchored window is < MIN_WINDOW_DAYS, returns empty samples with
@@ -49,32 +71,31 @@ export async function collectWeightSamples(
   targetWindowDays = 14,
   minSamples = 4,
   protocolName?: string,
+  protocolId?: string,
 ): Promise<{ samples: WeightSample[]; windowDays: number; anchoredToProtocol: boolean; tooShort: boolean }> {
 
   // Try to anchor to protocol start date first
   let anchorDate: string | null = null
   if (protocolName) {
-    anchorDate = await resolveProtocolStartDate(db, clientId, protocolName)
+    anchorDate = await resolveProtocolStartDate(db, clientId, protocolName, protocolId)
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = currentIsoDateUtc()
 
   if (anchorDate) {
     const daysSinceAnchor = Math.floor(
       (new Date(today).getTime() - new Date(anchorDate).getTime()) / 86400000
     )
 
-    if (daysSinceAnchor < MIN_WINDOW_DAYS) {
-      // Too soon since protocol start — don't compute, signal tooShort
-      return { samples: [], windowDays: daysSinceAnchor, anchoredToProtocol: true, tooShort: true }
+    if (daysSinceAnchor >= MIN_WINDOW_DAYS) {
+      // Collect samples since anchor date only when the anchored window is mature enough.
+      const samples = await fetchWeightSamples(db, clientId, anchorDate, today)
+      if (samples.length >= 2) {
+        return { samples, windowDays: daysSinceAnchor, anchoredToProtocol: true, tooShort: false }
+      }
     }
-
-    // Collect samples since anchor date
-    const samples = await fetchWeightSamples(db, clientId, anchorDate)
-    if (samples.length >= 2) {
-      return { samples, windowDays: daysSinceAnchor, anchoredToProtocol: true, tooShort: false }
-    }
-    // Not enough samples since anchor — fall through to adaptive window
+    // If the protocol is too recent or the anchored window is sparse,
+    // fall through to the rolling client-centric window instead of blocking the TDEE.
   }
 
   // Adaptive window fallback (no anchor or insufficient anchored samples)
@@ -85,7 +106,7 @@ export async function collectWeightSamples(
     cutoff.setDate(cutoff.getDate() - windowDays)
     const cutoffDate = cutoff.toISOString().slice(0, 10)
 
-    const samples = await fetchWeightSamples(db, clientId, cutoffDate)
+    const samples = await fetchWeightSamples(db, clientId, cutoffDate, today)
 
     if (samples.length >= minSamples || windowDays === windows[windows.length - 1]) {
       return { samples, windowDays, anchoredToProtocol: false, tooShort: false }
@@ -99,6 +120,7 @@ async function fetchWeightSamples(
   db: SupabaseClient,
   clientId: string,
   cutoffDate: string,
+  maxDateExclusive: string,
 ): Promise<WeightSample[]> {
   const map = new Map<string, number>()
 
@@ -114,7 +136,7 @@ async function fetchWeightSamples(
 
   if (manual?.weight_kg != null) {
     const d = String(manual.updated_at ?? '').slice(0, 10)
-    if (d >= cutoffDate) map.set(d, Number(manual.weight_kg))
+    if (d >= cutoffDate && d < maxDateExclusive) map.set(d, Number(manual.weight_kg))
   }
 
   // Source 2 — assessment bilans
@@ -129,7 +151,7 @@ async function fetchWeightSamples(
   for (const row of assessmentRows ?? []) {
     const sub = (row as any).assessment_submissions
     const d: string = (sub?.bilan_date ?? String(sub?.submitted_at ?? '').slice(0, 10)) as string
-    if (d >= cutoffDate && row.value_number != null) {
+    if (d >= cutoffDate && d < maxDateExclusive && row.value_number != null) {
       map.set(d, Number(row.value_number))
     }
   }
@@ -140,6 +162,7 @@ async function fetchWeightSamples(
     .select('date, weight_kg')
     .eq('client_id', clientId)
     .gte('date', cutoffDate)
+    .lt('date', maxDateExclusive)
     .not('weight_kg', 'is', null)
     .order('date', { ascending: true })
 
@@ -154,9 +177,65 @@ async function fetchWeightSamples(
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
+export async function collectDailyTdeeIntakes(
+  db: SupabaseClient,
+  clientId: string,
+  windowDays: number,
+  anchorDate?: string,
+): Promise<{
+  entries: TdeeDailyIntake[]
+  trackedDays: number
+  completeDays: number
+}> {
+  const cutoffDate = anchorDate ?? (() => {
+    const d = new Date()
+    d.setDate(d.getDate() - windowDays)
+    return d.toISOString().slice(0, 10)
+  })()
+  const today = currentIsoDateUtc()
+
+  const { data: meals } = await db
+    .from('nutrition_meals')
+    .select('physiological_date, meal_type, total_calories, total_protein_g, total_carbs_g, total_fat_g, total_fiber_g')
+    .eq('client_id', clientId)
+    .gte('physiological_date', cutoffDate)
+    .lt('physiological_date', today)
+
+  if (!meals || meals.length === 0) {
+    return { entries: [], trackedDays: 0, completeDays: 0 }
+  }
+
+  const byDate = new Map<string, { kcal: number; mealCount: number }>()
+  for (const m of meals) {
+    const macroDerivedKcal =
+      Number(m.total_protein_g ?? 0) * 4 +
+      Number(m.total_carbs_g ?? 0) * 4 +
+      Number(m.total_fat_g ?? 0) * 9 +
+      Number(m.total_fiber_g ?? 0) * 2
+    const kcal = Number(m.total_calories ?? 0) > 0
+      ? Number(m.total_calories)
+      : macroDerivedKcal
+    const current = byDate.get(m.physiological_date) ?? { kcal: 0, mealCount: 0 }
+    byDate.set(m.physiological_date, {
+      kcal: current.kcal + kcal,
+      mealCount: current.mealCount + (m.meal_type === 'drinks' ? 0 : 1),
+    })
+  }
+
+  const entries = Array.from(byDate.entries())
+    .map(([date, day]) => ({ date, kcal: Math.round(day.kcal), complete: day.kcal >= 800 && day.mealCount >= 2 }))
+    .sort((left, right) => left.date.localeCompare(right.date))
+  const trackedEntries = entries.filter((day) => day.kcal >= 800)
+  const trackedDays = trackedEntries.length
+  const completeEntries = entries.filter((day) => day.complete)
+  const completeDays = completeEntries.length
+
+  return { entries, trackedDays, completeDays }
+}
+
 /**
- * Compute average daily kcal intake from nutrition_meals over the window.
- * Falls back to protocol day 1 calories if insufficient logs.
+ * Compute average daily kcal intake from complete nutrition days over the window.
+ * Falls back to protocol day 1 calories if no complete client-log days exist.
  */
 export async function collectAvgIntake(
   db: SupabaseClient,
@@ -164,42 +243,39 @@ export async function collectAvgIntake(
   windowDays: number,
   protocolFallbackKcal: number,
   anchorDate?: string,
-): Promise<{ avgIntakeKcal: number; caloriesSource: 'logs' | 'protocol'; trackedDays: number }> {
-  const cutoffDate = anchorDate ?? (() => {
-    const d = new Date()
-    d.setDate(d.getDate() - windowDays)
-    return d.toISOString().slice(0, 10)
-  })()
+): Promise<{
+  avgIntakeKcal: number
+  caloriesSource: 'logs' | 'protocol'
+  trackedDays: number
+  completeDays: number
+  excludedCurrentDay: boolean
+}> {
+  const { entries, trackedDays, completeDays } = await collectDailyTdeeIntakes(
+    db,
+    clientId,
+    windowDays,
+    anchorDate,
+  )
 
-  const { data: meals } = await db
-    .from('nutrition_meals')
-    .select('physiological_date, total_protein_g, total_carbs_g, total_fat_g, total_fiber_g')
-    .eq('client_id', clientId)
-    .gte('physiological_date', cutoffDate)
-
-  if (!meals || meals.length === 0) {
-    return { avgIntakeKcal: protocolFallbackKcal, caloriesSource: 'protocol', trackedDays: 0 }
+  if (completeDays === 0) {
+    return {
+      avgIntakeKcal: protocolFallbackKcal,
+      caloriesSource: 'protocol',
+      trackedDays,
+      completeDays,
+      excludedCurrentDay: true,
+    }
   }
 
-  const byDate = new Map<string, number>()
-  for (const m of meals) {
-    const kcal =
-      Number(m.total_protein_g ?? 0) * 4 +
-      Number(m.total_carbs_g ?? 0) * 4 +
-      Number(m.total_fat_g ?? 0) * 9 +
-      Number(m.total_fiber_g ?? 0) * 2
-    byDate.set(m.physiological_date, (byDate.get(m.physiological_date) ?? 0) + kcal)
+  const completeEntries = entries.filter((entry) => entry.complete)
+  const avgIntakeKcal = Math.round(completeEntries.reduce((sum, entry) => sum + entry.kcal, 0) / completeDays)
+  return {
+    avgIntakeKcal,
+    caloriesSource: 'logs',
+    trackedDays,
+    completeDays,
+    excludedCurrentDay: true,
   }
-
-  const trackedEntries = Array.from(byDate.values()).filter(v => v >= 800)
-  const trackedDays = trackedEntries.length
-
-  if (trackedDays === 0) {
-    return { avgIntakeKcal: protocolFallbackKcal, caloriesSource: 'protocol', trackedDays: 0 }
-  }
-
-  const avgIntakeKcal = Math.round(trackedEntries.reduce((s, v) => s + v, 0) / trackedDays)
-  return { avgIntakeKcal, caloriesSource: 'logs', trackedDays }
 }
 
 /**

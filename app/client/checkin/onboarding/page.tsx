@@ -3,21 +3,30 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { subscribeToPush } from "@/lib/client/push";
+import { useClientT } from "@/components/client/ClientI18nProvider";
 
 type Moment = { moment: "morning" | "evening"; fields: string[] };
 
 export default function CheckinOnboardingPage() {
   const router = useRouter();
+  const { t } = useClientT();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
   const [moments, setMoments] = useState<Moment[]>([]);
   const [times, setTimes] = useState<Record<string, string>>({
     morning: "07:30",
     evening: "21:00",
   });
+  const showInstallStep = !isStandalone;
+  const totalSteps = showInstallStep ? 3 : 2;
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const standalone = window.matchMedia?.("(display-mode: standalone)")?.matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+      setIsStandalone(Boolean(standalone));
+    }
     // Guard — déjà configuré : aller directement au schedule/check-in
     if (typeof window !== "undefined" && localStorage.getItem("checkin_configured") === "1") {
       router.replace("/client/checkin/schedule");
@@ -27,7 +36,9 @@ export default function CheckinOnboardingPage() {
       const res = await fetch("/api/client/checkin/config");
       if (!res.ok) return;
       const data = await res.json();
-      setMoments((data?.moments ?? []) as Moment[]);
+      const nextMoments = (data?.moments ?? []) as Moment[];
+      setMoments(nextMoments);
+      if (nextMoments.length === 0) router.replace("/client");
     }
     loadConfig();
   }, [router]);
@@ -65,10 +76,10 @@ export default function CheckinOnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0d0d0d] px-6 py-10">
+    <main className="min-h-dvh bg-[#0d0d0d] px-6 py-10 overflow-x-hidden" style={{ paddingTop: 'max(2.5rem, env(safe-area-inset-top))', paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
       <section className="max-w-sm mx-auto bg-white/[0.02] rounded-xl p-5">
         <div className="flex gap-1.5 mb-5">
-          {[0, 1, 2].map((i) => (
+          {Array.from({ length: totalSteps }, (_, i) => i).map((i) => (
             <div
               key={i}
               className={`h-1.5 rounded-full ${i === step ? "w-5 bg-[#f2f2f2]" : "w-1.5 bg-white/20"}`}
@@ -78,41 +89,47 @@ export default function CheckinOnboardingPage() {
 
         {step === 0 && (
           <div className="space-y-4">
-            <h1 className="text-white text-[22px] font-black">Tes rappels quotidiens</h1>
+            <h1 className="text-white text-[22px] font-black">{t('checkin.onboarding.title')}</h1>
             <p className="text-white/60 text-[13px] leading-relaxed">
-              Ton coach a activé les check-ins {moments.map((m) => m.moment === "morning" ? "matin" : "soir").join(" + ")}.
+              {t('checkin.onboarding.desc', {
+                moments: moments.map((m) => m.moment === "morning" ? t('checkin.onboarding.morning') : t('checkin.onboarding.evening')).join(" + "),
+              })}
             </p>
             <button
               onClick={() => setStep(1)}
               className="w-full h-11 rounded-xl bg-[#f2f2f2] text-[#080808] text-[12px] font-bold"
             >
-              Suivant
+              {t('onboarding.welcome.cta.next')}
             </button>
           </div>
         )}
 
-        {step === 1 && (
+        {showInstallStep && step === 1 && (
           <div className="space-y-4">
-            <h1 className="text-white text-[22px] font-black">Installe l'application</h1>
+            <h1 className="text-white text-[22px] font-black">{t('checkin.onboarding.install.title')}</h1>
             <div className="text-white/60 text-[13px] space-y-2">
-              <p>iOS: Safari → Partager → "Sur l'écran d'accueil"</p>
-              <p>Android: Chrome → menu ⋮ → "Installer l'application"</p>
+              <p>{t('checkin.onboarding.install.desc1')}</p>
+              <p>{t('checkin.onboarding.install.ios')}</p>
+              <p>{t('checkin.onboarding.install.android')}</p>
             </div>
             <button
               onClick={() => setStep(2)}
               className="w-full h-11 rounded-xl bg-[#f2f2f2] text-[#080808] text-[12px] font-bold"
             >
-              C'est fait, continuer
+              {t('checkin.onboarding.install.done')}
             </button>
           </div>
         )}
 
-        {step === 2 && (
+        {step === (showInstallStep ? 2 : 1) && (
           <div className="space-y-4">
-            <h1 className="text-white text-[22px] font-black">Configure tes horaires</h1>
+            <h1 className="text-white text-[22px] font-black">{t('checkin.onboarding.times.title')}</h1>
+            <p className="text-white/60 text-[13px] leading-relaxed">
+              {t('checkin.onboarding.times.desc')}
+            </p>
             {moments.map((m) => (
               <div key={m.moment} className="bg-white/[0.03] rounded-xl p-3">
-                <p className="text-[12px] text-white/70 capitalize mb-2">{m.moment === "morning" ? "Matin" : "Soir"}</p>
+                <p className="text-[12px] text-white/70 capitalize mb-2">{m.moment === "morning" ? t('checkin.title.morning') : t('checkin.title.evening')}</p>
                 <input
                   type="time"
                   value={times[m.moment]}
@@ -124,7 +141,7 @@ export default function CheckinOnboardingPage() {
 
             {permissionDenied && (
               <p className="text-[11px] text-amber-300/90">
-                Notifications refusées. Tu pourras les activer plus tard depuis ton profil.
+                {t('checkin.onboarding.denied')}
               </p>
             )}
 
@@ -133,7 +150,7 @@ export default function CheckinOnboardingPage() {
               disabled={saving}
               className="w-full h-11 rounded-xl bg-[#f2f2f2] text-[#080808] text-[12px] font-bold disabled:opacity-50"
             >
-              {saving ? "Activation..." : "Activer mes rappels"}
+              {saving ? t('checkin.onboarding.activating') : t('checkin.onboarding.activate')}
             </button>
           </div>
         )}

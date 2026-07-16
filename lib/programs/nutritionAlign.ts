@@ -1,4 +1,5 @@
 import type { NutritionProtocolDay } from '@/lib/nutrition/types'
+import { getNutritionDaysByRole } from '@/lib/nutrition/day-role'
 
 export interface DayRoles {
   trainingDayId: string | null
@@ -9,8 +10,11 @@ const TRAINING_RE = /entra[îi]n|training|sport|muscul|perf/i
 const REST_RE = /repos|rest|regen|recup|récup/i
 
 export function detectDayRoles(days: NutritionProtocolDay[]): DayRoles {
-  let trainingDayId: string | null = null
-  let restDayId: string | null = null
+  const trainingRoleDays = getNutritionDaysByRole(days, 'training')
+  const restRoleDays = getNutritionDaysByRole(days, 'rest')
+
+  let trainingDayId: string | null = trainingRoleDays[0]?.id ?? null
+  let restDayId: string | null = restRoleDays[0]?.id ?? null
 
   for (const d of days) {
     if (!trainingDayId && TRAINING_RE.test(d.name)) trainingDayId = d.id

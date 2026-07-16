@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { revalidatePath } from 'next/cache'
 
 function service() {
   return createServiceClient(
@@ -93,6 +94,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: pushError.message }, { status: 500 })
     }
   }
+
+  revalidatePath('/client')
+  revalidatePath('/client/profil')
+  revalidatePath('/client/checkin')
 
   return NextResponse.json(data)
 }

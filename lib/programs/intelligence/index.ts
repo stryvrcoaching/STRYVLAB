@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { buildIntelligenceResult } from './scoring'
-import type { BuilderSession, TemplateMeta, IntelligenceResult, IntelligenceAlert, BuilderExercise, IntelligenceProfile, LabOverrides, SRAHeatmapWeek } from './types'
+import type { BuilderSession, TemplateMeta, IntelligenceResult, IntelligenceAlert, BuilderExercise, IntelligenceProfile, LabOverrides, SRAHeatmapWeek, VolumeFocus } from './types'
 
-export type { IntelligenceResult, IntelligenceAlert, BuilderSession, TemplateMeta, BuilderExercise, IntelligenceProfile, LabOverrides, SRAHeatmapWeek }
+export type { IntelligenceResult, IntelligenceAlert, BuilderSession, TemplateMeta, BuilderExercise, IntelligenceProfile, LabOverrides, SRAHeatmapWeek, VolumeFocus }
 export { scoreAlternatives } from './alternatives'
 export type { AlternativeScore } from './alternatives'
 export { resolveExerciseCoeff } from './catalog-utils'
 export { scoreSuperset } from './scoring'
-export { VOLUME_SEGMENTS, VOLUME_GROUP_LABELS, getVolumeTargets } from './volume-targets'
+export { VOLUME_SEGMENTS, VOLUME_GROUP_LABELS, getVolumeTargets, VOLUME_FOCUS_GROUPS, VOLUME_FOCUS_LABELS } from './volume-targets'
 
 const EMPTY_RESULT: IntelligenceResult = {
   globalScore: 0,
@@ -24,6 +24,7 @@ const EMPTY_RESULT: IntelligenceResult = {
   sraHeatmap: [],
   programStats: { totalSets: 0, totalEstimatedReps: 0, totalExercises: 0, avgExercisesPerSession: 0, sessionsStats: [] },
   volumeByMuscle: {},
+  volumeFocus: [],
 }
 
 // ─── Lab Mode Overrides ───────────────────────────────────────────────────────

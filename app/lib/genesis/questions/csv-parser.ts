@@ -32,7 +32,7 @@ const CSV_FILES = [
   'GENESIS ADAPTIVE QUESTIONNAIRE SYSTEM - 9_STIMULUS_P8_TRAINING.csv',
 ];
 
-function parseCSVFile(filepath: string, module: string): Question[] {
+function parseCSVFile(filepath: string, moduleName: string): Question[] {
   const content = fs.readFileSync(filepath, 'utf-8');
   const records = parse(content, {
     columns: true,
@@ -47,7 +47,7 @@ function parseCSVFile(filepath: string, module: string): Question[] {
 
     return {
       id: row.ID_Question,
-      module,
+      module: moduleName,
       dimension: row.Dimension || '',
       pattern: row['Pattern(s)'] || '',
       role: row.Rôle || '',
@@ -76,9 +76,9 @@ export function loadAllQuestions(): Question[] {
     }
 
     const moduleMatch = filename.match(/_(\d+)_(.+)\.csv$/);
-    const module = moduleMatch ? moduleMatch[2] : 'UNKNOWN';
+    const moduleName = moduleMatch ? moduleMatch[2] : 'UNKNOWN';
 
-    const questions = parseCSVFile(filepath, module);
+    const questions = parseCSVFile(filepath, moduleName);
     allQuestions.push(...questions);
   }
 

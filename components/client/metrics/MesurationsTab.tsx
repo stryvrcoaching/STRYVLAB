@@ -2,6 +2,7 @@
 
 import MetricCard from './MetricCard'
 import type { BodyDataResponse } from '@/app/api/client/body-data/route'
+import { useClientT } from '../ClientI18nProvider'
 
 interface Props {
   data: BodyDataResponse
@@ -24,6 +25,7 @@ function measureDelta(series: { value: number }[]): { delta: string; deltaGood: 
 }
 
 export default function MesurationsTab({ data }: Props) {
+  const { t } = useClientT()
   const hasCards = data.measureOrder.some(
     key => buildMeasureSeries(data.measuresByBilan, key).length > 0
   )
@@ -32,8 +34,8 @@ export default function MesurationsTab({ data }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         <p className="text-[13px] text-white/30 text-center leading-relaxed">
-          Aucune mensuration enregistrée.<br />
-          Appuie sur <span className="text-white/50 font-semibold">+</span> pour en ajouter.
+          {t('msg.no.measurements')}<br />
+          {t('msg.no.measurements.desc')}
         </p>
       </div>
     )

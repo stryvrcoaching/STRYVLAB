@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   hasActiveCycleFromBilan,
   computeAvgCycleLength,
+  getCycleRegularity,
+  getObservedCycleLengths,
   computeAvgMenstrualLength,
   computeCurrentCycleDay,
   detectPhase,
@@ -45,12 +47,37 @@ describe('computeAvgCycleLength', () => {
   it('averages multiple valid lengths', () => {
     expect(computeAvgCycleLength([makeLog(27), makeLog(29), makeLog(28)])).toBe(28)
   })
-  it('filters out outliers outside 21–35', () => {
-    // 15 filtered → only 28 remains → avg = 28
-    expect(computeAvgCycleLength([makeLog(15), makeLog(28)])).toBe(28)
+  it('keeps plausible intervals outside the standard range', () => {
+    expect(computeAvgCycleLength([makeLog(15), makeLog(28)])).toBe(22)
   })
   it('rounds correctly', () => {
     expect(computeAvgCycleLength([makeLog(27), makeLog(28)])).toBe(28)
+  })
+})
+
+describe('observed cycle adaptation', () => {
+  it('uses the median of observed start-to-start intervals', () => {
+    const logs: CycleLog[] = [
+      { period_start_date: '2026-03-31', period_end_date: null, computed_cycle_length_days: null },
+      { period_start_date: '2026-02-28', period_end_date: null, computed_cycle_length_days: null },
+      { period_start_date: '2026-02-01', period_end_date: null, computed_cycle_length_days: null },
+      { period_start_date: '2026-01-01', period_end_date: null, computed_cycle_length_days: null },
+    ]
+
+    expect(getObservedCycleLengths(logs)).toEqual([31, 27, 31])
+    expect(computeAvgCycleLength(logs)).toBe(31)
+  })
+
+  it('keeps variable but plausible cycles in the adaptive estimate', () => {
+    const logs: CycleLog[] = [
+      { period_start_date: '2026-04-25', period_end_date: null, computed_cycle_length_days: null },
+      { period_start_date: '2026-03-14', period_end_date: null, computed_cycle_length_days: null },
+      { period_start_date: '2026-02-01', period_end_date: null, computed_cycle_length_days: null },
+      { period_start_date: '2026-01-01', period_end_date: null, computed_cycle_length_days: null },
+    ]
+
+    expect(getCycleRegularity(logs)).toBe('irregular')
+    expect(computeAvgCycleLength(logs)).toBe(41)
   })
 })
 
@@ -177,5 +204,22 @@ describe('getCycleStateFromLogs — with logs', () => {
     ]
     const state = getCycleStateFromLogs(logs, null, new Date('2026-05-08'))
     expect(state.avgCycleLengthDays).toBe(26)
+  })
+
+  it('asks for a period-start confirmation around the learned date', () => {
+    const state = getCycleStateFromLogs([
+      { period_start_date: '2026-05-01', period_end_date: null, computed_cycle_length_days: 28 },
+    ], null, new Date('2026-05-27'))
+
+    expect(state.isPeriodStartExpected).toBe(true)
+  })
+
+  it('exposes whether the latest period has been completed', () => {
+    const state = getCycleStateFromLogs([
+      { period_start_date: '2026-05-01', period_end_date: '2026-05-05', computed_cycle_length_days: 28 },
+    ], null, new Date('2026-05-08'))
+
+    expect(state.lastPeriodDate).toBe('2026-05-01')
+    expect(state.lastPeriodEndDate).toBe('2026-05-05')
   })
 })

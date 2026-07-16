@@ -76,7 +76,7 @@ export default function DeloadAlertBanner({ clientId }: DeloadAlertBannerProps) 
         <button
           onClick={() => setDismissed(true)}
           className="shrink-0 text-white/40 hover:text-white/60 transition-colors p-1"
-          aria-label="Fermer l'alerte"
+          aria-label={t('ui.close.alert')}
         >
           <X size={16} />
         </button>

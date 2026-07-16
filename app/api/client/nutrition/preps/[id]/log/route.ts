@@ -1,9 +1,33 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { createClient } from "@/utils/supabase/server"
 import { createSupabaseService, resolveClientIdFromUserId } from "@/lib/nutrition/preps-service"
 import { computeMacroEnergy } from "@/lib/nutrition/energy"
+import { resolveClientLanguage } from "@/lib/client/resolve-language"
+import { resolveClientTimezone } from "@/lib/client/checkin/resolveClientTimezone"
+import { computePhysiologicalDate } from "@/lib/nutrition/physiological-date"
+import { ct, type ClientLang } from "@/lib/i18n/clientTranslations"
+
+function getMealTypeLabel(mealType: string | null) {
+  switch (mealType) {
+    case "breakfast":
+      return "petit-déjeuner"
+    case "lunch":
+      return "déjeuner"
+    case "dinner":
+      return "dîner"
+    case "snack":
+      return "encas"
+    default:
+      return "repas"
+  }
+}
+
+function formatFrenchNumber(value: number, maximumFractionDigits = 0) {
+  return new Intl.NumberFormat("fr-FR", { maximumFractionDigits }).format(value)
+}
 
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -14,20 +38,27 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   if (!clientId) return NextResponse.json({ error: "Client not found" }, { status: 404 })
 
   const db = createSupabaseService()
+  const lang = await resolveClientLanguage(db, clientId) as ClientLang
+  const timezone = await resolveClientTimezone(db, clientId)
   const { data: prep, error: prepError } = await db
     .from("client_nutrition_preps")
-    .select("id, physiological_date, title, meal_type, entries, total_calories, total_protein_g, total_carbs_g, total_fat_g, total_fiber_g, consumed_meal_id")
+    .select("id, physiological_date, title, meal_type, entries, total_calories, total_protein_g, total_carbs_g, total_fat_g, total_fiber_g, consumed_meal_id, status")
     .eq("id", params.id)
     .eq("client_id", clientId)
-    .eq("status", "planned")
+    .in("status", ["planned", "logged"])
     .single()
 
   if (prepError || !prep) {
     return NextResponse.json({ error: prepError?.message ?? "Prep not found" }, { status: 404 })
   }
 
+  const today = computePhysiologicalDate(new Date(), timezone)
+  if (prep.physiological_date !== today) {
+    return NextResponse.json({ error: "Prep can only be logged on its planned date" }, { status: 409 })
+  }
+
   // Idempotency: already logged on a previous attempt
-  if (prep.consumed_meal_id) {
+  if (prep.status === "logged" || prep.consumed_meal_id) {
     return NextResponse.json({ id: prep.consumed_meal_id }, { status: 200 })
   }
 
@@ -57,7 +88,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       meal_type: prep.meal_type ?? "snack",
       meal_source: "composer",
       logged_at: loggedAt.toISOString(),
-      notes: "Validé depuis Smart Nutrition Prep",
+      notes: ct(lang, "nutrition.track.validatedFromPrep"),
       total_calories: totalCalories,
       ...totals,
     })
@@ -119,25 +150,25 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     console.error('[preps/log] smart_agenda_events insert failed:', agendaResult.error.message)
   }
 
-  const pointsResult = await db.from("client_points").insert({
-    client_id: clientId,
-    action_type: "meal",
-    points: 3,
-    reference_id: meal.id,
-    earned_at: loggedAt.toISOString(),
-  })
-  if (pointsResult.error) {
-    console.error('[preps/log] client_points insert failed:', pointsResult.error.message)
-  }
-
   // Notify coach: client validated a planned prep
   const { data: clientRecord } = await db
     .from('coach_clients')
-    .select('coach_id')
+    .select('coach_id, first_name, last_name')
     .eq('id', clientId)
     .single()
 
   if (clientRecord?.coach_id) {
+    const clientName = [clientRecord.first_name, clientRecord.last_name].filter(Boolean).join(' ').trim() || 'Le client'
+    const prepLabel = String(prep.title ?? '').trim()
+    const mealTypeLabel = getMealTypeLabel(prep.meal_type)
+    const mealLabel = prepLabel ? `le repas "${prepLabel}"` : `son ${mealTypeLabel}`
+    const macroSummary = [
+      `${Math.round(totalCalories)} kcal`,
+      `P ${formatFrenchNumber(totals.total_protein_g, 1)} g`,
+      `G ${formatFrenchNumber(totals.total_carbs_g, 1)} g`,
+      `L ${formatFrenchNumber(totals.total_fat_g, 1)} g`,
+    ].join(' · ')
+
     // Rate limit: max 1 nutrition_trend / prep_validated notification per client per day
     const todayUtc = new Date().toISOString().slice(0, 10)
     const { data: existingNotif } = await db
@@ -160,6 +191,18 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         priority: 3,
         status: 'pending',
         email_sent: false,
+        title: 'Repas validé',
+        body: `${clientName} a validé ${mealLabel} prévu dans son planning nutritionnel · ${macroSummary}.`,
+        payload: {
+          prep_id: params.id,
+          prep_title: prepLabel || null,
+          meal_type: prep.meal_type ?? null,
+          total_calories: Math.round(totalCalories),
+          total_protein_g: totals.total_protein_g,
+          total_carbs_g: totals.total_carbs_g,
+          total_fat_g: totals.total_fat_g,
+          action_url: `/coach/clients/${clientId}/data/nutrition`,
+        },
       })
       if (notifResult.error) {
         console.error('[preps/log] coach_notifications insert failed:', notifResult.error.message)
@@ -167,5 +210,6 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     }
   }
 
+  revalidatePath("/client/nutrition")
   return NextResponse.json({ id: meal.id }, { status: 201 })
 }

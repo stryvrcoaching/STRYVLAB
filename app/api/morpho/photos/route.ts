@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { coachOwnsClient } from '@/lib/security/client-resource-access'
 
 function service() {
   return createServiceClient(
@@ -53,14 +54,7 @@ export async function GET(req: NextRequest) {
   const { clientId, position, source, from, to, limit, offset } = params.data
 
   // Vérifier ownership coach
-  const { data: clientRow } = await db
-    .from('coach_clients')
-    .select('id')
-    .eq('id', clientId)
-    .eq('coach_id', user.id)
-    .single()
-
-  if (!clientRow) {
+  if (!(await coachOwnsClient({ db, coachUserId: user.id, clientId }))) {
     return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
   }
 

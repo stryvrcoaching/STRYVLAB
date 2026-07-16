@@ -1,23 +1,99 @@
-import { SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { resolveClientLanguage } from '@/lib/client/resolve-language'
+import {
+  getClientPushCopy,
+  type ClientPushCopyKey,
+} from '@/lib/notifications/client-push-copy'
+import {
+  sendClientPush,
+  type ClientPushKind,
+} from '@/lib/notifications/send-client-push'
 
 interface NotificationPayload {
-  coachId:      string
-  clientId:     string
-  type:         'assessment_sent' | 'assessment_completed' | 'program_assigned' | 'program_updated' | 'bilan_received' | 'session_reminder' | 'payment_received'
-  message:      string
+  coachId: string
+  clientId: string
+  type:
+    | 'assessment_sent'
+    | 'assessment_completed'
+    | 'program_assigned'
+    | 'program_updated'
+    | 'bilan_received'
+    | 'session_reminder'
+    | 'payment_received'
+  message: string
   submissionId?: string
 }
 
+const COPY_KEY_BY_TYPE: Record<
+  NotificationPayload['type'],
+  ClientPushCopyKey
+> = {
+  assessment_sent: 'assessment.available',
+  assessment_completed: 'assessment.completed',
+  bilan_received: 'assessment.available',
+  program_assigned: 'workout.available',
+  program_updated: 'workout.updated',
+  session_reminder: 'session.reminder',
+  payment_received: 'payment.received',
+}
+
+function resolvePushKind(
+  type: NotificationPayload['type'],
+): ClientPushKind {
+  if (
+    type === 'assessment_sent'
+    || type === 'assessment_completed'
+    || type === 'bilan_received'
+  ) {
+    return 'bilan'
+  }
+
+  if (
+    type === 'program_assigned'
+    || type === 'program_updated'
+  ) {
+    return 'program'
+  }
+
+  if (type === 'session_reminder') {
+    return 'session'
+  }
+
+  return 'system'
+}
+
+function resolveActionUrl(
+  type: NotificationPayload['type'],
+): string {
+  if (
+    type === 'assessment_sent'
+    || type === 'assessment_completed'
+    || type === 'bilan_received'
+  ) {
+    return '/client/bilans'
+  }
+
+  if (
+    type === 'program_assigned'
+    || type === 'program_updated'
+    || type === 'session_reminder'
+  ) {
+    return '/client/programme'
+  }
+
+  return '/client'
+}
+
 /**
- * Insert a notification visible to both coach (by coach_id) and client (by target_user_id).
- * Fetches the client's user_id to populate target_user_id — if the client has no account yet,
- * the notification is still stored and will be visible once they link their account.
+ * Legacy notification bridge.
+ *
+ * Stores the historical client_notifications record, then sends a localized
+ * push through the central notification transport.
  */
 export async function insertClientNotification(
   db: SupabaseClient,
-  payload: NotificationPayload
+  payload: NotificationPayload,
 ) {
-  // Resolve client's auth user_id so they can see the notification in their app
   const { data: clientRow } = await db
     .from('coach_clients')
     .select('user_id')
@@ -25,11 +101,33 @@ export async function insertClientNotification(
     .single()
 
   await db.from('client_notifications').insert({
-    coach_id:       payload.coachId,
-    client_id:      payload.clientId,
-    submission_id:  payload.submissionId ?? null,
-    type:           payload.type,
-    message:        payload.message,
+    coach_id: payload.coachId,
+    client_id: payload.clientId,
+    submission_id: payload.submissionId ?? null,
+    type: payload.type,
+    message: payload.message,
     target_user_id: clientRow?.user_id ?? null,
   })
+
+  const lang = await resolveClientLanguage(
+    db,
+    payload.clientId,
+  )
+
+  const copy = getClientPushCopy(
+    COPY_KEY_BY_TYPE[payload.type],
+    lang,
+  )
+
+  await sendClientPush(
+    db,
+    payload.clientId,
+    resolvePushKind(payload.type),
+    {
+      title: copy.title,
+      body: copy.body,
+      url: resolveActionUrl(payload.type),
+      tag: `stryv-${payload.type}`,
+    },
+  )
 }

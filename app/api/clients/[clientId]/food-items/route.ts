@@ -2,23 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient as createServerClient } from "@/utils/supabase/server"
 import { createClient as createServiceClient } from "@supabase/supabase-js"
 import { z } from "zod"
+import { coachOwnsClient } from "@/lib/security/client-resource-access"
 
 function serviceClient() {
   return createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
-}
-
-async function ownershipCheck(coachId: string, clientId: string) {
-  const { data } = await serviceClient()
-    .from("coach_clients")
-    .select("id")
-    .eq("id", clientId)
-    .eq("coach_id", coachId)
-    .single()
-
-  return Boolean(data)
 }
 
 const searchSchema = z.object({
@@ -111,7 +101,8 @@ export async function GET(
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  if (!(await ownershipCheck(user.id, clientId))) {
+  const db = serviceClient()
+  if (!(await coachOwnsClient({ db, coachUserId: user.id, clientId }))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
@@ -119,7 +110,6 @@ export async function GET(
   if (!parsed.success) return NextResponse.json({ error: parsed.error }, { status: 400 })
 
   const { q, category, subcategory, sort, frequent, limit } = parsed.data
-  const db = serviceClient()
   const usage = frequent || sort === "frequent" || sort === "recent"
     ? await loadFoodUsage(clientId)
     : new Map<string, { count: number; lastUsedAt: number }>()
@@ -208,7 +198,8 @@ export async function POST(
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  if (!(await ownershipCheck(user.id, clientId))) {
+  const db = serviceClient()
+  if (!(await coachOwnsClient({ db, coachUserId: user.id, clientId }))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
@@ -217,7 +208,7 @@ export async function POST(
 
   const body = parsed.data
   const itemKey = `coach-${slugifyFoodName(body.name_fr)}-${clientId.slice(0, 8)}`
-  const { data, error } = await serviceClient()
+  const { data, error } = await db
     .from("food_items")
     .insert({
       name_fr: body.name_fr,

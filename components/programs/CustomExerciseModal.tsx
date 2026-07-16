@@ -41,6 +41,7 @@ const initialForm: FormData = {
 }
 
 interface CreatedExercise {
+  id: string
   name: string
   mediaUrl: string
   mediaType: string
@@ -119,7 +120,9 @@ export default function CustomExerciseModal({ onClose, onCreated }: Props) {
         const d = await res.json()
         throw new Error(d.error ?? 'Erreur lors de la création')
       }
+      const created = await res.json()
       onCreated({
+        id: created.id,
         name: form.name,
         mediaUrl: form.mediaUrl,
         mediaType: form.mediaType,

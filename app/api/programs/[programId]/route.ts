@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { activateWorkoutProgramAssignment, closeWorkoutProgramAssignment } from '@/lib/assignments/clientAssignments'
+import { resolveStoredFrequency } from '@/lib/programs/frequency'
+import { createClientAppNotification } from '@/lib/notifications/create-client-app-notification'
+import {
+  ensureProgramSharedAnnotation,
+  upsertProgramUpdatedAnnotation,
+} from '@/lib/programs/programAnnotations'
 
 function service() {
   return createServiceClient(
@@ -11,13 +18,14 @@ function service() {
 
 const SELECT = `
   id, name, description, goal, level, frequency, weeks, muscle_tags,
-  equipment_archetype, session_mode, status, is_client_visible, created_at,
+  equipment_archetype, session_mode, volume_focus, status, is_client_visible, created_at,
   program_sessions (
     id, name, day_of_week, days_of_week, position, notes,
     program_exercises (
       id, name, sets, reps, rest_sec, rir, notes, position, image_url,
       movement_pattern, equipment_required, primary_muscles, secondary_muscles,
-      group_id, is_compound, target_rir, weight_increment_kg, tempo, set_prescriptions,
+      group_id, is_compound, is_unilateral, target_rir, target_hr_zone, execution_type,
+      weight_increment_kg, tempo, set_prescriptions, superset_rest_mode,
       plane, mechanic, unilateral, primary_muscle, primary_activation,
       secondary_muscles_detail, secondary_activations, stabilizers,
       joint_stress_spine, joint_stress_knee, joint_stress_shoulder,
@@ -39,6 +47,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const body = await req.json()
   const db = service()
+  const { data: existingProgram } = await db
+    .from('programs')
+    .select('id, name, client_id, coach_id, is_client_visible')
+    .eq('id', params.programId)
+    .eq('coach_id', user.id)
+    .maybeSingle()
+
+  if (!existingProgram) {
+    return NextResponse.json({ error: 'Programme introuvable' }, { status: 404 })
+  }
 
   // Full rebuild when sessions are included (studio-lab builder save)
   if (body.sessions) {
@@ -103,9 +121,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             is_compound: e.is_compound ?? null,
             is_unilateral: e.is_unilateral ?? false,
             target_rir: e.target_rir ?? null,
+            target_hr_zone: e.target_hr_zone ?? null,
             weight_increment_kg: e.weight_increment_kg ?? 2.5,
             tempo: e.tempo ?? null,
             set_prescriptions: e.set_prescriptions ?? null,
+            superset_rest_mode: e.superset_rest_mode ?? 'after_round',
+            execution_type: e.execution_type ?? 'reps_rir',
             // Biomech fields
             plane: e.plane ?? null,
             mechanic: e.mechanic ?? null,
@@ -130,7 +151,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   // Build meta patch — includes both simple toggles and full metadata
   const {
     name, description, goal, level, frequency, weeks, muscle_tags,
-    equipment_archetype, session_mode, status, is_client_visible,
+    equipment_archetype, session_mode, volume_focus, status, is_client_visible,
   } = body
 
   const patch: Record<string, unknown> = {}
@@ -139,10 +160,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (goal !== undefined) patch.goal = goal
   if (level !== undefined) patch.level = level
   if (frequency !== undefined) patch.frequency = frequency
+  else if (body.sessions) {
+    patch.frequency = resolveStoredFrequency(body.sessions, null)
+  }
   if (weeks !== undefined) patch.weeks = weeks
   if (muscle_tags !== undefined) patch.muscle_tags = muscle_tags
   if (equipment_archetype !== undefined) patch.equipment_archetype = equipment_archetype || null
   if (session_mode !== undefined) patch.session_mode = session_mode
+  if (volume_focus !== undefined) patch.volume_focus = volume_focus
   if (status !== undefined) patch.status = status
   if (is_client_visible !== undefined) patch.is_client_visible = is_client_visible
 
@@ -161,6 +186,64 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!data) return NextResponse.json({ error: 'Programme introuvable' }, { status: 404 })
+
+    if (is_client_visible === true && !existingProgram.is_client_visible) {
+      await activateWorkoutProgramAssignment(db, {
+        clientId: existingProgram.client_id,
+        coachId: user.id,
+        programId: params.programId,
+        startedBy: user.id,
+      })
+    }
+
+    if (is_client_visible === false && existingProgram.is_client_visible) {
+      await closeWorkoutProgramAssignment(db, {
+        clientId: existingProgram.client_id,
+        programId: params.programId,
+        endedBy: user.id,
+        reason: 'unpublish',
+      })
+    }
+
+    const shouldNotifyClient =
+      is_client_visible !== false &&
+      (existingProgram.is_client_visible || is_client_visible === true) &&
+      (
+        body.sessions !== undefined ||
+        name !== undefined ||
+        description !== undefined ||
+        goal !== undefined ||
+        level !== undefined ||
+        frequency !== undefined ||
+        weeks !== undefined ||
+        status !== undefined
+      )
+
+    if (shouldNotifyClient) {
+      await createClientAppNotification(db, {
+        clientId: existingProgram.client_id,
+        coachId: user.id,
+        type: 'program_updated',
+        copyKey: 'workout.updated',
+        actionUrl: '/client/programme',
+        pushKind: 'program',
+        pushTag: `stryv-program-updated-${params.programId}`,
+        payload: { program_id: params.programId },
+      })
+
+      const annotationInput = {
+        clientId: existingProgram.client_id,
+        coachId: user.id,
+        programId: params.programId,
+        programName: data.name,
+      }
+      if (is_client_visible === true && !existingProgram.is_client_visible) {
+        await ensureProgramSharedAnnotation(db, annotationInput)
+      } else {
+        await upsertProgramUpdatedAnnotation(db, annotationInput)
+      }
+    }
+
     return NextResponse.json({ program: data })
   }
 
@@ -173,6 +256,26 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (existingProgram.is_client_visible) {
+    await createClientAppNotification(db, {
+      clientId: existingProgram.client_id,
+      coachId: user.id,
+      type: 'program_updated',
+      copyKey: 'workout.updated',
+      actionUrl: '/client/programme',
+      pushKind: 'program',
+      pushTag: `stryv-program-updated-${params.programId}`,
+      payload: { program_id: params.programId },
+    })
+    await upsertProgramUpdatedAnnotation(db, {
+      clientId: existingProgram.client_id,
+      coachId: user.id,
+      programId: params.programId,
+      programName: data.name,
+    })
+  }
+
   return NextResponse.json({ program: data })
 }
 
@@ -183,12 +286,29 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (authError || !user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
   const db = service()
+  const { data: existingProgram } = await db
+    .from('programs')
+    .select('id, client_id')
+    .eq('id', params.programId)
+    .eq('coach_id', user.id)
+    .maybeSingle()
+
+  if (!existingProgram) {
+    return NextResponse.json({ error: 'Programme introuvable' }, { status: 404 })
+  }
 
   // Remove metric annotation created when this program was assigned
   await db
     .from('metric_annotations')
     .delete()
     .eq('source_id', params.programId)
+
+  await closeWorkoutProgramAssignment(db, {
+    clientId: existingProgram.client_id,
+    programId: params.programId,
+    endedBy: user.id,
+    reason: 'delete',
+  })
 
   const { error } = await db
     .from('programs')

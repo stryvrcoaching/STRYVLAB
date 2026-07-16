@@ -1,3 +1,5 @@
+import { estimateSessionDurationMin } from "@/lib/training/sessionDuration";
+
 /** Weekday: 1 = Monday … 7 = Sunday (aligned with programme client UI). */
 
 export const WEEKDAY_LABELS_SHORT = [
@@ -20,14 +22,39 @@ export interface ProgramSessionScheduleInput {
   name: string;
   day_of_week: number | null;
   days_of_week?: number[] | null;
-  exercises?: { name?: string }[] | null;
+  exercises?:
+    | {
+        name?: string | null;
+        sets?: number | null;
+        reps?: string | null;
+        rep_min?: number | null;
+        rep_max?: number | null;
+        rest_sec?: number | null;
+        rir?: number | null;
+        target_rir?: number | null;
+        tempo?: string | null;
+        movement_pattern?: string | null;
+        is_unilateral?: boolean | null;
+        is_compound?: boolean | null;
+      }[]
+    | null;
 }
 
 export interface ProgramScheduleInput {
   id: string;
   name: string;
+  goal?: string | null;
   session_mode?: string | null;
   program_sessions?: ProgramSessionScheduleInput[] | null;
+}
+
+export interface WeekdaySessionSummary {
+  name: string;
+  exerciseCount: number;
+  setCount: number;
+  estimatedMinutes: number | null;
+  avgRestSec: number | null;
+  avgRir: number | null;
 }
 
 export interface WeekdayScheduleEntry {
@@ -35,6 +62,8 @@ export interface WeekdayScheduleEntry {
   label: string;
   kind: WeekdayKind;
   sessionNames: string[];
+  sessions: WeekdaySessionSummary[];
+  summary: WeekdaySessionSummary | null;
 }
 
 export interface TrainingWeekSchedule {
@@ -78,6 +107,73 @@ function classifySessions(
   return "rest_with_activity";
 }
 
+function average(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+function summarizeSession(
+  session: ProgramSessionScheduleInput,
+  goal: string,
+): WeekdaySessionSummary {
+  const exercises = session.exercises ?? [];
+  const setCount = exercises.reduce(
+    (sum, exercise) => sum + Math.max(0, Number(exercise.sets ?? 0)),
+    0,
+  );
+  const restValues = exercises
+    .map((exercise) => Number(exercise.rest_sec))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const rirValues = exercises
+    .map((exercise) => Number(exercise.target_rir ?? exercise.rir))
+    .filter((value) => Number.isFinite(value) && value >= 0);
+  const estimatedMinutes =
+    exercises.length > 0 ? estimateSessionDurationMin(exercises, goal) : null;
+
+  return {
+    name: session.name,
+    exerciseCount: exercises.length,
+    setCount,
+    estimatedMinutes,
+    avgRestSec: average(restValues),
+    avgRir: average(rirValues),
+  };
+}
+
+function summarizeDaySessions(
+  sessions: ProgramSessionScheduleInput[],
+  goal: string,
+): { sessions: WeekdaySessionSummary[]; summary: WeekdaySessionSummary | null } {
+  const summaries = sessions.map((session) => summarizeSession(session, goal));
+  if (summaries.length === 0) return { sessions: [], summary: null };
+  if (summaries.length === 1) return { sessions: summaries, summary: summaries[0] };
+
+  const estimatedMinutes = summaries
+    .map((session) => session.estimatedMinutes)
+    .filter((value): value is number => typeof value === "number")
+    .reduce((sum, value) => sum + value, 0);
+
+  return {
+    sessions: summaries,
+    summary: {
+      name: summaries.map((session) => session.name).join(" + "),
+      exerciseCount: summaries.reduce((sum, session) => sum + session.exerciseCount, 0),
+      setCount: summaries.reduce((sum, session) => sum + session.setCount, 0),
+      estimatedMinutes: estimatedMinutes > 0 ? estimatedMinutes : null,
+      avgRestSec: average(
+        summaries
+          .map((session) => session.avgRestSec)
+          .filter((value): value is number => typeof value === "number"),
+      ),
+      avgRir: average(
+        summaries
+          .map((session) => session.avgRir)
+          .filter((value): value is number => typeof value === "number"),
+      ),
+    },
+  };
+}
+
 /** Build Mon–Sun schedule from an active programme (day mode only). */
 export function buildTrainingWeekSchedule(
   program: ProgramScheduleInput | null | undefined,
@@ -88,6 +184,8 @@ export function buildTrainingWeekSchedule(
       label,
       kind: "undefined" as WeekdayKind,
       sessionNames: [],
+      sessions: [],
+      summary: null,
     }),
   );
 
@@ -133,11 +231,14 @@ export function buildTrainingWeekSchedule(
   const days = WEEKDAY_LABELS_SHORT.map((label, idx) => {
     const dow = idx + 1;
     const daySessions = byDow.get(dow) ?? [];
+    const summaries = summarizeDaySessions(daySessions, program.goal ?? "hypertrophy");
     return {
       dow,
       label,
       kind: classifySessions(daySessions),
       sessionNames: daySessions.map((s) => s.name),
+      sessions: summaries.sessions,
+      summary: summaries.summary,
     };
   });
 
@@ -176,13 +277,14 @@ export function suggestNutritionDayName(
 export function normalizeProgramForSchedule(
   program: ProgramScheduleInput & {
     program_sessions?: (ProgramSessionScheduleInput & {
-      program_exercises?: { name?: string }[] | null;
+      program_exercises?: ProgramSessionScheduleInput["exercises"];
     })[];
   },
 ): ProgramScheduleInput {
   return {
     id: program.id,
     name: program.name,
+    goal: program.goal,
     session_mode: program.session_mode,
     program_sessions: (program.program_sessions ?? []).map((s) => ({
       name: s.name,

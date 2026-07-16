@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { LAST_CLIENT_ROUTE_KEY } from '@/components/client/ClientRouteMemory'
+import { useClientT } from '@/components/client/ClientI18nProvider'
 
 export default function OfflinePage() {
+  const { t } = useClientT()
   const [retrying, setRetrying] = useState(false)
   const [fallbackTarget, setFallbackTarget] = useState('/client')
 
@@ -41,7 +43,7 @@ export default function OfflinePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d] flex flex-col items-center justify-center px-6 text-center">
+    <div className="min-h-dvh bg-[#0d0d0d] flex flex-col items-center justify-center px-6 text-center overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="mb-8">
         <div className="w-16 h-16 rounded-2xl bg-white/[0.06] flex items-center justify-center mx-auto mb-6">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/30">
@@ -49,13 +51,13 @@ export default function OfflinePage() {
           </svg>
         </div>
         <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/30 mb-3">
-          Hors ligne
+          {t('offline.badge')}
         </p>
         <h1 className="text-[22px] font-black text-white leading-tight mb-2">
-          Pas de connexion
+          {t('offline.title')}
         </h1>
         <p className="text-[13px] text-white/40 leading-relaxed max-w-[260px] mx-auto">
-          Retrouve ta séance dès que tu es de retour en ligne.
+          {t('offline.desc')}
         </p>
       </div>
 
@@ -63,7 +65,7 @@ export default function OfflinePage() {
         onClick={handleRetry}
         className="h-12 px-8 bg-[#f2f2f2] text-[#080808] text-[12px] font-black uppercase tracking-[0.1em] rounded-xl active:scale-[0.98] transition-transform"
       >
-        {retrying ? 'Retour...' : 'Réessayer'}
+        {retrying ? t('offline.returning') : t('offline.retry')}
       </button>
     </div>
   )

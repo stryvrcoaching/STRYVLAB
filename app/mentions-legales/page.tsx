@@ -1,255 +1,80 @@
-'use client';
+import type { Metadata } from 'next'
+import Link from 'next/link'
 
-import React from 'react';
-import Link from 'next/link';
-import { Building2, Server, Copyright, X, Scale, Mail, Globe, FileText } from 'lucide-react';
+export const metadata: Metadata = {
+  title: 'Mentions légales',
+  description: 'Identification de l’éditeur et informations légales de STRYV lab.',
+}
 
-export default function MentionsLegalesPage() {
+export default function LegalNoticePage() {
   return (
-    <main className="min-h-screen bg-background text-primary font-outfit">
-      
-      {/* HEADER FIXE */}
-      <header className="fixed top-0 left-0 right-0 z-50 px-6 md:px-12 py-6 bg-background/80 backdrop-blur-md border-b border-gray-100/50">
-        <div className="max-w-5xl mx-auto flex justify-between items-center">
-          <Link href="/" className="group flex items-center gap-2">
-            <span className="text-xl font-bold tracking-widest text-primary">STRYV</span>
-            <span className="text-xl font-light text-secondary">Smart fit</span>
-          </Link>
-
-          <Link 
-            href="/" 
-            className="w-8 h-8 rounded-full bg-surface shadow-soft-out flex items-center justify-center text-secondary hover:text-primary hover:scale-105 transition-all"
-          >
-            <X size={16} />
-          </Link>
+    <main className="min-h-screen bg-[#0d0d0d] text-white">
+      <header className="border-b border-white/10 px-5 py-5 sm:px-8">
+        <div className="mx-auto flex max-w-5xl items-center justify-between">
+          <Link href="/" className="font-unbounded text-sm tracking-[-0.04em]">STRYV lab</Link>
+          <Link href="/" className="font-barlow-condensed text-xs uppercase tracking-[0.16em] text-white/55 hover:text-white">Retour au site</Link>
         </div>
       </header>
 
-      {/* CONTENU PRINCIPAL */}
-      <div className="pt-32 pb-20 px-6 md:px-12">
-        <div className="max-w-3xl mx-auto">
+      <div className="mx-auto max-w-5xl px-5 py-16 sm:px-8 sm:py-24">
+        <p className="font-barlow-condensed text-xs uppercase tracking-[0.2em] text-[#c6b48b]">Éditeur & exploitation</p>
+        <h1 className="mt-5 font-barlow text-5xl font-semibold uppercase leading-[0.9] tracking-[-0.045em] sm:text-7xl">Mentions légales</h1>
+        <p className="mt-7 text-base leading-7 text-white/60">Dernière mise à jour technique : 15 juillet 2026.</p>
 
-          {/* TITRE & INTRO */}
-          <div className="mb-16">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/5 border border-accent/10 text-[10px] font-bold tracking-widest text-accent uppercase mb-6">
-              <Scale size={12} />
-              Information Juridique
+        <div className="mt-12 grid gap-5">
+          <section className="rounded-3xl border border-white/10 bg-white/[0.025] p-7 sm:p-8">
+            <h2 className="font-barlow text-2xl font-semibold">1. Éditeur</h2>
+            <div className="mt-4 grid gap-2 text-sm leading-7 text-white/62 sm:grid-cols-2">
+              <p><strong className="text-white/85">Exploitant :</strong> HB Solution — Boukelmoune Kévin</p>
+              <p><strong className="text-white/85">Forme :</strong> entreprise individuelle belge</p>
+              <p><strong className="text-white/85">Nom commercial :</strong> STRYV lab</p>
+              <p><strong className="text-white/85">BCE :</strong> 0745.797.168</p>
+              <p><strong className="text-white/85">TVA :</strong> BE0745797168</p>
+              <p><strong className="text-white/85">Publication :</strong> Boukelmoune Kévin</p>
+              <p><strong className="text-white/85">E-mail :</strong> <a className="text-[#c6b48b]" href="mailto:contact@stryvlab.com">contact@stryvlab.com</a></p>
+              <p><strong className="text-white/85">Téléphone :</strong> <a className="text-[#c6b48b]" href="tel:+32472238612">+32 472 23 86 12</a></p>
+              <p><strong className="text-white/85">Adresse :</strong> Boulevard Président Kennedy 69, 7000 Mons, Belgique</p>
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-primary mb-6">
-              Mentions Légales<br/>
-              <span className="text-secondary font-medium text-2xl">STRYV lab</span>
-            </h1>
-            <p className="text-sm text-secondary leading-relaxed font-light">
-              Conformément aux dispositions de la loi belge et européenne régissant les services de la société de l'information.<br/>
-              Dernière mise à jour : 09 janvier 2026
-            </p>
-          </div>
+          </section>
 
-          <div className="grid gap-8">
+          <section className="rounded-3xl border border-white/10 bg-white/[0.025] p-7 sm:p-8">
+            <h2 className="font-barlow text-2xl font-semibold">2. Services techniques</h2>
+            <div className="mt-4 space-y-3 text-sm leading-7 text-white/62">
+              <p><strong className="text-white/85">Hébergement applicatif :</strong> Vercel.</p>
+              <p><strong className="text-white/85">Base, authentification et stockage :</strong> Supabase.</p>
+              <p><strong className="text-white/85">Paiement :</strong> Stripe pour les parcours actifs.</p>
+              <p>
+                Les régions, transferts, durées de journaux et garanties contractuelles ne sont pas déduits
+                de ces noms de fournisseurs ; ils sont documentés dans le registre de traitement et la
+                politique de confidentialité après vérification des comptes déployés.
+              </p>
+            </div>
+          </section>
 
-            {/* 1. ÉDITEUR */}
-            <section className="bg-surface border border-white/60 shadow-soft-out rounded-2xl p-8">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="p-2 bg-surface-light rounded-lg text-accent">
-                  <Building2 size={20} />
-                </div>
-                <h2 className="text-lg font-bold text-primary pt-1">1. Éditeur du Site</h2>
-              </div>
-              <div className="text-sm text-secondary leading-relaxed pl-12 space-y-3">
-                <p className="font-medium text-primary mb-3">
-                  Le site web <strong>stryvlab.com</strong> et les services associés sont édités par :
-                </p>
-                <div className="space-y-2 text-gray-700">
-                  <p><strong>Raison sociale :</strong> STRYV lab (HB Solution)</p>
-                  <p><strong>Forme juridique :</strong> Indépendant</p>
-                  <p><strong>Siège social :</strong> Mons, Hainaut, Belgique</p>
-                  <p><strong>Numéro d'entreprise BCE :</strong> 0745.797.168</p>
-                  <p><strong>Numéro TVA :</strong> BE0745797168</p>
-                  <p><strong>Directeur de publication :</strong> Boukelmoune Kévin</p>
-                </div>
-                <div className="pt-3 space-y-1 text-gray-700">
-                  <p className="flex items-center gap-2">
-                    <Mail size={14} className="text-accent" />
-                    <strong>Contact :</strong> contact@stryvlab.com
-                  </p>
-                  <p className="flex items-center gap-2">
-                    <Globe size={14} className="text-accent" />
-                    <strong>Site web :</strong> <a href="https://www.stryvlab.com" className="underline hover:text-accent" target="_blank" rel="noopener">www.stryvlab.com</a>
-                  </p>
-                </div>
-              </div>
-            </section>
+          <section className="rounded-3xl border border-white/10 bg-white/[0.025] p-7 sm:p-8">
+            <h2 className="font-barlow text-2xl font-semibold">3. Propriété et responsabilité</h2>
+            <div className="mt-4 space-y-3 text-sm leading-7 text-white/62">
+              <p>
+                Les contenus, interfaces, marques, textes, médias et logiciels sont protégés par les droits
+                applicables. Leur reproduction ou réutilisation commerciale nécessite une autorisation,
+                sauf exception prévue par la loi.
+              </p>
+              <p>
+                STRYV lab s’efforce de maintenir les informations et services accessibles et à jour, sans
+                promettre un niveau de disponibilité ou un délai d’intervention qui ne figure pas dans un
+                contrat signé. Les contenus de coaching ne constituent pas un diagnostic médical.
+              </p>
+            </div>
+          </section>
+        </div>
 
-            {/* 2. HÉBERGEMENT */}
-            <section className="bg-surface border border-white/60 shadow-soft-out rounded-2xl p-8">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="p-2 bg-surface-light rounded-lg text-accent">
-                  <Server size={20} />
-                </div>
-                <h2 className="text-lg font-bold text-primary pt-1">2. Hébergement</h2>
-              </div>
-              <div className="text-sm text-secondary leading-relaxed pl-12 space-y-4">
-                <div>
-                  <p className="font-semibold text-primary mb-2">Infrastructure Web & Backend :</p>
-                  <p className="text-gray-700"><strong>Vercel Inc.</strong></p>
-                  <p className="text-gray-600">440 N Barranca Ave #4133, Covina, CA 91723, États-Unis</p>
-                  <p className="text-xs text-gray-500 mt-1">Serveurs de déploiement : Union Européenne (Allemagne, Pays-Bas)</p>
-                </div>
-
-                <div>
-                  <p className="font-semibold text-primary mb-2">Base de Données :</p>
-                  <p className="text-gray-700"><strong>Supabase Inc.</strong></p>
-                  <p className="text-gray-600">460 Bryant Street, San Francisco, CA 94107, États-Unis</p>
-                  <p className="text-xs text-gray-500 mt-1">Serveurs PostgreSQL : Union Européenne (Irlande, Allemagne)</p>
-                </div>
-
-                <div>
-                  <p className="font-semibold text-primary mb-2">Processeur de Paiement :</p>
-                  <p className="text-gray-700"><strong>Stripe Payments Europe Ltd.</strong></p>
-                  <p className="text-gray-600">1 Grand Canal Street Lower, Grand Canal Dock, Dublin 2, Irlande</p>
-                  <p className="text-xs text-gray-500 mt-1">Conformité : PCI-DSS Level 1, RGPD</p>
-                </div>
-              </div>
-            </section>
-
-            {/* 3. PROPRIÉTÉ INTELLECTUELLE */}
-            <section className="bg-surface border border-white/60 shadow-soft-out rounded-2xl p-8">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="p-2 bg-surface-light rounded-lg text-accent">
-                  <Copyright size={20} />
-                </div>
-                <h2 className="text-lg font-bold text-primary pt-1">3. Propriété Intellectuelle</h2>
-              </div>
-              <div className="text-sm text-secondary leading-relaxed pl-12 space-y-3">
-                <p>
-                  L'ensemble des éléments présents sur le site <strong>stryvlab.com</strong> et dans les services associés (marques, logos, textes, graphismes, photographies, vidéos, algorithmes, questionnaires, rapports, protocoles, code source, structure de navigation) sont la propriété exclusive de <strong>STRYV lab</strong> et sont protégés par :
-                </p>
-                <ul className="list-disc pl-4 space-y-1 text-gray-600">
-                  <li>Le droit d'auteur (Code de droit économique belge, Livre XI)</li>
-                  <li>Le droit des marques (Benelux et Union Européenne)</li>
-                  <li>Le droit des bases de données</li>
-                  <li>Le droit des brevets (le cas échéant)</li>
-                </ul>
-
-                <p className="pt-3">
-                  <strong>Marques déposées ou en cours de dépôt :</strong>
-                </p>
-                <ul className="list-disc pl-4 space-y-1 text-gray-600">
-                  <li><strong>STRYV lab™</strong></li>
-                  <li><strong>IPT™</strong> (Indice de Potentiel de Transformation)</li>
-                </ul>
-
-                <p className="pt-3 font-semibold text-primary">
-                  Interdictions strictes :
-                </p>
-                <ul className="list-disc pl-4 space-y-1 text-gray-600">
-                  <li>Reproduction totale ou partielle du site web sans autorisation écrite.</li>
-                  <li>Extraction, réutilisation ou commercialisation des contenus (rapports, protocoles, algorithmes).</li>
-                  <li>Rétro-ingénierie du scoring algorithmique (scraping, analyse de code, décompilation).</li>
-                  <li>Utilisation des marques "STRYV lab" et "IPT" à des fins commerciales ou de confusion.</li>
-                  <li>Création de liens profonds (deep linking) sans autorisation préalable.</li>
-                </ul>
-
-                <p className="text-xs bg-red-50 p-3 rounded-lg border border-red-100 mt-4">
-                  <strong>⚖️ Sanctions :</strong> Toute violation des droits de propriété intellectuelle expose l'auteur à des poursuites civiles (dommages et intérêts) et pénales (contrefaçon).
-                </p>
-              </div>
-            </section>
-
-            {/* 4. RESPONSABILITÉ */}
-            <section className="bg-surface border border-white/60 shadow-soft-out rounded-2xl p-8">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="p-2 bg-surface-light rounded-lg text-accent">
-                  <Scale size={20} />
-                </div>
-                <h2 className="text-lg font-bold text-primary pt-1">4. Responsabilité</h2>
-              </div>
-              <div className="text-sm text-secondary leading-relaxed pl-12 space-y-3">
-                <p>
-                  <strong>STRYV lab</strong> s'efforce de fournir des informations exactes et à jour sur le site, mais ne peut garantir l'exactitude, l'exhaustivité ou la pertinence des contenus.
-                </p>
-                <p>
-                  <strong>Limitation de responsabilité :</strong>
-                </p>
-                <ul className="list-disc pl-4 space-y-1 text-gray-600">
-                  <li>STRYV lab ne saurait être tenu responsable des dommages directs ou indirects résultant de l'utilisation du site ou des services (y compris interruptions, bugs, erreurs de calcul).</li>
-                  <li>L'utilisateur reconnaît utiliser le site et les services à ses propres risques.</li>
-                  <li>STRYV lab ne garantit aucun résultat spécifique (perte de poids, performance sportive, amélioration de la santé).</li>
-                </ul>
-                <p className="pt-2">
-                  <strong>Liens externes :</strong> Le site peut contenir des liens vers des sites tiers. STRYV lab n'exerce aucun contrôle sur ces sites et décline toute responsabilité quant à leur contenu.
-                </p>
-              </div>
-            </section>
-
-            {/* 5. CONTACT & RÉCLAMATIONS */}
-            <section className="bg-surface border border-white/60 shadow-soft-out rounded-2xl p-8">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="p-2 bg-surface-light rounded-lg text-accent">
-                  <Mail size={20} />
-                </div>
-                <h2 className="text-lg font-bold text-primary pt-1">5. Contact & Réclamations</h2>
-              </div>
-              <div className="text-sm text-secondary leading-relaxed pl-12 space-y-3">
-                <p>
-                  Pour toute question, réclamation ou demande d'information relative aux mentions légales, contactez-nous :
-                </p>
-                <div className="bg-accent/5 p-4 rounded-lg border border-accent/20 space-y-2">
-                  <p className="font-semibold text-primary">📧 Support STRYV lab</p>
-                  <p className="text-gray-700">E-mail : <strong>contact@stryvlab.com</strong></p>
-                  <p className="text-gray-700">Objet : « Mentions Légales - [Votre demande] »</p>
-                  <p className="text-xs text-gray-500 mt-2">Délai de réponse : 48h ouvrées maximum</p>
-                </div>
-              </div>
-            </section>
-
-            {/* 6. DROIT APPLICABLE */}
-            <section className="bg-surface border border-white/60 shadow-soft-out rounded-2xl p-8">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="p-2 bg-surface-light rounded-lg text-accent">
-                  <FileText size={20} />
-                </div>
-                <h2 className="text-lg font-bold text-primary pt-1">6. Droit Applicable & Juridiction</h2>
-              </div>
-              <div className="text-sm text-secondary leading-relaxed pl-12 space-y-3">
-                <p>
-                  Les présentes mentions légales sont régies par le <strong>droit belge</strong>.
-                </p>
-                <p>
-                  En cas de litige relatif à l'interprétation ou à l'exécution des présentes, et à défaut de solution amiable, compétence exclusive est attribuée aux <strong>tribunaux de Bruxelles</strong>, Belgique.
-                </p>
-                <p className="text-xs bg-gray-50 p-3 rounded-lg border border-gray-100 mt-3">
-                  Conformément au Règlement (UE) n°524/2013, les consommateurs européens peuvent accéder à la plateforme de résolution en ligne des litiges de la Commission européenne : <a href="https://ec.europa.eu/consumers/odr" className="underline text-accent" target="_blank" rel="noopener">ec.europa.eu/consumers/odr</a>
-                </p>
-              </div>
-            </section>
-
-            {/* 7. CRÉDITS */}
-            <section className="bg-surface border border-white/60 shadow-soft-out rounded-2xl p-8">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="p-2 bg-surface-light rounded-lg text-accent">
-                  <Globe size={20} />
-                </div>
-                <h2 className="text-lg font-bold text-primary pt-1">7. Crédits</h2>
-              </div>
-              <div className="text-sm text-secondary leading-relaxed pl-12 space-y-2">
-                <p><strong>Conception & Développement :</strong> STRYV lab</p>
-                <p><strong>Framework :</strong> Next.js 15 (React), TypeScript, Tailwind CSS</p>
-                <p><strong>Typographie :</strong> Outfit (Google Fonts), Michroma (custom)</p>
-                <p><strong>Icônes :</strong> Lucide React</p>
-                <p><strong>Hébergement :</strong> Vercel + Supabase (voir section 2)</p>
-              </div>
-            </section>
-
-          </div>
+        <div className="mt-12 flex flex-wrap gap-5 border-t border-white/10 pt-8 font-barlow-condensed text-xs uppercase tracking-[0.14em] text-white/45">
+          <Link href="/confidentialite" className="hover:text-white">Confidentialité</Link>
+          <Link href="/cookies" className="hover:text-white">Cookies</Link>
+          <Link href="/cgv" className="hover:text-white">Conditions commerciales</Link>
+          <a href="mailto:contact@stryvlab.com" className="hover:text-white">Contact</a>
         </div>
       </div>
-
-      <footer className="bg-white border-t border-gray-200 py-12 px-6 text-center">
-        <p className="text-[11px] font-medium tracking-wide text-gray-400 uppercase">
-          © {new Date().getFullYear()} STRYV lab.
-        </p>
-      </footer>
     </main>
-  );
+  )
 }

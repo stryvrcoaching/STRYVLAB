@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { aggregateMealsByDate, buildNutritionProtocolCardAnalytics } from '@/lib/nutrition/protocol-card-analytics'
+import {
+  aggregateMealsByDate,
+  buildNutritionProtocolCardAnalytics,
+  buildNutritionProtocolPlanAnalytics,
+} from '@/lib/nutrition/protocol-card-analytics'
 
 describe('nutrition protocol card analytics', () => {
   it('builds workout-aligned analytics from recent nutrition data', () => {
@@ -29,9 +33,11 @@ describe('nutrition protocol card analytics', () => {
 
     expect(analytics.days_count).toBe(1)
     expect(analytics.analyzed_days_count).toBe(3)
+    expect(analytics.complete_days_count).toBe(3)
     expect(analytics.kcal_delta_trend.length).toBe(3)
     expect(analytics.kcal_variation_trend.length).toBe(2)
     expect(analytics.reliability_label).toBe('Fiables')
+    expect(analytics.state_label).toBe('Fiable')
     expect(analytics.nutrition_score).not.toBeNull()
   })
 
@@ -63,5 +69,24 @@ describe('nutrition protocol card analytics', () => {
 
     expect(analytics.analyzed_days_count).toBe(3)
     expect(analytics.reliability_label).toBe('Fiables')
+  })
+
+  it('builds plan analytics for drafts without relying on live logs', () => {
+    const analytics = buildNutritionProtocolPlanAnalytics({
+      protocol: {
+        days: [
+          { position: 0, name: 'Training day', calories: 2400, hydration_ml: 2600, carb_cycle_type: 'high' },
+          { position: 1, name: 'Rest day', calories: 2000, hydration_ml: 2200, carb_cycle_type: 'low' },
+        ],
+      },
+    })
+
+    expect(analytics.days_count).toBe(2)
+    expect(analytics.avg_target_kcal).toBe(2200)
+    expect(analytics.kcal_amplitude).toBe(400)
+    expect(analytics.training_days_count).toBe(1)
+    expect(analytics.rest_days_count).toBe(1)
+    expect(analytics.structure_score).not.toBeNull()
+    expect(analytics.warnings).toEqual([])
   })
 })

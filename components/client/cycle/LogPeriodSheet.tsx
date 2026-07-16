@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useClientT } from '../ClientI18nProvider'
 import type { CycleState } from '@/lib/cycle/cycleEngine'
+import useBodyScrollLock from '@/components/client/useBodyScrollLock'
 
 interface Props {
   open: boolean
@@ -13,10 +14,18 @@ interface Props {
   onUpdated: (newState: CycleState) => void
 }
 
-type Mode = 'main' | 'pick-start-date' | 'confirm-conflict'
+type Mode = 'main' | 'pick-start-date' | 'pick-end-date' | 'confirm-conflict'
+
+function addDays(date: string, days: number) {
+  const value = new Date(`${date}T00:00:00Z`)
+  value.setUTCDate(value.getUTCDate() + days)
+  return value.toISOString().slice(0, 10)
+}
 
 export default function LogPeriodSheet({ open, cycleState, onClose, onUpdated }: Props) {
   const { t } = useClientT()
+  useBodyScrollLock(open)
+
   const [mode, setMode] = useState<Mode>('main')
   const [pickedDate, setPickedDate] = useState('')
   const [conflictDate, setConflictDate] = useState('')
@@ -25,7 +34,7 @@ export default function LogPeriodSheet({ open, cycleState, onClose, onUpdated }:
 
   const hasOpenPeriod =
     cycleState?.lastPeriodDate !== null &&
-    cycleState?.currentPhase === 'menstrual'
+    cycleState?.lastPeriodEndDate === null
 
   async function logStart(date: string, _force = false) {
     setLoading(true)
@@ -33,7 +42,7 @@ export default function LogPeriodSheet({ open, cycleState, onClose, onUpdated }:
       const res = await fetch('/api/client/cycle/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'start', date }),
+        body: JSON.stringify({ type: 'start', date, force: _force }),
       })
       if (res.status === 409) {
         const data = await res.json()
@@ -57,14 +66,13 @@ export default function LogPeriodSheet({ open, cycleState, onClose, onUpdated }:
     }
   }
 
-  async function logEnd() {
+  async function logEnd(date: string) {
     setLoading(true)
     try {
-      const today = new Date().toISOString().slice(0, 10)
       const res = await fetch('/api/client/cycle/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'end', date: today }),
+        body: JSON.stringify({ type: 'end', date }),
       })
       if (!res.ok) throw new Error('Failed')
       const data = await res.json()
@@ -87,6 +95,17 @@ export default function LogPeriodSheet({ open, cycleState, onClose, onUpdated }:
   }
 
   const today = new Date().toISOString().slice(0, 10)
+  const earliestEndDate = cycleState?.lastPeriodDate
+    ? addDays(cycleState.lastPeriodDate, 1)
+    : null
+  const canLogPeriodEnd = Boolean(
+    hasOpenPeriod && earliestEndDate && earliestEndDate <= today,
+  )
+  const isPickingDate = mode === 'pick-start-date' || mode === 'pick-end-date'
+  const isPickingStartDate = mode === 'pick-start-date'
+  const shouldConfirmPeriodStart = Boolean(
+    cycleState?.isPeriodStartExpected && !hasOpenPeriod,
+  )
 
   return (
     <AnimatePresence>
@@ -100,8 +119,8 @@ export default function LogPeriodSheet({ open, cycleState, onClose, onUpdated }:
           />
           <motion.div
             key="sheet"
-            className="fixed left-0 right-0 bottom-0 z-[90] rounded-t-2xl"
-            style={{ background: '#0d0d0d', paddingBottom: 'max(env(safe-area-inset-bottom), 24px)' }}
+            className="client-native-bottom-sheet fixed left-0 right-0 bottom-0 z-[90] rounded-t-2xl"
+            style={{ background: '#0d0d0d', paddingBottom: 'var(--client-modal-bottom-padding)' }}
             initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           >
@@ -109,7 +128,7 @@ export default function LogPeriodSheet({ open, cycleState, onClose, onUpdated }:
             <div className="relative flex items-center justify-between px-5 pt-5 pb-4">
               <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-white/[0.10]" />
               <p className="text-[15px] font-barlow-condensed font-bold uppercase tracking-[0.12em] text-white">
-                Cycle
+                {t('cycle.title')}
               </p>
               <button
                 onClick={handleClose}
@@ -127,7 +146,7 @@ export default function LogPeriodSheet({ open, cycleState, onClose, onUpdated }:
               ) : mode === 'confirm-conflict' ? (
                 <div className="space-y-3">
                   <p className="text-[12px] font-barlow text-[#808080] leading-relaxed px-1">
-                    Un log existe déjà le {conflictDate}. Remplacer ?
+                    {t('cycle.modal.conflict', { date: conflictDate })}
                   </p>
                   <button
                     onClick={() => {
@@ -137,45 +156,53 @@ export default function LogPeriodSheet({ open, cycleState, onClose, onUpdated }:
                     disabled={loading}
                     className="w-full h-[52px] rounded-xl bg-white/[0.10] text-white text-[13px] font-barlow font-bold active:opacity-80 disabled:opacity-50"
                   >
-                    Confirmer quand même
+                    {t('cycle.action.confirm_anyway')}
                   </button>
                   <button
                     onClick={() => setMode('main')}
                     className="w-full h-[44px] rounded-xl bg-white/[0.03] text-[#808080] text-[13px] font-barlow active:bg-white/[0.06]"
                   >
-                    Annuler
+                    {t('common.cancel')}
                   </button>
                 </div>
-              ) : mode === 'pick-start-date' ? (
+              ) : isPickingDate ? (
                 <div className="space-y-3">
-                  <p className="text-[11px] font-barlow text-[#5a5a5a] px-1">Premier jour de règles :</p>
+                  <p className="text-[11px] font-barlow text-[#5a5a5a] px-1">
+                    {t(isPickingStartDate ? 'cycle.label.start_date' : 'cycle.label.end_date')}
+                  </p>
                   <input
                     type="date"
                     value={pickedDate}
+                    min={isPickingStartDate ? undefined : earliestEndDate ?? undefined}
                     max={today}
                     onChange={e => setPickedDate(e.target.value)}
                     className="w-full h-[52px] rounded-xl bg-white/[0.06] text-[#e0e0e0] text-[14px] font-barlow px-4 min-w-0 outline-none"
                   />
                   <button
-                    onClick={() => pickedDate && logStart(pickedDate)}
+                    onClick={() => pickedDate && (isPickingStartDate ? logStart(pickedDate) : logEnd(pickedDate))}
                     disabled={!pickedDate || loading}
                     className="w-full h-[52px] rounded-xl bg-white/[0.10] text-white text-[13px] font-barlow font-bold active:opacity-80 disabled:opacity-50"
                   >
-                    {loading ? 'Enregistrement…' : 'Confirmer'}
+                    {loading ? t('cycle.modal.loading') : t('common.confirm')}
                   </button>
                   <button
                     onClick={() => setMode('main')}
                     className="w-full h-[44px] rounded-xl bg-white/[0.03] text-[#808080] text-[13px] font-barlow active:bg-white/[0.06]"
                   >
-                    Retour
+                    {t('cycle.action.retour')}
                   </button>
                 </div>
               ) : (
                 <>
+                  {shouldConfirmPeriodStart && (
+                    <p className="rounded-xl bg-white/[0.04] px-4 py-3 text-[12px] font-barlow leading-relaxed text-[#a0a0a0]">
+                      {t('cycle.hint.expected_start')}
+                    </p>
+                  )}
                   {/* Section 1: Début de règles */}
                   <div className="rounded-xl bg-white/[0.04] overflow-hidden">
                     <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[#5a5a5a] px-4 pt-3 pb-1">
-                      Début de règles
+                      {t('cycle.section.start')}
                     </p>
                     <div className="p-3 space-y-2">
                       <button
@@ -184,31 +211,38 @@ export default function LogPeriodSheet({ open, cycleState, onClose, onUpdated }:
                         className="w-full h-[52px] rounded-xl bg-white/[0.10] text-white text-[13px] font-barlow font-bold active:opacity-80 disabled:opacity-50 flex items-center justify-center gap-2"
                       >
                         <span className="w-3 h-3 rounded-full bg-white/[0.30] shrink-0" />
-                        Aujourd&apos;hui
+                        {t('cycle.action.today')}
                       </button>
                       <button
                         onClick={() => setMode('pick-start-date')}
                         disabled={loading}
                         className="w-full h-[44px] rounded-xl bg-white/[0.03] text-[#808080] text-[12px] font-barlow active:bg-white/[0.06]"
                       >
-                        Choisir une autre date
+                        {t('cycle.action.choose_date')}
                       </button>
                     </div>
                   </div>
 
                   {/* Section 2: Fin de règles — conditional */}
-                  {hasOpenPeriod && (
+                  {canLogPeriodEnd && (
                     <div className="rounded-xl bg-white/[0.04] overflow-hidden">
                       <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[#5a5a5a] px-4 pt-3 pb-1">
-                        Fin de règles
+                        {t('cycle.section.end')}
                       </p>
                       <div className="p-3">
                         <button
-                          onClick={logEnd}
+                          onClick={() => logEnd(today)}
                           disabled={loading}
                           className="w-full h-[44px] rounded-xl bg-white/[0.03] text-[#e0e0e0] text-[13px] font-barlow active:bg-white/[0.06] disabled:opacity-50"
                         >
-                          {loading ? 'Enregistrement…' : 'Mes règles sont terminées'}
+                          {loading ? t('cycle.modal.loading') : t('cycle.action.end_today')}
+                        </button>
+                        <button
+                          onClick={() => setMode('pick-end-date')}
+                          disabled={loading}
+                          className="w-full h-[40px] mt-2 rounded-xl bg-white/[0.03] text-[#808080] text-[12px] font-barlow active:bg-white/[0.06] disabled:opacity-50"
+                        >
+                          {t('cycle.action.choose_date')}
                         </button>
                       </div>
                     </div>

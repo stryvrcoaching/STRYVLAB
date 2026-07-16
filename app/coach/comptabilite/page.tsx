@@ -35,6 +35,7 @@ import {
 } from "recharts";
 import { useSetTopBar } from "@/components/layout/useSetTopBar";
 import { Skeleton } from "@/components/ui/skeleton";
+import HeaderIconButton from "@/components/layout/HeaderIconButton";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -141,20 +142,17 @@ export default function ComptabilitePage() {
   const topBarRight = useMemo(
     () => (
       <>
-        <button
+        <HeaderIconButton
           onClick={() => setShowCreateFormula(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white/[0.02] hover:bg-white/[0.05] rounded-xl text-[12px] font-semibold text-white/60 hover:text-white transition-colors"
-        >
-          <CreditCard size={15} />
-          Nouvelle formule
-        </button>
-        <button
+          icon={<CreditCard size={15} />}
+          label="Nouvelle formule"
+        />
+        <HeaderIconButton
           onClick={() => setShowAddPayment(true)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#1f8a65] hover:bg-[#217356] rounded-xl font-bold text-[12px] text-white transition-colors"
-        >
-          <Plus size={16} />
-          Enregistrer un paiement
-        </button>
+          icon={<Plus size={16} />}
+          label="Enregistrer un paiement"
+          variant="accent"
+        />
       </>
     ),
     [],

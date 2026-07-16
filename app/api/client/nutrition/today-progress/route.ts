@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { resolveClientFromUser } from '@/lib/client/resolve-client'
 import { computePhysiologicalDate } from '@/lib/nutrition/physiological-date'
 import { computeMacroEnergy } from '@/lib/nutrition/energy'
 import { resolveProtocolDayByDate } from '@/lib/nutrition/protocol-schedule'
 import { resolveClientTimezone } from '@/lib/client/checkin/resolveClientTimezone'
 import { utcRangeForPhysiologicalDate } from '@/lib/client/checkin/timeWindows'
+import { fetchActiveSmoothingPlanDaysForDates } from '@/lib/nutrition/smoothing/fetch'
+import { applySmoothingOverlay } from '@/lib/nutrition/smoothing/apply-overlay'
 
 function service() {
   return createServiceClient(
@@ -14,23 +17,25 @@ function service() {
   )
 }
 
+function parseRequestedDate(req: NextRequest) {
+  const value = req.nextUrl.searchParams.get('date')?.trim()
+  if (!value) return null
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
+}
+
 // GET /api/client/nutrition/today-progress
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: cc } = await service()
-    .from('coach_clients')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
+  const db = service()
+  const cc = await resolveClientFromUser(user.id, user.email, db, 'id, timezone')
   if (!cc) return NextResponse.json({ error: 'Client not found' }, { status: 404 })
 
-  const db = service()
-  const timezone = await resolveClientTimezone(db, cc.id)
-  const today = computePhysiologicalDate(new Date(), timezone)
-  const { start: physiologicalStart, end: physiologicalEnd } = utcRangeForPhysiologicalDate(today, timezone)
+  const timezone = String(cc.timezone ?? '').trim() || await resolveClientTimezone(db, cc.id)
+  const physiologicalDate = parseRequestedDate(req) ?? computePhysiologicalDate(new Date(), timezone)
+  const { start: physiologicalStart, end: physiologicalEnd } = utcRangeForPhysiologicalDate(physiologicalDate, timezone)
 
   const [{ data: protocol }, { data: composerMeals }, { data: legacyMeals }, { data: waterLogs }] = await Promise.all([
     db.from('nutrition_protocols')
@@ -44,7 +49,7 @@ export async function GET(_req: NextRequest) {
     db.from('nutrition_meals')
       .select('total_calories, total_protein_g, total_carbs_g, total_fat_g')
       .eq('client_id', cc.id)
-      .eq('physiological_date', today),
+      .eq('physiological_date', physiologicalDate),
     // Legacy AI meals — lower confidence (0.55), fallback
     db.from('meal_logs')
       .select('estimated_macros, ai_status')
@@ -103,7 +108,7 @@ export async function GET(_req: NextRequest) {
   const days = (protocol as any)?.nutrition_protocol_days ?? []
   const slots = (protocol as any)?.nutrition_protocol_schedule_slots ?? []
   const targetDay = resolveProtocolDayByDate(
-    today,
+    physiologicalDate,
     (protocol as any)?.schedule_start_date ?? null,
     days,
     slots,
@@ -117,10 +122,29 @@ export async function GET(_req: NextRequest) {
         fat_g:     Number(targetDay.fat_g     ?? 0),
       }
     : null
+  const smoothingDays = await fetchActiveSmoothingPlanDaysForDates(db, cc.id, [physiologicalDate])
+  const finalTarget = target && smoothingDays.length > 0
+    ? (() => {
+        const { target: adjustedTarget } = applySmoothingOverlay({
+          kcal: target.calories,
+          protein_g: target.protein_g,
+          carbs_g: target.carbs_g,
+          fat_g: target.fat_g,
+          water_ml: 0,
+        }, smoothingDays)
+        return {
+          calories: adjustedTarget.kcal,
+          protein_g: adjustedTarget.protein_g,
+          carbs_g: adjustedTarget.carbs_g,
+          fat_g: adjustedTarget.fat_g,
+        }
+      })()
+    : target
 
   return NextResponse.json({
+    date: physiologicalDate,
     consumed,
-    target,
+    target: finalTarget,
     hasProtocol: !!protocol,
     mealCount: (composerMeals ?? []).length + (legacyMeals ?? []).length,
   })

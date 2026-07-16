@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { unstable_noStore as noStore } from 'next/cache'
 import { resolveClientFromUser } from '@/lib/client/resolve-client'
 import { resolveClientTimezone } from '@/lib/client/checkin/resolveClientTimezone'
 import { utcRangeForPhysiologicalDate } from '@/lib/client/checkin/timeWindows'
@@ -9,18 +10,24 @@ import type { NutritionMacros } from '@/components/client/smart/SmartNutritionWi
 import type { NutritionMeal } from '@/lib/nutrition/food-items'
 import type { SmartNutritionPrep } from '@/components/client/smart/SmartNutritionPrepList'
 import type { GenericAlert } from '@/components/client/smart/SmartAlertsFeed'
-import { type ClientLang } from '@/lib/i18n/clientTranslations'
+import { ct, type ClientLang } from '@/lib/i18n/clientTranslations'
 import { computeMacroEnergy } from '@/lib/nutrition/energy'
 import { resolveProtocolDayByDate, resolveRestProtocolDay } from '@/lib/nutrition/protocol-schedule'
+import { mergeCoachPlanPreps } from '@/lib/nutrition/client-planning'
 import { NUTRITION_UI_COLORS } from '@/lib/nutrition/ui-colors'
 import { detectCurrentPhase, getCycleSyncAdjustment } from '@/lib/nutrition/engine/cycleSync'
 import type { CyclePhase, CycleSyncAdjustment } from '@/lib/nutrition/engine/cycleSync'
+import { getEffectiveCycleSyncAdjustment, normalizeCycleSyncProfile } from '@/lib/nutrition/cycle-sync-profile'
 import { getCycleStateFromLogs } from '@/lib/cycle/cycleEngine'
 import type { CycleState, CycleLog } from '@/lib/cycle/cycleEngine'
+import { fetchActiveSmoothingPlanDaysForDates } from '@/lib/nutrition/smoothing/fetch'
+import { applySmoothingOverlay } from '@/lib/nutrition/smoothing/apply-overlay'
+import { localizeNutritionScenarioLabel } from '@/lib/nutrition/scenario-labels'
 import NutritionClientPage from './NutritionClientPage'
 import { fetchClientDayOverride } from '@/lib/client/day-kind'
+import { resolveClientLanguage } from '@/lib/client/resolve-language'
 
-type SearchParams = { date?: string }
+type SearchParams = { date?: string; tab?: 'suivi' | 'planning' | 'tendances' }
 
 function inferTrainingDay(protocolDay: Record<string, unknown> | null): boolean {
   if (!protocolDay) return false
@@ -41,7 +48,11 @@ function svc() {
   )
 }
 
-export default async function ClientNutritionPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function ClientNutritionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const { date: dateParam, tab: tabParam } = await searchParams
+  noStore()
+  const activeTab = tabParam === 'tendances' || tabParam === 'planning' ? tabParam : 'suivi'
+  const needsTrendTabData = activeTab === 'tendances'
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
@@ -49,34 +60,40 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
   const client = await resolveClientFromUser(user.id, user.email, svc(), 'id, gender')
   if (!client) return null
   const isFemale = (client as { gender?: string | null }).gender === 'female'
-  const timezone = await resolveClientTimezone(svc(), client.id)
+  const timezone = String(client.timezone ?? '').trim() || await resolveClientTimezone(svc(), client.id)
 
-  const date = searchParams.date ?? computePhysiologicalDate(new Date(), timezone)
+  const date = dateParam ?? computePhysiologicalDate(new Date(), timezone)
   const { start: physiologicalStart, end: physiologicalEnd } = utcRangeForPhysiologicalDate(date, timezone)
   const clientId = client.id
 
   // ── Parallel fetches (all direct Supabase, no loopback HTTP) ──────────────
-  const [protoResult, mealsResult, prepsResult, waterResult, weightResult, checkinWeightResult, trendResult, streakResult, prefsResult, cycleResult, cycleLogsResult, dayOverrideResult] = await Promise.allSettled([
+  const [protoResult, tdeeStateResult, mealsResult, prepsResult, waterResult, weightResult, checkinWeightResult, trendResult, streakResult, prefsResult, cycleResult, cycleLogsResult, dayOverrideResult, smoothingDaysResult] = await Promise.allSettled([
     svc()
       .from('nutrition_protocols')
-      .select('cycle_sync_enabled, tdee_adaptive, tdee_data_source, schedule_start_date, nutrition_protocol_days(position, name, calories, protein_g, carbs_g, fat_g, hydration_ml, carb_cycle_type, cycle_sync_phase, recommendations), nutrition_protocol_schedule_slots(week_index, dow, protocol_day_position)')
+      .select('id, cycle_sync_enabled, cycle_sync_profile, tdee_adaptive, tdee_data_source, schedule_start_date, nutrition_protocol_days(position, name, calories, protein_g, carbs_g, fat_g, hydration_ml, carb_cycle_type, cycle_sync_phase, recommendations, meal_plan), nutrition_protocol_schedule_slots(week_index, dow, protocol_day_position)')
       .eq('client_id', clientId)
       .eq('status', 'shared')
       .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
 
+    svc()
+      .from('client_tdee_state')
+      .select('current_tdee, current_tdee_at, source, stability_status')
+      .eq('client_id', clientId)
+      .maybeSingle(),
+
     // Meals with full entries for the journal list
     svc()
       .from('nutrition_meals')
       .select(`
-        id, meal_type, title, logged_at, physiological_date,
+        id, meal_type, meal_source, title, logged_at, physiological_date,
         total_calories, total_protein_g, total_carbs_g, total_fat_g, total_fiber_g,
         photo_urls, notes,
         nutrition_entries (
           id, quantity_g, calories_kcal, protein_g, carbs_g, fat_g, fiber_g,
           input_mode, confidence_score,
-          food_items (id, name_fr, category_l1, item_key, kcal_per_100g)
+          food_items (id, name_fr, category_l1, category_l2, icon_key, item_key, kcal_per_100g)
         )
       `)
       .eq('client_id', clientId)
@@ -86,10 +103,10 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
 
     svc()
       .from('client_nutrition_preps')
-      .select('id, physiological_date, title, meal_type, meal_slot, variant_group_id, scenario_key, scenario_label, is_active, status, entries, total_calories, total_protein_g, total_carbs_g, total_fat_g, total_fiber_g, planned_for, created_at, updated_at')
+      .select('id, physiological_date, title, meal_type, meal_slot, variant_group_id, scenario_key, scenario_label, is_active, status, entries, total_calories, total_protein_g, total_carbs_g, total_fat_g, total_fiber_g, consumed_meal_id, planned_for, created_at, updated_at, source_type, source_protocol_id, source_day_position, source_meal_id, source_snapshot')
       .eq('client_id', clientId)
       .eq('physiological_date', date)
-      .eq('status', 'planned')
+      .in('status', ['planned', 'logged'])
       .order('created_at', { ascending: false }),
 
     svc()
@@ -121,35 +138,39 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
       .maybeSingle(),
 
     // Weekly trend: last 7 days — full macros for grid
-    (async () => {
-      const today = new Date()
-      const days: string[] = []
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(today)
-        d.setDate(today.getDate() - i)
-        days.push(d.toISOString().slice(0, 10))
-      }
-      return svc()
-        .from('nutrition_meals')
-        .select('physiological_date, total_calories, total_protein_g, total_carbs_g, total_fat_g')
-        .eq('client_id', clientId)
-        .neq('meal_type', 'drinks')
-        .in('physiological_date', days)
-    })(),
+    needsTrendTabData
+      ? (async () => {
+          const today = new Date()
+          const days: string[] = []
+          for (let i = 6; i >= 0; i--) {
+            const d = new Date(today)
+            d.setDate(today.getDate() - i)
+            days.push(d.toISOString().slice(0, 10))
+          }
+          return svc()
+            .from('nutrition_meals')
+            .select('physiological_date, total_calories, total_protein_g, total_carbs_g, total_fat_g')
+            .eq('client_id', clientId)
+            .neq('meal_type', 'drinks')
+            .in('physiological_date', days)
+        })()
+      : Promise.resolve({ data: [] }),
 
     // 90-day logged dates for streak + calendar
-    (async () => {
-      const d90ago = new Date()
-      d90ago.setDate(d90ago.getDate() - 89)
-      const from90 = d90ago.toISOString().slice(0, 10)
-      return svc()
-        .from('nutrition_meals')
-        .select('physiological_date')
-        .eq('client_id', clientId)
-        .neq('meal_type', 'drinks')
-        .gte('physiological_date', from90)
-        .order('physiological_date', { ascending: true })
-    })(),
+    needsTrendTabData
+      ? (async () => {
+          const d90ago = new Date()
+          d90ago.setDate(d90ago.getDate() - 89)
+          const from90 = d90ago.toISOString().slice(0, 10)
+          return svc()
+            .from('nutrition_meals')
+            .select('physiological_date')
+            .eq('client_id', clientId)
+            .neq('meal_type', 'drinks')
+            .gte('physiological_date', from90)
+            .order('physiological_date', { ascending: true })
+        })()
+      : Promise.resolve({ data: [] }),
 
     // Client language preference
     svc()
@@ -193,6 +214,8 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
       : Promise.resolve({ data: null, error: null }),
 
     fetchClientDayOverride(svc(), clientId, date),
+
+    fetchActiveSmoothingPlanDaysForDates(svc(), clientId, [date]),
   ])
 
   // ── Body weight ───────────────────────────────────────────────────────────
@@ -214,9 +237,11 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
   const protocolDay = dayOverride?.kind === 'off'
     ? resolveRestProtocolDay(((protoData?.nutrition_protocol_days as any[]) ?? [])) ?? baseProtocolDay
     : baseProtocolDay
-  const tdeeAdaptive = (protoData as any)?.tdee_adaptive ?? null
-  const tdeeDataSource = (protoData as any)?.tdee_data_source ?? null
+  const tdeeState = tdeeStateResult.status === 'fulfilled' ? tdeeStateResult.value.data : null
+  const tdeeAdaptive = (tdeeState as any)?.current_tdee ?? (protoData as any)?.tdee_adaptive ?? null
+  const tdeeDataSource = (tdeeState as any)?.source ?? (protoData as any)?.tdee_data_source ?? null
   const cycleSyncEnabled: boolean = (protoData as any)?.cycle_sync_enabled ?? false
+  const cycleSyncProfile = normalizeCycleSyncProfile((protoData as any)?.cycle_sync_profile)
   const protocolDays: Array<{ name: string; kcal: number; protein_g: number; carbs_g: number; fat_g: number; carb_cycle_type?: string | null; recommendations?: string | null }> =
     ((protoData?.nutrition_protocol_days as any[]) ?? []).map((d: any) => ({
       name:            String(d.name ?? ''),
@@ -250,10 +275,15 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
     water_ml:  Number(td?.hydration_ml ?? 2500),
   }
 
+  // ── Language ──────────────────────────────────────────────────────────────
+  const rawLang = prefsResult.status === 'fulfilled' ? (prefsResult.value as any)?.data?.language : null
+  const lang = await resolveClientLanguage(svc(), clientId, rawLang) as ClientLang
+
   // ── Consumed today ────────────────────────────────────────────────────────
   const rawMeals = mealsResult.status === 'fulfilled' ? (mealsResult.value.data ?? []) : []
   const meals: NutritionMeal[] = rawMeals.map((m: any) => ({
     ...m,
+    photo_log_status: null,
     total_calories: computeMacroEnergy({
       protein_g: Number(m.total_protein_g ?? 0),
       carbs_g: Number(m.total_carbs_g ?? 0),
@@ -264,13 +294,13 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
     nutrition_entries: undefined,
   }))
   const water = waterResult.status === 'fulfilled' ? (waterResult.value.data ?? []) : []
-  const preps: SmartNutritionPrep[] = prepsResult.status === 'fulfilled'
+  const persistedPreps: SmartNutritionPrep[] = prepsResult.status === 'fulfilled'
     ? ((prepsResult.value.data ?? []) as any[]).map((prep) => ({
         ...prep,
         meal_slot: prep.meal_slot ?? prep.meal_type ?? 'snack',
         variant_group_id: prep.variant_group_id ?? prep.meal_slot ?? prep.meal_type ?? 'snack',
         scenario_key: prep.scenario_key ?? 'default',
-        scenario_label: prep.scenario_label ?? "Scénario principal",
+        scenario_label: localizeNutritionScenarioLabel(lang, prep.scenario_label),
         is_active: prep.is_active === true,
         entries: Array.isArray(prep.entries) ? prep.entries : [],
         total_calories: Number(prep.total_calories ?? 0),
@@ -280,6 +310,8 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
         total_fiber_g: Number(prep.total_fiber_g ?? 0),
       }))
     : []
+  const smoothingDays = smoothingDaysResult.status === 'fulfilled' ? smoothingDaysResult.value : []
+  const activeSmoothingDay = smoothingDays[0] ?? null
 
   const consumedBase = meals.reduce(
     (acc, m) => ({
@@ -293,21 +325,6 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
   const water_ml = water.reduce((s, w) => s + Number(w.amount_ml ?? 0), 0)
   const caffeine_mg = water.reduce((s, w) => s + Number(w.caffeine_mg ?? 0), 0)
   const consumed: NutritionMacros = { ...consumedBase, water_ml, caffeine_mg }
-
-  // ── IA alerts (pure fn, no HTTP) ──────────────────────────────────────────
-  const hasLunchLog = meals.some(m => m.meal_type === 'lunch')
-  const rawAlerts = computeNutritionAlerts({
-    consumed: { ...consumedBase, water_ml, caffeine_mg },
-    target,
-    currentHour: new Date().getHours(),
-    hasLunchLog,
-  })
-  const alerts: GenericAlert[] = rawAlerts.map(a => ({
-    code: a.code,
-    severity: a.severity,
-    title: a.title,
-    body: a.body,
-  }))
 
   // ── Weekly trend ──────────────────────────────────────────────────────────
   const today = new Date()
@@ -351,9 +368,21 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
     streakMeals.map((m: any) => m.physiological_date as string)
   )
 
-  // ── Language ──────────────────────────────────────────────────────────────
-  const rawLang = prefsResult.status === 'fulfilled' ? (prefsResult.value as any)?.data?.language : null
-  const lang: ClientLang = ['fr', 'en', 'es'].includes(rawLang) ? (rawLang as ClientLang) : 'fr'
+  // ── IA alerts (pure fn, no HTTP) ──────────────────────────────────────────
+  const hasLunchLog = meals.some(m => m.meal_type === 'lunch')
+  const rawAlerts = computeNutritionAlerts({
+    consumed: { ...consumedBase, water_ml, caffeine_mg },
+    target,
+    currentHour: new Date().getHours(),
+    hasLunchLog,
+    lang,
+  })
+  const alerts: GenericAlert[] = rawAlerts.map(a => ({
+    code: a.code,
+    severity: a.severity,
+    title: a.title,
+    body: a.body,
+  }))
 
   // ── Cycle Sync (female only) ──────────────────────────────────────────────
   let cycleSyncPhase: CyclePhase | null = null
@@ -394,23 +423,50 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
     cycleState = getCycleStateFromLogs(cycleLogs, bilanValue)
   }
 
+  if (cycleState?.currentPhase && cycleState.currentCycleDay) {
+    cycleSyncPhase = cycleState.currentPhase
+    cycleSyncAdjustment = getCycleSyncAdjustment(cycleState.currentPhase)
+    cycleDay = cycleState.currentCycleDay
+  }
+
   // Runtime cycle sync adjustment — applied only when coach enabled it and client has active phase
-  if (cycleSyncEnabled && cycleState?.currentPhase) {
-    const adj = getCycleSyncAdjustment(cycleState.currentPhase)
+  const runtimeCycleResolution = cycleSyncEnabled && cycleState?.currentPhase
+    ? getEffectiveCycleSyncAdjustment({
+        adjustment: getCycleSyncAdjustment(cycleState.currentPhase),
+        cycleState,
+        profile: cycleSyncProfile,
+      })
+    : null
+  const runtimeCycleAdjustment = runtimeCycleResolution?.adjustment ?? null
+  if (runtimeCycleAdjustment) cycleSyncAdjustment = runtimeCycleAdjustment
+  if (runtimeCycleAdjustment) {
     target = {
-      kcal:      Math.max(0, target.kcal      + adj.caloriesDelta),
-      protein_g: Math.max(0, target.protein_g + adj.proteinDelta),
-      carbs_g:   Math.max(0, target.carbs_g   + adj.carbsDelta),
-      fat_g:     Math.max(0, target.fat_g     + adj.fatDelta),
-      water_ml:  Math.max(0, target.water_ml  + adj.hydrationDeltaMl),
+      kcal:      Math.max(0, target.kcal      + runtimeCycleAdjustment.caloriesDelta),
+      protein_g: Math.max(0, target.protein_g + runtimeCycleAdjustment.proteinDelta),
+      carbs_g:   Math.max(0, target.carbs_g   + runtimeCycleAdjustment.carbsDelta),
+      fat_g:     Math.max(0, target.fat_g     + runtimeCycleAdjustment.fatDelta),
+      water_ml:  Math.max(0, target.water_ml  + runtimeCycleAdjustment.hydrationDeltaMl),
     }
   }
+
+  if (smoothingDays.length > 0) {
+    target = applySmoothingOverlay(target, smoothingDays).target
+  }
+
+  const preps = mergeCoachPlanPreps({
+    date,
+    protocol: protoData as any,
+    protocolDay: protocolDay as any,
+    persistedPreps: persistedPreps as any,
+    smoothingDay: activeSmoothingDay,
+    cycleAdjustment: runtimeCycleAdjustment,
+  }) as SmartNutritionPrep[]
 
   // Day type badge for TopBar
   const isTrainingDay = dayOverride?.kind === 'off'
     ? false
     : inferTrainingDay((protocolDay as Record<string, unknown>) ?? null)
-  const dayTypeLabel = String((protocolDay as Record<string, unknown> | null)?.name ?? 'Repos')
+  const dayTypeLabel = String((protocolDay as Record<string, unknown> | null)?.name ?? ct(lang, 'smart.workout.rest'))
   const dayTypeBadge = (
     <span
       className="text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.14em] px-2 py-1 rounded-lg"
@@ -426,6 +482,7 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
 
   return (
     <NutritionClientPage
+      initialTab={activeTab}
       date={date}
       target={target}
       consumed={consumed}

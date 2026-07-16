@@ -9,6 +9,7 @@ interface Props {
   field: FieldConfig;
   value: string | number | string[] | boolean | undefined;
   onChange: (value: string | number | string[] | boolean) => void;
+  previewMode?: boolean;
   // token de la soumission publique — requis pour upload côté client
   submissionToken?: string;
   // id de la soumission — requis pour upload côté coach
@@ -21,6 +22,7 @@ function PhotoUploadWidget({
   field,
   value,
   onChange,
+  previewMode,
   submissionToken,
   submissionId,
   blockId,
@@ -227,6 +229,7 @@ function PhotoUploadWidget({
           e.preventDefault();
         }}
         onDrop={(e) => {
+          if (previewMode) return;
           e.preventDefault();
           const file = e.dataTransfer.files?.[0];
           if (file) handleFile(file);
@@ -236,6 +239,7 @@ function PhotoUploadWidget({
           /* État : photo présente */
           <div className="flex flex-col items-center justify-center p-4 gap-2">
             {preview && (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={preview}
                 alt={label}
@@ -268,6 +272,7 @@ function PhotoUploadWidget({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (previewMode) return;
                     inputRef.current?.click();
                   }}
                   className="text-xs font-bold text-accent hover:opacity-80 transition-opacity"
@@ -283,7 +288,10 @@ function PhotoUploadWidget({
             className="flex flex-col items-center justify-center gap-3 p-6 cursor-pointer"
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
+            onKeyDown={(e) => {
+              if (previewMode) return;
+              if (e.key === "Enter") inputRef.current?.click();
+            }}
           >
             <div className="w-12 h-12 rounded-xl bg-surface flex items-center justify-center">
               <Upload size={20} className="text-secondary/60" />
@@ -293,7 +301,7 @@ function PhotoUploadWidget({
                 Cliquez ou glissez une photo
               </p>
               <p className="text-xs text-secondary/60 mt-0.5">
-                JPG, PNG, WEBP · max 30 Mo
+                {previewMode ? "Aperçu visuel du champ photo" : "JPG, PNG, WEBP · max 30 Mo"}
               </p>
             </div>
           </div>
@@ -309,7 +317,9 @@ function PhotoUploadWidget({
         type="file"
         accept="image/jpeg,image/png,image/webp"
         className="hidden"
+        disabled={previewMode}
         onChange={(e) => {
+          if (previewMode) return;
           const file = e.target.files?.[0];
           if (file) handleFile(file);
         }}
@@ -390,6 +400,7 @@ export default function MetricField({
   field,
   value,
   onChange,
+  previewMode,
   submissionToken,
   submissionId,
   blockId,
@@ -632,6 +643,7 @@ export default function MetricField({
         field={field}
         value={value}
         onChange={onChange}
+        previewMode={previewMode}
         submissionToken={submissionToken}
         submissionId={submissionId}
         blockId={blockId}

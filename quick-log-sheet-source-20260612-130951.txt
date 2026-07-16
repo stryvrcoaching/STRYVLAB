@@ -1,0 +1,242 @@
+============================================================
+QUICK LOG SHEET SOURCE
+============================================================
+
+     1	"use client";
+     2	
+     3	import { useEffect, useState } from "react";
+     4	import { motion, AnimatePresence } from "framer-motion";
+     5	import { X, Drop, ForkKnife, Lightning } from "@phosphor-icons/react";
+     6	import dynamic from "next/dynamic";
+     7	import type { CycleState } from "@/lib/cycle/cycleEngine";
+     8	import type { NutritionMacros } from "@/components/client/smart/SmartNutritionWidget";
+     9	import { CaffeineGlyph } from "@/components/client/CaffeineGlyph";
+    10	
+    11	const QuickWaterModal   = dynamic(() => import("@/components/client/QuickWaterModal"),           { ssr: false });
+    12	const QuickCaffeineModal = dynamic(() => import("@/components/client/QuickCaffeineModal"),       { ssr: false });
+    13	const FreeActivitySheet = dynamic(() => import("@/components/client/smart/FreeActivitySheet"),   { ssr: false });
+    14	const LogPeriodSheet    = dynamic(() => import("@/components/client/cycle/LogPeriodSheet"),      { ssr: false });
+    15	const MealLogSheet      = dynamic(() => import("@/components/client/smart/MealLogSheet"),        { ssr: false });
+    16	const VoiceLogSheet     = dynamic(() => import("@/components/client/smart/VoiceLogSheet"),       { ssr: false });
+    17	
+    18	interface Props {
+    19	  open: boolean;
+    20	  onClose: () => void;
+    21	}
+    22	
+    23	type BalanceContext = {
+    24	  consumed: NutritionMacros
+    25	  target: NutritionMacros
+    26	}
+    27	
+    28	type SubSheet = "water" | "caffeine" | "activity" | "cycle" | "meal" | "meal-voice" | null;
+    29	
+    30	const BASE_ACTIONS = [
+    31	  {
+    32	    key: "water" as const,
+    33	    Icon: Drop,
+    34	    label: "Eau",
+    35	    sub: "Logger ma consommation d'eau",
+    36	  },
+    37	  {
+    38	    key: "caffeine" as const,
+    39	    Icon: Drop,
+    40	    label: "Café & thé",
+    41	    sub: "Espresso, normal, lungo",
+    42	  },
+    43	  {
+    44	    key: "meal" as const,
+    45	    Icon: ForkKnife,
+    46	    label: "Repas",
+    47	    sub: "Ajouter un repas ou aliment",
+    48	  },
+    49	  {
+    50	    key: "activity" as const,
+    51	    Icon: Lightning,
+    52	    label: "Activité",
+    53	    sub: "Course, marche, sport libre…",
+    54	  },
+    55	];
+    56	
+    57	export default function QuickLogSheet({ open, onClose }: Props) {
+    58	  const [sub, setSub] = useState<SubSheet>(null);
+    59	  const [cycleState, setCycleState] = useState<CycleState | null>(null);
+    60	  const [balanceContext, setBalanceContext] = useState<BalanceContext | null>(null);
+    61	
+    62	  useEffect(() => {
+    63	    if (!open) return;
+    64	    // Cycle state
+    65	    fetch("/api/client/cycle/status")
+    66	      .then(r => r.ok ? r.json() : null)
+    67	      .then(data => { if (data?.cycleState) setCycleState(data.cycleState); })
+    68	      .catch(() => {});
+    69	    // Nutrition balance du jour pour les jauges live
+    70	    fetch("/api/client/nutrition/today-progress")
+    71	      .then(r => r.ok ? r.json() : null)
+    72	      .then(data => {
+    73	        if (!data?.target) return;
+    74	        const toMacros = (d: { calories: number; protein_g: number; carbs_g: number; fat_g: number }): NutritionMacros => ({
+    75	          kcal: d.calories,
+    76	          protein_g: d.protein_g,
+    77	          carbs_g: d.carbs_g,
+    78	          fat_g: d.fat_g,
+    79	          water_ml: 0,
+    80	        });
+    81	        setBalanceContext({ consumed: toMacros(data.consumed), target: toMacros(data.target) });
+    82	      })
+    83	      .catch(() => {});
+    84	  }, [open]);
+    85	
+    86	  function handleClose() {
+    87	    setSub(null);
+    88	    onClose();
+    89	  }
+    90	
+    91	  function handleAction(key: string) {
+    92	    if (key === "water")    { setSub("water"); return; }
+    93	    if (key === "caffeine") { setSub("caffeine"); return; }
+    94	    if (key === "activity") { setSub("activity"); return; }
+    95	    if (key === "cycle")    { setSub("cycle"); return; }
+    96	    // "meal" → ouvrir directement MealLogSheet standard, pas de sélecteur intermédiaire
+    97	    if (key === "meal")     { setSub("meal"); return; }
+    98	  }
+    99	
+   100	  const actions = [
+   101	    ...BASE_ACTIONS,
+   102	    ...(cycleState?.hasActiveCycle ? [{
+   103	      key: "cycle" as const,
+   104	      Icon: Drop,
+   105	      label: "Cycle",
+   106	      sub: "Début ou fin de règles",
+   107	    }] : []),
+   108	  ];
+   109	
+   110	  return (
+   111	    <>
+   112	      {/* Main quick-log sheet */}
+   113	      <AnimatePresence>
+   114	        {open && sub === null && (
+   115	          <>
+   116	            <motion.div
+   117	              key="overlay"
+   118	              className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-[2px]"
+   119	              initial={{ opacity: 0 }}
+   120	              animate={{ opacity: 1 }}
+   121	              exit={{ opacity: 0 }}
+   122	              onClick={handleClose}
+   123	            />
+   124	            <motion.div
+   125	              key="sheet"
+   126	              className="fixed left-0 right-0 bottom-0 z-[70] rounded-t-2xl"
+   127	              style={{ background: '#0d0d0d', maxHeight: '88vh', display: 'flex', flexDirection: 'column', paddingBottom: "max(env(safe-area-inset-bottom), 16px)" }}
+   128	              initial={{ y: "100%" }}
+   129	              animate={{ y: 0 }}
+   130	              exit={{ y: "100%" }}
+   131	              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+   132	            >
+   133	              {/* Header */}
+   134	              <div className="relative flex items-center justify-between px-5 pt-5 pb-4 shrink-0">
+   135	                <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-white/[0.10]" />
+   136	                <p className="text-[15px] font-barlow-condensed font-bold uppercase tracking-[0.12em] text-white">
+   137	                  Logger
+   138	                </p>
+   139	                <button
+   140	                  onClick={handleClose}
+   141	                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/[0.06] text-white/40 active:bg-white/[0.08]"
+   142	                >
+   143	                  <X size={15} />
+   144	                </button>
+   145	              </div>
+   146	
+   147	              {/* Actions */}
+   148	              <div className="px-4 pb-4 flex flex-col gap-2">
+   149	                <div className="grid grid-cols-2 gap-2">
+   150	                  {actions.filter(action => action.key === "water" || action.key === "caffeine").map(({ key, Icon, label, sub: subLabel }) => (
+   151	                    <button
+   152	                      key={key}
+   153	                      onClick={() => handleAction(key)}
+   154	                      className="flex items-center gap-3 px-3 h-[64px] rounded-xl bg-white/[0.03] active:bg-white/[0.06] transition-colors text-left"
+   155	                    >
+   156	                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-white/[0.06]">
+   157	                        {key === "caffeine" ? <CaffeineGlyph drinkType="coffee" active size="sm" color="#111111" /> : <Icon size={18} className="text-white/70" />}
+   158	                      </div>
+   159	                      <div className="flex flex-col min-w-0">
+   160	                        <span className="text-[13px] font-barlow font-semibold text-[#e0e0e0] leading-tight">
+   161	                          {label}
+   162	                        </span>
+   163	                        <span className="text-[10px] font-barlow text-white/40 leading-tight truncate">
+   164	                          {subLabel}
+   165	                        </span>
+   166	                      </div>
+   167	                    </button>
+   168	                  ))}
+   169	                </div>
+   170	                <div className="flex flex-col gap-2">
+   171	                  {actions.filter(action => action.key !== "water" && action.key !== "caffeine").map(({ key, Icon, label, sub: subLabel }) => (
+   172	                    <button
+   173	                      key={key}
+   174	                      onClick={() => handleAction(key)}
+   175	                      className="flex items-center gap-4 px-4 h-[60px] rounded-xl bg-white/[0.03] active:bg-white/[0.06] transition-colors text-left"
+   176	                    >
+   177	                      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-white/[0.06]">
+   178	                        <Icon size={18} className="text-white/70" />
+   179	                      </div>
+   180	                      <div className="flex flex-col min-w-0">
+   181	                        <span className="text-[14px] font-barlow font-semibold text-[#e0e0e0] leading-tight">
+   182	                          {label}
+   183	                        </span>
+   184	                        <span className="text-[11px] font-barlow text-white/40 leading-tight truncate">
+   185	                          {subLabel}
+   186	                        </span>
+   187	                      </div>
+   188	                    </button>
+   189	                  ))}
+   190	                </div>
+   191	              </div>
+   192	            </motion.div>
+   193	          </>
+   194	        )}
+   195	      </AnimatePresence>
+   196	
+   197	      {/* Sub-sheets */}
+   198	      <QuickWaterModal
+   199	        open={sub === "water"}
+   200	        onClose={() => { setSub(null); onClose(); }}
+   201	      />
+   202	      <QuickCaffeineModal
+   203	        open={sub === "caffeine"}
+   204	        onClose={() => { setSub(null); onClose(); }}
+   205	      />
+   206	      <FreeActivitySheet
+   207	        open={sub === "activity"}
+   208	        onClose={() => { setSub(null); onClose(); }}
+   209	        onSaved={() => { setSub(null); onClose(); }}
+   210	      />
+   211	      <LogPeriodSheet
+   212	        open={sub === "cycle"}
+   213	        cycleState={cycleState}
+   214	        onClose={() => { setSub(null); onClose(); }}
+   215	        onUpdated={(newState) => { setCycleState(newState); setSub(null); onClose(); }}
+   216	      />
+   217	      {/* Repas → surface unifiée avec jauges live */}
+   218	      <MealLogSheet
+   219	        open={sub === "meal"}
+   220	        composerMode="standard"
+   221	        intent="track"
+   222	        balanceContext={balanceContext ?? undefined}
+   223	        onClose={() => { setSub(null); onClose(); }}
+   224	        onSuccess={() => { setSub(null); onClose(); }}
+   225	      />
+   226	      <VoiceLogSheet
+   227	        open={sub === "meal-voice"}
+   228	        onClose={() => { setSub(null); onClose(); }}
+   229	        onSuccess={() => { setSub(null); onClose(); }}
+   230	        initialInputMode="voice"
+   231	      />
+   232	    </>
+   233	  );
+   234	}
+
+============================================================
+FIN
+============================================================

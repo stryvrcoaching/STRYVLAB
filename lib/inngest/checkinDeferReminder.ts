@@ -4,6 +4,11 @@ import {
   computePhysiologicalDateInTimezone,
   addDaysToDateKey,
 } from '@/lib/client/checkin/timeWindows'
+import { resolveClientLanguage } from '@/lib/client/resolve-language'
+import { getClientPushCopy } from '@/lib/notifications/client-push-copy'
+import { sendClientPush } from '@/lib/notifications/send-client-push'
+import { createCheckinAvailability, getPendingSlots } from '@/lib/client/checkin/pendingCheckins'
+import { getClientAppBadgeCount } from '@/lib/client/appBadgeCount'
 
 type InitMsg = {
   id: string
@@ -18,16 +23,10 @@ const FLOW_OF: Record<string, 'morning' | 'evening'> = {
   evening_init: 'evening',
 }
 
-const NUDGE: Record<'morning' | 'evening', { chat: string; push: { title: string; body: string; url: string } }> = {
-  morning: {
-    chat: 'Quand tu veux pour ton check-in du matin — le bouton Check-in est en haut à gauche.',
-    push: { title: 'Check-in du matin', body: 'Quand tu veux, c’est rapide.', url: '/client' },
-  },
-  evening: {
-    chat: 'Quand tu veux pour ton check-in du soir — le bouton Check-in est en haut à gauche.',
-    push: { title: 'Check-in du soir', body: 'Quand tu veux, c’est rapide.', url: '/client' },
-  },
-}
+const DEFERRED_COPY = {
+  morning: 'checkin.morning.deferred',
+  evening: 'checkin.evening.deferred',
+} as const
 
 /**
  * One light reminder ~1h after a client deferred a check-in ("Plus tard"):
@@ -59,29 +58,23 @@ export async function runDeferReminders(
 
   const clientIds = Array.from(new Set(candidates.map((m) => m.client_id)))
 
-  const [{ data: schedules }, { data: checkins }, { data: clients }] = await Promise.all([
-    db.from('daily_checkin_schedules').select('client_id, timezone').in('client_id', clientIds),
+  const [{ data: schedules }, { data: checkins }, { data: configs }] = await Promise.all([
+    db.from('daily_checkin_schedules').select('client_id, moment, scheduled_time, timezone').in('client_id', clientIds),
     db.from('client_daily_checkins').select('client_id, date, flow_type').in('client_id', clientIds),
-    db.from('coach_clients').select('id, push_token').in('id', clientIds),
+    db.from('daily_checkin_configs').select('client_id, is_active, days_of_week').in('client_id', clientIds),
   ])
 
   const tzByClient = new Map((schedules ?? []).map((s) => [s.client_id as string, (s.timezone as string) || 'Europe/Paris']))
-  const pushByClient = new Map(
-    (clients ?? []).filter((c) => c.push_token).map((c) => [c.id as string, c.push_token as string]),
-  )
+  const schedulesByClient = new Map<string, Array<{ moment: string; scheduled_time: string }>>()
+  for (const schedule of schedules ?? []) {
+    const clientSchedules = schedulesByClient.get(schedule.client_id as string) ?? []
+    clientSchedules.push({ moment: String(schedule.moment), scheduled_time: String(schedule.scheduled_time) })
+    schedulesByClient.set(schedule.client_id as string, clientSchedules)
+  }
+  const configByClient = new Map((configs ?? []).map((config) => [config.client_id as string, config]))
   const doneSet = new Set(
     (checkins ?? []).map((c) => `${c.client_id}:${c.date}:${c.flow_type}`),
   )
-
-  // Push setup (optional — no-op if VAPID/token absent)
-  const vapidPublic = process.env.VAPID_PUBLIC_KEY
-  const vapidPrivate = process.env.VAPID_PRIVATE_KEY
-  const vapidSubject = process.env.VAPID_SUBJECT
-  let webpush: typeof import('web-push') | null = null
-  if (vapidPublic && vapidPrivate && vapidSubject) {
-    webpush = await import('web-push').then((m) => (m as any).default ?? m)
-    webpush!.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate)
-  }
 
   let chat = 0
   let push = 0
@@ -89,9 +82,6 @@ export async function runDeferReminders(
   for (const msg of candidates) {
     const flow = FLOW_OF[msg.message_type]
     const tz = tzByClient.get(msg.client_id) ?? 'Europe/Paris'
-
-    // Only nudge while still inside the flow's local window (avoids odd-hour pings).
-    if (activeWindowAt(now, tz) !== flow) continue
 
     // Skip if the check-in for that physiological day is already done.
     const today = computePhysiologicalDateInTimezone(now, tz)
@@ -104,26 +94,48 @@ export async function runDeferReminders(
       continue
     }
 
+    const clientSessions = (checkins ?? [])
+      .filter((checkin) => checkin.client_id === msg.client_id)
+      .map((checkin) => ({ flow_type: checkin.flow_type as string, date: checkin.date as string, completed_at: 'done' }))
+    const availability = createCheckinAvailability(
+      configByClient.get(msg.client_id) as { is_active?: boolean | null; days_of_week?: number[] | null } | undefined,
+      schedulesByClient.get(msg.client_id),
+    )
+    const isStillPending = getPendingSlots(now, tz, clientSessions, availability)
+      .some((slot) => slot.date === msgDay && slot.flow_type === flow)
+    if (!isStillPending) continue
+
+    const lang = await resolveClientLanguage(db, msg.client_id)
+    const copy = getClientPushCopy(
+      DEFERRED_COPY[flow],
+      lang,
+    )
+
     // 1) light chat message (new, never overwrites the init)
     const { error: insErr } = await db.from('chat_messages').insert({
       client_id: msg.client_id,
       role: 'assistant',
-      content: NUDGE[flow].chat,
+      content: copy.chat ?? copy.body,
       message_type: 'text',
       metadata: { kind: 'defer_reminder', flow },
     })
     if (!insErr) chat++
 
     // 2) push (best-effort)
-    const token = pushByClient.get(msg.client_id)
-    if (webpush && token) {
-      try {
-        await webpush.sendNotification(JSON.parse(token), JSON.stringify(NUDGE[flow].push))
-        push++
-      } catch {
-        await db.from('coach_clients').update({ push_token: null }).eq('id', msg.client_id)
-      }
-    }
+    const wasSent = await sendClientPush(
+      db,
+      msg.client_id,
+      'checkin',
+      {
+        title: copy.title,
+        body: copy.body,
+        url: `/client?openCheckin=${flow}&date=${encodeURIComponent(msgDay)}`,
+        tag: `stryv-checkin-deferred-${flow}-${msg.id}`,
+        badgeCount: await getClientAppBadgeCount(db, msg.client_id).catch(() => undefined),
+      },
+    )
+
+    if (wasSent) push++
 
     // 3) mark reminded (idempotent)
     await db.from('chat_messages').update({ metadata: { ...(msg.metadata ?? {}), defer_reminded: true } }).eq('id', msg.id)

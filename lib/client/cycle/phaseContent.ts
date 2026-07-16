@@ -1,4 +1,5 @@
 import type { CyclePhase } from '@/lib/cycle/cycleEngine'
+import type { ClientLang } from '@/lib/i18n/clientTranslations'
 
 export type CycleContext = 'nutrition' | 'training'
 
@@ -98,4 +99,196 @@ export const PHASE_CONTENT: Record<CyclePhase, Record<CycleContext, PhaseContent
       impact: 'Intensité ↓ · Mobilité ↑ · Récupération active recommandée',
     },
   },
+}
+
+const PHASE_CONTENT_BY_LANG: Record<ClientLang, Record<CyclePhase, Record<CycleContext, PhaseContent>>> = {
+  fr: PHASE_CONTENT,
+  en: {
+    follicular: {
+      nutrition: {
+        title: 'Follicular phase',
+        subtitle: 'D6–D13 · High insulin sensitivity',
+        bullets: [
+          'Your carbs are used more efficiently for energy and muscle recovery.',
+          'A good period to maintain your intake without overshooting. Fat loss is naturally easier.',
+          'Appetite is often moderate. Listen to your hunger cues.',
+        ],
+        impact: 'Neutral calories · Carbs well tolerated · Optimal deficit window',
+      },
+      training: {
+        title: 'Follicular phase',
+        subtitle: 'D6–D13 · Rising energy',
+        bullets: [
+          'Strength and endurance improve progressively. Use this window to push progression.',
+          'Faster recovery between sessions.',
+          'A good phase to increase loads or intensity.',
+        ],
+        impact: 'Strength ↑ · Recovery ↑ · Endurance ↑',
+      },
+    },
+    ovulatory: {
+      nutrition: {
+        title: 'Ovulatory phase',
+        subtitle: 'D14–D16 · Peak performance',
+        bullets: [
+          'Estrogen peaks and your metabolism performs at its best.',
+          'Keep your intake steady. This is your best phase to perform without overeating.',
+          'Normal hydration is usually enough.',
+        ],
+        impact: 'Neutral calories · Optimal metabolism · Optimal deficit window',
+      },
+      training: {
+        title: 'Ovulatory phase',
+        subtitle: 'D14–D16 · Performance peak',
+        bullets: [
+          'Strength, coordination, and explosiveness are at their highest.',
+          'Ideal for PRs and your hardest sessions.',
+          'Make the most of this short window. It usually lasts 2 to 3 days.',
+        ],
+        impact: 'Max strength · Coordination ↑ · Max energy',
+      },
+    },
+    luteal: {
+      nutrition: {
+        title: 'Luteal phase',
+        subtitle: 'D17–D28 · Higher needs',
+        bullets: [
+          'Metabolism is slightly faster (+5%). Your calorie needs are naturally higher.',
+          'Water retention can hide scale progress. This is normal and temporary.',
+          'Prioritize complex carbs to support energy and limit cravings.',
+        ],
+        impact: 'Calories ↑ · Protein ↑ · Carbs ↑ · Hydration ↑',
+      },
+      training: {
+        title: 'Luteal phase',
+        subtitle: 'D17–D28 · Variable energy',
+        bullets: [
+          'Energy can vary more from day to day. Listen to your body.',
+          'Moderate to hard sessions are usually well tolerated early in the phase.',
+          'At the end of the phase, favor active recovery and mobility.',
+        ],
+        impact: 'Variable energy · Recovery ↑ · End of phase: intensity ↓',
+      },
+    },
+    menstrual: {
+      nutrition: {
+        title: 'Menstrual phase',
+        subtitle: 'D1–D5 · Support and recovery',
+        bullets: [
+          'Iron needs are higher. Include iron-rich foods like red meat or lentils.',
+          'Anti-inflammatory omega-3s can help reduce discomfort.',
+          'Do not cut calories during this phase. Your body needs resources.',
+        ],
+        impact: 'Iron ↑ · Omega-3 ↑ · Hydration ↑ · Do not reduce calories',
+      },
+      training: {
+        title: 'Menstrual phase',
+        subtitle: 'D1–D5 · Recovery phase',
+        bullets: [
+          'This is a natural recovery phase. Light movement is beneficial.',
+          'Favor yoga, stretching, and mobility over very heavy sessions.',
+          'If you feel good, a moderate session can still work. Listen to your body.',
+        ],
+        impact: 'Intensity ↓ · Mobility ↑ · Active recovery recommended',
+      },
+    },
+  },
+  es: {
+    follicular: {
+      nutrition: {
+        title: 'Fase folicular',
+        subtitle: 'D6–D13 · Alta sensibilidad a la insulina',
+        bullets: [
+          'Tus carbohidratos se utilizan mejor para la energía y la recuperación muscular.',
+          'Es un buen periodo para mantener tus aportes sin pasarte. La pérdida de grasa se facilita de forma natural.',
+          'El apetito suele ser moderado. Escucha tus señales de hambre.',
+        ],
+        impact: 'Calorías neutras · Carbohidratos bien tolerados · Fase óptima para el déficit',
+      },
+      training: {
+        title: 'Fase folicular',
+        subtitle: 'D6–D13 · Energía en aumento',
+        bullets: [
+          'La fuerza y la resistencia mejoran progresivamente. Aprovecha esta ventana para progresar.',
+          'Recuperación más rápida entre sesiones.',
+          'Buena fase para aumentar cargas o intensidad.',
+        ],
+        impact: 'Fuerza ↑ · Recuperación ↑ · Resistencia ↑',
+      },
+    },
+    ovulatory: {
+      nutrition: {
+        title: 'Fase ovulatoria',
+        subtitle: 'D14–D16 · Rendimiento máximo',
+        bullets: [
+          'El estrógeno alcanza su pico y tu metabolismo rinde al máximo.',
+          'Mantén tus aportes. Es tu mejor fase para rendir sin comer de más.',
+          'Una hidratación normal suele ser suficiente.',
+        ],
+        impact: 'Calorías neutras · Metabolismo óptimo · Fase óptima para el déficit',
+      },
+      training: {
+        title: 'Fase ovulatoria',
+        subtitle: 'D14–D16 · Pico de rendimiento',
+        bullets: [
+          'La fuerza, la coordinación y la explosividad están al máximo.',
+          'Ideal para PRs y para las sesiones más intensas.',
+          'Aprovecha esta ventana corta. Suele durar 2 o 3 días.',
+        ],
+        impact: 'Fuerza máxima · Coordinación ↑ · Energía máxima',
+      },
+    },
+    luteal: {
+      nutrition: {
+        title: 'Fase lútea',
+        subtitle: 'D17–D28 · Necesidades aumentadas',
+        bullets: [
+          'El metabolismo se acelera ligeramente (+5%). Tus necesidades calóricas son naturalmente más altas.',
+          'La retención de agua puede ocultar el progreso en la báscula. Es normal y temporal.',
+          'Prioriza los carbohidratos complejos para sostener la energía y limitar los antojos.',
+        ],
+        impact: 'Calorías ↑ · Proteínas ↑ · Carbohidratos ↑ · Hidratación ↑',
+      },
+      training: {
+        title: 'Fase lútea',
+        subtitle: 'D17–D28 · Energía variable',
+        bullets: [
+          'La energía puede variar más según el día. Escucha a tu cuerpo.',
+          'Las sesiones moderadas a intensas suelen tolerarse bien al inicio de la fase.',
+          'Al final de la fase, prioriza la recuperación activa y la movilidad.',
+        ],
+        impact: 'Energía variable · Recuperación ↑ · Final de fase: intensidad ↓',
+      },
+    },
+    menstrual: {
+      nutrition: {
+        title: 'Fase menstrual',
+        subtitle: 'D1–D5 · Apoyo y recuperación',
+        bullets: [
+          'Las necesidades de hierro aumentan. Incluye fuentes ricas en hierro como carne roja o lentejas.',
+          'Los omega-3 antiinflamatorios pueden ayudar a reducir las molestias.',
+          'No recortes calorías durante esta fase. Tu cuerpo necesita recursos.',
+        ],
+        impact: 'Hierro ↑ · Omega-3 ↑ · Hidratación ↑ · No reducir calorías',
+      },
+      training: {
+        title: 'Fase menstrual',
+        subtitle: 'D1–D5 · Fase de recuperación',
+        bullets: [
+          'Es una fase de recuperación natural. El movimiento suave es beneficioso.',
+          'Prioriza yoga, estiramientos y movilidad en lugar de sesiones muy pesadas.',
+          'Si te sientes bien, una sesión moderada sigue siendo posible. Escucha a tu cuerpo.',
+        ],
+        impact: 'Intensidad ↓ · Movilidad ↑ · Recuperación activa recomendada',
+      },
+    },
+  },
+}
+
+export function getPhaseContent(
+  lang: ClientLang,
+  phase: CyclePhase,
+  context: CycleContext,
+): PhaseContent {
+  return PHASE_CONTENT_BY_LANG[lang]?.[phase]?.[context] ?? PHASE_CONTENT[phase][context]
 }

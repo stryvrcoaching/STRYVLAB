@@ -1,0 +1,22 @@
+{
+  "reviewed_at": "2026-07-16",
+  "sources": [
+    {
+      "name": "Nutrition5k",
+      "official_url": "https://github.com/google-research-datasets/Nutrition5k",
+      "recommended_use": "Assiettes et quantités mesurées; sélectionner un petit sous-ensemble du split officiel.",
+      "license": "CC-BY-4.0",
+      "target_cases": 15,
+      "notes": "Le jeu complet est volumineux. Ne télécharger que les fichiers nécessaires et conserver l'attribution de chaque cas."
+    },
+    {
+      "name": "Open Food Facts",
+      "official_url": "https://openfoodfacts.github.io/documentation/docs/Product-Opener/api/",
+      "image_guidance_url": "https://openfoodfacts.github.io/openfoodfacts-server/api/how-to-download-images/",
+      "recommended_use": "Face produit, tableau nutritionnel et code-barres pour des produits explicitement sélectionnés.",
+      "license": "Base ODbL; images CC BY-SA avec vérification des droits intégrés et des conditions courantes",
+      "target_cases": 10,
+      "notes": "Respecter le User-Agent et les limites d'API. Pour une collecte massive, utiliser le jeu AWS officiel plutôt que crawler le site."
+    }
+  ]
+}

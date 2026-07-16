@@ -98,6 +98,7 @@ describe('buildPhaseFooterMetricCards', () => {
       },
       'fr',
       84,
+      new Date('2026-05-29T12:00:00.000Z'),
     )
 
     expect(cards.performance.zone).toBe('poor')
@@ -136,6 +137,6 @@ describe('buildPhaseFooterMetricCards', () => {
 
     expect(cards.sleep.value).toBe('85')
     expect(cards.sleep.zone).toBe('poor')
-    expect(cards.sleep.zoneLabel).toBe('Récup. insuffisante')
+    expect(cards.sleep.zoneLabel).toBe('Récupération insuffisante')
   })
 })

@@ -10,13 +10,14 @@ export type CategoryL1 =
   | "extras"
 
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack"
-export type InputMode = "composer" | "portion" | "photo_ai" | "voice"
+export type InputMode = "composer" | "portion" | "photo_ai" | "voice" | "text" | "photo_guided"
 
 export interface FoodItem {
   id: string
   name_fr: string
   category_l1: CategoryL1
   category_l2: string | null
+  icon_key: string | null
   item_key: string
   kcal_per_100g: number
   protein_per_100g: number
@@ -50,7 +51,8 @@ export interface NutritionMeal {
   physiological_date: string
   title: string | null
   meal_type: MealType
-  meal_source?: "manual" | "voice" | "text" | "composer" | "auto_adjusted" | "flash_estimate" | null
+  meal_source?: "manual" | "voice" | "text" | "composer" | "auto_adjusted" | "flash_estimate" | "photo_guided" | null
+  photo_log_status?: "capturing" | "analyzing" | "clarifying" | "ready_to_log" | "logged" | "refined" | "failed" | null
   logged_at: string
   total_calories: number
   total_protein_g: number

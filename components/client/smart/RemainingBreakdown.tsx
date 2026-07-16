@@ -7,17 +7,89 @@ import { NUTRITION_UI_COLORS } from '@/lib/nutrition/ui-colors'
 import { useClientT } from '../ClientI18nProvider'
 
 type DeltaCard = {
-  key: 'protein' | 'carbs' | 'fat' | 'water'
+  key: 'protein' | 'carbs' | 'fat'
   label: string
   shortLabel: string
   remaining: number
   overflow: number
-  unit: 'g' | 'L'
+  target: number
+  unit: 'g' | 'kcal'
   accent: string
 }
 
-function formatValue(value: number, unit: 'g' | 'L'): string {
-  return unit === 'L' ? `${value.toFixed(1)} ${unit}` : `${Math.round(value)}${unit}`
+function formatValue(value: number, unit: 'g' | 'kcal'): string {
+  return unit === 'kcal' ? `${Math.round(value)}` : `${Math.round(value)}`
+}
+
+function formatOverflowValue(value: number, unit: 'g' | 'kcal'): string {
+  return unit === 'kcal' ? `${Math.round(value)} kcal` : `${Math.round(value)}g`
+}
+
+function RemainingSquircleGauge({
+  label,
+  valueText,
+  progress,
+  color,
+  helper,
+}: {
+  label: string
+  valueText: string
+  progress: number
+  color: string
+  helper: string
+}) {
+  const size = 58
+  const stroke = 4.5
+  const inset = stroke / 2
+  const pathSize = size - stroke
+  const radius = 18
+  const path = `
+    M ${inset + radius} ${inset}
+    H ${inset + pathSize - radius}
+    Q ${inset + pathSize} ${inset} ${inset + pathSize} ${inset + radius}
+    V ${inset + pathSize - radius}
+    Q ${inset + pathSize} ${inset + pathSize} ${inset + pathSize - radius} ${inset + pathSize}
+    H ${inset + radius}
+    Q ${inset} ${inset + pathSize} ${inset} ${inset + pathSize - radius}
+    V ${inset + radius}
+    Q ${inset} ${inset} ${inset + radius} ${inset}
+  `.replace(/\s+/g, ' ').trim()
+  const pathLength = 4 * (pathSize - 2 * radius) + 2 * Math.PI * radius
+  const clamped = Math.max(0, Math.min(progress, 1))
+  const dashOffset = pathLength * (1 - clamped)
+
+  return (
+    <div className="flex min-w-0 flex-col items-center">
+      <div className="relative h-[58px] w-[58px]">
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <path
+            d={path}
+            fill="none"
+            stroke="rgba(255,255,255,0.08)"
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d={path}
+            fill="none"
+            stroke={color}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray={pathLength}
+            strokeDashoffset={dashOffset}
+            style={{ transition: 'stroke-dashoffset 0.3s ease, stroke 0.3s ease' }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-[13px] font-black leading-none tracking-[-0.03em] text-white">{valueText}</span>
+        </div>
+      </div>
+      <p className="mt-1.5 text-[10px] font-semibold text-white/84">{label}</p>
+      <p className="mt-0.5 text-center text-[8px] font-semibold uppercase tracking-[0.1em] text-white/32">{helper}</p>
+    </div>
+  )
 }
 
 function buildHeadline(cards: DeltaCard[], remainingCaloriesNet: number, t: (key: any) => string): string {
@@ -63,16 +135,16 @@ export default function RemainingBreakdown({
   })
   const { remainingCaloriesFromMacros } = informativeBalance
   const remaining = {
+    calories: Math.max(0, actionable.actionableRemaining.calories),
     protein_g: actionable.actionableRemaining.protein,
     carbs_g: actionable.actionableRemaining.carbs,
     fat_g: actionable.actionableRemaining.fat,
-    water_ml: Math.max(0, target.water_ml - consumed.water_ml),
   }
   const overflow = {
+    calories: Math.max(0, consumed.kcal - target.kcal),
     protein_g: actionable.overflow.protein_g,
     carbs_g: actionable.overflow.carbs_g,
     fat_g: actionable.overflow.fat_g,
-    water_ml: Math.max(0, consumed.water_ml - target.water_ml),
   }
   const cards: DeltaCard[] = [
     {
@@ -81,6 +153,7 @@ export default function RemainingBreakdown({
       shortLabel: t('nutrition.protein'),
       remaining: remaining.protein_g,
       overflow: overflow.protein_g,
+      target: target.protein_g,
       unit: 'g',
       accent: NUTRITION_UI_COLORS.protein,
     },
@@ -90,6 +163,7 @@ export default function RemainingBreakdown({
       shortLabel: t('nutrition.carbs'),
       remaining: remaining.carbs_g,
       overflow: overflow.carbs_g,
+      target: target.carbs_g,
       unit: 'g',
       accent: NUTRITION_UI_COLORS.carbs,
     },
@@ -99,17 +173,9 @@ export default function RemainingBreakdown({
       shortLabel: t('nutrition.fat'),
       remaining: remaining.fat_g,
       overflow: overflow.fat_g,
+      target: target.fat_g,
       unit: 'g',
       accent: NUTRITION_UI_COLORS.fat,
-    },
-    {
-      key: 'water',
-      label: t('nutrition.hydration'),
-      shortLabel: t('nutrition.hydration'),
-      remaining: remaining.water_ml / 1000,
-      overflow: overflow.water_ml / 1000,
-      unit: 'L',
-      accent: NUTRITION_UI_COLORS.water,
     },
   ]
 
@@ -121,13 +187,31 @@ export default function RemainingBreakdown({
     .filter(card => card.overflow > 0)
     .sort((a, b) => b.overflow - a.overflow)
   const headline = buildHeadline(cards, actionable.actionableRemaining.calories, t)
+  const gaugeCards = [
+    {
+      key: 'calories',
+      label: 'Calories',
+      valueText: formatValue(remaining.calories, 'kcal'),
+      progress: target.kcal > 0 ? consumed.kcal / target.kcal : 0,
+      color: overflow.calories > 0 ? '#ef4444' : NUTRITION_UI_COLORS.calories,
+      helper: overflow.calories > 0 ? t('nutrition.remaining.slowDown') : remaining.calories > 0 ? t('nutrition.remaining.useful') : t('nutrition.remaining.targetReached'),
+    },
+    ...cards.map((card) => ({
+      key: card.key,
+      label: card.label,
+      valueText: formatValue(card.remaining, card.unit),
+      progress: card.target > 0 ? (card.target - card.remaining + card.overflow) / card.target : 0,
+      color: card.overflow > 0 ? '#ef4444' : card.accent,
+      helper: card.overflow > 0 ? t('nutrition.remaining.slowDown') : card.remaining > 0 ? t('nutrition.remaining.useful') : t('nutrition.remaining.targetReached'),
+    })),
+  ] as const
 
   return (
     <div className="bg-[#111111] rounded-2xl p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[11px] text-white mb-1">
-            Reste à consommer
+            {t('nutrition.remaining.title')}
           </div>
           <p className="text-[13px] text-white/65 leading-relaxed max-w-[28ch]">
             {headline}
@@ -138,44 +222,45 @@ export default function RemainingBreakdown({
             {Math.round(actionable.actionableRemaining.calories)}
           </div>
           <div className="text-[9px] uppercase tracking-[0.12em] text-white/35">
-            kcal restantes
+            {t('nutrition.remaining.remainingKcal')}
           </div>
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        {remainingCards.length > 0 ? (
-          remainingCards.map(card => (
-            <div key={card.key} className="rounded-2xl bg-white/[0.03] p-3">
-              <div className="text-[10px] uppercase tracking-[0.1em] text-white/40 font-bold">{card.label}</div>
-              <div className="mt-1 text-[20px] font-black tabular-nums" style={{ color: card.accent }}>
-                {formatValue(card.remaining, card.unit)}
-              </div>
-              <div className="text-[10px] text-white/35 mt-1">
-                encore utiles
-              </div>
-            </div>
-          ))
-        ) : (
+      {remainingCards.length > 0 ? (
+        <div className="mt-3 grid grid-cols-4 gap-2">
+          {gaugeCards.map(card => (
+            <RemainingSquircleGauge
+              key={card.key}
+              label={card.label}
+              valueText={card.valueText}
+              progress={card.progress}
+              color={card.color}
+              helper={card.helper}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <div className="col-span-2 rounded-2xl bg-[#111111] p-3">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-[#e0e0e0] font-bold">Bonne zone</div>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-[#e0e0e0] font-bold">{t('nutrition.remaining.goodZone')}</div>
             <div className="mt-1 text-[13px] text-white/75 leading-relaxed">
               {t("nutrition.nomacro.lag")}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {overflowCards.length > 0 && (
         <div className="mt-3 rounded-2xl bg-[#111111] p-3">
-          <div className="text-[10px] uppercase tracking-[0.12em] text-[#e0e0e0] font-bold">À freiner</div>
+          <div className="text-[10px] uppercase tracking-[0.12em] text-[#e0e0e0] font-bold">{t('nutrition.remaining.slowDown')}</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {overflowCards.map(card => (
               <div
                 key={card.key}
                 className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[11px] font-bold tabular-nums text-[#b0b0b0]"
               >
-                {card.label} +{formatValue(card.overflow, card.unit)}
+                {card.label} +{formatOverflowValue(card.overflow, card.unit)}
               </div>
             ))}
           </div>

@@ -358,6 +358,72 @@ function computeSignalReliability(signal: SignalValue, freshnessScore: number): 
   return clamp(signal.confidence * 0.6 + freshnessScore * 0.2 + (signal.sourceReliability ?? 0.4) * 0.2)
 }
 
+export function hasPhaseInterpretationSignals(
+  signals: Pick<
+    DerivedSignals,
+    | 'weightTrend'
+    | 'bodyFatTrend'
+    | 'waistTrend'
+    | 'performanceTrend'
+    | 'recoveryTrend'
+    | 'nutritionAdherence'
+    | 'rhrDelta'
+  >,
+): boolean {
+  return Boolean(
+    signals.weightTrend.observed ||
+      signals.bodyFatTrend.observed ||
+      Boolean(signals.waistTrend?.observed) ||
+      signals.performanceTrend.observed ||
+      signals.recoveryTrend.observed ||
+      signals.nutritionAdherence.observed ||
+      signals.rhrDelta?.currentRhr != null,
+  )
+}
+
+export function getMissingPhaseInterpretationReason(
+  signals: Pick<
+    DerivedSignals,
+    | 'weightTrend'
+    | 'bodyFatTrend'
+    | 'waistTrend'
+    | 'performanceTrend'
+    | 'recoveryTrend'
+    | 'nutritionAdherence'
+    | 'rhrDelta'
+  >,
+  locale: 'fr' | 'en' = 'fr',
+): string {
+  const missing: string[] = []
+
+  if (!signals.recoveryTrend.observed && signals.rhrDelta?.currentRhr == null) {
+    missing.push(locale === 'en' ? 'no coach check-in' : 'aucun check-in coach')
+  }
+  if (!signals.performanceTrend.observed) {
+    missing.push(locale === 'en' ? 'no logged session' : 'aucune séance loggée')
+  }
+  if (
+    !signals.weightTrend.observed &&
+    !signals.bodyFatTrend.observed &&
+    !Boolean(signals.waistTrend?.observed)
+  ) {
+    missing.push(locale === 'en' ? 'no body assessment' : 'aucun bilan corporel')
+  }
+  if (!signals.nutritionAdherence.observed) {
+    missing.push(locale === 'en' ? 'no usable nutrition log' : 'aucun log nutrition exploitable')
+  }
+
+  if (missing.length === 0) {
+    return locale === 'en'
+      ? 'No interpretable phase signals are available yet for this window.'
+      : 'Aucun signal de phase interprétable n’est encore disponible sur cette fenêtre.'
+  }
+
+  return locale === 'en'
+    ? `Phase reading unavailable: ${missing.join(', ')}.`
+    : `Lecture de phase indisponible: ${missing.join(', ')}.`
+}
+
 export function buildDerivedSignals(input: RawSignalInput): DerivedSignals & { insufficientData: boolean } {
   const bodyComp = normalizeBodyCompositionSignals(input)
   const perf = normalizePerformanceSignals(input)

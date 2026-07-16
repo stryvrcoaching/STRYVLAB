@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import Image from 'next/image'
 import { X } from 'lucide-react'
+import { useClientT } from '@/components/client/ClientI18nProvider'
 import { scoreAlternatives } from '@/lib/programs/intelligence'
 import type { BuilderExercise } from '@/lib/programs/intelligence'
 import { getCatalogEntryByName, getBiomechData } from '@/lib/programs/intelligence/catalog-utils'
@@ -30,10 +31,10 @@ interface Props {
   onClose: () => void
 }
 
-const QUALITY_LABEL: Record<number, { text: string; color: string }> = {
-  0: { text: 'Recommandé', color: 'text-[#f2f2f2] bg-[#f2f2f2]/10' },
-  1: { text: 'Similaire',   color: 'text-blue-400 bg-blue-400/10' },
-  2: { text: 'Alternative', color: 'text-white/50 bg-white/[0.06]' },
+const QUALITY_LABEL: Record<number, { textKey: string; color: string }> = {
+  0: { textKey: 'swap.badge.recommended', color: 'text-[#f2f2f2] bg-[#f2f2f2]/10' },
+  1: { textKey: 'swap.badge.similar',   color: 'text-blue-400 bg-blue-400/10' },
+  2: { textKey: 'swap.badge.alternative', color: 'text-white/50 bg-white/[0.06]' },
 }
 
 export default function ExerciseSwapSheet({
@@ -43,6 +44,7 @@ export default function ExerciseSwapSheet({
   onSwap,
   onClose,
 }: Props) {
+  const { t } = useClientT()
   const catalogMeta = getCatalogEntryByName(exercise.name)
   const biomech = getBiomechData(exercise.name)
 
@@ -107,7 +109,7 @@ export default function ExerciseSwapSheet({
 
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex-1 min-w-0 mr-3">
-            <p className="text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/30">Changer l&apos;exercice</p>
+            <p className="text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/30">{t('swap.changeExercise')}</p>
             <p className="text-[15px] font-bold text-white leading-tight mt-0.5 truncate">{exercise.name}</p>
           </div>
           <button
@@ -119,13 +121,13 @@ export default function ExerciseSwapSheet({
         </div>
 
         <p className="text-[11px] text-white/30 px-4 pb-3">
-          Remplacement temporaire — programme original restauré après la séance.
+          {t('swap.temporaryReplace')}
         </p>
 
-        <div className="flex flex-col gap-2 px-4 pb-8">
+        <div className="flex flex-col gap-2 px-4 pb-4">
           {alternatives.length === 0 && (
             <p className="text-[12px] text-white/30 py-4 text-center">
-              Aucune alternative trouvée pour cet exercice.
+              {t('swap.none')}
             </p>
           )}
           {alternatives.map((alt, idx) => {
@@ -157,7 +159,7 @@ export default function ExerciseSwapSheet({
                   <p className="text-[13px] font-semibold text-white leading-tight line-clamp-2">{alt.entry.name}</p>
                   <div className="flex items-center gap-1.5 mt-1">
                     <span className={`text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.1em] px-1.5 py-0.5 rounded-full ${badge.color}`}>
-                      {badge.text}
+                      {t(badge.textKey as never)}
                     </span>
                     {alt.label && alt.label !== 'Alternative' && (
                       <span className="text-[10px] text-white/30">{alt.label}</span>
@@ -170,7 +172,7 @@ export default function ExerciseSwapSheet({
                   onClick={() => handleUse(alt.entry.name)}
                   className="shrink-0 h-9 px-3 rounded-xl bg-[#f2f2f2] text-[11px] font-black uppercase tracking-[0.08em] text-[#080808] active:scale-95 transition-transform"
                 >
-                  Utiliser
+                  {t('swap.use')}
                 </button>
               </div>
             )

@@ -7,6 +7,7 @@ import { NUTRITION_UI_COLORS } from '@/lib/nutrition/ui-colors'
 import { getCycleSyncAdjustment } from '@/lib/nutrition/engine/cycleSync'
 import type { CycleState } from '@/lib/cycle/cycleEngine'
 import { useClientT } from '../ClientI18nProvider'
+import { clientLocale } from '@/lib/i18n/clientTranslations'
 
 interface ProtocolDay {
   name: string
@@ -46,19 +47,6 @@ const CARB_CYCLE_COLOR: Record<string, string> = {
   high:   NUTRITION_UI_COLORS.protein, // vert
   medium: NUTRITION_UI_COLORS.carbs,   // or
   low:    'rgba(255,255,255,0.18)',
-}
-
-const CARB_CYCLE_LABELS: Record<string, string> = {
-  high:   'Glucides hauts',
-  medium: 'Glucides modérés',
-  low:    'Glucides bas',
-}
-
-const PHASE_NAMES: Record<string, string> = {
-  menstrual:  'Menstruation',
-  follicular: 'Folliculaire',
-  ovulatory:  'Ovulation',
-  luteal:     'Lutéale',
 }
 
 const PHASE_COLORS: Record<string, string> = {
@@ -104,6 +92,7 @@ function Row({
 }
 
 function WeekSchedule({ slots, days }: { slots: ScheduleSlot[]; days: ProtocolDay[] }) {
+  const { t } = useClientT()
   if (slots.length === 0) return null
 
   // Build a lookup: dayName → carbCycleType
@@ -114,7 +103,7 @@ function WeekSchedule({ slots, days }: { slots: ScheduleSlot[]; days: ProtocolDa
   return (
     <div className="bg-[#111111] rounded-2xl p-4 space-y-3">
       <p className="font-barlow-condensed font-bold uppercase tracking-[0.14em] text-[9px] text-white/25">
-        Planning hebdomadaire
+        {t('nutrition.protocol.weeklyPlanning')}
       </p>
       <div className="grid grid-cols-7 gap-1">
         {DOW_DISPLAY_ORDER.map((dow, i) => {
@@ -138,7 +127,11 @@ function WeekSchedule({ slots, days }: { slots: ScheduleSlot[]; days: ProtocolDa
       </div>
       {/* Legend */}
       <div className="flex flex-wrap gap-3">
-        {Object.entries(CARB_CYCLE_LABELS).map(([key, label]) => (
+        {([
+          ['high', t('nutrition.carbCycle.high')],
+          ['medium', t('nutrition.carbCycle.medium')],
+          ['low', t('nutrition.carbCycle.low')],
+        ] as const).map(([key, label]) => (
           days.some(d => d.carb_cycle_type === key) && (
             <div key={key} className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: CARB_CYCLE_COLOR[key] }} />
@@ -168,14 +161,15 @@ function DayAccordion({
   cycleSyncEnabled?: boolean
   defaultOpen: boolean
 }) {
-  const { t } = useClientT()
+  const { lang, t } = useClientT()
+  const locale = clientLocale(lang)
   const [open, setOpen] = useState(defaultOpen)
 
   const delta     = tdee != null && tdee > 0 ? Math.round(day.kcal - tdee) : null
   const deltaStr  = delta != null ? (delta >= 0 ? `+${delta}` : `${delta}`) + ' kcal vs TDEE' : null
   const goalLabel =
     delta == null ? null :
-    delta >  100  ? 'Surplus' :
+    delta >  100  ? t('nutrition.goal.surplus') :
     delta < -100  ? t('goal.deficit_calorique') : t('goal.maintenance')
 
   const gPerKg = bodyWeightKg && bodyWeightKg > 0
@@ -183,10 +177,16 @@ function DayAccordion({
     : null
 
   const tdeeSourceLabel = tdeeSource === 'formula_proxy'
-    ? 'Estimé (formule)'
-    : 'Adaptatif'
+    ? t('nutrition.protocol.tdeeEstimated')
+    : t('nutrition.protocol.tdeeAdaptive')
 
-  const cycleTypeLabel = day.carb_cycle_type ? CARB_CYCLE_LABELS[day.carb_cycle_type] : null
+  const cycleTypeLabel = day.carb_cycle_type
+    ? day.carb_cycle_type === 'high'
+      ? t('nutrition.carbCycle.high')
+      : day.carb_cycle_type === 'medium'
+        ? t('nutrition.carbCycle.medium')
+        : t('nutrition.carbCycle.low')
+    : null
   const cycleTypeColor = day.carb_cycle_type ? CARB_CYCLE_COLOR[day.carb_cycle_type] : undefined
 
   const showCycle = !!(cycleSyncEnabled && cycleState?.hasActiveCycle && cycleState.currentPhase)
@@ -215,7 +215,7 @@ function DayAccordion({
           </div>
           <div className="flex items-baseline gap-2 mt-0.5">
             <p className="text-[13px] font-semibold text-[#e0e0e0] tabular-nums">
-              {Math.round(day.kcal).toLocaleString('fr-FR')} kcal
+              {Math.round(day.kcal).toLocaleString(locale)} kcal
             </p>
             {goalLabel && (
               <p className="text-[11px] text-white/35">{goalLabel}</p>
@@ -242,7 +242,7 @@ function DayAccordion({
               {/* Notes coach */}
               {day.recommendations && (
                 <>
-                  <SectionLabel>Notes de ton coach</SectionLabel>
+                  <SectionLabel>{t('nutrition.protocol.coachNotes')}</SectionLabel>
                   <p className="text-[12px] text-white/60 leading-relaxed whitespace-pre-wrap pb-1">
                     {day.recommendations}
                   </p>
@@ -252,10 +252,10 @@ function DayAccordion({
               {/* TDEE */}
               {tdee != null && tdee > 0 && (
                 <>
-                  <SectionLabel>Dépense énergétique</SectionLabel>
+                  <SectionLabel>{t('nutrition.protocol.energySpend')}</SectionLabel>
                   <Row
                     label="TDEE"
-                    value={`${Math.round(tdee).toLocaleString('fr-FR')} kcal`}
+                    value={`${Math.round(tdee).toLocaleString(locale)} kcal`}
                     sub={tdeeSourceLabel}
                     valueColor="#4a90e2"
                   />
@@ -263,34 +263,34 @@ function DayAccordion({
               )}
 
               {/* Objectif calorique */}
-              <SectionLabel>Objectif calorique</SectionLabel>
+              <SectionLabel>{t('nutrition.protocol.calorieGoal')}</SectionLabel>
               <Row
-                label="Cible"
-                value={`${Math.round(day.kcal).toLocaleString('fr-FR')} kcal`}
+                label={t('nutrition.protocol.target')}
+                value={`${Math.round(day.kcal).toLocaleString(locale)} kcal`}
                 sub={deltaStr ?? undefined}
                 valueColor={NUTRITION_UI_COLORS.carbs}
               />
 
               {/* Macros */}
-              <SectionLabel>Macronutriments</SectionLabel>
+              <SectionLabel>{t('nutrition.protocol.macros')}</SectionLabel>
               {day.protein_g > 0 && (
                 <Row
-                  label="Protéines"
+                  label={t('nutrition.protein')}
                   value={`${Math.round(day.protein_g)} g`}
-                  sub={gPerKg ? `${gPerKg} g/kg de poids corporel` : undefined}
+                  sub={gPerKg ? t('nutrition.protocol.weightRatio', { n: gPerKg }) : undefined}
                   valueColor={NUTRITION_UI_COLORS.protein}
                 />
               )}
               {day.carbs_g > 0 && (
                 <Row
-                  label="Glucides"
+                  label={t('nutrition.carbs')}
                   value={`${Math.round(day.carbs_g)} g`}
                   valueColor={NUTRITION_UI_COLORS.carbs}
                 />
               )}
               {day.fat_g > 0 && (
                 <Row
-                  label="Lipides"
+                  label={t('nutrition.fat')}
                   value={`${Math.round(day.fat_g)} g`}
                   valueColor={NUTRITION_UI_COLORS.fat}
                 />
@@ -299,7 +299,7 @@ function DayAccordion({
               {/* Cycle sync */}
               {showCycle && cycleAdj && (() => {
                 const phase      = cycleState!.currentPhase!
-                const phaseName  = PHASE_NAMES[phase] ?? phase
+                const phaseName  = t(`cycle.phase.${phase}` as any)
                 const phaseColor = PHASE_COLORS[phase] ?? '#a855f7'
                 const hasDeltas  = cycleAdj.caloriesDelta !== 0 || cycleAdj.proteinDelta !== 0 || cycleAdj.carbsDelta !== 0
                 const adjStr     = hasDeltas
@@ -315,10 +315,10 @@ function DayAccordion({
                   : undefined
                 return (
                   <>
-                    <SectionLabel>Synchronisation cycle</SectionLabel>
+                    <SectionLabel>{t('nutrition.protocol.cycleSync')}</SectionLabel>
                     <Row
-                      label={`Phase ${phaseName}`}
-                      value={hasDeltas ? `${adjStr} → ${adjustedKcal.toLocaleString('fr-FR')} kcal` : adjStr}
+                      label={t('nutrition.protocol.phase', { name: phaseName })}
+                      value={hasDeltas ? `${adjStr} → ${adjustedKcal.toLocaleString(locale)} kcal` : adjStr}
                       sub={nextLabel}
                       valueColor={phaseColor}
                     />
@@ -349,7 +349,7 @@ export default function ProtocolRationale({
   const days: ProtocolDay[] = protocolDays?.length
     ? protocolDays
     : target
-      ? [{ name: dayName ?? 'Journée', kcal: target.kcal, protein_g: target.protein_g, carbs_g: target.carbs_g, fat_g: target.fat_g }]
+      ? [{ name: dayName ?? t('smart.timeline.label'), kcal: target.kcal, protein_g: target.protein_g, carbs_g: target.carbs_g, fat_g: target.fat_g }]
       : []
 
   if (days.length === 0) return null
@@ -357,9 +357,9 @@ export default function ProtocolRationale({
   const carbCycleTypes = new Set(days.map(d => d.carb_cycle_type).filter(Boolean))
   const isCarbCycling  = carbCycleTypes.size > 1
   const structureLabel = isCarbCycling
-    ? `Carb cycling — ${days.length} types de journées`
+    ? `Carb cycling — ${t('nutrition.protocol.dayTypes', { n: days.length })}`
     : days.length > 1
-      ? `${days.length} types de journées`
+      ? t('nutrition.protocol.dayTypes', { n: days.length })
       : null
 
   // Global phase: weighted average kcal across schedule (if slots available), else unweighted
@@ -374,10 +374,10 @@ export default function ProtocolRationale({
   const avgDelta     = avgKcal != null && tdee != null && tdee > 0 ? Math.round(avgKcal - tdee) : null
   const globalPhase  =
     avgDelta == null ? null :
-    avgDelta >  100  ? 'Surplus calorique' :
+    avgDelta >  100  ? t('nutrition.goal.caloricSurplus') :
     avgDelta < -100  ? t('goal.deficit_calorique') : t('goal.maintenance')
   const avgDeltaStr  = avgDelta != null
-    ? (avgDelta >= 0 ? `+${avgDelta}` : `${avgDelta}`) + ' kcal/j en moyenne vs TDEE'
+    ? t('nutrition.protocol.avgVsTdee', { n: `${avgDelta >= 0 ? `+${avgDelta}` : `${avgDelta}`}` })
     : null
 
   return (
@@ -385,7 +385,7 @@ export default function ProtocolRationale({
       {/* ── Header ── */}
       <div className="px-1 pb-1">
         <p className="font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[11px] text-white/40">
-          Mon protocole
+          {t('nutrition.protocol.myProtocol')}
         </p>
         {(structureLabel || globalPhase) && (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">

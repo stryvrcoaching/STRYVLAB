@@ -76,8 +76,8 @@ export default function ProfileForm({ clientId, initial }: Props) {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        first_name:       form.first_name || undefined,
-        last_name:        form.last_name || undefined,
+        first_name:       form.first_name.trim() || undefined,
+        last_name:        form.last_name.trim() || null,
         phone:            form.phone || null,
         goal:             form.goal || null,
         date_of_birth:    form.date_of_birth || null,

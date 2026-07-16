@@ -39,6 +39,24 @@ export type NutritionProtocolCardAnalytics = {
   kcal_variation_trend: number[]
 }
 
+export type NutritionProtocolPlanAnalytics = {
+  days_count: number
+  avg_target_kcal: number | null
+  kcal_amplitude: number | null
+  training_days_count: number
+  rest_days_count: number
+  hydration_target_avg_ml: number | null
+  structure_score: number | null
+  warnings: string[]
+}
+
+export type NutritionProtocolTrackingAnalytics = NutritionProtocolCardAnalytics & {
+  window_label: string
+  complete_days_count: number
+  partial_days_count: number
+  state_label: 'En attente' | 'Précoce' | 'Partiel' | 'Fiable'
+}
+
 type AggregatedMeal = {
   mealCount: number
   calories: number
@@ -74,6 +92,10 @@ function average(values: number[]) {
   return round1(values.reduce((sum, value) => sum + value, 0) / values.length)
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
 function buildTrailingDateKeys(startDate: string, endDate: string) {
   const keys: string[] = []
   let cursor = endDate
@@ -94,6 +116,65 @@ function reliabilityLabel(input: {
   if (partialRatio >= 0.45) return 'Faibles' as const
   if (partialRatio >= 0.2 || input.partialDays > 0) return 'Partielles' as const
   return 'Fiables' as const
+}
+
+function trackingStateLabel(input: {
+  analyzedDaysCount: number
+  validDays: number
+  partialDays: number
+}) {
+  if (input.analyzedDaysCount === 0) return 'En attente' as const
+  if (input.analyzedDaysCount < 3) return 'Précoce' as const
+  const completeRatio = input.analyzedDaysCount > 0 ? input.validDays / input.analyzedDaysCount : 0
+  if (completeRatio < 0.6 || input.partialDays > input.validDays) return 'Partiel' as const
+  return 'Fiable' as const
+}
+
+export function buildNutritionProtocolPlanAnalytics(input: {
+  protocol: {
+    days?: NutritionProtocolCardDay[]
+  }
+}): NutritionProtocolPlanAnalytics {
+  const days = (input.protocol.days ?? []).slice().sort((a, b) => a.position - b.position)
+  const calories = days
+    .map((day) => Number(day.calories))
+    .filter((value) => Number.isFinite(value))
+  const hydrationTargets = days
+    .map((day) => Number(day.hydration_ml))
+    .filter((value) => Number.isFinite(value))
+  const trainingDays = days.filter((day) => inferTrainingDay(day)).length
+  const restDays = days.filter((day) => !inferTrainingDay(day)).length
+  const warnings: string[] = []
+
+  if (trainingDays === 0) warnings.push('Aucun jour entraînement')
+  if (restDays === 0) warnings.push('Aucun jour repos')
+  if (calories.length < days.length) warnings.push('Calories incomplètes')
+  if (hydrationTargets.length < days.length) warnings.push('Hydratation incomplète')
+
+  const avgTargetKcal = average(calories)
+  const kcalAmplitude =
+    calories.length > 0
+      ? Math.max(...calories) - Math.min(...calories)
+      : null
+  if (kcalAmplitude != null && kcalAmplitude < 150 && days.length > 1) warnings.push('Amplitude calorique faible')
+
+  const scoreBase =
+    (days.length > 0 ? 40 : 0) +
+    Math.round((calories.length / Math.max(days.length, 1)) * 25) +
+    Math.round((hydrationTargets.length / Math.max(days.length, 1)) * 15) +
+    (trainingDays > 0 ? 10 : 0) +
+    (restDays > 0 ? 10 : 0)
+
+  return {
+    days_count: days.length,
+    avg_target_kcal: avgTargetKcal,
+    kcal_amplitude: kcalAmplitude != null ? round1(kcalAmplitude) : null,
+    training_days_count: trainingDays,
+    rest_days_count: restDays,
+    hydration_target_avg_ml: average(hydrationTargets),
+    structure_score: days.length > 0 ? clamp(scoreBase, 0, 100) : null,
+    warnings,
+  }
 }
 
 export function aggregateMealsByDate(
@@ -147,7 +228,7 @@ export function buildNutritionProtocolCardAnalytics(input: {
   smoothingDaysByDate?: Map<string, NutritionSmoothingPlanDay>
   mealsByDate: Map<string, AggregatedMeal>
   waterByDate: Map<string, number>
-}): NutritionProtocolCardAnalytics {
+}): NutritionProtocolTrackingAnalytics {
   const days = (input.protocol.days ?? []).slice().sort((a, b) => a.position - b.position)
   const slots = input.protocol.schedule_slots ?? []
   const fallbackDateKeys =
@@ -249,6 +330,11 @@ export function buildNutritionProtocolCardAnalytics(input: {
   const avgKcalDelta = average(deltaForAverage)
   const avgDailyVariation = average(kcalVariationTrend)
   const analyzedDaysCount = usedDateKeys.length
+  const stateLabel = trackingStateLabel({
+    analyzedDaysCount,
+    validDays,
+    partialDays,
+  })
 
   return {
     days_count: days.length,
@@ -262,6 +348,10 @@ export function buildNutritionProtocolCardAnalytics(input: {
       analyzedDaysCount,
     }),
     analyzed_days_count: analyzedDaysCount,
+    complete_days_count: validDays,
+    partial_days_count: partialDays,
+    state_label: stateLabel,
+    window_label: analyzedDaysCount === 0 ? 'En attente de données client' : `Depuis activation : ${analyzedDaysCount} jour${analyzedDaysCount > 1 ? 's' : ''}`,
     kcal_delta_trend: dailyDeltas,
     kcal_variation_trend: kcalVariationTrend,
   }

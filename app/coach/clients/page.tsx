@@ -26,14 +26,24 @@ import {
   ChevronDown,
   BarChart3,
   MessageSquareWarning,
+  Bell,
+  Salad,
+  Dumbbell,
+  ClipboardList,
+  HeartPulse,
+  Activity,
+  MessageSquare,
 } from "lucide-react";
 import { useDockActions } from "@/components/layout/NavDock";
 import { useDock } from "@/components/layout/DockContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import ClientsActionStrip from "@/components/coach/ClientsActionStrip";
+import ClientActionPanels from "@/components/coach/ClientActionPanels";
 import {
   getTransformationPhaseLabel,
   TRANSFORMATION_PHASE_OPTIONS,
 } from "@/lib/coach/transformationPhase";
+import type { ClientActionItem } from "@/lib/coach/client-action-items";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -64,6 +74,96 @@ type Client = {
   subscriptions?: Subscription[];
   lastActivity?: string | null;
 };
+
+type ClientNotification = {
+  id: string;
+  source: "coach" | "shared" | "legacy";
+  clientId: string;
+  clientName: string;
+  title?: string | null;
+  body?: string | null;
+  payload?: Record<string, unknown> | null;
+  category: string;
+  categoryLabel: string;
+  subcategory: string | null;
+  eventLabel: string | null;
+  status: string;
+  actionUrl: string;
+  createdAt: string;
+};
+
+type ClientStripStats = {
+  total: number;
+  active: number;
+  withoutFormula: number;
+  toFollow: number;
+};
+
+type WithoutFormulaRow = {
+  clientId: string;
+  clientName: string;
+  createdAt: string | null;
+};
+
+type PlanningChoiceState = {
+  item: ClientActionItem;
+  suggestedMode: "agenda" | "kanban" | "both";
+} | null;
+
+function getPlanningRecommendationCopy(
+  item: ClientActionItem,
+  suggestedMode: "agenda" | "kanban" | "both",
+) {
+  if (item.kind === "upcoming_event_preparation") {
+    return suggestedMode === "both"
+      ? "Recommandé car un événement approche et il faut à la fois un rappel et une tâche de préparation."
+      : "Recommandé car un événement approche et demande une préparation rapide."
+  }
+
+  if (item.kind === "missing_formula") {
+    return "Recommandé car le sujet est commercial et doit être traité rapidement sans se perdre dans le flux."
+  }
+
+  if (item.kind === "assessment_review") {
+    return suggestedMode === "agenda"
+      ? "Recommandé car le sujet demande surtout un point de revue daté."
+      : "Recommandé car le bilan doit être suivi dans l’organisation coach."
+  }
+
+  if (item.kind === "kanban_blocker") {
+    return "Recommandé car une action est déjà dans le flux d’organisation et doit être reprise proprement."
+  }
+
+  if (item.kind === "coach_notification") {
+    return "Recommandé car rien n’est encore planifié et le sujet doit être cadré avant d’être oublié."
+  }
+
+  return suggestedMode === "both"
+    ? "Recommandé car cette priorité mérite à la fois un rappel et une trace opérationnelle."
+    : suggestedMode === "kanban"
+    ? "Recommandé car cette priorité doit être suivie comme une vraie tâche."
+    : "Recommandé car cette priorité a surtout besoin d’un rappel daté."
+}
+
+const NOTIFICATION_BADGES: Record<string, { icon: React.ElementType; className: string }> = {
+  assessment: { icon: ClipboardList, className: "bg-sky-500/10 text-sky-300" },
+  training: { icon: Dumbbell, className: "bg-violet-500/10 text-violet-300" },
+  nutrition: { icon: Salad, className: "bg-[#1f8a65]/12 text-[#8ef0c7]" },
+  recovery: { icon: HeartPulse, className: "bg-amber-500/10 text-amber-300" },
+  progress: { icon: Activity, className: "bg-cyan-500/10 text-cyan-300" },
+  feedback: { icon: MessageSquare, className: "bg-pink-500/10 text-pink-300" },
+  engagement: { icon: Bell, className: "bg-orange-500/10 text-orange-300" },
+  admin: { icon: CreditCard, className: "bg-emerald-500/10 text-emerald-300" },
+  system: { icon: Bell, className: "bg-white/[0.06] text-white/55" },
+}
+
+function timeAgo(iso: string) {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60) return "À l'instant";
+  if (diff < 3600) return `${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} h`;
+  return `${Math.floor(diff / 86400)} j`;
+}
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -152,6 +252,21 @@ export default function CoachClientsPage() {
   const [pendingNotifs, setPendingNotifs] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [notificationsClient, setNotificationsClient] = useState<Client | null>(null);
+  const [clientNotifications, setClientNotifications] = useState<ClientNotification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [withoutFormulaOpen, setWithoutFormulaOpen] = useState(false);
+  const [toFollowOpen, setToFollowOpen] = useState(false);
+  const [focusedClientIds, setFocusedClientIds] = useState<string[] | null>(null);
+  const [actionStats, setActionStats] = useState<ClientStripStats>({
+    total: 0,
+    active: 0,
+    withoutFormula: 0,
+    toFollow: 0,
+  });
+  const [withoutFormulaRows, setWithoutFormulaRows] = useState<WithoutFormulaRow[]>([]);
+  const [toFollowRows, setToFollowRows] = useState<ClientActionItem[]>([]);
+  const [planningChoice, setPlanningChoice] = useState<PlanningChoiceState>(null);
 
   useDockActions({
     NEW_CLIENT: () => setShowModal(true),
@@ -169,7 +284,11 @@ export default function CoachClientsPage() {
   const [filterTag, setFilterTag] = useState<string>("all");
   const [filterSub, setFilterSub] = useState<string>("all"); // 'all' | 'with_sub' | 'no_sub'
   const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
+    if (typeof window === "undefined") return "grid";
+    const stored = window.localStorage.getItem("coach_clients_view_mode");
+    return stored === "list" ? "list" : "grid";
+  });
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -181,12 +300,18 @@ export default function CoachClientsPage() {
     });
   }, [router]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("coach_clients_view_mode", viewMode);
+  }, [viewMode]);
+
   const fetchClients = useCallback(async () => {
     setLoading(true);
-    const [clientsRes, tagsRes, notifsRes] = await Promise.all([
+    const [clientsRes, tagsRes, notifsRes, actionsRes] = await Promise.all([
       fetch("/api/clients"),
       fetch("/api/tags"),
       fetch("/api/coach/inbox?summary=true"),
+      fetch("/api/coach/client-actions"),
     ]);
 
     const clientsData = clientsRes.ok
@@ -194,9 +319,19 @@ export default function CoachClientsPage() {
       : { clients: [] };
     const tagsData = tagsRes.ok ? await tagsRes.json() : { tags: [] };
     const notifsData = notifsRes.ok ? await notifsRes.json() : { pending: {} };
+    const actionsData = actionsRes.ok
+      ? await actionsRes.json()
+      : {
+          stats: { total: 0, active: 0, withoutFormula: 0, toFollow: 0 },
+          withoutFormula: [],
+          toFollow: [],
+        };
     
     setAllTags(tagsData.tags ?? []);
     setPendingNotifs(notifsData.pending ?? {});
+    setActionStats(actionsData.stats ?? { total: 0, active: 0, withoutFormula: 0, toFollow: 0 });
+    setWithoutFormulaRows(actionsData.withoutFormula ?? []);
+    setToFollowRows(actionsData.toFollow ?? []);
 
     const baseClients: Client[] = clientsData.clients ?? [];
 
@@ -250,19 +385,19 @@ export default function CoachClientsPage() {
       c.subscriptions?.some((s) => s.status === "active")
     )
       return false;
+    if (focusedClientIds && !focusedClientIds.includes(c.id)) return false;
     return true;
   });
 
   // ── Stats bar ──────────────────────────────────────────────────────────────
 
-  const stats = {
-    total: clients.length,
-    active: clients.filter((c) => c.status === "active").length,
-    withSub: clients.filter((c) =>
-      c.subscriptions?.some((s) => s.status === "active"),
-    ).length,
-    pending: Object.values(pendingNotifs).reduce((a, b) => a + b, 0),
-  };
+  const openClientProfile = useCallback((clientId: string) => {
+    const client = clients.find((row) => row.id === clientId);
+    if (client) {
+      openClient({ id: client.id, firstName: client.first_name, lastName: client.last_name });
+    }
+    router.push(`/coach/clients/${clientId}`);
+  }, [clients, openClient, router]);
 
   // ── Form ───────────────────────────────────────────────────────────────────
 
@@ -309,11 +444,100 @@ export default function CoachClientsPage() {
     }, 1500);
   };
 
+  const openNotifications = useCallback(async (client: Client) => {
+    setNotificationsClient(client);
+    setNotificationsLoading(true);
+    try {
+      const res = await fetch(`/api/coach/inbox?client=${client.id}`);
+      const data = await res.json().catch(() => ({ notifications: [] }));
+      setClientNotifications(data.notifications ?? []);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, []);
+
+  const handleOpenNotificationsForClient = useCallback((clientId: string) => {
+    const client = clients.find((row) => row.id === clientId);
+    if (!client) return;
+    void openNotifications(client);
+  }, [clients, openNotifications]);
+
+  const handlePlanPriority = useCallback(async (item: ClientActionItem, mode: "agenda" | "kanban" | "both") => {
+    await fetch(`/api/coach/client-actions/${encodeURIComponent(item.priorityKey)}/plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode,
+        clientId: item.clientId,
+        clientName: item.clientName,
+        kind: item.kind,
+        reason: item.reason,
+      }),
+    });
+    await fetchClients();
+  }, [fetchClients]);
+
+  const handleMarkPriorityTreated = useCallback(async (item: ClientActionItem) => {
+    await fetch(`/api/coach/client-actions/${encodeURIComponent(item.priorityKey)}/treat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clientId: item.clientId,
+        kind: item.kind,
+        actionTaken: "mark_treated",
+      }),
+    });
+    await fetchClients();
+  }, [fetchClients]);
+
+  const handleOpenKanbanForPriority = useCallback((_item: ClientActionItem) => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("dashboard_active_view", "kanban");
+    }
+    router.push("/dashboard");
+  }, [router]);
+
+  const handleRequestPlanChoice = useCallback((item: ClientActionItem, suggestedMode: "agenda" | "kanban" | "both") => {
+    setPlanningChoice({ item, suggestedMode });
+  }, []);
+
+  const markNotificationRead = useCallback(async (notificationId: string) => {
+    setClientNotifications((current) => current.filter((item) => item.id !== notificationId));
+    await fetch(`/api/coach/inbox`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [notificationId] }),
+    });
+    if (notificationsClient) {
+      setPendingNotifs((current) => ({
+        ...current,
+        [notificationsClient.id]: Math.max((current[notificationsClient.id] ?? 1) - 1, 0),
+      }));
+    }
+  }, [notificationsClient]);
+
+  const markAllNotificationsRead = useCallback(async () => {
+    if (!notificationsClient) return;
+    const notificationIds = clientNotifications.map((notification) => notification.id);
+    setClientNotifications([]);
+    if (notificationIds.length === 0) return;
+    await fetch(`/api/coach/inbox`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: notificationIds }),
+    });
+    setPendingNotifs((current) => ({
+      ...current,
+      [notificationsClient.id]: 0,
+    }));
+  }, [clientNotifications, notificationsClient]);
+
   const activeFiltersCount = [
     filterStatus !== "all",
     filterPhase !== "all",
     filterTag !== "all",
     filterSub !== "all",
+    focusedClientIds !== null,
   ].filter(Boolean).length;
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -322,57 +546,12 @@ export default function CoachClientsPage() {
     <main className="min-h-screen bg-[#121212] font-sans">
       <div className="p-6 max-w-[1200px] mx-auto">
         {/* STATS STRIP */}
-        <div
-          className={`grid grid-cols-4 gap-4 mb-6 transition-all duration-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
-        >
-          {[
-            {
-              icon: Users,
-              label: "Total clients",
-              value: stats.total,
-              accent: false,
-            },
-            {
-              icon: TrendingUp,
-              label: "Actifs",
-              value: stats.active,
-              accent: true,
-            },
-            {
-              icon: CreditCard,
-              label: "Avec formule",
-              value: stats.withSub,
-              accent: false,
-            },
-            {
-              icon: MessageSquareWarning,
-              label: "En attente",
-              value: stats.pending,
-              accent: stats.pending > 0,
-            },
-          ].map(({ icon: Icon, label, value, accent }) => (
-            <div
-              key={label}
-              className="rounded-2xl bg-[#181818] px-5 py-4 flex items-center gap-4"
-            >
-              <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${accent ? "bg-[#1f8a65]/20" : "bg-white/[0.04]"}`}
-              >
-                <Icon
-                  size={18}
-                  className={accent ? "text-[#1f8a65]" : "text-white/45"}
-                />
-              </div>
-              <div>
-                <p className="text-2xl font-black text-white tabular-nums">
-                  {value}
-                </p>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">
-                  {label}
-                </p>
-              </div>
-            </div>
-          ))}
+        <div className={`transition-all duration-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+          <ClientsActionStrip
+            stats={actionStats}
+            onOpenWithoutFormula={() => setWithoutFormulaOpen(true)}
+            onOpenToFollow={() => setToFollowOpen(true)}
+          />
         </div>
 
         {/* SEARCH + FILTERS BAR */}
@@ -432,6 +611,23 @@ export default function CoachClientsPage() {
             {filtered.length} / {clients.length}
           </p>
         </div>
+
+        {focusedClientIds !== null && (
+          <div className="mb-4 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setFocusedClientIds(null)}
+              className="inline-flex items-center gap-2 rounded-full border border-[#8ef0c7]/16 bg-[#1f8a65]/10 px-4 py-2 text-[12px] font-semibold text-[#8ef0c7] transition-colors hover:bg-[#1f8a65]/16"
+            >
+              Vue prioritaire active
+              <span className="text-white/42">·</span>
+              Réinitialiser
+            </button>
+            <p className="text-[11px] uppercase tracking-[0.14em] text-white/34">
+              {focusedClientIds.length} client{focusedClientIds.length > 1 ? "s" : ""} ciblé{focusedClientIds.length > 1 ? "s" : ""}
+            </p>
+          </div>
+        )}
 
         {/* FILTER PANEL */}
         <AnimatePresence>
@@ -572,6 +768,7 @@ export default function CoachClientsPage() {
                 client={client}
                 index={i}
                 pendingCount={pendingNotifs[client.id] || 0}
+                onOpenNotifications={() => openNotifications(client)}
                 onClick={() => {
                   openClient({ id: client.id, firstName: client.first_name, lastName: client.last_name });
                   router.push(`/coach/clients/${client.id}`);
@@ -612,6 +809,7 @@ export default function CoachClientsPage() {
                     client={client}
                     index={i}
                     pendingCount={pendingNotifs[client.id] || 0}
+                    onOpenNotifications={() => openNotifications(client)}
                     onClick={() => {
                       openClient({ id: client.id, firstName: client.first_name, lastName: client.last_name });
                       router.push(`/coach/clients/${client.id}`);
@@ -624,8 +822,255 @@ export default function CoachClientsPage() {
         )}
       </div>
 
+      <ClientActionPanels
+        withoutFormulaOpen={withoutFormulaOpen}
+        toFollowOpen={toFollowOpen}
+        withoutFormula={withoutFormulaRows}
+        toFollow={toFollowRows}
+        onCloseWithoutFormula={() => setWithoutFormulaOpen(false)}
+        onCloseToFollow={() => setToFollowOpen(false)}
+        onHeaderWithoutFormulaClick={() => {
+          setFilterSub("no_sub");
+          setFocusedClientIds(null);
+          setWithoutFormulaOpen(false);
+        }}
+        onHeaderToFollowClick={() => {
+          setFocusedClientIds(toFollowRows.map((item) => item.clientId));
+          setToFollowOpen(false);
+        }}
+        onOpenClient={openClientProfile}
+        onAssignFormula={openClientProfile}
+        onOpenNotifications={handleOpenNotificationsForClient}
+        onOpenAssessments={openClientProfile}
+        onOpenKanban={handleOpenKanbanForPriority}
+        onPlanPriority={handlePlanPriority}
+        onRequestPlanChoice={handleRequestPlanChoice}
+        onMarkTreated={handleMarkPriorityTreated}
+      />
+
+      <AnimatePresence>
+        {planningChoice && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-md z-[74]"
+              onClick={() => setPlanningChoice(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.98 }}
+              className="fixed inset-0 z-[75] flex items-center justify-center p-4"
+            >
+              <div
+                className="w-full max-w-md rounded-2xl bg-[#181818] border-subtle p-5"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/32">
+                      Organisation
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold text-white">
+                      Planifier cette priorité
+                    </h3>
+                    <p className="mt-1 text-[12px] text-white/45">
+                      {planningChoice.item.clientName} · {planningChoice.item.reason}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPlanningChoice(null)}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.05] text-white/55"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-3">
+                  <div className="rounded-xl bg-white/[0.03] border-subtle px-4 py-3">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/32">
+                      Pourquoi cette reco
+                    </p>
+                    <p className="mt-2 text-[12px] leading-relaxed text-white/58">
+                      {getPlanningRecommendationCopy(planningChoice.item, planningChoice.suggestedMode)}
+                    </p>
+                  </div>
+                  {[
+                    {
+                      mode: "agenda" as const,
+                      title: "Créer une alerte",
+                      desc: "Ajoute un rappel dans l’agenda coach.",
+                    },
+                    {
+                      mode: "kanban" as const,
+                      title: "Ajouter au kanban",
+                      desc: "Transforme la priorité en tâche à suivre.",
+                    },
+                    {
+                      mode: "both" as const,
+                      title: "Les deux",
+                      desc: "Crée une alerte et une tâche liées.",
+                    },
+                  ].map((option) => {
+                    const recommended = option.mode === planningChoice.suggestedMode;
+                    return (
+                      <button
+                        key={option.mode}
+                        type="button"
+                        onClick={async () => {
+                          const item = planningChoice.item;
+                          setPlanningChoice(null);
+                          await handlePlanPriority(item, option.mode);
+                        }}
+                        className={`w-full rounded-2xl border-subtle px-4 py-4 text-left transition-colors ${
+                          recommended ? "bg-[#1f8a65]/10 hover:bg-[#1f8a65]/15" : "bg-white/[0.03] hover:bg-white/[0.05]"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[13px] font-semibold text-white">
+                              {option.title}
+                            </p>
+                            <p className="mt-1 text-[12px] text-white/45">
+                              {option.desc}
+                            </p>
+                          </div>
+                          {recommended && (
+                            <span className="rounded-full bg-[#1f8a65]/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#7fe2bf]">
+                              Recommandé
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* MODAL CRÉATION CLIENT */}
       <AnimatePresence>
+        {notificationsClient && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-md z-[72]"
+              onClick={() => setNotificationsClient(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.98 }}
+              className="fixed inset-x-4 top-[8vh] z-[73] mx-auto w-full max-w-2xl rounded-[28px] border border-white/[0.08] bg-[#181818] p-5 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">
+                    Notifications athlète
+                  </p>
+                  <h3 className="mt-2 text-lg font-semibold text-white">
+                    {notificationsClient.first_name} {notificationsClient.last_name}
+                  </h3>
+                  <p className="mt-1 text-[12px] text-white/45">
+                    Historique des alertes encore en attente pour ce client.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {clientNotifications.length > 0 && !notificationsLoading ? (
+                    <button
+                      onClick={() => void markAllNotificationsRead()}
+                      className="rounded-xl bg-white/[0.06] px-3 py-2 text-[11px] font-semibold text-white/70"
+                    >
+                      Tout marquer comme lu
+                    </button>
+                  ) : null}
+                  <button
+                    onClick={() => setNotificationsClient(null)}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.05] text-white/55"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-5 max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+                {notificationsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((item) => (
+                      <div key={item} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
+                        <Skeleton className="h-4 w-40" />
+                        <Skeleton className="mt-3 h-3 w-full" />
+                      </div>
+                    ))}
+                  </div>
+                ) : clientNotifications.length === 0 ? (
+                  <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-6 text-center">
+                    <p className="text-sm font-semibold text-white">Aucune notification en attente</p>
+                  </div>
+                ) : (
+                  clientNotifications.map((notification) => {
+                    const badge = NOTIFICATION_BADGES[notification.category] ?? NOTIFICATION_BADGES.system;
+                    const BadgeIcon = badge.icon;
+                    return (
+                      <div
+                        key={notification.id}
+                        className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${badge.className}`}>
+                                <BadgeIcon size={11} />
+                                {notification.categoryLabel}
+                              </span>
+                            </div>
+                            <p className="mt-3 text-sm font-semibold text-white">
+                              {notification.title || "Notification coach"}
+                            </p>
+                            {notification.body && (
+                              <p className="mt-2 text-[12px] leading-relaxed text-white/60">
+                                {notification.body}
+                              </p>
+                            )}
+                            <p className="mt-2 text-[11px] text-white/35">
+                              {timeAgo(notification.createdAt)}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 flex-col gap-2">
+                            <button
+                              onClick={() => {
+                                setNotificationsClient(null);
+                                router.push(notification.actionUrl);
+                              }}
+                              className="rounded-xl bg-white/[0.08] px-3 py-2 text-[11px] font-bold text-white/80"
+                            >
+                              Ouvrir
+                            </button>
+                            <button
+                              onClick={() => markNotificationRead(notification.id)}
+                              className="rounded-xl bg-white/[0.06] px-3 py-2 text-[11px] font-semibold text-white/65"
+                            >
+                              Marquer lu
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+
         {showModal && (
           <>
             <motion.div
@@ -837,11 +1282,13 @@ function ClientCard({
   client,
   index,
   pendingCount,
+  onOpenNotifications,
   onClick,
 }: {
   client: Client;
   index: number;
   pendingCount?: number;
+  onOpenNotifications: () => void;
   onClick: () => void;
 }) {
   const activeSub = client.subscriptions?.find((s) => s.status === "active");
@@ -877,6 +1324,7 @@ function ClientCard({
       <div className="flex items-start gap-3 mb-4">
         <div className="relative">
           {client.profile_photo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={client.profile_photo_url}
               alt={`${client.first_name} ${client.last_name}`}
@@ -891,9 +1339,16 @@ function ClientCard({
             </div>
           )}
           {!!pendingCount && pendingCount > 0 && (
-            <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center border-2 border-[#181818]">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenNotifications();
+              }}
+              className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#181818] bg-red-500 text-[10px] font-black text-white"
+            >
               {pendingCount}
-            </div>
+            </button>
           )}
         </div>
         <div className="min-w-0 flex-1">
@@ -1005,11 +1460,13 @@ function ClientRow({
   client,
   index,
   pendingCount,
+  onOpenNotifications,
   onClick,
 }: {
   client: Client;
   index: number;
   pendingCount?: number;
+  onOpenNotifications: () => void;
   onClick: () => void;
 }) {
   const activeSubs =
@@ -1037,6 +1494,7 @@ function ClientRow({
         <div className="flex items-center gap-3">
           <div className="relative">
             {client.profile_photo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={client.profile_photo_url}
                 alt={`${client.first_name} ${client.last_name}`}
@@ -1051,9 +1509,16 @@ function ClientRow({
               </div>
             )}
             {!!pendingCount && pendingCount > 0 && (
-              <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-500 text-white text-[8px] font-black flex items-center justify-center border-[1.5px] border-[#181818]">
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenNotifications();
+                }}
+                className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-[1.5px] border-[#181818] bg-red-500 text-[8px] font-black text-white"
+              >
                 {pendingCount > 1 ? pendingCount : ""}
-              </div>
+              </button>
             )}
           </div>
           <span className="font-semibold text-white text-sm">

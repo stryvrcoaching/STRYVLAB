@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
+import { readSessionStorage, writeSessionStorage } from "@/lib/client/browserStorage"
 
 // 2× half-turn spin: 0→180 (pause) →360, zoom pulse on second half
 const SPIN_MS  = 1800
@@ -19,8 +20,8 @@ export default function SplashScreen() {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    if (sessionStorage.getItem("stryvr_splash_seen")) return
-    sessionStorage.setItem("stryvr_splash_seen", "1")
+    if (readSessionStorage("stryvr_splash_seen")) return
+    writeSessionStorage("stryvr_splash_seen", "1")
     setVisible(true)
     const t = setTimeout(() => setVisible(false), TOTAL_MS)
     return () => clearTimeout(t)

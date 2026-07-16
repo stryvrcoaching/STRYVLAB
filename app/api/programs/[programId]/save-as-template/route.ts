@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { VALID_MOVEMENT_PATTERN_SET } from '@/lib/programs/movementPatterns'
+import { resolveStoredFrequency } from '@/lib/programs/frequency'
 
 function service() {
   return createServiceClient(
@@ -8,14 +10,6 @@ function service() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 }
-
-const VALID_MOVEMENT_PATTERNS = new Set([
-  'horizontal_push', 'vertical_push', 'horizontal_pull', 'vertical_pull',
-  'squat_pattern', 'hip_hinge', 'knee_flexion', 'knee_extension', 'calf_raise',
-  'elbow_flexion', 'elbow_extension', 'lateral_raise', 'hip_abduction', 'hip_adduction',
-  'shoulder_rotation', 'carry', 'scapular_elevation', 'scapular_retraction', 'scapular_protraction',
-  'core_anti_flex', 'core_flex', 'core_rotation',
-])
 
 // POST /api/programs/[programId]/save-as-template
 // Copie un programme client vers coach_program_templates (programme intact)
@@ -37,13 +31,13 @@ export async function POST(
     .from('programs')
     .select(`
       id, name, description, goal, level, frequency, weeks, muscle_tags,
-      equipment_archetype, session_mode, coach_id,
+      equipment_archetype, session_mode, volume_focus, coach_id,
       program_sessions (
         id, name, day_of_week, days_of_week, position, notes,
         program_exercises (
           name, sets, reps, rest_sec, rir, notes, position, image_url,
           movement_pattern, equipment_required, primary_muscles, secondary_muscles,
-          group_id, is_compound, set_prescriptions, tempo
+          group_id, is_compound, is_unilateral, target_rir, set_prescriptions, superset_rest_mode, tempo, execution_type, target_hr_zone
         )
       )
     `)
@@ -54,6 +48,7 @@ export async function POST(
   if (!program) return NextResponse.json({ error: 'Programme introuvable' }, { status: 404 })
 
   const templateName = name?.trim() || program.name
+  const computedFrequency = resolveStoredFrequency((program.program_sessions as any[]) ?? [], program.frequency ?? null)
 
   // Créer le template
   const { data: template, error: tErr } = await db
@@ -64,11 +59,12 @@ export async function POST(
       description: description?.trim() || program.description || null,
       goal: program.goal,
       level: program.level,
-      frequency: (program.program_sessions as any[])?.length ?? program.frequency,
+      frequency: computedFrequency || program.frequency || null,
       weeks: program.weeks,
       muscle_tags: program.muscle_tags ?? [],
       equipment_archetype: program.equipment_archetype ?? null,
       session_mode: program.session_mode ?? 'day',
+      volume_focus: program.volume_focus ?? {},
     })
     .select('id')
     .single()
@@ -120,7 +116,7 @@ export async function POST(
           notes: e.notes ?? null,
           position: ei,
           image_url: e.image_url ?? null,
-          movement_pattern: e.movement_pattern && VALID_MOVEMENT_PATTERNS.has(e.movement_pattern)
+          movement_pattern: e.movement_pattern && VALID_MOVEMENT_PATTERN_SET.has(e.movement_pattern)
             ? e.movement_pattern
             : null,
           equipment_required: e.equipment_required ?? [],
@@ -128,8 +124,13 @@ export async function POST(
           secondary_muscles: e.secondary_muscles ?? [],
           group_id: e.group_id ?? null,
           is_compound: e.is_compound ?? undefined,
+          is_unilateral: e.is_unilateral ?? false,
+          target_rir: e.target_rir ?? null,
           set_prescriptions: e.set_prescriptions ?? null,
+          superset_rest_mode: e.superset_rest_mode ?? 'after_round',
           tempo: e.tempo ?? null,
+          execution_type: e.execution_type ?? 'reps_rir',
+          target_hr_zone: e.target_hr_zone ?? null,
         }))
       )
       if (exErr) {

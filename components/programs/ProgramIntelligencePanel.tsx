@@ -7,8 +7,8 @@ import {
   Tooltip,
 } from 'recharts'
 import { Zap, ChevronDown, ChevronUp, Sliders, FlaskConical, Microscope, HelpCircle, ArrowRight, AlertTriangle, AlertCircle, Info } from 'lucide-react'
-import type { IntelligenceResult, TemplateMeta, SRAHeatmapWeek } from '@/lib/programs/intelligence'
-import { VOLUME_SEGMENTS, VOLUME_GROUP_LABELS, getVolumeTargets } from '@/lib/programs/intelligence'
+import type { IntelligenceResult, TemplateMeta, SRAHeatmapWeek, VolumeFocus } from '@/lib/programs/intelligence'
+import { VOLUME_FOCUS_LABELS } from '@/lib/programs/intelligence'
 
 interface Props {
   result: IntelligenceResult
@@ -20,6 +20,7 @@ interface Props {
   presentPatterns?: string[]
   onOverrideChange?: (pattern: string, value: number) => void
   onOverrideReset?: () => void
+  onVolumeFocusChange?: (group: string, focus: VolumeFocus) => void
   onAlertClick?: (sessionIndex: number, exerciseIndex: number) => void
 }
 
@@ -57,21 +58,21 @@ const SUBSCORE_TOOLTIPS: Record<string, string> = {
 }
 
 const OVERRIDE_TOOLTIPS: Record<string, string> = {
-  horizontal_push: 'Multiplie le coefficient stimulus des poussées horizontales (développé couché, dips…)',
-  vertical_push: 'Multiplie le coefficient stimulus des poussées verticales (développé militaire, push press…)',
-  horizontal_pull: 'Multiplie le coefficient stimulus des tirages horizontaux (rowing, tirage buste penché…)',
-  vertical_pull: 'Multiplie le coefficient stimulus des tirages verticaux (traction, tirage poulie haute…)',
+  horizontal_push: 'Ajuste le stimulus des développés couchés, pompes et dips.',
+  vertical_push: 'Ajuste le stimulus des développés au-dessus de la tête.',
+  horizontal_pull: 'Ajuste le stimulus des tirages réalisés vers le buste.',
+  vertical_pull: 'Ajuste le stimulus des tractions et tirages réalisés de haut en bas.',
   elbow_flexion: 'Multiplie le coefficient stimulus des exercices de biceps (curl barre, curl haltères…)',
   elbow_extension: 'Multiplie le coefficient stimulus des exercices de triceps (extensions, pushdown…)',
-  squat_pattern: 'Multiplie le coefficient stimulus des squats (squat barre, goblet squat, leg press…)',
-  hip_hinge: 'Multiplie le coefficient stimulus des charnières hanche (soulevé de terre, hip thrust, good morning…)',
-  knee_flexion: 'Multiplie le coefficient stimulus des flexions genou (leg curl couché ou assis…)',
-  core_flex: 'Multiplie le coefficient stimulus des exercices de flexion abdominale (crunch, relevé de jambes…)',
-  core_anti_flex: 'Multiplie le coefficient stimulus du gainage (planche, pallof press, ab wheel…)',
-  core_rotation: 'Multiplie le coefficient stimulus des rotations de tronc (russian twist, woodchop…)',
+  squat_pattern: 'Ajuste le stimulus des squats, fentes et presses à cuisses.',
+  hip_hinge: 'Ajuste le stimulus des soulevés de terre, extensions de hanche et variantes similaires.',
+  knee_flexion: 'Ajuste le stimulus des flexions du genou, comme les leg curls.',
+  core_flex: 'Ajuste le stimulus des flexions abdominales et relevés de jambes.',
+  core_anti_flex: 'Ajuste le stimulus du gainage et des exercices de stabilité du tronc.',
+  core_rotation: 'Ajuste le stimulus des rotations du tronc.',
   lateral_raise: 'Multiplie le coefficient stimulus des élévations latérales et exercices épaules isolés',
   calf_raise: 'Multiplie le coefficient stimulus des exercices de mollets',
-  scapular_elevation: 'Multiplie le coefficient stimulus des haussements d\'épaules (shrug…)',
+  scapular_elevation: 'Ajuste le stimulus des haussements d’épaules.',
 }
 
 // Muscles affichés dans le radar — 10 axes
@@ -87,6 +88,69 @@ const RADAR_MUSCLES: { key: string; label: string }[] = [
   { key: 'mollets', label: 'Mollets' },
   { key: 'abdos', label: 'Abdos' },
 ]
+
+const RADAR_MUSCLE_GROUPS: Record<string, string> = {
+  dos: 'dos',
+  grand_dorsal: 'dos',
+  dos_superieur: 'dos',
+  rhomboides: 'dos',
+  trapeze: 'dos',
+  trapeze_superieur: 'dos',
+  trapeze_moyen: 'dos',
+  trapeze_inferieur: 'dos',
+  erecteurs_rachis: 'dos',
+  lombaires: 'dos',
+  pectoraux: 'pectoraux',
+  grand_pectoral: 'pectoraux',
+  grand_pectoral_sup: 'pectoraux',
+  grand_pectoral_inf: 'pectoraux',
+  grand_pectoral_superieur: 'pectoraux',
+  grand_pectoral_inferieur: 'pectoraux',
+  petit_pectoral: 'pectoraux',
+  epaules: 'epaules',
+  deltoide_anterieur: 'epaules',
+  deltoide_lateral: 'epaules',
+  deltoide_posterieur: 'epaules',
+  coiffe_rotateurs: 'epaules',
+  subscapulaire: 'epaules',
+  biceps: 'biceps',
+  biceps_brachial: 'biceps',
+  brachial: 'biceps',
+  brachial_anterieur: 'biceps',
+  brachio_radial: 'biceps',
+  triceps: 'triceps',
+  triceps_brachii: 'triceps',
+  triceps_lateral: 'triceps',
+  triceps_medial: 'triceps',
+  triceps_long: 'triceps',
+  quadriceps: 'quadriceps',
+  droit_femoral: 'quadriceps',
+  rectus_femoris: 'quadriceps',
+  vaste_lateral: 'quadriceps',
+  vaste_medial: 'quadriceps',
+  vaste_intermediaire: 'quadriceps',
+  'ischio-jambiers': 'ischio-jambiers',
+  ischio_jambiers: 'ischio-jambiers',
+  biceps_femoral: 'ischio-jambiers',
+  semi_membraneux: 'ischio-jambiers',
+  semi_tendineux: 'ischio-jambiers',
+  fessiers: 'fessiers',
+  grand_fessier: 'fessiers',
+  moyen_fessier: 'fessiers',
+  petit_fessier: 'fessiers',
+  mollets: 'mollets',
+  mollet: 'mollets',
+  gastrocnemien: 'mollets',
+  soleaire: 'mollets',
+  solea: 'mollets',
+  abdos: 'abdos',
+  droit_abdominal: 'abdos',
+  droit_abdominal_inf: 'abdos',
+  obliques: 'abdos',
+  transverse: 'abdos',
+  transverse_abdominal: 'abdos',
+  sangle_abdominale: 'abdos',
+}
 
 // Traduction slugs normalisés → français naturel (après normalizeFiberSlug côté moteur)
 // Doit rester en sync avec BIOMECH_TO_FR dans scoring.ts
@@ -105,6 +169,7 @@ const FIBER_LABEL_FR: Record<string, string> = {
   // Quadriceps
   quadriceps: 'Quadriceps',
   droit_femoral: 'Droit fémoral',
+  rectus_femoris: 'Droit fémoral',
   vaste_lateral: 'Vaste latéral',
   vaste_medial: 'Vaste médial',
   // Dos
@@ -117,11 +182,14 @@ const FIBER_LABEL_FR: Record<string, string> = {
   trapeze_moyen: 'Trapèze moy.',
   trapeze_inferieur: 'Trapèze inf.',
   erecteurs_rachis: 'Érecteurs rachis',
+  erecteurs_spinaux: 'Érecteurs rachis',
   lombaires: 'Lombaires',
   // Pectoraux
   grand_pectoral: 'Grand pectoral',
   grand_pectoral_sup: 'Grand pect. sup.',
   grand_pectoral_inf: 'Grand pect. inf.',
+  grand_pectoral_superieur: 'Grand pectoral supérieur',
+  grand_pectoral_inferieur: 'Grand pectoral inférieur',
   petit_pectoral: 'Petit pectoral',
   pectoraux: 'Pectoraux',
   // Épaules
@@ -133,34 +201,54 @@ const FIBER_LABEL_FR: Record<string, string> = {
   epaules: 'Épaules',
   // Bras
   biceps: 'Biceps',
+  biceps_brachial: 'Biceps brachial',
+  brachial: 'Brachial',
   brachial_anterieur: 'Brachial ant.',
   brachio_radial: 'Brachio-radial',
   triceps: 'Triceps',
+  triceps_long: 'Triceps — longue portion',
+  triceps_lateral: 'Triceps — faisceau latéral',
+  triceps_medial: 'Triceps — faisceau médial',
   // Mollets
   gastrocnemien: 'Gastrocnémien',
   soleaire: 'Soléaire',
+  solea: 'Soléaire',
+  mollet: 'Mollets',
   mollets: 'Mollets',
   // Core
   droit_abdominal: 'Droit abdominal',
   droit_abdominal_inf: 'Abdominaux inf.',
   obliques: 'Obliques',
+  obliques_externes: 'Obliques externes',
+  obliques_internes: 'Obliques internes',
   transverse: 'Transverse',
+  transverse_abdominal: 'Transverse abdominal',
   sangle_abdominale: 'Sangle abdominale',
   abdos: 'Abdos',
 }
 
 const PATTERN_LABEL_FR: Record<string, string> = {
-  horizontal_push: 'Push horiz.', vertical_push: 'Push vert.',
-  horizontal_pull: 'Pull horiz.', vertical_pull: 'Pull vert.',
-  squat_pattern: 'Squat', hip_hinge: 'Hip hinge',
-  knee_flexion: 'Flex. genou', knee_extension: 'Ext. genou',
+  horizontal_push: 'Poussée horizontale', vertical_push: 'Poussée verticale',
+  horizontal_pull: 'Tirage horizontal', vertical_pull: 'Tirage vertical',
+  squat_pattern: 'Dominante genou', hip_hinge: 'Charnière de hanche',
+  knee_flexion: 'Flexion du genou', knee_extension: 'Extension du genou',
+  wrist_flexion: 'Flexion du poignet', wrist_extension: 'Extension du poignet', forearm_rotation: 'Rotation de l’avant-bras',
   elbow_flexion: 'Biceps', elbow_extension: 'Triceps',
-  lateral_raise: 'Élév. lat.', calf_raise: 'Mollets',
-  core_flex: 'Core', core_anti_flex: 'Gainage', core_rotation: 'Rotation',
-  carry: 'Carry', scapular_elevation: 'Shrug',
+  lateral_raise: 'Élévation latérale', shoulder_abduction: 'Élévation latérale', calf_raise: 'Mollets',
+  core_flex: 'Flexion abdominale', core_anti_flex: 'Gainage', anti_rotation: 'Gainage anti-rotation', core_rotation: 'Rotation du tronc',
+  carry: 'Porté chargé', scapular_elevation: 'Haussement d’épaules',
   hip_abduction: 'Abduction', hip_adduction: 'Adduction',
-  shoulder_rotation: 'Rot. épaule', scapular_retraction: 'Rétraction',
+  shoulder_rotation: 'Rotation de l’épaule', scapular_retraction: 'Rétraction des omoplates',
   scapular_protraction: 'Protraction',
+}
+
+function formatPatternLabel(pattern: string) {
+  return PATTERN_LABEL_FR[pattern] ?? 'Mouvement à qualifier'
+}
+
+function formatStimulusAdjustment(value: number) {
+  const delta = Math.round((value - 1) * 100)
+  return delta === 0 ? 'Référence du catalogue' : `${delta > 0 ? '+' : ''}${delta} % de stimulus estimé`
 }
 
 // Couleur de barre selon intensité relative (% du max dans la séance)
@@ -194,7 +282,7 @@ const ALERT_STYLE = {
 export default function ProgramIntelligencePanel({
   result, meta, onAlertClick,
   morphoConnected, morphoDate, sraHeatmap,
-  labOverrides, presentPatterns, onOverrideChange, onOverrideReset,
+  labOverrides, presentPatterns, onOverrideChange, onOverrideReset, onVolumeFocusChange,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false)
   const [labOpen, setLabOpen] = useState(false)
@@ -205,14 +293,22 @@ export default function ProgramIntelligencePanel({
 
   const globalColor = SCORE_COLOR(result.globalScore)
 
-  // Radar — normaliser sur le max pour que le graphe soit toujours lisible
+  const radarDistribution = Object.entries(result.distribution).reduce<Record<string, number>>((acc, [muscle, volume]) => {
+    const group = RADAR_MUSCLE_GROUPS[muscle]
+    if (!group) return acc
+    acc[group] = (acc[group] ?? 0) + volume
+    return acc
+  }, {})
+
+  // Radar — agréger les sous-muscles par groupe puis normaliser sur le max
   const radarRaw = RADAR_MUSCLES.map(({ key, label }) => ({
     muscle: label,
-    volume: result.distribution[key] ?? 0,
+    volume: radarDistribution[key] ?? 0,
   }))
   const radarMax = Math.max(...radarRaw.map(d => d.volume), 1)
   const radarData = radarRaw.map(d => ({
     muscle: d.muscle,
+    rawVolume: d.volume,
     volume: Math.round((d.volume / radarMax) * 100),
   }))
   const priorityAlerts = result.alerts.slice(0, 4)
@@ -316,92 +412,56 @@ export default function ProgramIntelligencePanel({
             </div>
           )}
 
-          {/* ── Volume MEV/MAV/MRV par groupe musculaire ── */}
-          {Object.keys(result.volumeByMuscle).length > 0 && (
+          {/* ── Volume MEV/MAV/MRV par objectif musculaire ── */}
+          {result.volumeFocus.length > 0 && (
             <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4">
               <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/40 mb-0.5">
-                Volume hebdomadaire
+                Objectifs et stimulus hebdomadaire
               </p>
-              <p className="text-[9px] text-white/25 mb-3">Sets équivalents · MEV / MAV / MRV</p>
+              <p className="text-[9px] text-white/25 mb-3">Les seuils s’appliquent au groupe complet, pas à chaque faisceau isolé.</p>
 
-              <div className="flex flex-col gap-4">
-                {VOLUME_SEGMENTS.map(segment => {
-                  const groups = segment.groups.filter(g => result.volumeByMuscle[g] != null)
-                  if (groups.length === 0) return null
+              <div className="flex flex-col gap-3">
+                {result.volumeFocus.map(group => {
+                  const isBelowTarget = group.targetMin != null && group.volume < group.targetMin
+                  const isOverMrv = group.volume > group.mrv
+                  const isOverMav = group.mode !== 'priority' && group.volume > group.mav && !isOverMrv
+                  const barColor = isOverMrv ? '#ef4444' : isOverMav ? '#f59e0b' : isBelowTarget ? '#6b7280' : '#1f8a65'
+                  const fillPct = Math.min((group.volume / group.mrv) * 100, 100)
+                  const targetLabel = group.mode === 'priority'
+                    ? `cible MAV → MRV (${group.mav}–${group.mrv})`
+                    : group.mode === 'maintenance'
+                      ? `maintien ${group.targetMin}–${group.mev}`
+                      : group.mode === 'off'
+                        ? 'non évalué comme objectif'
+                        : `progression MEV → MAV (${group.mev}–${group.mav})`
+
                   return (
-                    <div key={segment.key}>
-                      <p className="text-[8px] font-semibold uppercase tracking-[0.14em] text-white/30 mb-2">
-                        {segment.label}
-                      </p>
-                      <div className="flex flex-col gap-2.5">
-                        {groups.map(group => {
-                          const volume = result.volumeByMuscle[group] ?? 0
-                          const [mev, mav, mrv] = getVolumeTargets(group, meta.goal, meta.level)
-                          const label = VOLUME_GROUP_LABELS[group] ?? group.replace(/_/g, ' ')
-
-                          const isUnderMev = volume < mev
-                          const isOverMrv = volume > mrv
-                          const isOverMav = volume > mav && !isOverMrv
-
-                          const barColor = isOverMrv ? '#ef4444' : isOverMav ? '#f59e0b' : isUnderMev ? '#6b7280' : '#1f8a65'
-                          const fillPct = Math.min((volume / mrv) * 100, 100)
-
-                          return (
-                            <div key={group}>
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-[9px] text-white/50">{label}</span>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-[8px] font-mono" style={{ color: barColor }}>
-                                    {volume.toFixed(1)}
-                                  </span>
-                                  <span className="text-[8px] text-white/20 font-mono">
-                                    /{mrv}
-                                  </span>
-                                </div>
-                              </div>
-                              {/* Barre segmentée MEV / MAV / MRV */}
-                              <div className="relative h-[5px] bg-white/[0.04] rounded-full overflow-hidden">
-                                {/* Zone MEV (0→mev) en vert clair */}
-                                <div
-                                  className="absolute top-0 left-0 h-full rounded-full opacity-20"
-                                  style={{ width: `${Math.min((mev / mrv) * 100, 100)}%`, backgroundColor: '#1f8a65' }}
-                                />
-                                {/* Zone MAV (mev→mav) en vert plus soutenu */}
-                                <div
-                                  className="absolute top-0 h-full rounded-full opacity-15"
-                                  style={{
-                                    left: `${(mev / mrv) * 100}%`,
-                                    width: `${Math.min(((mav - mev) / mrv) * 100, 100 - (mev / mrv) * 100)}%`,
-                                    backgroundColor: '#1f8a65',
-                                  }}
-                                />
-                                {/* Volume réel */}
-                                <motion.div
-                                  className="absolute top-0 left-0 h-full rounded-full"
-                                  style={{ backgroundColor: barColor }}
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${fillPct}%` }}
-                                  transition={{ duration: 0.5, ease: 'easeOut' }}
-                                />
-                              </div>
-                              {/* Marqueurs MEV/MAV */}
-                              <div className="relative mt-0.5 h-3">
-                                <span
-                                  className="absolute text-[7px] text-white/20 transform -translate-x-1/2"
-                                  style={{ left: `${(mev / mrv) * 100}%` }}
-                                >
-                                  MEV
-                                </span>
-                                <span
-                                  className="absolute text-[7px] text-white/20 transform -translate-x-1/2"
-                                  style={{ left: `${(mav / mrv) * 100}%` }}
-                                >
-                                  MAV
-                                </span>
-                              </div>
-                            </div>
-                          )
-                        })}
+                    <div key={group.key}>
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-[9px] text-white/55">{group.label}</span>
+                        {onVolumeFocusChange ? (
+                          <select
+                            value={group.mode}
+                            onChange={(event) => onVolumeFocusChange(group.key, event.target.value as VolumeFocus)}
+                            aria-label={`Objectif ${group.label}`}
+                            className="max-w-[108px] rounded-md border border-white/[0.08] bg-black/20 px-1.5 py-1 text-[8px] text-white/60 outline-none focus:border-[#1f8a65]"
+                          >
+                            {Object.entries(VOLUME_FOCUS_LABELS).map(([value, label]) => (
+                              <option key={value} value={value}>{label}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-[8px] text-white/30">{VOLUME_FOCUS_LABELS[group.mode]}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-[8px] text-white/25">{targetLabel}</span>
+                        <span className="text-[8px] font-mono" style={{ color: barColor }}>{group.volume.toFixed(1)} <span className="text-white/20">/{group.mrv}</span></span>
+                      </div>
+                      <div className="relative h-[5px] bg-white/[0.04] rounded-full overflow-hidden">
+                        <div className="absolute top-0 left-0 h-full rounded-full opacity-15" style={{ width: `${Math.min((group.mev / group.mrv) * 100, 100)}%`, backgroundColor: '#1f8a65' }} />
+                        <div className="absolute top-0 h-full rounded-full opacity-10" style={{ left: `${(group.mev / group.mrv) * 100}%`, width: `${Math.min(((group.mav - group.mev) / group.mrv) * 100, 100)}%`, backgroundColor: '#1f8a65' }} />
+                        <motion.div className="absolute top-0 left-0 h-full rounded-full" style={{ backgroundColor: barColor }} initial={{ width: 0 }} animate={{ width: `${fillPct}%` }} transition={{ duration: 0.5, ease: 'easeOut' }} />
                       </div>
                     </div>
                   )
@@ -413,17 +473,17 @@ export default function ProgramIntelligencePanel({
           {/* ── KPIs globaux ── */}
           {result.programStats.totalSets > 0 && (
             <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4">
-              <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/40 mb-2.5">Volume programme</p>
+              <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/40 mb-2.5">Charge prescrite hebdomadaire</p>
               <div className="grid grid-cols-2 gap-1.5">
                 {[
-                  { label: 'Séries/sem.', value: result.programStats.totalSets },
+                  { label: 'Séries planifiées', value: result.programStats.totalSets },
                   {
                     label: 'Reps est.', value: result.programStats.totalEstimatedReps >= 1000
                       ? `${(result.programStats.totalEstimatedReps / 1000).toFixed(1)}k`
                       : result.programStats.totalEstimatedReps
                   },
-                  { label: 'Exercices', value: result.programStats.totalExercises },
-                  { label: 'Exos/séance', value: result.programStats.avgExercisesPerSession },
+                  { label: 'Exercices uniques', value: result.programStats.totalExercises },
+                  { label: 'Exercices / séance', value: result.programStats.avgExercisesPerSession },
                 ].map(({ label, value }) => (
                   <div key={label} className="bg-white/[0.02] rounded-xl p-2 flex items-center justify-between gap-1.5">
                     <p className="text-[8px] text-white/40">{label}</p>
@@ -438,13 +498,19 @@ export default function ProgramIntelligencePanel({
           {mounted && radarRaw.some(d => d.volume > 0) && (
             <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4">
               <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/40 mb-1">
-                Distribution musculaire
+                Distribution du stimulus
               </p>
-              <p className="text-[9px] text-white/25 mb-3">Volume normalisé — programme complet</p>
+              <p className="text-[9px] text-white/25 mb-3">Stimulus estimé, normalisé sur le groupe le plus sollicité</p>
               <div style={{ width: '100%', height: 200 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <RadarChart data={radarData} margin={{ top: 8, right: 16, bottom: 8, left: 16 }}>
                     <PolarGrid stroke="rgba(255,255,255,0.08)" />
+                    <Tooltip
+                      formatter={(value: number, _name, item) => [`${item?.payload?.rawVolume?.toFixed?.(1) ?? value}`, 'Volume pondéré']}
+                      labelFormatter={(label) => `${label}`}
+                      contentStyle={{ background: '#0f0f0f', border: 'none', borderRadius: 8, fontSize: 10 }}
+                      itemStyle={{ color: 'rgba(255,255,255,0.7)' }}
+                    />
                     <PolarAngleAxis
                       dataKey="muscle"
                       tick={{ fontSize: 8, fill: 'rgba(255,255,255,0.45)', fontWeight: 600 }}
@@ -457,10 +523,6 @@ export default function ProgramIntelligencePanel({
                       fillOpacity={0.2}
                       strokeWidth={1.5}
                     />
-                    <Tooltip
-                      contentStyle={{ background: '#0f0f0f', border: 'none', borderRadius: 8, fontSize: 10 }}
-                      itemStyle={{ color: 'rgba(255,255,255,0.7)' }}
-                    />
                   </RadarChart>
                 </ResponsiveContainer>
               </div>
@@ -471,9 +533,9 @@ export default function ProgramIntelligencePanel({
           {result.programStats.sessionsStats.length > 0 && (
             <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4">
               <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/40 mb-0.5">
-                Volume par faisceau musculaire
+                Stimulus direct par faisceau
               </p>
-              <p className="text-[9px] text-white/25 mb-3">Par séance · volume pondéré (sets × coeff stimulus)</p>
+              <p className="text-[9px] text-white/25 mb-3">Par séance · cible principale de chaque exercice</p>
 
               <div className="flex flex-col gap-4">
                 {result.programStats.sessionsStats.map((s, i) => {
@@ -500,7 +562,7 @@ export default function ProgramIntelligencePanel({
                       <div className="flex flex-col gap-1.5">
                         {fibers.map(([fiber, vol]) => {
                           const pct = maxVol > 0 ? Math.round((vol / maxVol) * 100) : 0
-                          const label = FIBER_LABEL_FR[fiber] ?? fiber.replace(/_/g, ' ')
+                          const label = FIBER_LABEL_FR[fiber] ?? 'Muscle à qualifier'
                           const color = barColor(pct)
                           return (
                             <div key={fiber} className="flex items-center gap-2">
@@ -560,7 +622,7 @@ export default function ProgramIntelligencePanel({
             >
               <div className="flex items-center gap-2">
                 <FlaskConical size={13} className="text-[#8b5cf6]" />
-                <span className="text-[11px] font-semibold text-[#8b5cf6]">Lab Mode</span>
+                <span className="text-[11px] font-semibold text-[#8b5cf6]">Lab — ajustement du stimulus</span>
                 <span className="text-[9px] text-[#8b5cf6]/50 bg-[#8b5cf6]/10 px-1.5 py-0.5 rounded-full">BETA</span>
                 {morphoConnected && (
                   <span className="text-[9px] text-[#1f8a65] bg-[#1f8a65]/10 px-1.5 py-0.5 rounded-full">
@@ -639,10 +701,10 @@ export default function ProgramIntelligencePanel({
                     <div>
                       <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/30 mb-1 flex items-center gap-1.5">
                         <Zap size={10} />
-                        Charge musculaire simulée
+                        Charge de récupération estimée
                       </p>
                       <p className="text-[8px] text-white/20 mb-2 leading-relaxed">
-                        Simulation statique — même programme répété 4 semaines · surcharge progressive à venir
+                        Projection théorique du programme actuel : volume estimé, espacement des séances et niveau du pratiquant. Ce n’est pas une mesure de fatigue réelle.
                       </p>
                       <div className="flex items-center gap-3 mb-2">
                         {[
@@ -669,7 +731,7 @@ export default function ProgramIntelligencePanel({
                           <tbody>
                             {allMuscles.map(muscle => (
                               <tr key={muscle}>
-                                <td className="text-white/40 pr-2 py-0.5 capitalize">{muscle}</td>
+                                <td className="text-white/40 pr-2 py-0.5">{FIBER_LABEL_FR[muscle] ?? 'Muscle à qualifier'}</td>
                                 {heatmapWeeks.map(week => {
                                   const entry = week.muscles.find(x => x.name === muscle)
                                   const fatigue = entry?.fatigue ?? 0
@@ -699,19 +761,19 @@ export default function ProgramIntelligencePanel({
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/30 flex items-center gap-1.5">
                         <Sliders size={10} />
-                        Overrides coefficients
+                        Ajustements du stimulus
                       </p>
                       {onOverrideReset && Object.keys(labOverrides ?? {}).some(k => (labOverrides ?? {})[k] !== 1.0) && (
                         <button
                           onClick={onOverrideReset}
                           className="text-[9px] text-[#8b5cf6]/60 hover:text-[#8b5cf6] transition-colors"
                         >
-                          Reset
+                          Réinitialiser
                         </button>
                       )}
                     </div>
                     <p className="text-[8px] text-white/20 mb-2 leading-relaxed">
-                      Multiplie le coefficient stimulus de tous les exercices d&apos;un pattern. Utile pour corriger des exercices non enrichis ou adapter à l&apos;activation réelle du client.
+                      Ajustement temporaire, non enregistré. À 110 %, chaque série du mouvement concerné compte comme 1,1 série de stimulus estimé. Il met à jour le volume estimé, le radar, la récupération, le score et les alertes — jamais les séries prescrites.
                     </p>
                     <div className="space-y-2">
                       {presentPatterns.map(pattern => {
@@ -721,7 +783,7 @@ export default function ProgramIntelligencePanel({
                           <div key={pattern}>
                             <div className="flex items-center gap-2">
                               <span className="text-[9px] text-white/40 w-32 shrink-0 truncate capitalize">
-                                {pattern.replace(/_/g, ' ')}
+                                {formatPatternLabel(pattern)}
                               </span>
                               <input
                                 type="range"
@@ -736,12 +798,12 @@ export default function ProgramIntelligencePanel({
                                 className="text-[9px] font-mono w-8 text-right shrink-0"
                                 style={{ color: currentVal !== 1.0 ? '#8b5cf6' : 'rgba(255,255,255,0.3)' }}
                               >
-                                {currentVal.toFixed(2)}
+                                {Math.round(currentVal * 100)} %
                               </span>
                             </div>
-                            {tooltip && (
-                              <p className="text-[8px] text-white/20 ml-32 mt-0.5 leading-relaxed pl-2">{tooltip}</p>
-                            )}
+                            <p className="text-[8px] text-white/20 ml-32 mt-0.5 leading-relaxed pl-2">
+                              {formatStimulusAdjustment(currentVal)} · {tooltip ?? 'Ajuste le stimulus estimé des exercices de cette famille de mouvements.'}
+                            </p>
                           </div>
                         )
                       })}

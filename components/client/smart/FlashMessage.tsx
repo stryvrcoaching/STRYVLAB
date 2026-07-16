@@ -23,7 +23,7 @@ export function FlashMessage({ flash, onDismiss }: { flash: FlashState | null; o
     if (!flash) return
     const timer = setTimeout(onDismiss, 3500)
     return () => clearTimeout(timer)
-  }, [flash?.id, onDismiss])
+  }, [flash, onDismiss])
 
   const styles = flash ? TYPE_STYLES[flash.type] : TYPE_STYLES.info
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createServiceClient } from "@supabase/supabase-js"
 import { z } from "zod"
@@ -72,6 +73,7 @@ export async function PATCH(
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  revalidatePath("/client/nutrition")
   return NextResponse.json({ data })
 }
 
@@ -105,7 +107,7 @@ export async function DELETE(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   await db.from("smart_agenda_events").delete().eq("source_id", params.id).eq("client_id", clientId)
-  await db.from("client_points").delete().eq("reference_id", params.id).eq("client_id", clientId)
 
+  revalidatePath("/client/nutrition")
   return NextResponse.json({ ok: true })
 }

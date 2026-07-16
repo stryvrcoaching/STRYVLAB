@@ -1,0 +1,4 @@
+interface:
+  display_name: "Client Sheet Design System"
+  short_description: "Use the STRYVR client sheet design system"
+  default_prompt: "Apply the canonical STRYVR client sheet layout and interaction patterns."

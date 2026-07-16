@@ -1,0 +1,88 @@
+{
+  "version": 6,
+  "tools": {
+    "codex": {
+      "toolId": "codex",
+      "version": "5.0.2",
+      "files": [
+        {
+          "relativePath": ".codex/config.toml",
+          "hash": "760064e18bc32338726becdbbd6b1103"
+        },
+        {
+          "relativePath": ".codex/config.json",
+          "hash": "f6037c478015aef85b76e159ebaf1f31"
+        }
+      ],
+      "mergeFiles": [],
+      "plugins": [
+        {
+          "name": "aidd-context",
+          "source": {
+            "kind": "local",
+            "path": "/Users/user/Desktop/STRYVLAB/.tmp/aidd/extracted/aidd-framework-codex-marketplace-5.0.3/plugins/aidd-context"
+          },
+          "version": "2.0.1",
+          "strict": false,
+          "files": {},
+          "marketplace": "aidd-framework-codex"
+        },
+        {
+          "name": "aidd-dev",
+          "source": {
+            "kind": "local",
+            "path": "/Users/user/Desktop/STRYVLAB/.tmp/aidd/extracted/aidd-framework-codex-marketplace-5.0.3/plugins/aidd-dev"
+          },
+          "version": "2.0.0",
+          "strict": false,
+          "files": {},
+          "marketplace": "aidd-framework-codex"
+        },
+        {
+          "name": "aidd-vcs",
+          "source": {
+            "kind": "local",
+            "path": "/Users/user/Desktop/STRYVLAB/.tmp/aidd/extracted/aidd-framework-codex-marketplace-5.0.3/plugins/aidd-vcs"
+          },
+          "version": "2.0.0",
+          "strict": false,
+          "files": {},
+          "marketplace": "aidd-framework-codex"
+        },
+        {
+          "name": "aidd-pm",
+          "source": {
+            "kind": "local",
+            "path": "/Users/user/Desktop/STRYVLAB/.tmp/aidd/extracted/aidd-framework-codex-marketplace-5.0.3/plugins/aidd-pm"
+          },
+          "version": "2.0.0",
+          "strict": false,
+          "files": {},
+          "marketplace": "aidd-framework-codex"
+        },
+        {
+          "name": "aidd-refine",
+          "source": {
+            "kind": "local",
+            "path": "/Users/user/Desktop/STRYVLAB/.tmp/aidd/extracted/aidd-framework-codex-marketplace-5.0.3/plugins/aidd-refine"
+          },
+          "version": "2.0.0",
+          "strict": false,
+          "files": {},
+          "marketplace": "aidd-framework-codex"
+        },
+        {
+          "name": "aidd-orchestrator",
+          "source": {
+            "kind": "local",
+            "path": "/Users/user/Desktop/STRYVLAB/.tmp/aidd/extracted/aidd-framework-codex-marketplace-5.0.3/plugins/aidd-orchestrator"
+          },
+          "version": "2.0.0",
+          "strict": false,
+          "files": {},
+          "marketplace": "aidd-framework-codex"
+        }
+      ]
+    }
+  }
+}

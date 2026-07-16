@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { SessionLog } from '@/lib/client/progressTypes'
+import { useClientT } from '@/components/client/ClientI18nProvider'
 
 interface SessionPoint {
   date: string // YYYY-MM-DD
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export default function ExerciseProgressionChart({ rawLogs }: Props) {
+  const { t } = useClientT()
   // 1. Process rawLogs into exercise progression data
   const exercisesData = useMemo((): ExerciseData[] => {
     const exerciseMap: Record<string, SessionPoint[]> = {}
@@ -135,14 +137,12 @@ export default function ExerciseProgressionChart({ rawLogs }: Props) {
   const progression = lastWeight - firstWeight
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Section label */}
-      <p className="text-[11px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/60 px-1">
+    <div className="rounded-2xl bg-[#161616] p-4">
+      <p className="mb-3 px-1 text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.16em] text-white/40">
         Progression par exercice
       </p>
 
-      {/* Exercise selector pills (horizontal scroll) */}
-      <div className="flex gap-2 overflow-x-auto pb-1 px-1 -mx-1 snap-x">
+      <div className="mb-3 flex gap-2 overflow-x-auto pb-1 px-1 -mx-1 snap-x">
         {exercisesData.map((ex, idx) => {
           const isSelected = idx === selectedExerciseIdx
           const maxExWeight = Math.max(...ex.points.map(p => p.maxWeight))
@@ -150,10 +150,10 @@ export default function ExerciseProgressionChart({ rawLogs }: Props) {
             <button
               key={`${ex.name}-${idx}`}
               onClick={() => setSelectedExerciseIdx(idx)}
-              className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-semibold transition-all duration-200 whitespace-nowrap snap-start ${
+              className={`shrink-0 whitespace-nowrap snap-start rounded-xl px-3 py-1.5 text-[10px] font-semibold transition-all duration-200 ${
                 isSelected
                   ? 'bg-[#f2f2f2] text-[#080808]'
-                  : 'bg-[#1a1a1a] text-[#5a5a5a] hover:bg-[#222222]'
+                  : 'bg-black/[0.12] text-white/35 hover:bg-black/[0.18] hover:text-white/60'
               }`}
             >
               {ex.name} · {maxExWeight}kg
@@ -162,8 +162,7 @@ export default function ExerciseProgressionChart({ rawLogs }: Props) {
         })}
       </div>
 
-      {/* SVG Chart */}
-      <div className="bg-[#111111] rounded-xl overflow-hidden p-2">
+      <div className="overflow-hidden rounded-2xl bg-black/[0.12] p-2.5">
         <svg viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`} className="w-full h-[140px]">
           {/* Grid lines */}
           {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
@@ -258,15 +257,14 @@ export default function ExerciseProgressionChart({ rawLogs }: Props) {
         </svg>
       </div>
 
-      {/* Stats pills */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="mt-3 grid grid-cols-3 gap-2">
         <StatPill label="Max" value={`${Math.round(maxSessionWeight)}kg`} />
         <StatPill
-          label="Progression"
+          label={t('progress.kpi.progression')}
           value={`${progression >= 0 ? '+' : ''}${Math.round(progression * 10) / 10}kg`}
           accent={progression > 0}
         />
-        <StatPill label="Séances" value={`${points.length}`} />
+        <StatPill label={t('progress.kpi.sessions')} value={`${points.length}`} />
       </div>
     </div>
   )
@@ -274,7 +272,7 @@ export default function ExerciseProgressionChart({ rawLogs }: Props) {
 
 function StatPill({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className={`flex flex-col items-center rounded-xl px-2 py-2 ${accent ? 'bg-[#f2f2f2]/15' : 'bg-white/[0.04]'}`}>
+    <div className={`flex flex-col items-center rounded-2xl px-2 py-2.5 ${accent ? 'bg-[#f2f2f2]/15' : 'bg-black/[0.12]'}`}>
       <p className={`text-[9px] font-semibold uppercase tracking-[0.1em] ${accent ? 'text-[#f2f2f2]' : 'text-white/40'}`}>
         {label}
       </p>

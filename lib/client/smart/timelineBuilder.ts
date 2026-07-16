@@ -1,6 +1,14 @@
 import { groupWaterByTimeOfDay, type WaterLog } from './waterAggregation'
+import { ct, type ClientLang } from '@/lib/i18n/clientTranslations'
 
-export type TimelineKind = 'meal' | 'water' | 'workout' | 'activity' | 'checkin'
+export type TimelineKind = 'meal' | 'water' | 'workout' | 'activity' | 'checkin' | 'appointment'
+
+export type AppointmentRow = {
+  id: string
+  starts_at: string
+  title: string
+  meeting_kind: string
+}
 
 export type TimelineEntry = {
   id: string
@@ -54,15 +62,16 @@ export type TimelineSource = {
   session: SessionSummary | null
   activities: ActivityRow[]
   checkins: CheckinRow[]
+  appointments?: AppointmentRow[]
 }
 
-const ACTIVITY_LABEL: Record<ActivityRow['activity_type'], string> = {
-  running: 'Course',
-  cycling: 'Vélo',
-  swimming: 'Natation',
-  walking: 'Marche',
-  team_sport: 'Sport collectif',
-  other: 'Activité',
+const ACTIVITY_LABEL_KEY: Record<ActivityRow['activity_type'], Parameters<typeof ct>[1]> = {
+  running: 'smart.activity.type.running',
+  cycling: 'smart.activity.type.cycling',
+  swimming: 'smart.activity.type.swimming',
+  walking: 'smart.activity.type.walking',
+  team_sport: 'smart.activity.type.team_sport',
+  other: 'smart.activity.type.other',
 }
 
 const SLOT_REPRESENTATIVE_SUFFIX: Record<'morning' | 'midday' | 'afternoon' | 'evening', string> = {
@@ -72,14 +81,7 @@ const SLOT_REPRESENTATIVE_SUFFIX: Record<'morning' | 'midday' | 'afternoon' | 'e
   evening: 'T20:00:00Z',
 }
 
-const SLOT_LABEL: Record<'morning' | 'midday' | 'afternoon' | 'evening', string> = {
-  morning: 'Hydratation matin',
-  midday: 'Hydratation midi',
-  afternoon: 'Hydratation après-midi',
-  evening: 'Hydratation soir',
-}
-
-export function buildTimeline(src: TimelineSource, tz: string = 'Europe/Paris'): TimelineEntry[] {
+export function buildTimeline(src: TimelineSource, tz: string = 'Europe/Paris', lang: ClientLang = 'fr'): TimelineEntry[] {
   const entries: TimelineEntry[] = []
 
   // Meals
@@ -105,7 +107,13 @@ export function buildTimeline(src: TimelineSource, tz: string = 'Europe/Paris'):
           id: `water-${slot}`,
           kind: 'water',
           start_iso: `${dateRef}${SLOT_REPRESENTATIVE_SUFFIX[slot]}`,
-          title: SLOT_LABEL[slot],
+          title: ct(lang, slot === 'morning'
+            ? 'smart.timeline.morning'
+            : slot === 'midday'
+              ? 'smart.timeline.midday'
+              : slot === 'afternoon'
+                ? 'smart.timeline.afternoon'
+                : 'smart.timeline.evening'),
           subtitle: `${ml} ml`,
         })
       }
@@ -119,7 +127,7 @@ export function buildTimeline(src: TimelineSource, tz: string = 'Europe/Paris'):
       kind: 'workout',
       start_iso: src.session.completed_at,
       title: src.session.title,
-      subtitle: `${src.session.exercises_count} exercices · ${src.session.duration_min} min`,
+      subtitle: `${src.session.exercises_count} ${ct(lang, 'smart.timeline.exercises')} · ${src.session.duration_min} min`,
       href: `/client/programme/recap/${src.session.id}`,
     })
   }
@@ -130,24 +138,39 @@ export function buildTimeline(src: TimelineSource, tz: string = 'Europe/Paris'):
       id: a.id,
       kind: 'activity',
       start_iso: a.started_at,
-      title: a.custom_label?.trim() || ACTIVITY_LABEL[a.activity_type],
-      subtitle: `${a.duration_min} min · intensité ${a.intensity}/10`,
+      title: a.custom_label?.trim() || ct(lang, ACTIVITY_LABEL_KEY[a.activity_type]),
+      subtitle: `${a.duration_min} min · ${ct(lang, 'smart.timeline.intensity')} ${a.intensity}/10`,
     })
   }
 
   // Checkins
   for (const c of src.checkins) {
     const parts: string[] = []
-    if (c.sleep_h != null) parts.push(`${c.sleep_h}h sommeil`)
-    if (c.energy != null) parts.push(`énergie ${c.energy}/10`)
-    if (c.stress != null) parts.push(`stress ${c.stress}/10`)
+    if (c.sleep_h != null) parts.push(`${c.sleep_h}h ${ct(lang, 'smart.timeline.sleep')}`)
+    if (c.energy != null) parts.push(`${ct(lang, 'smart.timeline.energy')} ${c.energy}/10`)
+    if (c.stress != null) parts.push(`${ct(lang, 'smart.timeline.stress')} ${c.stress}/10`)
     entries.push({
       id: c.id,
       kind: 'checkin',
       start_iso: c.logged_at,
-      title: 'Check-in',
+      title: ct(lang, 'smart.radial.checkin'),
       subtitle: parts.join(' · '),
     })
+  }
+
+  // Appointments
+  if (src.appointments) {
+    for (const appt of src.appointments) {
+      const timeLabel = new Intl.DateTimeFormat('fr-FR', { timeStyle: 'short' }).format(new Date(appt.starts_at))
+      entries.push({
+        id: appt.id,
+        kind: 'appointment',
+        start_iso: appt.starts_at,
+        title: appt.title,
+        subtitle: `${appt.meeting_kind === 'video' ? 'Visioconférence' : appt.meeting_kind === 'phone' ? 'Téléphone' : appt.meeting_kind === 'in_person' ? 'Présentiel' : 'Appel'} · ${timeLabel}`,
+        href: `/client/rendez-vous/${appt.id}`,
+      })
+    }
   }
 
   return entries.sort((a, b) => a.start_iso.localeCompare(b.start_iso))

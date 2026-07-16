@@ -8,8 +8,6 @@ import {
   Scan,
   Utensils,
   Dumbbell,
-  HeartPulse,
-  BarChart3,
   CreditCard,
   Euro,
   Activity,
@@ -31,15 +29,15 @@ export type DockBottomItem = {
 export function useDockBottom(): DockBottomItem[] {
   const pathname = usePathname();
 
-  // Lab — client ouvert — Data & Analyse
+  // Lab — client ouvert — Suivi
   if (pathname.includes("/coach/clients/") && pathname.includes("/data")) {
     const clientId = pathname.split("/coach/clients/")[1]?.split("/")[0];
     return [
-      { id: "metriques", label: "Métriques", href: `/coach/clients/${clientId}/data/metriques`, icon: BarChart2 },
       { id: "bilans", label: "Bilans", href: `/coach/clients/${clientId}/data/bilans`, icon: ClipboardList },
-      { id: "performances", label: "Performances", href: `/coach/clients/${clientId}/data/performances`, icon: TrendingUp },
-      { id: "nutrition", label: "Nutrition", href: `/coach/clients/${clientId}/data/nutrition`, icon: Utensils },
+      { id: "metriques", label: "Métriques", href: `/coach/clients/${clientId}/data/metriques`, icon: BarChart2 },
       { id: "morphopro", label: "MorphoPro", href: `/coach/clients/${clientId}/data/morphopro`, icon: Scan },
+      { id: "nutrition", label: "Nutrition", href: `/coach/clients/${clientId}/data/nutrition`, icon: Utensils },
+      { id: "performances", label: "Performances", href: `/coach/clients/${clientId}/data/performances`, icon: TrendingUp },
     ];
   }
 
@@ -49,8 +47,6 @@ export function useDockBottom(): DockBottomItem[] {
     return [
       { id: "nutrition", label: "Nutrition", href: `/coach/clients/${clientId}/protocoles/nutrition`, icon: Utensils },
       { id: "entrainement", label: "Workout Studio", href: `/coach/clients/${clientId}/protocoles/entrainement`, icon: Dumbbell },
-      { id: "cardio", label: "Cardio", href: `/coach/clients/${clientId}/protocoles/cardio`, icon: HeartPulse },
-      { id: "composition", label: "Composition", href: `/coach/clients/${clientId}/protocoles/composition`, icon: BarChart3 },
     ];
   }
 
@@ -59,7 +55,7 @@ export function useDockBottom(): DockBottomItem[] {
     const clientId = pathname.split("/coach/clients/")[1]?.split("/")[0];
     return [
       { id: "profil", label: "Profil", href: `/coach/clients/${clientId}/profil`, icon: UserCircle },
-      { id: "data", label: "Data & Analyse", href: `/coach/clients/${clientId}/data/metriques`, icon: BarChart2 },
+      { id: "data", label: "Suivi", href: `/coach/clients/${clientId}/data/bilans`, icon: BarChart2 },
       { id: "protocoles", label: "Protocoles", href: `/coach/clients/${clientId}/protocoles/nutrition`, icon: Layers },
     ];
   }
@@ -79,8 +75,6 @@ export function useDockBottom(): DockBottomItem[] {
     return [
       { id: "nutrition", label: "Nutrition", href: "", icon: Utensils },
       { id: "entrainement", label: "Workout Studio", href: "", icon: Dumbbell },
-      { id: "cardio", label: "Cardio", href: "", icon: HeartPulse },
-      { id: "composition", label: "Composition", href: "", icon: BarChart3 },
     ];
   }
 

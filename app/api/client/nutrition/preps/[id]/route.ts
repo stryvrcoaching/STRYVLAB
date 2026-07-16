@@ -11,6 +11,8 @@ import {
   prepEntrySchema,
 } from "@/lib/nutrition/preps-service"
 import type { SmartPrepSlot } from "@/lib/nutrition/simulation-state"
+import { ct } from '@/lib/i18n/clientTranslations'
+import { resolveClientLanguage } from '@/lib/client/resolve-language'
 
 const prepSlotSchema = z.enum(["breakfast", "lunch", "dinner", "snack"])
 
@@ -39,6 +41,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if ("error" in auth) return auth.error
 
   const db = createSupabaseService()
+  const lang = await resolveClientLanguage(db, auth.clientId)
   const { data: existing, error: existingError } = await db
     .from("client_nutrition_preps")
     .select("id, physiological_date, meal_type, meal_slot, variant_group_id, scenario_key, scenario_label, is_active")
@@ -73,7 +76,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const nextMealSlot = (body.data.meal_slot ?? existing.meal_slot ?? body.data.meal_type ?? existing.meal_type ?? "snack") as SmartPrepSlot
   const nextVariantGroupId = body.data.variant_group_id?.trim() || existing.variant_group_id || nextMealSlot
   const nextScenarioKey = body.data.scenario_key?.trim() || existing.scenario_key || "default"
-  const nextScenarioLabel = body.data.scenario_label?.trim() || existing.scenario_label || "Scénario principal"
+  const nextScenarioLabel = body.data.scenario_label?.trim() || existing.scenario_label || ct(lang, 'nutrition.scenario.main')
   update.meal_slot = nextMealSlot
   update.variant_group_id = nextVariantGroupId
   update.scenario_key = nextScenarioKey

@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { Dumbbell, Moon, Activity, HelpCircle } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
+import { Dumbbell, Moon, Activity, HelpCircle, Clock, Layers, Target, Timer } from "lucide-react";
 import type { TrainingWeekSchedule, WeekdayKind } from "@/lib/nutrition/training-week-schedule";
 import {
   WEEKDAY_KIND_LABELS,
@@ -13,7 +13,7 @@ interface Props {
   loading?: boolean;
   protocolDayNames: string[];
   activeDow?: number | null;
-  onSelectDow?: (dow: number) => void;
+  onSelectDow?: (dow: number | null) => void;
 }
 
 const KIND_STYLES: Record<
@@ -42,6 +42,21 @@ const KIND_STYLES: Record<
   },
 };
 
+function SessionMetricPill({
+  icon,
+  label,
+}: {
+  icon: ReactNode;
+  label: string;
+}) {
+  return (
+    <span className="inline-flex h-5 items-center gap-1 rounded-full bg-white/[0.045] px-2 text-[9px] font-semibold text-white/55">
+      {icon}
+      {label}
+    </span>
+  );
+}
+
 export default function TrainingWeekSchedulePanel({
   schedule,
   loading = false,
@@ -54,9 +69,13 @@ export default function TrainingWeekSchedulePanel({
     const entry = schedule.days.find((d) => d.dow === activeDow);
     if (!entry) return null;
     const name = suggestNutritionDayName(entry.kind, protocolDayNames);
-    if (!name) return null;
     return { entry, name };
   }, [schedule, activeDow, protocolDayNames]);
+
+  const selectedEntry = useMemo(() => {
+    if (!schedule || activeDow == null) return null;
+    return schedule.days.find((day) => day.dow === activeDow) ?? null;
+  }, [schedule, activeDow]);
 
   if (loading) {
     return (
@@ -107,7 +126,7 @@ export default function TrainingWeekSchedulePanel({
               key={day.dow}
               type="button"
               disabled={!onSelectDow}
-              onClick={() => onSelectDow?.(day.dow)}
+              onClick={() => onSelectDow?.(isSelected ? null : day.dow)}
               className={`rounded-lg border-[0.3px] px-1 py-1.5 text-center transition-all ${
                 isSelected
                   ? "border-[#1f8a65]/40 bg-[#1f8a65]/10"
@@ -120,22 +139,63 @@ export default function TrainingWeekSchedulePanel({
               >
                 <Icon size={8} />
               </span>
-              <p className="text-[7px] text-white/35 mt-0.5 leading-tight line-clamp-2">
-                {WEEKDAY_KIND_LABELS[day.kind]}
-              </p>
+              {isSelected && day.summary ? (
+                <p className="mt-1 line-clamp-2 text-[7px] font-semibold leading-tight text-[#6ee7b7]">
+                  {day.summary.name}
+                </p>
+              ) : (
+                <p className="text-[7px] text-white/35 mt-0.5 leading-tight line-clamp-2">
+                  {WEEKDAY_KIND_LABELS[day.kind]}
+                </p>
+              )}
             </button>
           );
         })}
       </div>
 
-      {suggestion && (
+      {selectedEntry?.summary ? (
+        <div className="rounded-lg border-[0.3px] border-[#1f8a65]/20 bg-[#1f8a65]/[0.06] px-2.5 py-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-[10px] font-semibold text-white/80">
+                {schedule.programName}
+              </p>
+              <p className="truncate text-[12px] font-bold text-white">
+                {selectedEntry.summary.name}
+              </p>
+            </div>
+            {suggestion?.name && (
+              <span className="shrink-0 rounded-full bg-[#1f8a65]/15 px-2 py-1 text-[9px] font-semibold text-[#6ee7b7]">
+                {suggestion.name}
+              </span>
+            )}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {selectedEntry.summary.estimatedMinutes != null && (
+              <SessionMetricPill icon={<Clock size={10} />} label={`~${selectedEntry.summary.estimatedMinutes} min`} />
+            )}
+            <SessionMetricPill icon={<Layers size={10} />} label={`${selectedEntry.summary.setCount} sets`} />
+            <SessionMetricPill icon={<Dumbbell size={10} />} label={`${selectedEntry.summary.exerciseCount} ex.`} />
+            {selectedEntry.summary.avgRestSec != null && (
+              <SessionMetricPill icon={<Timer size={10} />} label={`${selectedEntry.summary.avgRestSec}s repos`} />
+            )}
+            {selectedEntry.summary.avgRir != null && (
+              <SessionMetricPill icon={<Target size={10} />} label={`RIR ${selectedEntry.summary.avgRir}`} />
+            )}
+          </div>
+        </div>
+      ) : suggestion && (
         <p className="text-[10px] text-white/45 leading-snug">
           {suggestion.entry.label} : {WEEKDAY_KIND_LABELS[suggestion.entry.kind]}
           {suggestion.entry.sessionNames.length > 0 && (
             <> ({suggestion.entry.sessionNames.join(", ")})</>
           )}
           . Suggestion nutrition :{" "}
-          <span className="text-[#6ee7b7] font-medium">{suggestion.name}</span>
+          {suggestion.name ? (
+            <span className="text-[#6ee7b7] font-medium">{suggestion.name}</span>
+          ) : (
+            <span className="text-white/35">à définir</span>
+          )}
         </p>
       )}
     </div>

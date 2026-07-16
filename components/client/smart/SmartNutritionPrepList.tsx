@@ -7,6 +7,7 @@ import { Check, ChevronDown, ChevronUp, Pencil, Sparkles, Trash2, Wand2 } from "
 import { NUTRITION_UI_COLORS } from "@/lib/nutrition/ui-colors"
 import type { SmartPrepSlot } from "@/lib/nutrition/simulation-state"
 import { useClientT } from "@/components/client/ClientI18nProvider"
+import { FoodIcon } from "@/components/nutrition/FoodIcon"
 
 export interface SmartNutritionPrep {
   id: string
@@ -22,6 +23,9 @@ export interface SmartNutritionPrep {
   entries: Array<{
     food_item_id: string
     name_fr: string
+    category_l1?: string | null
+    category_l2?: string | null
+    icon_key?: string | null
     quantity_g: number
     calories_kcal: number
     protein_g: number
@@ -34,7 +38,14 @@ export interface SmartNutritionPrep {
   total_carbs_g: number
   total_fat_g: number
   total_fiber_g: number
+  consumed_meal_id?: string | null
   planned_for: string | null
+  source_type?: "client_planned" | "coach_plan" | null
+  source_protocol_id?: string | null
+  source_day_position?: number | null
+  source_meal_id?: string | null
+  source_snapshot?: unknown
+  is_virtual?: boolean
 }
 
 
@@ -74,7 +85,7 @@ function PrepCard({ prep, onLogged, onDeleted, onEdit, onToggleActive, slotLabel
     setBusy("log")
     const res = await fetch(`/api/client/nutrition/preps/${prep.id}/log`, { method: "POST" })
     if (res.ok) onLogged(prep.id)
-    else flashError('Erreur lors de la validation. Réessaie.')
+    else flashError(t('nutrition.prep.error.log'))
     setBusy(null)
   }
 
@@ -82,7 +93,7 @@ function PrepCard({ prep, onLogged, onDeleted, onEdit, onToggleActive, slotLabel
     setBusy("delete")
     const res = await fetch(`/api/client/nutrition/preps/${prep.id}`, { method: "DELETE" })
     if (res.ok) onDeleted(prep.id)
-    else flashError('Suppression impossible. Réessaie.')
+    else flashError(t('nutrition.prep.error.delete'))
     setBusy(null)
   }
 
@@ -95,20 +106,20 @@ function PrepCard({ prep, onLogged, onDeleted, onEdit, onToggleActive, slotLabel
   return (
     <motion.div
       layout
-      className={`rounded-2xl overflow-hidden transition-all ${
+      className={`overflow-hidden rounded-[24px] border transition-all ${
         prep.is_active
-          ? "bg-[#111111]"
-          : "bg-[#101010] opacity-80"
+          ? "border-white/[0.08] bg-[#111111]"
+          : "border-white/[0.05] bg-[#101010] opacity-80"
       }`}
     >
       <button
         onClick={() => setExpanded(v => !v)}
         className="w-full flex items-center gap-3 px-4 pt-4 pb-3 text-left"
       >
-        <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
-          prep.is_active ? 'bg-[#818cf8]/12' : 'bg-white/[0.05]'
+        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+          prep.is_active ? 'bg-white/[0.08]' : 'bg-white/[0.05]'
         }`}>
-          <Wand2 size={16} className={prep.is_active ? 'text-[#818cf8]' : 'text-white/55'} />
+          <Wand2 size={16} className={prep.is_active ? 'text-white/82' : 'text-white/55'} />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-semibold text-white truncate">{prep.title || t('prep.preparedMeal')}</p>
@@ -116,7 +127,7 @@ function PrepCard({ prep, onLogged, onDeleted, onEdit, onToggleActive, slotLabel
             <p className="text-[10px] uppercase tracking-[0.12em] text-white/30">Smart Nutrition Prep</p>
             <span className="text-[9px] uppercase tracking-[0.12em] text-white/35">{slotLabels[prep.meal_slot]}</span>
             {prep.is_active ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#818cf8]/12 px-2 py-0.5 text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.16em] text-[#818cf8]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.08] px-2 py-0.5 text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.16em] text-white/78">
                 <Sparkles size={10} />
                 {t('prep.active')}
               </span>
@@ -135,7 +146,7 @@ function PrepCard({ prep, onLogged, onDeleted, onEdit, onToggleActive, slotLabel
       </button>
 
       <div className="px-4 pb-3">
-        <div className="flex gap-3 mb-2">
+        <div className="mb-2 flex gap-3">
           <span className="text-[11px] font-semibold" style={{ color: NUTRITION_UI_COLORS.protein }}>P {prep.total_protein_g}g</span>
           <span className="text-[11px] font-semibold" style={{ color: NUTRITION_UI_COLORS.carbs }}>G {prep.total_carbs_g}g</span>
           <span className="text-[11px] font-semibold" style={{ color: NUTRITION_UI_COLORS.fat }}>L {prep.total_fat_g}g</span>
@@ -154,13 +165,13 @@ function PrepCard({ prep, onLogged, onDeleted, onEdit, onToggleActive, slotLabel
           >
             <div className="px-4 pb-3 space-y-2">
               {prep.is_active && (
-                <div className="rounded-xl bg-[#818cf8]/10 px-3 py-2 text-[11px] text-white/72 leading-relaxed">
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.05] px-3 py-2 text-[11px] leading-relaxed text-white/72">
                   {t('prep.simulationNote')}
                 </div>
               )}
               {prep.entries.map((entry, index) => (
-                <div key={`${entry.food_item_id}-${index}`} className="flex items-center gap-2">
-                  <div className="h-1 w-1 rounded-full bg-white/20" />
+                <div key={`${entry.food_item_id}-${index}`} className="flex items-center gap-2 rounded-xl bg-white/[0.03] px-2.5 py-2">
+                  <FoodIcon food={entry} size={32} />
                   <span className="text-[12px] text-white/65 truncate flex-1">{entry.name_fr}</span>
                   <span className="text-[11px] text-white/35">{entry.quantity_g}g</span>
                   <span className="text-[11px] text-white/45 w-14 text-right">{Math.round(entry.calories_kcal)} kcal</span>
@@ -172,20 +183,20 @@ function PrepCard({ prep, onLogged, onDeleted, onEdit, onToggleActive, slotLabel
                 <p className="text-[11px] text-red-300">{errorMsg}</p>
               </div>
             )}
-            <div className="px-4 pb-4 flex gap-2">
+            <div className="flex gap-2 px-4 pb-4">
               <button
                 onClick={() => onEdit(prep)}
                 disabled={busy !== null}
-                className="h-9 w-9 rounded-xl bg-white/[0.06] text-white/60 flex items-center justify-center disabled:opacity-40 active:scale-95 transition-all"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.06] text-white/60 disabled:opacity-40 active:scale-95 transition-all"
               >
                 <Pencil size={13} />
               </button>
               <button
                 onClick={toggleActive}
                 disabled={busy !== null}
-                className={`h-9 px-3 rounded-xl text-[10px] font-bold uppercase tracking-[0.1em] disabled:opacity-40 active:scale-[0.98] transition-all ${
+                className={`h-9 rounded-xl px-3 text-[10px] font-bold uppercase tracking-[0.1em] disabled:opacity-40 active:scale-[0.98] transition-all ${
                   prep.is_active
-                    ? "bg-[#818cf8]/12 text-[#818cf8]"
+                    ? "bg-white/[0.08] text-white"
                     : "bg-white/[0.04] text-white/55"
                 }`}
               >
@@ -194,7 +205,7 @@ function PrepCard({ prep, onLogged, onDeleted, onEdit, onToggleActive, slotLabel
               <button
                 onClick={logPrep}
                 disabled={busy !== null}
-                className="flex-1 h-9 rounded-xl bg-[#f2f2f2] text-[#080808] text-[11px] font-bold uppercase tracking-[0.1em] flex items-center justify-center gap-1.5 disabled:opacity-40 active:scale-[0.98] transition-all"
+                className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#f2f2f2] text-[11px] font-bold uppercase tracking-[0.1em] text-[#080808] disabled:opacity-40 active:scale-[0.98] transition-all"
               >
                 <Check size={13} />
                 {busy === "log" ? t('prep.validating') : t('prep.validate')}
@@ -202,7 +213,7 @@ function PrepCard({ prep, onLogged, onDeleted, onEdit, onToggleActive, slotLabel
               <button
                 onClick={deletePrep}
                 disabled={busy !== null}
-                className="h-9 w-9 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center disabled:opacity-40 active:scale-95 transition-all"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/10 text-red-400 disabled:opacity-40 active:scale-95 transition-all"
               >
                 <Trash2 size={13} />
               </button>
@@ -220,7 +231,7 @@ export default function SmartNutritionPrepList({
   compact = false,
   activeScenarioKey = 'default',
   onScenarioChange = () => {},
-  scenarioOptions = [{ key: 'default', label: 'Scénario principal' }],
+  scenarioOptions,
   showScenarioChips = true,
 }: {
   initialPreps: SmartNutritionPrep[]
@@ -234,6 +245,7 @@ export default function SmartNutritionPrepList({
   const { t } = useClientT()
   const router = useRouter()
   const [preps, setPreps] = useState(initialPreps)
+  const resolvedScenarioOptions = scenarioOptions ?? [{ key: 'default', label: t('nutrition.scenario.main') }]
 
   const slotLabels: Record<SmartPrepSlot, string> = {
     breakfast: t('compose.slot.breakfast'),
@@ -264,20 +276,24 @@ export default function SmartNutritionPrepList({
       }),
     })
     if (!res.ok) return
+
+    const json = await res.json()
+    const updatedPrep = json?.data as SmartNutritionPrep | undefined
+    if (!updatedPrep) return
+
     setPreps(prev => prev.map(entry => {
-      if (entry.id === prep.id) return { ...entry, is_active: nextActive }
+      if (entry.id === prep.id) return { ...entry, ...updatedPrep }
       if (
-        nextActive &&
+        updatedPrep.is_active &&
         entry.id !== prep.id &&
-        entry.meal_slot === prep.meal_slot &&
-        entry.variant_group_id === prep.variant_group_id &&
-        entry.scenario_key === prep.scenario_key
+        entry.meal_slot === updatedPrep.meal_slot &&
+        entry.variant_group_id === updatedPrep.variant_group_id &&
+        entry.scenario_key === updatedPrep.scenario_key
       ) {
         return { ...entry, is_active: false }
       }
       return entry
     }))
-    router.refresh()
   }
 
   const visiblePreps = preps.filter((prep) => prep.scenario_key === activeScenarioKey)
@@ -298,16 +314,16 @@ export default function SmartNutritionPrepList({
     <section className="space-y-2">
       {showScenarioChips && (
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {scenarioOptions.map((scenario) => {
+          {resolvedScenarioOptions.map((scenario) => {
             const active = scenario.key === activeScenarioKey
-            const displayLabel = scenario.label === "Aujourd'hui" ? "Scénario principal" : scenario.label
+            const displayLabel = scenario.label === t("compose.today") ? t("nutrition.scenario.main") : scenario.label
             return (
               <button
                 key={scenario.key}
                 onClick={() => onScenarioChange(scenario.key)}
                 className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.14em] transition-all ${
                   active
-                    ? 'bg-[#818cf8]/16 text-[#818cf8]'
+                    ? 'bg-[#f2f2f2] text-[#080808]'
                     : 'bg-[#111114] text-white/42 hover:text-white/72'
                 }`}
               >
@@ -325,7 +341,7 @@ export default function SmartNutritionPrepList({
       )}
       {visiblePreps.length === 0 && (
         <div className="rounded-2xl bg-[#111114] px-4 py-4">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-[#818cf8] font-semibold">{t('prep.scenarioReady')}</p>
+          <p className="text-[10px] uppercase tracking-[0.16em] text-white/62 font-semibold">{t('prep.scenarioReady')}</p>
           <p className="text-[12px] text-white/62 mt-1">{t('prep.scenarioEmpty')}</p>
         </div>
       )}

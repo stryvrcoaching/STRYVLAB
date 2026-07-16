@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { fetchClientTdeeState } from '@/lib/nutrition/tdee-state'
 
 function svc() {
   return createServiceClient(
@@ -26,6 +27,7 @@ export async function GET(req: NextRequest) {
 
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - days)
+  const clientTdeeState = await fetchClientTdeeState(svc() as any, cc.id)
 
   // Fetch sparse adaptive TDEE history points
   const { data: history, error } = await svc()
@@ -37,21 +39,10 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Always fetch the protocol-level tdee_adaptive as the authoritative reference.
-  // This is what Nutrition Studio shows and is updated each time the coach applies adaptive TDEE.
-  const { data: protocol } = await svc()
-    .from('nutrition_protocols')
-    .select('tdee_adaptive, tdee_adaptive_at, tdee_data_source')
-    .eq('client_id', cc.id)
-    .eq('status', 'shared')
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const protocolTdee: number | null = (protocol as any)?.tdee_adaptive ?? null
-
   return NextResponse.json({
     history: history ?? [],
-    protocolTdee,
+    clientTdee: clientTdeeState?.current_tdee ?? null,
+    clientTdeeAt: clientTdeeState?.current_tdee_at ?? null,
+    stabilityStatus: clientTdeeState?.stability_status ?? null,
   })
 }

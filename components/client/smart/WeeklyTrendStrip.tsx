@@ -1,13 +1,15 @@
+import { useClientT } from '@/components/client/ClientI18nProvider'
 import { NUTRITION_UI_COLORS } from '@/lib/nutrition/ui-colors'
 
 type Point = { date: string; consumed: number; target: number }
 
 export default function WeeklyTrendStrip({ trend }: { trend: Point[] }) {
+  const { t } = useClientT()
   const today = new Date().toISOString().slice(0, 10)
   return (
     <div className="bg-[#111111] rounded-2xl p-4">
       <div className="font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[11px] text-white mb-3">
-        7 derniers jours
+        {t('programme.period.7d')}
       </div>
       <div className="flex items-end gap-2 h-[60px]">
         {trend.map(p => {

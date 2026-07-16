@@ -26,13 +26,13 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!program) return NextResponse.json({ error: 'Programme introuvable' }, { status: 404 })
 
   const body = await req.json()
-  const { name, sets, reps, rest_sec, tempo, rir, notes, position, set_prescriptions } = body
+  const { name, sets, reps, rest_sec, tempo, rir, notes, position, set_prescriptions, superset_rest_mode } = body
   if (!name) return NextResponse.json({ error: 'name requis' }, { status: 400 })
 
-  const { primary_muscles, secondary_muscles } = body
+  const { primary_muscles, secondary_muscles, execution_type, target_hr_zone } = body
   const { data, error } = await service()
     .from('program_exercises')
-    .insert({ session_id: params.sessionId, name, sets: sets ?? 3, reps: reps ?? '8-12', rest_sec, tempo, rir, notes, position: position ?? 0, primary_muscles: primary_muscles ?? [], secondary_muscles: secondary_muscles ?? [], set_prescriptions: set_prescriptions ?? null })
+    .insert({ session_id: params.sessionId, name, sets: sets ?? 3, reps: reps ?? '8-12', rest_sec, tempo, rir, notes, position: position ?? 0, primary_muscles: primary_muscles ?? [], secondary_muscles: secondary_muscles ?? [], set_prescriptions: set_prescriptions ?? null, superset_rest_mode: superset_rest_mode ?? 'after_round', execution_type: execution_type ?? 'reps_rir', target_hr_zone: target_hr_zone ?? null })
     .select()
     .single()
 
@@ -81,6 +81,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
       target_rir: e.target_rir ?? e.rir ?? null,
       weight_increment_kg: e.weight_increment_kg ?? 2.5,
       set_prescriptions: e.set_prescriptions ?? null,
+      superset_rest_mode: e.superset_rest_mode ?? 'after_round',
+      execution_type: e.execution_type ?? 'reps_rir',
+      target_hr_zone: e.target_hr_zone ?? null,
     }))
     const { error } = await db.from('program_exercises').insert(rows)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

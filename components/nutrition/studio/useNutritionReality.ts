@@ -39,8 +39,8 @@ export type NutritionRealityPayload = {
     }>;
   };
   energy: {
-    protocolTdee: number | null;
-    protocolTdeeAt: string | null;
+    clientTdee: number | null;
+    clientTdeeAt: string | null;
     tdeeDataSource: string | null;
     tdeeHistory: Array<{
       calculated_at: string;

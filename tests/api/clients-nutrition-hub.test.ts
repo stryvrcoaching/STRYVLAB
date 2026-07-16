@@ -5,6 +5,30 @@ const mocks = createSupabaseMocks();
 
 vi.mock("@/utils/supabase/server", () => ({ createClient: () => mocks.serverMock }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => mocks.serviceMock }));
+vi.mock("@/lib/nutrition/smoothing/coach-service", () => ({
+  buildCoachSmoothingState: vi.fn(async () => ({
+    date: new Date().toISOString().slice(0, 10),
+    protocolId: "protocol-1",
+    protocolName: "Protocole",
+    activePlan: null,
+    proposal: {
+      eligible: false,
+      thresholdKcal: 150,
+      rawDeltaKcal: 0,
+      smoothableDeltaKcal: 0,
+      direction: null,
+      recommendedDurationDays: null,
+    },
+    previewDays: [],
+  })),
+  ensureCoachSmoothingRecommendationNotification: vi.fn(async () => undefined),
+}));
+vi.mock("@/lib/nutrition/tdee-state", () => ({
+  fetchClientTdeeState: vi.fn(async () => ({
+    current: null,
+    history: [],
+  })),
+}));
 
 import { GET } from "@/app/api/clients/[clientId]/nutrition-hub/route";
 import { NextRequest } from "../mocks/next-server";
@@ -111,6 +135,50 @@ describe("GET /api/clients/[clientId]/nutrition-hub", () => {
         ],
         error: null,
       },
+      {
+        data: {
+          id: "plan-1",
+          client_id: "client-1",
+          coach_id: "coach-123",
+          source_date: "2026-06-28",
+          source_target_kcal: 2200,
+          source_consumed_kcal: 2500,
+          threshold_kcal: 50,
+          raw_delta_kcal: 300,
+          smoothable_delta_kcal: 250,
+          direction: "surplus",
+          duration_days: 3,
+          strategy: "recommended",
+          status: "active",
+          created_by: "client",
+          client_decision: "confirmed",
+          replaced_by_plan_id: null,
+          coach_note: "On garde ça court.",
+          coach_note_updated_at: new Date().toISOString(),
+          coach_last_action: "noted",
+          nutrition_smoothing_plan_days: [
+            {
+              id: "day-1",
+              plan_id: "plan-1",
+              date: new Date().toISOString().slice(0, 10),
+              sequence_index: 0,
+              resolved_bucket: "neutral_day",
+              source_day_label: "Jour",
+              day_weight: 1,
+              base_target_kcal: 2200,
+              cycle_synced_target_kcal: 2200,
+              kcal_delta: -80,
+              protein_delta_g: 0,
+              carbs_delta_g: -20,
+              fat_delta_g: 0,
+              status: "pending",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          ],
+        },
+        error: null,
+      },
     ]);
 
     const response = await GET(
@@ -126,5 +194,6 @@ describe("GET /api/clients/[clientId]/nutrition-hub", () => {
     expect(body.agenda).toBeInstanceOf(Array);
     expect(body.energy).toBeDefined();
     expect(body.availableWindows).toEqual([3, 7, 14, 30]);
+    expect(body.activeSmoothingPlan?.id).toBe("plan-1");
   }, 15000);
 });

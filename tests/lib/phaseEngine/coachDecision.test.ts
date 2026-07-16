@@ -156,4 +156,25 @@ describe('buildCoachDecision', () => {
     expect(decision.matrix.status).toBe('not_adapted')
     expect(decision.headline).toBe('Phase non adaptée: adhérence trop faible')
   })
+
+  it('turns a fat-gain verdict into a concrete composition-control plan', () => {
+    const raw = makeRawInput({ anchorDate: ANCHOR_DATE })
+    const signals = buildDerivedSignals(raw)
+    const result = computePhaseOptimization(signals)
+    result.phaseMatrix = {
+      rule: 'fat_gain_mismatch',
+      status: 'not_adapted',
+      priority: 'high',
+      matchedConditions: ['high_fat_gain_risk', 'body_response_off_target'],
+    }
+
+    const decision = buildCoachDecision(result, signals, raw, 'fr')
+
+    expect(decision.recommendation).toContain('Resserrer la phase')
+    expect(decision.sevenDayTrajectory.title).toBe('Contrôle compositionnel 7 jours')
+    expect(decision.sevenDayTrajectory.summary).toContain('vérifier l’exécution calorique')
+    expect(decision.sevenDayTrajectory.days[0].exitCriteria).toContain(
+      'Une mesure BF ou du tour de taille confirme la tendance',
+    )
+  })
 })

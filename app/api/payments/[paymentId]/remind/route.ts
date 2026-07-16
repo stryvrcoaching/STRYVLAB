@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { sendPaymentReminderEmail } from '@/lib/email/mailer'
+import { z } from 'zod'
 
 function serviceClient() {
   return createServiceClient(
@@ -9,6 +10,7 @@ function serviceClient() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 }
+const idSchema = z.string().uuid()
 
 // ─── POST /api/payments/[paymentId]/remind ────────────────────────────────────
 // Manual payment reminder: sends an email to the client for a pending payment.
@@ -19,6 +21,9 @@ export async function POST(
   const supabase = createServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  if (!idSchema.safeParse(params.paymentId).success) {
+    return NextResponse.json({ error: 'Paiement introuvable' }, { status: 404 })
+  }
 
   const db = serviceClient()
 
@@ -43,6 +48,7 @@ export async function POST(
     .from('coach_clients')
     .select('first_name, last_name, email')
     .eq('id', payment.client_id)
+    .eq('coach_id', user.id)
     .single()
 
   if (!client?.email) {
@@ -71,6 +77,7 @@ export async function POST(
     .from('subscription_payments')
     .update({ reminder_sent_at: new Date().toISOString() })
     .eq('id', params.paymentId)
+    .eq('coach_id', user.id)
 
   return NextResponse.json({ sent: true })
 }

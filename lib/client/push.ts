@@ -9,13 +9,18 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return output
 }
 
-export async function subscribeToPush(): Promise<string | null> {
+export async function subscribeToPush(options: { forceRenew?: boolean } = {}): Promise<string | null> {
   if (typeof window === 'undefined') return null
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null
   if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return null
 
   const registration = await navigator.serviceWorker.ready
   let subscription = await registration.pushManager.getSubscription()
+
+  if (subscription && options.forceRenew) {
+    await subscription.unsubscribe()
+    subscription = null
+  }
 
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({

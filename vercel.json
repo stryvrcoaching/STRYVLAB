@@ -1,8 +1,24 @@
 {
   "crons": [
     {
+      "path": "/api/cron/adaptive-tdee",
+      "schedule": "0 4 * * *"
+    },
+    {
       "path": "/api/cron/expire-subscriptions",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/payment-reminders",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/coach-trial-onboarding",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/account-purge",
+      "schedule": "30 2 * * *"
     }
   ]
 }

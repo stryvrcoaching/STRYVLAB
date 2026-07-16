@@ -1,19 +1,13 @@
 'use client'
 
 import type { CyclePhase } from '@/lib/cycle/cycleEngine'
+import { useClientT } from '@/components/client/ClientI18nProvider'
 
 const PHASE_COLORS: Record<CyclePhase, string> = {
   follicular: '#22c55e',
   ovulatory:  '#fbbf24',
   luteal:     '#a855f7',
   menstrual:  '#ef4444',
-}
-
-const PHASE_LABELS: Record<CyclePhase, string> = {
-  follicular: 'Folliculaire',
-  ovulatory:  'Ovulation',
-  luteal:     'Lutéale',
-  menstrual:  'Règles',
 }
 
 function getPhaseProgress(
@@ -77,8 +71,9 @@ export default function CycleArcIndicator({
   confidence,
   onClick,
 }: Props) {
+  const { t } = useClientT()
   const phaseColor = PHASE_COLORS[phase]
-  const phaseLabel = PHASE_LABELS[phase]
+  const phaseLabel = phase === 'menstrual' ? t('cycle.phase.menstrual.full') : t(`cycle.phase.${phase}`)
 
   const { elapsed, total } = getPhaseProgress(phase, cycleDay, avgCycleLength, menstrualLength)
   const phasePct = total > 0 ? Math.max(0, elapsed) / total : 0
@@ -101,7 +96,7 @@ export default function CycleArcIndicator({
           {phaseLabel}
         </p>
         <p className="text-[8px] text-white/30 leading-tight">
-          J{cycleDay}/{avgCycleLength}
+          {t('cycle.day.short', { day: cycleDay })}/{avgCycleLength}
           {confidence === 'estimated' && ' ◐'}
         </p>
       </div>

@@ -106,6 +106,21 @@ function smoothedTrendSubtitle(locale: PhaseEngineLocale, windowDays: number): s
   return `(Tendance lissée ${windowDays}j)`
 }
 
+function missingMetricSubtitle(
+  locale: PhaseEngineLocale,
+  metric: 'weight' | 'bodyFat',
+  windowDays: number,
+): string {
+  if (locale === 'en') {
+    return metric === 'weight'
+      ? `No weight logged in the last ${windowDays} days`
+      : `No body-fat measurement in the last ${windowDays} days`
+  }
+  return metric === 'weight'
+    ? `Aucun poids saisi sur les ${windowDays} derniers jours`
+    : `Aucune mesure BF sur les ${windowDays} derniers jours`
+}
+
 function defaultZoneLabel(zone: FooterMetricZone | null, locale: PhaseEngineLocale): string | undefined {
   if (!zone) return undefined
   const labels =
@@ -166,7 +181,7 @@ export function buildPhaseFooterMetricCards(
       const zoneRank = { poor: 0, average: 1, optimal: 2 }
       if (zoneRank[checkinZone] > zoneRank[sleepZone]) {
         sleepZoneLabel =
-          locale === 'en' ? 'Insufficient recovery' : 'Récup. insuffisante'
+          locale === 'en' ? 'Insufficient recovery' : 'Récupération insuffisante'
       }
     }
   } else if (sleepFromRecovery != null) {
@@ -211,7 +226,7 @@ export function buildPhaseFooterMetricCards(
           zoneLabel: defaultZoneLabel(weightTrendToZone(signals.weightTrend), locale),
           subtitle,
         }
-      : { ...emptyCard(), subtitle },
+      : { ...emptyCard(), subtitle: missingMetricSubtitle(locale, 'weight', windowDays) },
     bodyFat: smoothedBodyFat != null
       ? {
           value: smoothedBodyFat.toFixed(1),
@@ -220,7 +235,7 @@ export function buildPhaseFooterMetricCards(
           zoneLabel: defaultZoneLabel(bodyFatTrendToZone(signals.bodyFatTrend), locale),
           subtitle,
         }
-      : { ...emptyCard(), subtitle },
+      : { ...emptyCard(), subtitle: missingMetricSubtitle(locale, 'bodyFat', windowDays) },
     sleep: sleepValue != null
       ? {
           value: sleepValue,

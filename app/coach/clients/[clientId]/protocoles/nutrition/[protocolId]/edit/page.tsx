@@ -11,9 +11,11 @@ export default function EditNutritionProtocolPage() {
   const protocolId = params.protocolId as string
 
   const [protocol, setProtocol] = useState<NutritionProtocol | null>(null)
+  const [loading, setLoading] = useState(true)
   const [error,    setError]    = useState('')
 
   useEffect(() => {
+    setLoading(true)
     fetch(`/api/clients/${clientId}/nutrition-protocols/${protocolId}`)
       .then(r => r.json())
       .then(d => {
@@ -21,6 +23,7 @@ export default function EditNutritionProtocolPage() {
         else setError('Protocole introuvable')
       })
       .catch(() => setError('Erreur réseau'))
+      .finally(() => setLoading(false))
   }, [clientId, protocolId])
 
   if (error) {
@@ -28,6 +31,23 @@ export default function EditNutritionProtocolPage() {
       <main className="min-h-screen bg-[#121212]">
         <div className="px-6 pt-10 text-center">
           <p className="text-[14px] text-white/50">{error}</p>
+        </div>
+      </main>
+    )
+  }
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#121212]">
+        <div className="px-6 py-6">
+          <div className="space-y-4 animate-pulse">
+            <div className="h-10 w-56 rounded-xl bg-white/[0.05]" />
+            <div className="grid gap-4 xl:grid-cols-[280px_320px_1fr]">
+              <div className="h-[720px] rounded-2xl bg-white/[0.04]" />
+              <div className="h-[720px] rounded-2xl bg-white/[0.04]" />
+              <div className="h-[720px] rounded-2xl bg-white/[0.04]" />
+            </div>
+          </div>
         </div>
       </main>
     )

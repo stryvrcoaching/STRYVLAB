@@ -1,5 +1,7 @@
 'use client'
 
+import { useClientT } from '@/components/client/ClientI18nProvider'
+
 interface DataPoint {
   date: string
   value: number
@@ -17,12 +19,8 @@ interface Props {
   unit: string
 }
 
-function formatDate(d: string): string {
-  const dt = new Date(d + 'T00:00:00')
-  return dt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-}
-
 export default function MetricExpandedChart({ series, annotations = [], unit }: Props) {
+  const { t } = useClientT()
   if (series.length === 0) return null
 
   const W = 280
@@ -96,9 +94,9 @@ export default function MetricExpandedChart({ series, annotations = [], unit }: 
 
       <div className="grid grid-cols-3 gap-2 pt-1">
         {[
-          { label: 'MIN', value: `${minV}${unit}` },
-          { label: 'MOY', value: `${avg}${unit}` },
-          { label: 'MAX', value: `${maxV}${unit}` },
+          { label: t('common.min.short'), value: `${minV}${unit}` },
+          { label: t('common.avg.short'), value: `${avg}${unit}` },
+          { label: t('common.max.short'), value: `${maxV}${unit}` },
         ].map(({ label, value }) => (
           <div key={label} className="text-center">
             <p className="text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.12em] text-[#5a5a5a]">{label}</p>

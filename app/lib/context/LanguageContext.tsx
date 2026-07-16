@@ -27,7 +27,7 @@ export function LanguageProvider({
     if (initialLanguage && initialLanguage !== language) {
       setLanguage(initialLanguage as Language);
     }
-  }, [initialLanguage]);
+  }, [initialLanguage, language]);
 
   const switchLanguage = (lang: Language) => {
     setLanguage(lang);

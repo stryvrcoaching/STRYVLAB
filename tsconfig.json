@@ -1,6 +1,14 @@
 {
   "compilerOptions": {
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext",
+      "webworker"
+    ],
+    "types": [
+      "@serwist/next/typings"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -18,9 +26,24 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
-    }
+      "@/*": [
+        "./*"
+      ]
+    },
+    "target": "ES2017"
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "components/PhaseTimeline.tsx", ".next/types/app/outils/1rm/OneRMCalculator.tsx", ".next/types/app/outils/body-fat/BodyFatCalculator.tsx"],
-  "exclude": ["node_modules", "scripts"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "components/PhaseTimeline.tsx",
+    ".next/types/app/outils/1rm/OneRMCalculator.tsx",
+    ".next/types/app/outils/body-fat/BodyFatCalculator.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "scripts",
+    "public/sw.js"
+  ]
 }

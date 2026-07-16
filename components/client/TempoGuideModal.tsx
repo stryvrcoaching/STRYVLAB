@@ -489,7 +489,7 @@ function TempoGuideModalInner({
     }
 
     rafRef.current = requestAnimationFrame(tick)
-  }, [reps, repDuration, phaseDurations, vib, hapticsEnabled])
+  }, [reps, repDuration, phaseDurations, vib])
 
   useEffect(() => {
     if (countdown !== null) return
@@ -653,7 +653,7 @@ function TempoGuideModalInner({
   )
 
   return (
-    <AnimatePresence onExitComplete={() => onClose(closingResult ?? { plannedReps: reps, bonusReps: 0, totalReps: reps })}>
+    <AnimatePresence initial={false} onExitComplete={() => onClose(closingResult ?? { plannedReps: reps, bonusReps: 0, totalReps: reps })}>
       {!closing && (
         <motion.div
           key="tempo-guide"
@@ -750,7 +750,9 @@ function TempoGuideModalInner({
                     <button
                       onClick={(e) => { e.stopPropagation(); handleClose() }}
                       style={{
-                        position: 'absolute', top: 20, right: 20,
+                        position: 'absolute',
+                        top: 'max(20px, env(safe-area-inset-top))',
+                        right: 'max(20px, env(safe-area-inset-right))',
                         width: 36, height: 36, borderRadius: 12,
                         background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.12)',
                         cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -846,14 +848,26 @@ function TempoGuideModalInner({
                   {countdown === 0 && (
                     <motion.div key="go" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                       style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                      <span style={{ fontSize: 80, color: ACCENT_TEMPO, fontFamily: 'monospace', fontWeight: 900 }}>GO</span>
+                      <span style={{ fontSize: 80, color: ACCENT_TEMPO, fontFamily: 'monospace', fontWeight: 900 }}>{t('tempo.go')}</span>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
 
               {/* Panneau droit — 180px, flex-col, tout centré verticalement */}
-              <div style={{ width: 180, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px 16px 16px 12px', borderLeft: '1px solid rgba(255,255,255,0.04)' }}>
+              <div
+                style={{
+                  width: 180,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  paddingTop: 'max(16px, env(safe-area-inset-top))',
+                  paddingRight: 'max(16px, env(safe-area-inset-right))',
+                  paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+                  paddingLeft: 12,
+                  borderLeft: '1px solid rgba(255,255,255,0.04)'
+                }}
+              >
                 {/* Nom exercice + fermer */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                   <div>
@@ -911,7 +925,18 @@ function TempoGuideModalInner({
                Header compact → Courbe flex-1 → Label+Timer → Barres → Counter */
             <>
               {/* Header */}
-              <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '48px 20px 12px' }}>
+              <div
+                style={{
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingTop: 'max(24px, env(safe-area-inset-top))',
+                  paddingLeft: 20,
+                  paddingRight: 20,
+                  paddingBottom: 12
+                }}
+              >
                 <div>
                   <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', marginBottom: 2 }}>Tempo guide</p>
                   <p style={{ fontSize: 16, fontWeight: 700, color: 'white' }}>{exerciseName}</p>
@@ -957,7 +982,7 @@ function TempoGuideModalInner({
                   {countdown === 0 && (
                     <motion.div key="go" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                       style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                      <span style={{ fontSize: 96, color: ACCENT_TEMPO, fontFamily: 'monospace', fontWeight: 900 }}>GO</span>
+                      <span style={{ fontSize: 96, color: ACCENT_TEMPO, fontFamily: 'monospace', fontWeight: 900 }}>{t('tempo.go')}</span>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -972,7 +997,7 @@ function TempoGuideModalInner({
                   ref={phaseLabelRef}
                   style={{ fontFamily: 'var(--font-barlow-condensed, sans-serif)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.18em', fontSize: 28, color: countdown !== null ? ACCENT_TEMPO : phaseColor }}
                 >
-                  {countdown !== null ? 'PRÊT' : PHASE_CONFIG[currentPhase].label}
+                  {countdown !== null ? t('tempo.ready') : PHASE_CONFIG[currentPhase].label}
                 </span>
                 {countdown === null && (
                   <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 3, letterSpacing: '0.06em' }}>

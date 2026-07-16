@@ -29,22 +29,22 @@ export default function NutritionQualityPanel({
         </p>
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <article className="rounded-[20px] border border-white/[0.06] bg-white/[0.03] p-4">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <article className="rounded-[22px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] p-4">
           <p className="text-[30px] font-semibold text-white">{dataQuality.validDays}</p>
           <p className="mt-2 text-[12px] text-white/46">Jours valides</p>
         </article>
-        <article className="rounded-[20px] border border-white/[0.06] bg-white/[0.03] p-4">
+        <article className="rounded-[22px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] p-4">
           <p className="text-[30px] font-semibold text-white">{dataQuality.partialDays}</p>
           <p className="mt-2 text-[12px] text-white/46">Jours partiels</p>
         </article>
-        <article className="rounded-[20px] border border-white/[0.06] bg-white/[0.03] p-4">
+        <article className="rounded-[22px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] p-4">
           <p className="text-[30px] font-semibold text-white">
             {dataQuality.missingMealDays}
           </p>
           <p className="mt-2 text-[12px] text-white/46">Repas absents</p>
         </article>
-        <article className="rounded-[20px] border border-white/[0.06] bg-white/[0.03] p-4">
+        <article className="rounded-[22px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] p-4">
           <p className="text-[30px] font-semibold text-white">
             {dataQuality.missingHydrationDays}
           </p>

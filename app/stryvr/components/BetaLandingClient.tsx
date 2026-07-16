@@ -4,6 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import { HeroPhoneStack, AppMockup } from './AppMockup';
 import { BetaForm } from './BetaForm';
+import { AnalyticsConsentBanner } from '@/components/analytics/AnalyticsConsentBanner';
+import { PublicPageTracker } from '@/components/analytics/PublicPageTracker';
+import { trackProductEvent } from '@/lib/analytics/browser';
 
 /* ═══════════════════════════════════════════
    DA TECHNOGYM — tokens STRYVR
@@ -62,10 +65,18 @@ function SectionH2({ children }: { children: React.ReactNode }) {
 }
 
 /* ─── OUTLINE BUTTON ──────────────────────── */
-function OutlineBtn({ children, href }: { children: React.ReactNode; href: string }) {
+function OutlineBtn({ children, href, featureKey }: { children: React.ReactNode; href: string; featureKey: string }) {
   return (
     <a
       href={href}
+      onClick={() => {
+        void trackProductEvent({
+          eventName: 'cta_clicked',
+          source: 'stryvr-landing',
+          featureKey,
+          pagePath: '/stryvr',
+        });
+      }}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 8,
         height: 44, padding: '0 20px',
@@ -105,6 +116,14 @@ function Navbar() {
         {/* CTA desktop */}
         <a
           href="#waitlist"
+          onClick={() => {
+            void trackProductEvent({
+              eventName: 'cta_clicked',
+              source: 'stryvr-landing',
+              featureKey: 'navbar_waitlist',
+              pagePath: '/stryvr',
+            });
+          }}
           style={{
             display: 'none',
             height: 36,
@@ -321,7 +340,7 @@ function AppSection() {
             ))}
           </div>
 
-          <OutlineBtn href="#waitlist">ACCÈS BÊTA</OutlineBtn>
+          <OutlineBtn href="#waitlist" featureKey="midpage_waitlist">ACCÈS BÊTA</OutlineBtn>
         </motion.div>
       </div>
     </Section>
@@ -520,6 +539,8 @@ function Footer() {
 export function BetaLandingClient({ betaCount }: { betaCount: number }) {
   return (
     <div style={{ backgroundColor: BG, color: '#ffffff', minHeight: '100vh' }}>
+      <AnalyticsConsentBanner source="stryvr-landing" pagePath="/stryvr" featureKey="landing_page" />
+      <PublicPageTracker source="stryvr-landing" pagePath="/stryvr" featureKey="landing_page" />
       <Navbar />
       <HeroSection betaCount={betaCount} />
       <StatsSection />

@@ -12,7 +12,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     setupFiles: ['./tests/setup.ts'],
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'lib/**/*.test.ts'],
     coverage: {
       reporter: ['text', 'lcov'],
       include: ['app/api/**/*.ts'],

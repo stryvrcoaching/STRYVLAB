@@ -2,8 +2,9 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/utils/supabase/client";
-import { KeyRound, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -135,8 +136,8 @@ export default function ResetPasswordPage() {
     <main className="min-h-screen bg-[#121212] flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-white/[0.02] rounded-2xl p-8">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-9 h-9 rounded-xl bg-[#1f8a65]/15 flex items-center justify-center">
-            <KeyRound size={16} className="text-[#1f8a65]" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-[#181818]">
+            <Image src="/images/logo.png" alt="STRYV lab" width={28} height={28} className="h-7 w-7 object-contain brightness-0 invert" />
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/30">

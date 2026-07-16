@@ -1,61 +1,45 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, CheckCircle } from 'lucide-react'
 import { useClientT } from './ClientI18nProvider'
-
-const FIELD_CONFIG: Record<string, { emoji: string; min: number; max: number; step: number }> = {
-  sleep_duration: { emoji: '🌙', min: 0, max: 14, step: 0.5 },
-  sleep_quality:  { emoji: '😴', min: 1, max: 5, step: 1 },
-  energy:         { emoji: '⚡', min: 1, max: 5, step: 1 },
-  stress:         { emoji: '🧘', min: 1, max: 5, step: 1 },
-  mood:           { emoji: '😊', min: 1, max: 5, step: 1 },
-}
+import useBodyScrollLock from './useBodyScrollLock'
+import PointsEarnedOverlay from './PointsEarnedOverlay'
+import CheckinSavingOverlay from './checkin/CheckinSavingOverlay'
+import { formatCheckinStepValue, getCheckinUiSteps, getDefaultCheckinStepValue, type CheckinUiStep } from '@/lib/client/checkin/presentation'
+import { emitClientInboxUpdated } from '@/lib/client/inboxEvents'
 
 interface Props {
   moment: 'morning' | 'evening'
   open: boolean
   onClose: () => void
   onSuccess?: () => void
+  date?: string
 }
 
-export default function CheckinModal({ moment, open, onClose, onSuccess }: Props) {
-  const { t } = useClientT()
+export default function CheckinModal({ moment, open, onClose, onSuccess, date }: Props) {
+  const { t, lang } = useClientT()
+  const uiCopy = {
+    section: t('checkin.modal.section'),
+    response: t('checkin.modal.response'),
+    skip: t('checkin.modal.skip'),
+    inputHint: t('checkin.modal.inputHint'),
+  }
+  useBodyScrollLock(open)
   const [loading, setLoading] = useState(true)
   const [configId, setConfigId] = useState('')
-  const [fields, setFields] = useState<string[]>([])
+  const [steps, setSteps] = useState<CheckinUiStep[]>([])
   const [values, setValues] = useState<Record<string, number>>({})
   const [step, setStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
   const [points, setPoints] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
 
-  const scaleMap: Record<string, { low: string; high: string }> = {
-    sleep_duration: { low: 'checkin.scale.sleep_duration.low', high: 'checkin.scale.sleep_duration.high' },
-    sleep_quality: { low: 'checkin.scale.sleep_quality.bad', high: 'checkin.scale.sleep_quality.excellent' },
-    energy: { low: 'checkin.scale.energy.exhausted', high: 'checkin.scale.energy.top' },
-    stress: { low: 'checkin.scale.stress.calm', high: 'checkin.scale.stress.very_stressed' },
-    mood: { low: 'checkin.scale.mood.bad', high: 'checkin.scale.mood.excellent' },
-  }
-
-  const buildFieldMeta = () => {
-    const result: Record<string, { label: string; emoji: string; min: number; max: number; step: number; lowLabel: string; highLabel: string }> = {}
-    for (const [key, config] of Object.entries(FIELD_CONFIG)) {
-      const scales = scaleMap[key] || { low: 'common.low', high: 'common.high' }
-      result[key] = {
-        label: t(`checkin.field.${key}` as any),
-        emoji: config.emoji,
-        min: config.min,
-        max: config.max,
-        step: config.step,
-        lowLabel: t(scales.low as any),
-        highLabel: t(scales.high as any),
-      }
-    }
-    return result
-  }
+  useEffect(() => setMounted(true), [])
 
   useEffect(() => {
     if (!open) return
@@ -64,24 +48,33 @@ export default function CheckinModal({ moment, open, onClose, onSuccess }: Props
     setDone(false)
     setPoints(null)
     setError(null)
+    setSteps([])
+    setValues({})
 
-    fetch('/api/client/checkin/today')
-      .then(r => r.json())
-      .then(data => {
+    const fetchUrl = date
+      ? `/api/client/checkin/today?date=${encodeURIComponent(date)}`
+      : '/api/client/checkin/today'
+
+    fetch(fetchUrl)
+      .then((r) => r.json())
+      .then((data) => {
         const current = (data?.moments ?? []).find((m: any) => m.moment === moment)
         setConfigId(data?.config_id ?? '')
         const activeFields: string[] = current?.fields ?? []
-        setFields(activeFields)
+        const nextSteps = getCheckinUiSteps(moment, activeFields, lang)
+        setSteps(nextSteps)
         const defaults: Record<string, number> = {}
-        const meta = buildFieldMeta()
-        for (const f of activeFields) {
-          defaults[f] = meta[f]?.min ?? 1
+        for (const nextStep of nextSteps) {
+          const defaultValue = getDefaultCheckinStepValue(nextStep)
+          if (typeof defaultValue === 'number') {
+            defaults[nextStep.key] = defaultValue
+          }
         }
         setValues(defaults)
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [open, moment])
+  }, [open, moment, lang, date])
 
   useEffect(() => {
     if (!open) return
@@ -90,29 +83,66 @@ export default function CheckinModal({ moment, open, onClose, onSuccess }: Props
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  const currentField = fields[step]
-  const fieldMeta = buildFieldMeta()
-  const meta = currentField ? (fieldMeta[currentField] ?? { label: currentField, emoji: '📋', min: 1, max: 5, step: 1, lowLabel: t('common.low'), highLabel: t('common.high') }) : null
-  const isLast = step >= fields.length - 1
-  const pct = meta
-    ? (((values[currentField] ?? meta.min) - meta.min) / (meta.max - meta.min)) * 100
+  const currentStep = steps[step] ?? null
+  const isLast = step >= steps.length - 1
+  const currentValue = currentStep ? values[currentStep.key] : undefined
+  const canContinue = Boolean(currentStep) && (typeof currentValue === 'number' || currentStep?.optional)
+  const pct = currentStep && typeof currentValue === 'number' && typeof currentStep.min === 'number' && typeof currentStep.max === 'number'
+    ? (((currentValue - currentStep.min) / (currentStep.max - currentStep.min)) * 100)
     : 0
 
+  function setNumericValue(stepKey: string, rawValue: string) {
+    const trimmed = rawValue.replace(',', '.').trim()
+    setValues((prev) => {
+      const next = { ...prev }
+      if (!trimmed.length) {
+        delete next[stepKey]
+        return next
+      }
+      const parsed = Number(trimmed)
+      if (!Number.isFinite(parsed)) return next
+      next[stepKey] = stepKey === 'daily_steps' ? Math.max(0, Math.round(parsed)) : parsed
+      return next
+    })
+  }
+
+  function advanceAfterChoice(nextValue: number) {
+    if (!currentStep) return
+
+    setValues((prev) => ({ ...prev, [currentStep.key]: nextValue }))
+
+    window.setTimeout(() => {
+      if (isLast) {
+        void submit()
+        return
+      }
+      setStep((current) => Math.min(steps.length - 1, current + 1))
+    }, 120)
+  }
+
   async function submit() {
-    if (!configId || !fields.length) return
+    if (!configId || !steps.length) return
     setSubmitting(true)
     setError(null)
     try {
+      const responses = Object.fromEntries(
+        Object.entries(values).filter(([, value]) => typeof value === 'number' && Number.isFinite(value)),
+      )
       const res = await fetch('/api/client/checkin/respond', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config_id: configId, moment, responses: values }),
+        body: JSON.stringify({
+          config_id: configId,
+          moment,
+          responses,
+          ...(date ? { date } : {}),
+        }),
       })
       if (res.status === 409) {
-        // Already submitted today — treat as success
-        setPoints(10)
+        setPoints(0)
         setDone(true)
-        setTimeout(() => { onSuccess?.(); onClose() }, 1800)
+        emitClientInboxUpdated()
+        onSuccess?.()
         return
       }
       if (!res.ok) {
@@ -121,9 +151,10 @@ export default function CheckinModal({ moment, open, onClose, onSuccess }: Props
         return
       }
       const data = await res.json().catch(() => null)
-      setPoints(data?.is_late ? 5 : 10)
+      setPoints(data?.points_awarded ?? (data?.is_late ? 5 : 10))
       setDone(true)
-      setTimeout(() => { onSuccess?.(); onClose() }, 1800)
+      emitClientInboxUpdated()
+      onSuccess?.()
     } catch {
       setError(t('checkin.modal.error.network'))
     } finally {
@@ -133,50 +164,54 @@ export default function CheckinModal({ moment, open, onClose, onSuccess }: Props
 
   const momentLabel = t(moment === 'morning' ? 'checkin.label.matin' : 'checkin.label.soir')
 
-  return (
-    <AnimatePresence>
-      {open && (
+  if (!mounted) return null
+
+  return createPortal((
+    <>
+      <PointsEarnedOverlay open={open && done && points !== null} points={points ?? 0} onDone={onClose} />
+      <AnimatePresence>
+      {open && !done && (
         <>
-          {/* Backdrop */}
           <motion.div
-            className="fixed inset-0 z-[60] bg-black/70"
+            className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-[2px]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={submitting ? undefined : onClose}
           />
 
-          {/* Sheet */}
           <motion.div
-            className="fixed bottom-0 left-0 right-0 z-[70] rounded-t-2xl overflow-hidden"
-            style={{ background: '#161616', maxHeight: '88vh' }}
+            className="client-native-bottom-sheet fixed bottom-0 left-0 right-0 z-[70] flex flex-col overflow-hidden rounded-t-[28px] shadow-2xl"
+            style={{ background: '#0d0d0d', maxHeight: '88dvh' }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            transition={{ type: 'spring', stiffness: 380, damping: 38 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 pt-5 pb-4 shrink-0">
+            <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-white/[0.10]" />
+
+            <div className="flex shrink-0 items-center justify-between px-5 pb-4 pt-5">
               <div>
-                <p className="text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.22em] text-white/40 leading-none mb-1">
-                  {t(moment === 'morning' ? 'checkin.label.matin' : 'checkin.label.soir').toUpperCase()}
-                </p>
-                <p className="text-[18px] font-barlow-condensed font-bold uppercase tracking-[0.08em] text-white leading-tight">
+                <p className="text-[15px] font-barlow-condensed font-bold uppercase tracking-[0.12em] text-white">
                   {momentLabel}
+                </p>
+                <p className="mt-1 text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/32">
+                  {uiCopy.section}
                 </p>
               </div>
               <button
                 onClick={onClose}
-                className="h-9 w-9 flex items-center justify-center rounded-xl bg-white/[0.06] text-white/50 hover:bg-white/[0.10] transition-colors"
+                disabled={submitting}
+                className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.06] text-white/40 active:bg-white/[0.08] disabled:opacity-30"
+                aria-label={t('ui.close')}
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             </div>
 
-            {/* Progress dots */}
-            {!loading && !done && fields.length > 1 && (
+            {!loading && !done && steps.length > 1 && (
               <div className="flex items-center gap-1.5 px-5 pb-4">
-                {fields.map((_, i) => (
+                {steps.map((_, i) => (
                   <div
                     key={i}
                     className="h-[3px] rounded-full transition-all duration-300"
@@ -189,123 +224,196 @@ export default function CheckinModal({ moment, open, onClose, onSuccess }: Props
               </div>
             )}
 
-            <div className="px-5 pb-8 flex-1 overflow-y-auto">
-              {loading ? (
-                <div className="py-8 text-center text-white/40 text-[13px]">{t('checkin.modal.loading')}</div>
-              ) : !fields.length ? (
-                <div className="py-8 text-center">
-                  <p className="text-[13px] text-white/50">{t('checkin.modal.empty')}</p>
-                </div>
-              ) : done ? (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.92 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="py-8 flex flex-col items-center gap-3"
-                >
-                  <div className="h-14 w-14 rounded-2xl bg-[#f2f2f2] flex items-center justify-center">
-                    <CheckCircle size={28} className="text-[#080808]" />
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6">
+                {loading ? (
+                  <div className="py-8 text-center text-[13px] text-white/40">{t('checkin.modal.loading')}</div>
+                ) : !steps.length ? (
+                  <div className="py-8 text-center">
+                    <p className="text-[13px] text-white/50">{t('checkin.modal.empty')}</p>
                   </div>
-                  <p className="text-[15px] font-barlow-condensed font-bold uppercase tracking-[0.1em] text-white">
-                    {t('checkin.modal.success')}
-                  </p>
-                  {points && (
-                    <p className="text-[28px] font-black text-[#f2f2f2] font-mono">
-                      +{points} pts
-                    </p>
-                  )}
-                </motion.div>
-              ) : meta ? (
-                <AnimatePresence mode="wait">
+                ) : done ? (
                   <motion.div
-                    key={currentField}
-                    initial={{ opacity: 0, x: 24 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -24 }}
-                    transition={{ duration: 0.18, ease: 'easeOut' }}
-                    className="space-y-6"
+                    initial={{ opacity: 0, scale: 0.92 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex flex-col items-center gap-3 py-8"
                   >
-                    {/* Question */}
-                    <div className="flex items-center gap-3 pt-2">
-                      <span className="text-[32px] leading-none">{meta.emoji}</span>
-                      <p className="text-[16px] font-bold text-white leading-snug">{meta.label}</p>
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f2f2f2]">
+                      <CheckCircle size={28} className="text-[#080808]" />
                     </div>
-
-                    {/* Value display */}
-                    <div className="flex items-end gap-1">
-                      <span className="text-[48px] font-black text-[#f2f2f2] font-mono leading-none tabular-nums">
-                        {meta.step < 1
-                          ? (values[currentField] ?? meta.min).toFixed(1)
-                          : values[currentField] ?? meta.min}
-                      </span>
-                      {meta.max === 14 && (
-                        <span className="text-[18px] font-bold text-white/40 mb-2">h</span>
-                      )}
-                      {meta.max === 5 && (
-                        <span className="text-[18px] font-bold text-white/40 mb-2">/ 5</span>
-                      )}
-                    </div>
-
-                    {/* Slider */}
-                    <div className="space-y-2">
-                      <input
-                        type="range"
-                        min={meta.min}
-                        max={meta.max}
-                        step={meta.step}
-                        value={values[currentField] ?? meta.min}
-                        onChange={e => setValues(v => ({ ...v, [currentField]: parseFloat(e.target.value) }))}
-                        className="w-full h-2 appearance-none rounded-full cursor-pointer"
-                        style={{
-                          background: `linear-gradient(to right, #f2f2f2 0%, #f2f2f2 ${pct}%, rgba(255,255,255,0.10) ${pct}%, rgba(255,255,255,0.10) 100%)`,
-                        }}
-                      />
-                      <div className="flex justify-between">
-                        <span className="text-[10px] text-white/30 font-barlow-condensed font-bold uppercase tracking-[0.1em]">{meta.lowLabel}</span>
-                        <span className="text-[10px] text-white/30 font-barlow-condensed font-bold uppercase tracking-[0.1em]">{meta.highLabel}</span>
-                      </div>
-                    </div>
-
-                    {/* Error */}
-                    {error && (
-                      <p className="text-[12px] text-red-400 text-center py-1">{error}</p>
-                    )}
-
-                    {/* Navigation */}
-                    <div className="flex gap-2 pt-2">
-                      {step > 0 && (
-                        <button
-                          onClick={() => setStep(s => s - 1)}
-                          className="h-12 px-5 rounded-xl bg-white/[0.06] text-white/70 text-[12px] font-bold uppercase tracking-[0.1em] transition-colors hover:bg-white/[0.10]"
-                        >
-                          {t('checkin.modal.action.back')}
-                        </button>
-                      )}
-                      {isLast ? (
-                        <button
-                          onClick={submit}
-                          disabled={submitting}
-                          className="flex-1 h-12 rounded-xl font-bold text-[13px] uppercase tracking-[0.1em] transition-opacity disabled:opacity-50"
-                          style={{ background: '#f2f2f2', color: '#0d0d0d' }}
-                        >
-                          {submitting ? '...' : t('checkin.modal.action.submit')}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setStep(s => s + 1)}
-                          className="flex-1 h-12 rounded-xl font-bold text-[13px] uppercase tracking-[0.1em]"
-                          style={{ background: '#f2f2f2', color: '#0d0d0d' }}
-                        >
-                          {t('checkin.modal.action.next')}
-                        </button>
-                      )}
-                    </div>
+                    <p className="text-[15px] font-barlow-condensed font-bold uppercase tracking-[0.1em] text-white">
+                      {t('checkin.modal.success')}
+                    </p>
+                    {points ? (
+                      <p className="font-mono text-[28px] font-black text-[#f2f2f2]">
+                        +{points} pts
+                      </p>
+                    ) : null}
                   </motion.div>
-                </AnimatePresence>
+                ) : currentStep ? (
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={currentStep.key}
+                      initial={{ opacity: 0, x: 24 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -24 }}
+                      transition={{ duration: 0.18, ease: 'easeOut' }}
+                      className="space-y-6"
+                    >
+                      <div className="space-y-3 pt-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-[32px] leading-none">{currentStep.emoji}</span>
+                          <p className="text-[18px] font-bold leading-snug text-white">{currentStep.question}</p>
+                        </div>
+                        {currentStep.helperText ? (
+                          <p className="text-[12px] leading-relaxed text-white/50">{currentStep.helperText}</p>
+                        ) : null}
+                      </div>
+
+                      {typeof currentValue === 'number' ? (
+                        <div className="rounded-2xl bg-white/[0.035] px-4 py-3">
+                          <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/32">{uiCopy.response}</p>
+                          <p className="mt-1 text-[28px] font-black text-white">
+                            {formatCheckinStepValue(currentStep, currentValue, lang)}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {currentStep.component === 'chips' ? (
+                        <div className="grid grid-cols-2 gap-3">
+                          {(currentStep.options ?? []).map((option) => {
+                            const selected = values[currentStep.key] === option.value
+                            return (
+                              <button
+                                key={option.value}
+                                onClick={() => advanceAfterChoice(option.value)}
+                                className={`rounded-xl px-4 py-4 text-left transition-colors ${
+                                  selected
+                                    ? 'bg-white/[0.10] text-white'
+                                    : 'bg-white/[0.03] text-white/70 active:bg-white/[0.06]'
+                                }`}
+                              >
+                                <p className="text-[24px] leading-none">{option.emoji ?? currentStep.emoji}</p>
+                                <p className="mt-3 text-[13px] font-semibold">{option.label}</p>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      ) : currentStep.component === 'number' ? (
+                        <div>
+                          <label className="mb-2 block text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/55">
+                            {uiCopy.inputHint}
+                          </label>
+                          <div className="flex items-end gap-3">
+                            <input
+                              type="number"
+                              inputMode={currentStep.step && currentStep.step < 1 ? 'decimal' : 'numeric'}
+                              min={currentStep.min}
+                              max={currentStep.max}
+                              step={currentStep.step ?? 1}
+                              value={typeof currentValue === 'number' ? String(currentValue) : ''}
+                              onChange={(e) => setNumericValue(currentStep.key, e.target.value)}
+                              placeholder={currentStep.unit === 'kg' ? '79.2' : currentStep.key === 'daily_steps' ? '8432' : '60'}
+                              className="h-11 min-w-0 flex-1 rounded-xl bg-[#080808] px-3 text-[18px] font-bold text-white outline-none placeholder:text-white/20"
+                            />
+                            {currentStep.unit ? (
+                              <span className="pb-3 text-[12px] font-bold uppercase tracking-[0.08em] text-white/45">
+                                {currentStep.unit}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            type="range"
+                            min={currentStep.min}
+                            max={currentStep.max}
+                            step={currentStep.step}
+                            value={currentValue ?? currentStep.min}
+                            onChange={(e) => setValues((prev) => ({ ...prev, [currentStep.key]: parseFloat(e.target.value) }))}
+                            className="slider-client h-2 w-full cursor-pointer appearance-none rounded-full"
+                            style={{
+                              background: `linear-gradient(to right, #f2f2f2 0%, #f2f2f2 ${pct}%, rgba(255,255,255,0.10) ${pct}%, rgba(255,255,255,0.10) 100%)`,
+                            }}
+                          />
+                          <div className="flex justify-between">
+                            <span className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.1em] text-white/30">
+                              {currentStep.lowLabel ?? t('common.low' as any)}
+                            </span>
+                            <span className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.1em] text-white/30">
+                              {currentStep.highLabel ?? t('common.high' as any)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {error ? (
+                        <p className="py-1 text-center text-[12px] text-red-400">{error}</p>
+                      ) : null}
+                    </motion.div>
+                  </AnimatePresence>
+                ) : null}
+              </div>
+
+              {!loading && !done && currentStep ? (
+                <div
+                  className="shrink-0 border-t border-white/[0.06] bg-[#0d0d0d] px-5 pt-3"
+                  style={{ paddingBottom: 'var(--client-modal-bottom-padding)' }}
+                >
+                  <div className="flex gap-2">
+                    {step > 0 ? (
+                      <button
+                        onClick={() => setStep((s) => Math.max(0, s - 1))}
+                        className="h-11 rounded-xl bg-white/[0.06] px-5 text-[12px] font-barlow-condensed font-bold uppercase tracking-[0.14em] text-white/55 transition-all active:scale-[0.98] active:bg-white/[0.08]"
+                      >
+                        {t('checkin.modal.action.back')}
+                      </button>
+                    ) : null}
+                    {currentStep.optional ? (
+                      <button
+                        onClick={() => {
+                          setValues((prev) => {
+                            const next = { ...prev }
+                            delete next[currentStep.key]
+                            return next
+                          })
+                          if (isLast) submit()
+                          else setStep((s) => Math.min(steps.length - 1, s + 1))
+                        }}
+                        className="h-11 rounded-xl bg-white/[0.06] px-5 text-[12px] font-barlow-condensed font-bold uppercase tracking-[0.14em] text-white/55 transition-all active:scale-[0.98]"
+                      >
+                        {uiCopy.skip}
+                      </button>
+                    ) : null}
+                    {isLast ? (
+                      <button
+                        onClick={submit}
+                        disabled={submitting || !canContinue}
+                        className="h-11 flex-1 rounded-xl font-barlow-condensed text-[12px] font-black uppercase tracking-[0.14em] transition-all active:scale-[0.98] disabled:opacity-50"
+                        style={{ background: '#f2f2f2', color: '#080808' }}
+                      >
+                        {submitting ? t('common.sending') : t('checkin.modal.action.submit')}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setStep((s) => Math.min(steps.length - 1, s + 1))}
+                        disabled={!canContinue}
+                        className="h-11 flex-1 rounded-xl font-barlow-condensed text-[12px] font-black uppercase tracking-[0.14em] transition-all active:scale-[0.98] disabled:opacity-50"
+                        style={{ background: '#f2f2f2', color: '#080808' }}
+                      >
+                        {t('checkin.modal.action.next')}
+                      </button>
+                    )}
+                  </div>
+                </div>
               ) : null}
             </div>
+            <CheckinSavingOverlay open={submitting} />
           </motion.div>
         </>
       )}
-    </AnimatePresence>
-  )
+      </AnimatePresence>
+    </>
+  ), document.body)
 }

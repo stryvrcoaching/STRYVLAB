@@ -50,3 +50,120 @@ SHOULDER-048,Thruster-landmine,full_body_push,frontal,compound,false,quadriceps,
 SHOULDER-049,Tirage-menton-avec-elastique,vertical_pull,sagittal,compound,false,upper_traps,0.6,medial_deltoid|biceps,0.25|0.15,core,3,1,4,4,4,elastic_resistance
 SHOULDER-050,Tirage-menton-avec-kettlebell,vertical_pull,sagittal,compound,false,upper_traps,0.65,medial_deltoid|biceps,0.2|0.15,core,4,1,4,5,5,free_weight_complex
 SHOULDER-051,Tirage-menton-machine-guidee,vertical_pull,sagittal,compound,false,upper_traps,0.7,medial_deltoid|biceps,0.2|0.1,core,3,1,3,2,2,machine_stability
+SHOULDER-052,Étirement du dos et des pectoraux,mobility_stability,transverse,isolation,false,lats,0.3,,,shoulders,1,1,1,2,3,bodyweight_basic
+SHOULDER-053,Extension de triceps en position à genoux poids de corps,elbow_extension,sagittal,compound,false,triceps_brachii,0.75,shoulders,0.1,core,1,1,2,3,4,bodyweight_basic
+SHOULDER-054,Étirement de la poitrine et de l'avant de l'épaule,core_stability,frontal,isolation,false,pectoralis_major,0.7,none,,shoulders,1,1,2,2,3,bodyweight_basic
+SHOULDER-055,Étirement dynamique de la poitrine (homme),mobility_stability,transverse,isolation,false,pectoralis_major,0.5,shoulders,0.1,core,2,1,2,2,3,bodyweight_basic
+SHOULDER-056,Élévateur,spine_extension,sagittal,isolation,false,upper_back,0.65,core,0.1,core,2,1,1,2,3,bodyweight_basic
+SHOULDER-057,Presse alternative avec kettlebell,vertical_push,sagittal,compound,true,anterior_deltoid,0.75,core|triceps,0.2|0.1,shoulders,2,2,3,4,5,free_weight_complex
+SHOULDER-058,Presse alternée au sol avec kettlebell,vertical_push,sagittal,compound,true,pectoralis_major,0.75,triceps|core,0.25|0.1,core,2,1,2,3,5,bodyweight_basic
+SHOULDER-059,Presse Arnold avec kettlebell,vertical_push,sagittal,compound,false,medial_deltoid,0.75,triceps|core,0.2|0.1,shoulders,2,1,3,3,4,free_weight_complex
+SHOULDER-060,Jerk double avec kettlebell,vertical_push,sagittal,compound,false,medial_deltoid,0.85,core|triceps,0.2|0.1,shoulders,2,2,4,4,6,free_weight_complex
+SHOULDER-061,Presse double avec kettlebell,vertical_push,sagittal,compound,false,medial_deltoid,0.8,triceps|core,0.2|0.1,shoulders,2,1,2,3,5,free_weight_complex
+SHOULDER-062,Snatch double avec kettlebell,vertical_push,sagittal,compound,false,medial_deltoid,0.85,core|biceps_brachii,0.25|0.15,core,3,2,4,5,6,free_weight_complex
+SHOULDER-063,Clean and jerk avec kettlebell à un bras,full_body_push,sagittal,compound,true,epaules,0.85,core|hamstrings,0.25|0.15,core|shoulders,3,2,4,5,7,free_weight_complex
+SHOULDER-064,Press avec kettlebell à un bras,vertical_push,sagittal,compound,true,epaules,0.85,core,0.2,core|shoulders,2,1,4,4,6,free_weight_complex
+SHOULDER-065,Press militaire avec kettlebell à un bras sur le côté,vertical_push,sagittal,compound,true,epaules,0.8,core,0.2,core,2,1,4,3,5,free_weight_complex
+SHOULDER-066,Press avec kettlebell à un bras,vertical_push,sagittal,compound,true,epaules,0.85,core,0.2,core,2,1,4,4,6,free_weight_complex
+SHOULDER-067,Snatch avec kettlebell à un bras,vertical_pull,sagittal,compound,true,epaules,0.9,core|hamstrings,0.2|0.15,core,3,2,4,5,7,free_weight_complex
+SHOULDER-068,Kettlebell pirate superset des jambes,vertical_push,sagittal,compound,true,epaules,0.75,core,0.2,core|shoulders,2,1,3,3,5,free_weight_complex
+SHOULDER-069,Presse assise avec kettlebell,vertical_push,sagittal,isolation,false,epaules,0.75,core|traps,0.2|0.15,core|shoulders,2,1,3,3,4,free_weight_complex
+SHOULDER-070,Presse militaire assise avec kettlebell à deux bras,vertical_push,sagittal,isolation,false,epaules,0.8,core|traps,0.25|0.2,core|shoulders,2,1,3,3,4,free_weight_complex
+SHOULDER-071,Presse à bascule avec kettlebell,vertical_push,sagittal,compound,true,epaules,0.7,core|traps,0.15|0.1,core|shoulders,2,1,3,4,6,free_weight_complex
+SHOULDER-072,Tirage haut sumo avec kettlebell,pull_vertical,sagittal,compound,false,traps,0.85,glutes|hamstrings,0.2|0.15,core|shoulders,3,3,3,5,6,free_weight_complex
+SHOULDER-073,Thruster avec kettlebell,full_body_push,sagittal,compound,false,epaules,0.8,quads|glutes,0.25|0.2,core|shoulders,2,2,3,5,5,free_weight_complex
+SHOULDER-074,Clean à deux bras avec kettlebell,vertical_push,sagittal,compound,false,epaules,0.75,core|traps,0.15|0.1,core|shoulders,2,2,3,4,5,free_weight_complex
+SHOULDER-075,Presse militaire à deux bras avec kettlebell,vertical_push,sagittal,isolation,false,epaules,0.8,core|traps,0.25|0.2,core|shoulders,2,1,3,3,4,free_weight_complex
+SHOULDER-076,Handstand,complex_stability,frontal,compound,false,triceps_brachii,0.8,core|shoulders,0.2|0.3,core|shoulders,2,1,4,6,7,bodyweight_complex
+SHOULDER-077,Wipers isométriques,core_rotation,sagittal,isolation,false,rectus_abdominis,0.7,obliques,0.15,core,2,1,1,3,4,bodyweight_basic
+SHOULDER-078,étirement latéral à genoux,mobility_stability,frontal,isolation,true,lats,0.4,,,core,1,1,1,3,3,bodyweight_basic
+SHOULDER-079,crochet gauche (boxe),core_rotation,transverse,compound,true,obliques,0.7,deltoids,0.2,core,2,1,3,5,7,bodyweight_basic
+SHOULDER-080,Un bras contre le mur,scapular_elevation,frontal,isolation,true,lats,0.5,core,0.2,shoulders,1,1,2,4,3,bodyweight_basic
+SHOULDER-081,Étirement des triceps au-dessus de la tête,mobility_stability,sagittal,isolation,true,triceps_brachii,0.4,,,none,1,1,1,2,3,bodyweight_basic
+SHOULDER-082,développé alterné avec haltères,vertical_push,sagittal,compound,true,anterior_deltoid,0.75,triceps_brachii|medial_deltoid,0.2|0.3,core,2,1,3,4,6,free_weight_complex
+SHOULDER-083,développé arnold avec haltères,vertical_push,sagittal,compound,false,anterior_deltoid,0.8,triceps_brachii|medial_deltoid,0.25|0.3,core,2,1,3,4,5,free_weight_complex
+SHOULDER-084,développé arnold v. 2,vertical_push,sagittal,compound,false,anterior_deltoid,0.8,triceps_brachii|medial_deltoid,0.25|0.3,core,2,1,3,4,5,free_weight_complex
+SHOULDER-085,développé couché assis avec haltères,vertical_push,sagittal,compound,false,anterior_deltoid,0.75,triceps_brachii|medial_deltoid,0.25|0.3,core,2,1,3,4,5,free_weight_complex
+SHOULDER-086,Développé cubain avec haltères,vertical_push,sagittal,compound,false,posterior_deltoid,0.7,anterior_deltoid|medial_deltoid,0.2|0.2,core|shoulders,2,1,3,4,5,free_weight_complex
+SHOULDER-087,Développé cubain avec haltères v. 2,vertical_push,sagittal,compound,false,posterior_deltoid,0.65,anterior_deltoid|medial_deltoid,0.15|0.15,core|shoulders,2,1,3,4,5,free_weight_complex
+SHOULDER-088,Écartés décliné avec haltères,horizontal_push,sagittal,isolation,false,pectoralis_major_lower,0.75,triceps_brachii,0.1,core,2,1,3,4,4,free_weight_complex
+SHOULDER-089,Écartés décliné unilatéraux avec haltères,horizontal_push,sagittal,isolation,true,pectoralis_major_lower,0.75,triceps_brachii,0.1,core,2,1,2,4,4,free_weight_complex
+SHOULDER-090,Hausser des épaules décliné avec haltères,scapular_elevation,sagittal,isolation,false,traps,0.75,,,core,2,1,3,3,4,free_weight_complex
+SHOULDER-091,Hausser des épaules décliné avec haltères v. 2,scapular_elevation,sagittal,isolation,false,traps,0.75,,,core,2,1,3,3,4,free_weight_complex
+SHOULDER-092,Extension des triceps décliné avec haltères,elbow_extension,sagittal,isolation,false,triceps_brachii,0.85,,,core,2,1,3,3,3,free_weight_complex
+SHOULDER-093,Écartés déclinés twist avec haltères,horizontal_push,sagittal,isolation,false,pectoralis_major_lower,0.75,,,core,2,1,3,4,4,free_weight_complex
+SHOULDER-094,Écartés avec haltères,horizontal_push,frontal,isolation,false,pectoralis_major,0.8,,,core,2,1,3,4,5,free_weight_complex
+SHOULDER-095,Écartés avec haltères sur ballon d'exercice,horizontal_push,frontal,isolation,false,pectoralis_major,0.75,core,0.2,core,2,1,3,5,5,free_weight_complex
+SHOULDER-096,Fente avant avec extension des triceps avec haltères,unilateral_lunge,sagittal,compound,true,triceps_brachii,0.85,quadriceps|glutes,0.25|0.2,core,2,3,2,6,7,free_weight_complex
+SHOULDER-097,Élévation frontale avec haltères,vertical_push,sagittal,isolation,false,anterior_deltoid,0.75,medial_deltoid|core,0.2|0.1,core,1,1,2,5,6,free_weight_complex
+SHOULDER-098,Élévation frontale v. 2 avec haltères,vertical_push,sagittal,isolation,false,anterior_deltoid,0.7,medial_deltoid|core,0.2|0.1,core,1,1,2,5,5,free_weight_complex
+SHOULDER-099,Élévation latérale avec haltères (canette pleine),lateral_raise,frontal,isolation,false,medial_deltoid,0.8,,,core,1,1,2,3,5,free_weight_complex
+SHOULDER-100,Développé alternatif incliné avec haltères,vertical_push,sagittal,compound,true,pectoralis_major,0.85,deltoids,0.25,core,2,1,2,5,6,free_weight_complex
+SHOULDER-101,Développé incliné avec haltères,vertical_push,sagittal,compound,false,pectoralis_major,0.85,deltoids,0.2,core,2,1,2,5,6,free_weight_complex
+SHOULDER-102,Développé incliné avec haltères,vertical_push,sagittal,compound,false,pectoralis_major_upper,0.85,anterior_deltoid|triceps_brachii,0.2|0.15,core|shoulders,2,1,2,3,4,free_weight_complex
+SHOULDER-103,Écartés inclinés avec haltères,horizontal_push,sagittal,compound,false,pectoralis_major,0.84,anterior_deltoid|triceps_brachii,0.2|0.1,core|shoulders,2,1,2,3,4,free_weight_complex
+SHOULDER-104,Écartés inclinés sur ballon suisse avec haltères,horizontal_push,sagittal,compound,false,pectoralis_major,0.83,anterior_deltoid|triceps_brachii,0.2|0.1,core,2,1,1,4,5,free_weight_complex
+SHOULDER-105,Développé marteau incliné avec haltères,vertical_push,sagittal,compound,false,pectoralis_major_upper,0.85,triceps_brachii,0.15,core|shoulders,2,1,2,3,4,free_weight_complex
+SHOULDER-106,Écartés inclinés unilatéraux avec haltères,horizontal_push,sagittal,compound,true,pectoralis_major,0.83,anterior_deltoid,0.15,core,2,1,2,4,5,free_weight_complex
+SHOULDER-107,Écartés inclinés unilatéraux sur ballon suisse avec haltères,horizontal_push,sagittal,compound,true,pectoralis_major,0.84,anterior_deltoid,0.15,core,2,1,2,5,5,free_weight_complex
+SHOULDER-108,Développé marteau unilatéral incliné avec haltères,vertical_push,sagittal,compound,true,triceps_brachii,0.9,,0.1,core,2,1,2,5,5,free_weight_complex
+SHOULDER-109,Développé marteau unilatéral incliné sur ballon suisse avec haltères,vertical_push,sagittal,compound,true,triceps_brachii,0.9,,0.1,core,2,1,2,5,5,free_weight_complex
+SHOULDER-110,Élévation latérale unilatérale inclinée avec haltères,lateral_raise,frontal,isolation,true,medial_deltoid,0.75,,,core,1,1,2,4,6,free_weight_complex
+SHOULDER-111,Développé unilatéral incliné avec haltères,vertical_push,sagittal,compound,true,pectoralis_major,0.85,triceps_brachii|anterior_deltoid,0.15|0.1,core,2,1,2,5,5,free_weight_complex
+SHOULDER-112,Développé incliné à un bras avec haltère sur ballon d'exercice,vertical_push,sagittal,compound,true,pectoralis_major,0.8,triceps_brachii|anterior_deltoid|core,0.2|0.1|0.3,core,2,1,3,6,7,bodyweight_complex
+SHOULDER-113,Développé incliné avec paume vers l'intérieur,vertical_push,sagittal,compound,false,pectoralis_major_upper,0.85,triceps_brachii|anterior_deltoid,0.2|0.15,core|shoulders,2,1,3,5,6,free_weight_complex
+SHOULDER-114,Développé incliné sur ballon d'exercice,vertical_push,sagittal,compound,false,pectoralis_major,0.8,triceps_brachii|anterior_deltoid|core,0.25|0.15|0.3,core,2,1,3,6,6,bodyweight_complex
+SHOULDER-115,Élévation inclinée avec haltères,vertical_push,sagittal,compound,false,medial_deltoid,0.7,anterior_deltoid|traps,0.15|0.1,core|shoulders,1,1,3,5,5,free_weight_complex
+SHOULDER-116,Élévation latérale inclinée avec haltères,lateral_raise,frontal,isolation,false,posterior_deltoid,0.75,traps|medial_deltoid,0.15|0.1,core,1,1,2,4,6,free_weight_complex
+SHOULDER-117,Élévation inclinée des épaules avec haltères,vertical_push,sagittal,compound,false,epaules,0.7,anterior_deltoid|traps,0.15|0.1,core,1,1,2,4,6,free_weight_complex
+SHOULDER-118,Haussement d'épaules incliné avec haltères,vertical_push,sagittal,isolation,false,traps,0.75,,,core,1,1,2,3,3,free_weight_isolation
+SHOULDER-119,Élévation T inclinée avec haltères,lateral_raise,frontal,isolation,false,epaules,0.65,,,core,1,1,2,4,5,free_weight_isolation
+SHOULDER-120,Extension des triceps inclinée avec haltères,elbow_extension,sagittal,isolation,false,triceps_brachii,0.75,core,0.15,core,1,1,2,3,4,free_weight_isolation
+SHOULDER-121,Volées torsadées inclinées avec haltères,core_rotation,transverse,compound,false,pectoralis_major,0.75,triceps_brachii|anterior_deltoid,0.2|0.1,core,2,1,2,6,7,free_weight_complex
+SHOULDER-122,Extension des triceps incliné à deux bras avec haltères,elbow_extension,sagittal,compound,false,triceps_brachii,0.75,core,0.1,core,1,1,2,2,4,free_weight_isolation
+SHOULDER-123,Élévation Y inclinée avec haltères,lateral_raise,frontal,isolation,false,epaules,0.7,,,core,1,1,2,4,5,free_weight_isolation
+SHOULDER-124,Croisé de fer avec haltères,lateral_raise,frontal,isolation,false,epaules,0.6,,,core,1,1,2,3,5,free_weight_isolation
+SHOULDER-125,Extension arrière avec haltères,elbow_extension,sagittal,isolation,false,triceps_brachii,0.75,,,core,1,1,2,2,4,free_weight_isolation
+SHOULDER-126,Extensions triceps avec haltères sur ballon de gym,elbow_extension,sagittal,isolation,true,triceps_brachii,0.85,,,core,2,1,2,3,4,bodyweight_basic
+SHOULDER-127,Élévation latérale avec haltères,lateral_raise,frontal,isolation,false,epaules,0.75,,,core,1,1,3,4,5,bodyweight_basic
+SHOULDER-128,Élévation latérale puis frontale avec haltères,complex_rotation,frontal,isolation,false,epaules,0.75,,,core,1,1,3,4,6,bodyweight_basic
+SHOULDER-129,Extension allongée avec haltères (au-dessus du visage),elbow_extension,sagittal,isolation,true,triceps_brachii,0.85,,,core,2,1,2,3,4,bodyweight_basic
+SHOULDER-130,Extension alternée allongée avec haltères,elbow_extension,sagittal,isolation,true,triceps_brachii,0.8,,,core,2,1,2,3,5,bodyweight_basic
+SHOULDER-131,Rotation externe allongée avec haltères,external_rotation,transverse,isolation,true,rotator_cuff,0.7,,,shoulders,1,1,2,4,5,bodyweight_basic
+SHOULDER-132,Développé alternatif avec câble,vertical_push,sagittal,compound,true,epaules,0.85,core|traps,0.2|0.1,core,2,1,3,5,4,cable_constant
+SHOULDER-133,Extension des triceps alternée avec câble,elbow_extension,sagittal,isolation,true,triceps_brachii,0.75,biceps_brachii|core,0.1|0.15,core|shoulders,1,1,2,3,2,cable_constant
+SHOULDER-134,Élévation croisée arrière avec câble,internal_rotation,transverse,isolation,true,epaules,0.75,traps,0.1,core,1,1,2,3,3,cable_constant
+SHOULDER-135,Variation croisée avec câble,horizontal_push,frontal,compound,false,pectoralis_major,0.75,deltoids,0.2,core,2,1,2,4,4,cable_constant
+SHOULDER-136,Élévation décline avec câble,horizontal_push,frontal,compound,false,pectoralis_major,0.75,deltoids,0.2,core,2,1,2,4,4,cable_constant
+SHOULDER-137,Élévation frontale à câbles,front_raise,sagittal,isolation,false,anterior_deltoid,0.8,,,core,1,1,2,2,4,cable_constant
+SHOULDER-138,Élévation frontale à câbles,front_raise,sagittal,isolation,false,anterior_deltoid,0.8,,,core,1,1,2,2,4,cable_constant
+SHOULDER-139,Élévation frontale à câbles,front_raise,sagittal,isolation,false,anterior_deltoid,0.8,,,core,1,1,2,2,4,cable_constant
+SHOULDER-140,Extension de triceps à poulie haute avec corde,vertical_push,sagittal,isolation,false,triceps_brachii,0.9,,,core,1,1,2,2,3,cable_constant
+SHOULDER-141,Presse à câbles sur banc incliné,vertical_push,sagittal,compound,false,pectoralis_major,0.85,triceps_brachii|anterior_deltoid,0.25|0.15,core,2,1,3,5,4,cable_constant
+SHOULDER-142,Élévation avec câbles en vol,horizontal_pull,sagittal,compound,false,pectoralis_major,0.8,,,core,1,1,2,2,3,cable_constant
+SHOULDER-143,Écarté incliné câblé (sur ballon de stabilité),horizontal_push,sagittal,isolation,false,pectoralis_major,0.7,anterior_deltoid|traps,0.2|0.1,core,2,1,2,3,4,bodyweight_basic
+SHOULDER-144,Extension des triceps inclinée avec câble,elbow_extension,sagittal,isolation,false,triceps_brachii,0.7,core,0.1,core,2,1,1,2,3,cable_constant
+SHOULDER-145,Extension des triceps avec câble,elbow_extension,sagittal,isolation,true,triceps_brachii,0.75,core,0.1,core,2,1,2,3,4,cable_constant
+SHOULDER-146,Tirage dans l'épaule à genoux (avec corde) (homme),horizontal_pull,sagittal,compound,false,posterior_deltoid,0.7,core,0.1,core,2,1,2,3,4,cable_constant
+SHOULDER-147,Extension des triceps à genoux avec câble,elbow_extension,sagittal,isolation,false,triceps_brachii,0.75,core,0.1,core,1,1,1,2,3,cable_constant
+SHOULDER-148,Élévation latérale avec câble,lateral_raise,frontal,isolation,true,medial_deltoid,0.75,core,0.1,core,1,1,2,2,5,cable_constant
+SHOULDER-149,Écarté bas avec câble,horizontal_push,sagittal,isolation,false,pectoralis_major,0.7,anterior_deltoid,0.2,core,2,1,2,3,4,cable_constant
+SHOULDER-150,Écartés allongés avec poulie,horizontal_push,sagittal,compound,false,pectoralis_major,0.75,anterior_deltoid|traps,0.2|0.1,core,1,1,2,3,4,cable_constant
+SHOULDER-151,Extension des triceps allongé v. 2,elbow_extension,sagittal,isolation,false,triceps_brachii,0.85,,,core,1,1,2,2,3,cable_constant
+SHOULDER-152,Écartés au milieu avec poulie,horizontal_push,frontal,compound,false,pectoralis_major,0.7,anterior_deltoid|traps,0.15|0.1,core,1,1,2,3,4,cable_constant
+SHOULDER-153,Écarté de poitrine incliné à un bras avec poulie,horizontal_push,sagittal,isolation,true,pectoralis_major,0.75,,,core,1,1,2,2,3,cable_constant
+SHOULDER-154,Écarté à un bras sur ballon d'exercice avec poulie,horizontal_push,sagittal,isolation,true,pectoralis_major,0.75,,,core,1,1,2,2,3,cable_constant
+SHOULDER-155,Écarté incliné à un bras sur ballon d'exercice avec poulie,horizontal_push,sagittal,isolation,true,pectoralis_major,0.75,,,core,1,1,2,2,3,cable_constant
+SHOULDER-156,Développé incliné à un bras avec poulie,vertical_push,sagittal,compound,true,pectoralis_major,0.8,anterior_deltoid,0.15,core,1,1,2,4,5,cable_constant
+SHOULDER-157,Développé incliné à un bras sur ballon d'exercice avec poulie,vertical_push,sagittal,compound,true,pectoralis_major,0.8,anterior_deltoid,0.15,core,1,1,2,4,5,cable_constant
+SHOULDER-158,Élévation latérale avec poulie à un bras,horizontal_push,frontal,isolation,true,pectoralis_major,0.7,,,core,1,1,2,2,3,cable_constant
+SHOULDER-159,Élévation latérale avec poulie à un bras,vertical_push,frontal,isolation,true,epaules,0.8,,,core,1,1,2,2,3,cable_constant
+SHOULDER-160,Press unilatéral à la machine sur ballon,vertical_push,sagittal,isolation,true,pectoralis_major,0.7,core,0.2,core,2,1,3,5,4,cable_constant
+SHOULDER-161,Extension triceps au-dessus de la tête (avec corde),vertical_push,sagittal,isolation,false,triceps_brachii,0.75,core,0.1,core,1,1,2,3,4,cable_constant
+SHOULDER-162,Press à la machine sur ballon,vertical_push,sagittal,compound,false,pectoralis_major,0.7,core,0.2,core,2,1,3,4,4,cable_constant
+SHOULDER-163,Tirage pour les deltoïdes arrière (stiruprun),pull_horizontal,transverse,compound,true,rear_delts,0.75,traps|lats|core,0.1|0.1|0.2,core,2,1,3,3,4,cable_constant
+SHOULDER-164,Tirage pour les deltoïdes arrière (avec corde),pull_horizontal,transverse,compound,false,rear_delts,0.7,traps|lats|core,0.1|0.1|0.2,core,2,1,3,2,4,cable_constant
+SHOULDER-165,Tirage arrière,pull_horizontal,transverse,compound,false,triceps_brachii,0.75,core,0.15,core,2,1,2,2,3,cable_constant
+SHOULDER-166,Extension tricep overhead avec corde de câble,vertical_push,sagittal,isolation,false,triceps_brachii,0.82,pec_major,0.1,core,1,1,2,2,4,cable_constant
+SHOULDER-167,Extension tricep incliné avec corde de câble,vertical_push,sagittal,isolation,false,triceps_brachii,0.81,pec_major,0.1,core,1,1,2,2,4,cable_constant
+SHOULDER-168,Extension tricep allongé au sol avec corde de câble,elbow_flexion,sagittal,isolation,false,triceps_brachii,0.79,,,core,1,1,1,2,3,cable_constant

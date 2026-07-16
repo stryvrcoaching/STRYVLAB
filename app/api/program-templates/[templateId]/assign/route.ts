@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { insertClientNotification } from "@/lib/notifications/insert-client-notification";
+import { createClientAppNotification } from "@/lib/notifications/create-client-app-notification";
 import { parseRepsRange } from "@/lib/progression/double-progression";
+import { VALID_MOVEMENT_PATTERN_SET } from "@/lib/programs/movementPatterns";
+import { activateWorkoutProgramAssignment } from "@/lib/assignments/clientAssignments";
+import { resolveStoredFrequency } from "@/lib/programs/frequency";
 
 // Déduit le palier de charge depuis le type d'équipement si non configuré par le coach
 // Câbles/poulies : 1kg (stacks magnétiques fins) — 5kg serait absurde sur extension triceps
@@ -25,14 +28,6 @@ function service() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 }
-
-const VALID_MOVEMENT_PATTERNS = new Set([
-  'horizontal_push', 'vertical_push', 'horizontal_pull', 'vertical_pull',
-  'squat_pattern', 'hip_hinge', 'knee_flexion', 'knee_extension', 'calf_raise',
-  'elbow_flexion', 'elbow_extension', 'lateral_raise', 'hip_abduction', 'hip_adduction',
-  'shoulder_rotation', 'carry', 'scapular_elevation', 'scapular_retraction', 'scapular_protraction',
-  'core_anti_flex', 'core_flex', 'core_rotation',
-]);
 
 // POST /api/program-templates/[templateId]/assign
 // Crée un coach_program pour un client depuis un template
@@ -59,13 +54,13 @@ export async function POST(
     .from("coach_program_templates")
     .select(
       `
-      id, name, weeks, goal, level, frequency, session_mode, equipment_archetype, muscle_tags,
+      id, name, weeks, goal, level, frequency, session_mode, volume_focus, equipment_archetype, muscle_tags,
       coach_program_template_sessions (
         id, name, day_of_week, days_of_week, position, notes,
         coach_program_template_exercises (
           name, sets, reps, rest_sec, rir, notes, position, image_url,
           primary_muscles, secondary_muscles, movement_pattern, equipment_required, group_id,
-          weight_increment_kg, is_compound, tempo, set_prescriptions
+          weight_increment_kg, is_compound, is_unilateral, target_rir, tempo, set_prescriptions, superset_rest_mode, execution_type, target_hr_zone
         )
       )
     `,
@@ -95,6 +90,9 @@ export async function POST(
     name_override ||
     `${template.name} — ${client.first_name} ${client.last_name}`;
 
+  const templateSessions = (template.coach_program_template_sessions as any[]) ?? [];
+  const computedFrequency = resolveStoredFrequency(templateSessions, template.frequency ?? null);
+
   // Créer le programme
   const { data: program, error: programError } = await db
     .from("programs")
@@ -105,8 +103,9 @@ export async function POST(
       weeks: template.weeks,
       goal: template.goal ?? null,
       level: template.level ?? null,
-      frequency: (template.coach_program_template_sessions as any[])?.length ?? template.frequency ?? null,
+      frequency: computedFrequency || template.frequency || null,
       session_mode: template.session_mode ?? "day",
+      volume_focus: template.volume_focus ?? {},
       equipment_archetype: template.equipment_archetype ?? null,
       muscle_tags: template.muscle_tags ?? [],
       description: `Basé sur le template "${template.name}"`,
@@ -162,20 +161,24 @@ export async function POST(
               image_url: e.image_url ?? null,
               primary_muscles: e.primary_muscles ?? [],
               secondary_muscles: e.secondary_muscles ?? [],
-              movement_pattern: e.movement_pattern && VALID_MOVEMENT_PATTERNS.has(e.movement_pattern)
+              movement_pattern: e.movement_pattern && VALID_MOVEMENT_PATTERN_SET.has(e.movement_pattern)
                 ? e.movement_pattern
                 : null,
               equipment_required: e.equipment_required ?? [],
               group_id: e.group_id ?? null,
               rep_min: parsed?.rep_min ?? null,
               rep_max: parsed?.rep_max ?? null,
-              target_rir: e.rir ?? null,
+              is_unilateral: e.is_unilateral ?? false,
+              target_rir: e.target_rir ?? e.rir ?? null,
               weight_increment_kg: e.weight_increment_kg != null
                 ? Number(e.weight_increment_kg)
                 : inferWeightIncrement(e.equipment_required ?? []),
               is_compound: e.is_compound ?? undefined,
               tempo: e.tempo ?? null,
               set_prescriptions: e.set_prescriptions ?? null,
+              superset_rest_mode: e.superset_rest_mode ?? 'after_round',
+              execution_type: e.execution_type ?? 'reps_rir',
+              target_hr_zone: e.target_hr_zone ?? null,
             };
           }),
       );
@@ -184,29 +187,18 @@ export async function POST(
   }
 
   // Notif client — programme assigné depuis template
-  await insertClientNotification(db, {
+  await createClientAppNotification(db, {
     coachId: user.id,
     clientId: client_id,
     type: "program_assigned",
-    message: `Ton coach t'a assigné un nouveau programme : "${programName}".`,
-    submissionId: program.id,
-  });
-
-  // Notif coach — explicite (nom client, nom programme, id programme)
-  const clientName =
-    `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim();
-  const notifMessage = `${clientName} a reçu le programme "${programName}".`;
-  await insertClientNotification(db, {
-    coachId: user.id,
-    clientId: client_id,
-    type: "program_assigned",
-    message: notifMessage,
-    submissionId: program.id,
+    copyKey: "workout.available",
+    actionUrl: "/client/programme",
+    pushKind: "program",
   });
 
   // Metric annotation — programme assigné (source_id = program.id pour nettoyage à la suppression)
   const today = new Date().toISOString().split("T")[0];
-  await db.from("metric_annotations").insert({
+  const { data: annotation } = await db.from("metric_annotations").insert({
     client_id: client_id,
     coach_id: user.id,
     event_type: "program_change",
@@ -214,6 +206,14 @@ export async function POST(
     label: `Nouveau programme : ${programName}`,
     body: `Programme assigné depuis le template "${template.name}"`,
     source_id: program.id,
+  }).select('id').single();
+
+  await activateWorkoutProgramAssignment(db, {
+    clientId: client_id,
+    coachId: user.id,
+    programId: program.id,
+    startedBy: user.id,
+    sourceAnnotationId: (annotation as any)?.id ?? null,
   });
 
   return NextResponse.json(

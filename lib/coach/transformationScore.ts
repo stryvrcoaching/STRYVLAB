@@ -15,6 +15,8 @@ export interface DimensionResult {
   score: number       // 0–100
   weight: number      // effective weight after redistribution
   dataPoints: number
+  explanation?: string
+  metrics?: Array<{ label: string; value: string }>
 }
 
 export interface BodyProgressResult extends DimensionResult {
@@ -28,6 +30,8 @@ export interface TransformationAlert {
 }
 
 export interface TransformationScoreResult {
+  analysisState: 'ready' | 'insufficient_data'
+  analysisStateReason: string | null
   score: number
   label: string
   window: 7 | 30
@@ -109,6 +113,48 @@ export function getScoreLabel(score: number): string {
   return 'Potentiel maximal'
 }
 
+export function hasMeaningfulTransformationSignals(
+  input: Pick<ComputeScoreInput, 'checkin' | 'performance' | 'bodyData'>,
+): boolean {
+  const hasCheckinField = Object.values(input.checkin.field_averages).some((value) => value != null)
+  const hasCheckinRate = input.checkin.response_rate != null
+  const hasSessions = input.performance.sessionsCount > 0
+  const hasBodySeries =
+    input.bodyData.weightSeries.length > 0 ||
+    input.bodyData.bodyFatSeries.length > 0 ||
+    input.bodyData.leanMassSeries.length > 0
+
+  return hasCheckinField || hasCheckinRate || hasSessions || hasBodySeries
+}
+
+export function getMissingTransformationSignalsReason(
+  input: Pick<ComputeScoreInput, 'checkin' | 'performance' | 'bodyData'>,
+): string {
+  const missing: string[] = []
+
+  const hasCheckinField = Object.values(input.checkin.field_averages).some((value) => value != null)
+  const hasCheckinRate = input.checkin.response_rate != null
+  if (!hasCheckinField && !hasCheckinRate) {
+    missing.push('aucun check-in coach')
+  }
+  if (input.performance.sessionsCount <= 0) {
+    missing.push('aucune séance loggée')
+  }
+  const hasBodySeries =
+    input.bodyData.weightSeries.length > 0 ||
+    input.bodyData.bodyFatSeries.length > 0 ||
+    input.bodyData.leanMassSeries.length > 0
+  if (!hasBodySeries) {
+    missing.push('aucun bilan corporel')
+  }
+
+  if (missing.length === 0) {
+    return 'Aucun signal de transformation interprétable n’est encore disponible sur cette fenêtre.'
+  }
+
+  return `Lecture de transformation indisponible: ${missing.join(', ')}.`
+}
+
 // ─── Weight redistribution ────────────────────────────────────────────────────
 
 function redistributeWeights(
@@ -177,6 +223,38 @@ function normalizeAdherence(
   if (scores.length === 0) return { score: 0, dataPoints: 0 }
   const avg = scores.reduce((a, b) => a + b, 0) / scores.length
   return { score: Math.round(avg * 100), dataPoints: scores.length }
+}
+
+function buildAdherenceExplanation(
+  checkin: CheckinSummaryInput,
+  sessionsCount: number,
+  weeklyFrequency: number,
+  windowDays: number,
+): Pick<DimensionResult, 'explanation' | 'metrics'> {
+  const targetSessions = weeklyFrequency * (windowDays / 7)
+  const sessionCompletionPct =
+    targetSessions > 0 ? Math.round(Math.min(sessionsCount / targetSessions, 1) * 100) : null
+
+  return {
+    explanation:
+      'Le score d’adhérence combine la réponse aux check-ins et les séances réalisées par rapport à la cible hebdomadaire.',
+    metrics: [
+      {
+        label: 'Check-ins répondus',
+        value:
+          checkin.response_rate != null
+            ? `${checkin.response_rate}%`
+            : 'Non disponible',
+      },
+      {
+        label: 'Séances réalisées vs cible',
+        value:
+          targetSessions > 0
+            ? `${sessionsCount}/${Math.round(targetSessions * 10) / 10} (${sessionCompletionPct ?? 0}%)`
+            : `${sessionsCount} séance(s)`,
+      },
+    ],
+  }
 }
 
 // ─── Body progress normalization ──────────────────────────────────────────────
@@ -253,6 +331,80 @@ function normalizeBodyProgress(data: BodyDataInput): RawBodyResult {
   return { score: Math.round(avg * 100), dataPoints: weightSeries.length, confidence }
 }
 
+function describeSlope(slope: number, direction: TrendDirection): string {
+  if (direction === 'down') {
+    if (slope <= -0.2) return 'Dans le bon sens'
+    if (slope < 0.2) return 'Quasi stable'
+    return 'Dans le mauvais sens'
+  }
+  if (direction === 'up') {
+    if (slope >= 0.2) return 'Dans le bon sens'
+    if (slope > -0.2) return 'Quasi stable'
+    return 'Dans le mauvais sens'
+  }
+  if (Math.abs(slope) <= 0.15) return 'Stable'
+  return slope > 0 ? 'Monte trop vite' : 'Baisse trop vite'
+}
+
+function goalDirectionLabel(goal: TrainingGoal): string {
+  const direction = GOAL_WEIGHT_DIRECTION[goal]
+  if (direction === 'down') return 'poids attendu en baisse'
+  if (direction === 'up') return 'poids attendu en hausse'
+  return 'poids attendu stable'
+}
+
+function buildBodyProgressExplanation(
+  data: BodyDataInput,
+  confidence: BodyProgressResult['confidence'],
+): Pick<BodyProgressResult, 'explanation' | 'metrics'> {
+  const metrics: Array<{ label: string; value: string }> = [
+    {
+      label: 'Lecture cible',
+      value: goalDirectionLabel(data.trainingGoal),
+    },
+  ]
+
+  if (data.weightSeries.length >= 2) {
+    const slope = linRegSlope(data.weightSeries)
+    metrics.push({
+      label: 'Tendance poids',
+      value: describeSlope(slope, GOAL_WEIGHT_DIRECTION[data.trainingGoal]),
+    })
+  } else {
+    metrics.push({ label: 'Tendance poids', value: 'Données insuffisantes' })
+  }
+
+  metrics.push({
+    label: 'Masse grasse',
+    value:
+      data.bodyFatSeries.length >= 2
+        ? describeSlope(linRegSlope(data.bodyFatSeries), 'down')
+        : 'Non disponible',
+  })
+  metrics.push({
+    label: 'Masse maigre',
+    value:
+      data.leanMassSeries.length >= 2
+        ? describeSlope(linRegSlope(data.leanMassSeries), 'up')
+        : 'Non disponible',
+  })
+  metrics.push({
+    label: 'Niveau de confiance',
+    value:
+      confidence === 'high'
+        ? 'Elevé'
+        : confidence === 'low'
+          ? 'Partiel'
+          : 'Insuffisant',
+  })
+
+  return {
+    explanation:
+      'Le score corporel compare la trajectoire du poids, de la masse grasse et de la masse maigre à l’objectif principal du client.',
+    metrics,
+  }
+}
+
 // ─── Performance normalization ────────────────────────────────────────────────
 
 function normalizePerformance(
@@ -276,6 +428,12 @@ function normalizePerformance(
     scores.push(Math.max(0, Math.min(1, 1 - avgRir / 5)))
   }
 
+  const overloadValues = exercises.map((e) => Math.min(e.overloads_last_4_weeks / 2, 1))
+  if (overloadValues.length > 0) {
+    const avgOverload = overloadValues.reduce((sum, value) => sum + value, 0) / overloadValues.length
+    scores.push(avgOverload)
+  }
+
   const stagnantRatio = exercises.filter(e => e.stagnation).length / exercises.length
   scores.push(1 - stagnantRatio)
 
@@ -283,6 +441,59 @@ function normalizePerformance(
 
   const avg = scores.reduce((a, b) => a + b, 0) / scores.length
   return { score: Math.round(avg * 100), dataPoints: exercises.length }
+}
+
+function buildPerformanceExplanation(
+  input: PerformanceSummaryInput,
+): Pick<DimensionResult, 'explanation' | 'metrics'> {
+  const { exercises, global_overreaching } = input.analysis
+  if (exercises.length === 0) {
+  return {
+    explanation:
+      'La performance a besoin de séries exploitables par exercice pour calculer la complétion, le RIR, les événements de surcharge détectés et la stagnation.',
+      metrics: [
+        { label: 'Séances détectées', value: String(input.sessionsCount) },
+        { label: 'Exercices analysables', value: '0' },
+      ],
+    }
+  }
+
+  const avgCompletion = Math.round(
+    (exercises.reduce((sum, exercise) => sum + exercise.completion_rate, 0) / exercises.length) * 100,
+  )
+  const rirValues = exercises.map((exercise) => exercise.avg_rir).filter((value): value is number => value != null)
+  const avgRir =
+    rirValues.length > 0
+      ? Math.round((rirValues.reduce((sum, value) => sum + value, 0) / rirValues.length) * 10) / 10
+      : null
+  const stagnantCount = exercises.filter((exercise) => exercise.stagnation).length
+  const overloadingCount = exercises.filter((exercise) => exercise.overloads_last_4_weeks > 0).length
+
+  return {
+    explanation:
+      'Le score de performance combine la complétion des sets, le RIR observé, les événements de surcharge enregistrés par le moteur de double progression et la part d’exercices jugés stagnants.',
+    metrics: [
+      { label: 'Séances détectées', value: String(input.sessionsCount) },
+      { label: 'Complétion des sets', value: `${avgCompletion}%` },
+      { label: 'RIR moyen', value: avgRir != null ? `${avgRir}` : 'Non disponible' },
+      {
+        label: 'Exercices avec événement de surcharge',
+        value: `${overloadingCount}/${exercises.length}`,
+      },
+      {
+        label: 'Exercices jugés en stagnation',
+        value: `${stagnantCount}/${exercises.length}`,
+      },
+      {
+        label: 'Règle de surcharge suivie',
+        value: 'Double progression sur exercices de programme compatibles',
+      },
+      {
+        label: 'Surmenage global',
+        value: global_overreaching ? 'Oui' : 'Non',
+      },
+    ],
+  }
 }
 
 // ─── Alert generation ─────────────────────────────────────────────────────────
@@ -380,13 +591,85 @@ export function computeTransformationScore(input: ComputeScoreInput): Transforma
     performRaw.score   * w.performance
 
   const dimensions = {
-    adherence:    { score: adherenceRaw.score, weight: w.adherence,    dataPoints: adherenceRaw.dataPoints },
-    recovery:     { score: recoveryRaw.score,  weight: w.recovery,     dataPoints: recoveryRaw.dataPoints  },
-    bodyProgress: { score: bodyRaw.score,      weight: w.bodyProgress, dataPoints: bodyRaw.dataPoints, confidence: bodyRaw.confidence },
-    performance:  { score: performRaw.score,   weight: w.performance,  dataPoints: performRaw.dataPoints   },
+    adherence: {
+      score: adherenceRaw.score,
+      weight: w.adherence,
+      dataPoints: adherenceRaw.dataPoints,
+      ...buildAdherenceExplanation(
+        input.checkin,
+        input.performance.sessionsCount,
+        input.performance.weeklyFrequency,
+        input.window,
+      ),
+    },
+    recovery: {
+      score: recoveryRaw.score,
+      weight: w.recovery,
+      dataPoints: recoveryRaw.dataPoints,
+      explanation:
+        'Le score de récupération reflète l’énergie, le sommeil, le stress et les courbatures sur la fenêtre sélectionnée.',
+      metrics: [
+        {
+          label: 'Sommeil',
+          value:
+            input.checkin.field_averages.sleep_duration != null
+              ? `${input.checkin.field_averages.sleep_duration} h`
+              : 'Non disponible',
+        },
+        {
+          label: 'Qualité du sommeil',
+          value:
+            input.checkin.field_averages.sleep_quality != null
+              ? `${input.checkin.field_averages.sleep_quality}/5`
+              : 'Non disponible',
+        },
+        {
+          label: 'Energie',
+          value:
+            input.checkin.field_averages.energy != null
+              ? `${input.checkin.field_averages.energy}/5`
+              : 'Non disponible',
+        },
+        {
+          label: 'Stress',
+          value:
+            input.checkin.field_averages.stress != null
+              ? `${input.checkin.field_averages.stress}/5`
+              : 'Non disponible',
+        },
+        {
+          label: 'Courbatures',
+          value:
+            input.checkin.field_averages.muscle_soreness != null
+              ? `${input.checkin.field_averages.muscle_soreness}/5`
+              : 'Non disponible',
+        },
+      ],
+    },
+    bodyProgress: {
+      score: bodyRaw.score,
+      weight: w.bodyProgress,
+      dataPoints: bodyRaw.dataPoints,
+      confidence: bodyRaw.confidence,
+      ...buildBodyProgressExplanation(input.bodyData, bodyRaw.confidence),
+    },
+    performance: {
+      score: performRaw.score,
+      weight: w.performance,
+      dataPoints: performRaw.dataPoints,
+      ...buildPerformanceExplanation(input.performance),
+    },
   }
+  const analysisState: TransformationScoreResult['analysisState'] =
+    !hasMeaningfulTransformationSignals(input) ? 'insufficient_data' : 'ready'
+  const analysisStateReason =
+    analysisState === 'insufficient_data'
+      ? getMissingTransformationSignalsReason(input)
+      : null
 
   return {
+    analysisState,
+    analysisStateReason,
     score: Math.round(composite),
     label: getScoreLabel(Math.round(composite)),
     window: input.window,

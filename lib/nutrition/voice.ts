@@ -72,6 +72,16 @@ const UNITS: Array<[RegExp, string]> = [
   [/\blitres?\b/gi, 'L'],
 ]
 
+const NUTRITION_CORRECTIONS: Array<[RegExp, string]> = [
+  [/\bche?ker\b/gi, 'shaker'],
+  [/\bshakeur\b/gi, 'shaker'],
+  [/\bc[eè]de poudre\b/gi, 'cette poudre'],
+  [/\b7 poudres?\b/gi, 'cette poudre'],
+  [/\bset poudre\b/gi, 'cette poudre'],
+  [/\bdemi ecreme\b/gi, 'demi-écrémé'],
+  [/\bpoudre de proteines\b/gi, 'poudre de protéines'],
+]
+
 export function cleanTranscript(raw: string, lang: string): string {
   let text = raw.toLowerCase()
 
@@ -86,6 +96,10 @@ export function cleanTranscript(raw: string, lang: string): string {
 
   for (const [re, abbr] of UNITS) {
     text = text.replace(re, abbr)
+  }
+
+  for (const [re, replacement] of NUTRITION_CORRECTIONS) {
+    text = text.replace(re, replacement)
   }
 
   return text.replace(/\s+/g, ' ').trim()

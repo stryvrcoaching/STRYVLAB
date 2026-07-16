@@ -3,6 +3,7 @@ import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { generateReceiptPdf } from '@/lib/pdf/receipt'
 import { sendInvoiceEmail } from '@/lib/email/mailer'
+import { z } from 'zod'
 
 function serviceClient() {
   return createServiceClient(
@@ -15,6 +16,7 @@ const METHOD_LABELS: Record<string, string> = {
   manual: 'Manuel', bank_transfer: 'Virement bancaire', card: 'Carte bancaire',
   cash: 'Espèces', stripe: 'Stripe', other: 'Autre',
 }
+const idSchema = z.string().uuid()
 
 // ─── Generate sequential invoice number for this coach ────────────────────────
 async function nextInvoiceNumber(db: ReturnType<typeof serviceClient>, coachId: string): Promise<string> {
@@ -50,6 +52,9 @@ export async function POST(
   const supabase = createServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  if (!idSchema.safeParse(params.paymentId).success) {
+    return NextResponse.json({ error: 'Paiement introuvable' }, { status: 404 })
+  }
 
   const body = await req.json().catch(() => ({}))
   const sendEmail = body.sendEmail === true
@@ -77,6 +82,7 @@ export async function POST(
     .from('coach_clients')
     .select('first_name, last_name, email')
     .eq('id', payment.client_id)
+    .eq('coach_id', user.id)
     .single()
 
   if (!client) return NextResponse.json({ error: 'Client introuvable' }, { status: 404 })
@@ -84,12 +90,12 @@ export async function POST(
   // Coach info — prefer coach_profiles, fallback to auth metadata
   const { data: coachProfile } = await db
     .from('coach_profiles')
-    .select('full_name, brand_name, pro_email, logo_url')
+    .select('full_name, brand_name, pro_email, logo_url, company_name, billing_country, business_registration_number, siret, address, vat_number')
     .eq('coach_id', user.id)
     .maybeSingle()
 
   const coachMeta = user.user_metadata ?? {}
-  const coachName: string = coachProfile?.brand_name ?? coachProfile?.full_name ?? coachMeta.full_name ?? coachMeta.first_name ?? user.email ?? 'Votre coach'
+  const coachName: string = coachProfile?.company_name ?? coachProfile?.brand_name ?? coachProfile?.full_name ?? coachMeta.full_name ?? coachMeta.first_name ?? user.email ?? 'Votre coach'
   const coachEmail: string = coachProfile?.pro_email ?? user.email ?? ''
   const coachLogoUrl: string | null = coachProfile?.logo_url ?? null
 
@@ -101,6 +107,7 @@ export async function POST(
       .from('subscription_payments')
       .update({ invoice_number: invoiceNumber })
       .eq('id', params.paymentId)
+      .eq('coach_id', user.id)
   }
 
   // Period label (month/year of payment date)
@@ -118,6 +125,11 @@ export async function POST(
     coachName,
     coachEmail,
     coachLogoUrl,
+    companyName: coachProfile?.company_name ?? null,
+    billingCountry: coachProfile?.billing_country ?? null,
+    businessRegistrationNumber: coachProfile?.business_registration_number ?? coachProfile?.siret ?? null,
+    vatNumber: coachProfile?.vat_number ?? null,
+    address: coachProfile?.address ?? null,
     clientName: `${client.first_name ?? ''} ${client.last_name ?? ''}`.trim(),
     clientEmail: client.email ?? '',
     formulaName,
@@ -148,6 +160,7 @@ export async function POST(
       .from('subscription_payments')
       .update({ invoice_sent_at: new Date().toISOString() })
       .eq('id', params.paymentId)
+      .eq('coach_id', user.id)
 
     return NextResponse.json({ sent: true, invoiceNumber })
   }

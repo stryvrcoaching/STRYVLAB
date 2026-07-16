@@ -47,7 +47,7 @@ function formatShortDate(value: string) {
 }
 
 function renderTarget(value: number | null, unit: string) {
-  return value == null ? `N/A ${unit}` : `${value} ${unit}`;
+  return value == null ? `— ${unit}` : `${value} ${unit}`;
 }
 
 function metricGap(consumed: number, target: number | null, unit: string) {
@@ -56,6 +56,53 @@ function metricGap(consumed: number, target: number | null, unit: string) {
   if (delta === 0) return `À la cible (${target} ${unit})`;
   const prefix = delta > 0 ? "+" : "";
   return `${prefix}${delta} ${unit} vs cible`;
+}
+
+function completionRate(consumed: number, target: number | null) {
+  if (target == null || target <= 0) return null;
+  return Math.round((consumed / target) * 100);
+}
+
+function hydrationHint(consumed: number, target: number | null) {
+  const rate = completionRate(consumed, target);
+  if (rate == null) return "Cible hydrique non disponible";
+  return `${rate}% de la cible`;
+}
+
+function FocusMetricCard({
+  label,
+  value,
+  hint,
+  color,
+  tone,
+  span,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  color: string;
+  tone: string;
+  span?: string;
+}) {
+  return (
+    <article
+      className={`min-w-0 rounded-[22px] border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] p-4 ${span ?? ""}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="min-w-0 text-[10px] uppercase tracking-[0.16em] text-white/35">{label}</p>
+        <span
+          className="inline-flex shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em]"
+          style={{ color, backgroundColor: tone }}
+        >
+          live
+        </span>
+      </div>
+      <p className="mt-3 text-[16px] font-semibold sm:text-[18px]" style={{ color }}>
+        {value}
+      </p>
+      <p className="mt-2 text-[12px] leading-relaxed text-white/54">{hint}</p>
+    </article>
+  );
 }
 
 export default function NutritionFocusDayCard({
@@ -70,7 +117,7 @@ export default function NutritionFocusDayCard({
   }
 
   return (
-    <section className="rounded-[26px] border border-white/[0.06] bg-white/[0.02] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.18)]">
+    <section className="rounded-[28px] border border-white/[0.07] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.018))] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.18)]">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">
@@ -95,71 +142,43 @@ export default function NutritionFocusDayCard({
         <p className="mt-2 text-[13px] leading-relaxed text-white/72">{rationale}</p>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <article className="rounded-[20px] border border-white/[0.06] bg-white/[0.04] p-4">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">Calories</p>
-          <p
-            className="mt-2 text-xl font-semibold"
-            style={{ color: NUTRITION_UI_COLORS.calories }}
-          >
-            {row.consumed.calories} kcal
-          </p>
-          <p className="mt-2 text-[12px] text-white/48">
-            {metricGap(row.consumed.calories, row.target.calories, "kcal")}
-          </p>
-        </article>
-
-        <article className="rounded-[20px] border border-white/[0.06] bg-white/[0.04] p-4">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">Protéines</p>
-          <p
-            className="mt-2 text-xl font-semibold"
-            style={{ color: NUTRITION_UI_COLORS.protein }}
-          >
-            {row.consumed.protein_g} g
-          </p>
-          <p className="mt-2 text-[12px] text-white/48">
-            Cible {renderTarget(row.target.protein_g, "g")}
-          </p>
-        </article>
-
-        <article className="rounded-[20px] border border-white/[0.06] bg-white/[0.04] p-4">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">Hydratation</p>
-          <p
-            className="mt-2 text-xl font-semibold"
-            style={{ color: NUTRITION_UI_COLORS.water }}
-          >
-            {row.consumed.hydration_ml} ml
-          </p>
-          <p className="mt-2 text-[12px] text-white/48">
-            Cible {renderTarget(row.target.hydration_ml, "ml")}
-          </p>
-        </article>
-
-        <article className="rounded-[20px] border border-white/[0.06] bg-white/[0.04] p-4">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">Glucides</p>
-          <p
-            className="mt-2 text-xl font-semibold"
-            style={{ color: NUTRITION_UI_COLORS.carbs }}
-          >
-            {row.consumed.carbs_g} g
-          </p>
-          <p className="mt-2 text-[12px] text-white/48">
-            Cible {renderTarget(row.target.carbs_g, "g")}
-          </p>
-        </article>
-
-        <article className="rounded-[20px] border border-white/[0.06] bg-white/[0.04] p-4 sm:col-span-2">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-white/35">Lipides</p>
-          <p
-            className="mt-2 text-xl font-semibold"
-            style={{ color: NUTRITION_UI_COLORS.fat }}
-          >
-            {row.consumed.fat_g} g
-          </p>
-          <p className="mt-2 text-[12px] text-white/48">
-            Cible {renderTarget(row.target.fat_g, "g")}
-          </p>
-        </article>
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <FocusMetricCard
+          label="Calories"
+          value={`${row.consumed.calories} kcal`}
+          hint={metricGap(row.consumed.calories, row.target.calories, "kcal")}
+          color={NUTRITION_UI_COLORS.calories}
+          tone="rgba(104,159,250,0.12)"
+        />
+        <FocusMetricCard
+          label="Protéines"
+          value={`${row.consumed.protein_g} g`}
+          hint={`Cible ${renderTarget(row.target.protein_g, "g")}`}
+          color={NUTRITION_UI_COLORS.protein}
+          tone="rgba(93,186,135,0.12)"
+        />
+        <FocusMetricCard
+          label="Hydratation"
+          value={`${row.consumed.hydration_ml} ml`}
+          hint={hydrationHint(row.consumed.hydration_ml, row.target.hydration_ml)}
+          color={NUTRITION_UI_COLORS.water}
+          tone="rgba(35,115,200,0.12)"
+          span="col-span-2"
+        />
+        <FocusMetricCard
+          label="Glucides"
+          value={`${row.consumed.carbs_g} g`}
+          hint={`Cible ${renderTarget(row.target.carbs_g, "g")}`}
+          color={NUTRITION_UI_COLORS.carbs}
+          tone="rgba(255,209,94,0.12)"
+        />
+        <FocusMetricCard
+          label="Lipides"
+          value={`${row.consumed.fat_g} g`}
+          hint={`Cible ${renderTarget(row.target.fat_g, "g")}`}
+          color={NUTRITION_UI_COLORS.fat}
+          tone="rgba(255,134,96,0.12)"
+        />
       </div>
     </section>
   );

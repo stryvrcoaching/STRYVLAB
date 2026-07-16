@@ -19,10 +19,12 @@ export default async function EditProgramTemplatePage({ params }: { params: { te
       id, name, description, goal, level, frequency, weeks, muscle_tags, notes,
       equipment_archetype, session_mode, is_system, coach_id,
       coach_program_template_sessions (
-        id, name, day_of_week, position, notes,
+        id, name, day_of_week, days_of_week, position, notes,
         coach_program_template_exercises (
           id, name, sets, reps, rest_sec, rir, notes, position, image_url,
-          movement_pattern, equipment_required
+          movement_pattern, equipment_required, primary_muscles, secondary_muscles,
+          group_id, is_unilateral, set_prescriptions, tempo, execution_type, target_hr_zone, target_rir,
+          weight_increment_kg
         )
       )
     `)

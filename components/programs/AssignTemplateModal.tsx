@@ -233,7 +233,7 @@ export default function AssignTemplateModal({
                           <span className="text-[10px] text-white/40">·</span>
                           <span className="text-[10px] text-white/50">{LEVELS[t.level] ?? t.level}</span>
                           <span className="text-[10px] text-white/40">·</span>
-                          <span className="text-[10px] font-mono text-white/50">{t.frequency}j/sem.</span>
+                          <span className="text-[10px] font-mono text-white/50">{t.frequency} séances/sem.</span>
                           <span className="text-[10px] text-white/40">·</span>
                           <span className="text-[10px] font-mono text-white/50">{t.weeks} sem.</span>
                           {t.equipment_archetype && (

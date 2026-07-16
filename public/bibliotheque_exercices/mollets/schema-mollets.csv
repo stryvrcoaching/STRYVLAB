@@ -10,3 +10,13 @@ CALF-008,Extension-mollets-smith-machine,plantar_flexion,sagittal,isolation,fals
 CALF-009,Extension-mollets-sur-marche,plantar_flexion,sagittal,isolation,false,gastrocnemius,0.8,soleus,0.2,ankle,4,3,1,5,5,unilateral_step
 CALF-010,Extensions-des-mollets-avec-partenaire,plantar_flexion,sagittal,isolation,false,gastrocnemius,0.75,soleus,0.25,ankle,3,2,1,6,6,assisted_resistance
 CALF-011,Extensions-mollets-hack-squat,plantar_flexion,sagittal,isolation,false,soleus,0.75,gastrocnemius,0.25,ankle,3,4,1,2,2,machine_loaded
+CALF-012,Tibial raise debout contre mur,dorsiflexion,sagittal,isolation,false,tibial_anterieur,0.85,,,ankle,1,1,1,1,1,wall_support
+CALF-013,Tibial raise machine,dorsiflexion,sagittal,isolation,false,tibial_anterieur,0.9,,,ankle,1,1,1,1,1,machine_stability
+CALF-014,Dorsiflexion cheville elastique assis,dorsiflexion,sagittal,isolation,true,tibial_anterieur,0.8,,,ankle,1,1,1,2,2,elastic_control
+CALF-015,Dorsiflexion cheville poulie basse,dorsiflexion,sagittal,isolation,true,tibial_anterieur,0.85,,,ankle,1,1,1,2,3,cable_control
+CALF-016,Marche sur talons,dorsiflexion,sagittal,compound,false,tibial_anterieur,0.7,core|quadriceps,0.15|0.15,ankle|core,2,2,1,4,4,locomotion_endurance
+CALF-017,Cercles de cheville,mobility_stability,sagittal,isolation,true,mollets,0.4,,,,1,1,1,1,3,bodyweight_basic
+CALF-018,Planche d'équilibre,core_stability,frontal,compound,true,mollets,0.7,core|glutes,0.2|0.3,core,2,2,1,5,6,bodyweight_basic
+CALF-019,Élévation des mollets sans poids,plantar_flexion,sagittal,isolation,false,gastrocnemius,0.8,,,core,1,1,1,2,4,bodyweight_basic
+CALF-020,Saut en avant,horizontal_push,sagittal,compound,false,quadriceps,0.75,glutes,0.2,core,2,2,1,4,6,bodyweight_basic
+CALF-021,Élévation de mollet au sol sur une jambe,plantar_flexion,sagittal,isolation,true,gastrocnemius,0.7,,,none,1,1,1,3,2,bodyweight_basic

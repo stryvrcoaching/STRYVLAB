@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useClientT } from '@/components/client/ClientI18nProvider'
 
 type Session = {
   id: string
@@ -11,12 +12,13 @@ type Session = {
 }
 
 export default function RecentSessionsStrip({ sessions }: { sessions: Session[] }) {
+  const { lang, t } = useClientT()
   if (sessions.length === 0) return null
 
   return (
     <div className="bg-[#111111] rounded-2xl p-4">
       <div className="font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[11px] text-white mb-3">
-        Dernières séances
+        {t('logger.progress.recentSessions')}
       </div>
       <div className="flex gap-2 overflow-x-auto">
         {sessions.map(s => (
@@ -26,11 +28,11 @@ export default function RecentSessionsStrip({ sessions }: { sessions: Session[] 
             className="min-w-[140px] bg-white/[0.02] rounded-xl p-3 active:scale-[0.99] transition-transform shrink-0"
           >
             <div className="text-[10px] text-white/40 tabular-nums">
-              {new Date(s.completed_at).toLocaleDateString('fr-FR')}
+              {new Date(s.completed_at).toLocaleDateString(lang === 'es' ? 'es-ES' : lang === 'en' ? 'en-GB' : 'fr-FR')}
             </div>
             <div className="text-[14px] font-black text-white mt-1 tabular-nums">{s.volume_kg} kg</div>
             {s.avg_rir != null && (
-              <div className="text-[10px] text-white/55 mt-0.5">RIR moy {s.avg_rir}</div>
+              <div className="text-[10px] text-white/55 mt-0.5">{t('logger.progress.avgRir')} {s.avg_rir}</div>
             )}
           </Link>
         ))}

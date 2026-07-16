@@ -1,3 +1,5 @@
+import { ct, type ClientLang } from '@/lib/i18n/clientTranslations'
+
 export type NutritionAlertCode =
   | 'protein_low'
   | 'carbs_limit'
@@ -28,11 +30,12 @@ export type NutritionInput = {
   target: NutritionConsumed
   currentHour: number
   hasLunchLog: boolean
+  lang?: ClientLang
 }
 
 export function computeNutritionAlerts(input: NutritionInput): NutritionAlert[] {
   const alerts: NutritionAlert[] = []
-  const { consumed, target, currentHour, hasLunchLog } = input
+  const { consumed, target, currentHour, hasLunchLog, lang = 'fr' } = input
 
   // Rule 1: protein_low (warning) — after 14h, behind schedule
   if (currentHour >= 14) {
@@ -43,8 +46,8 @@ export function computeNutritionAlerts(input: NutritionInput): NutritionAlert[] 
       alerts.push({
         code: 'protein_low',
         severity: 'warning',
-        title: 'PROTÉINES EN RETARD',
-        body: `il te reste ${delta}g pour atteindre ${target.protein_g}g`,
+        title: ct(lang, 'smart.nutrition.alert.proteinLow'),
+        body: ct(lang, 'smart.nutrition.alert.proteinLow.body', { delta, target: target.protein_g }),
         delta,
       })
     }
@@ -56,8 +59,8 @@ export function computeNutritionAlerts(input: NutritionInput): NutritionAlert[] 
     alerts.push({
       code: 'carbs_limit',
       severity: 'critical',
-      title: 'LIMITE GLUCIDES ATTEINTE',
-      body: `-${delta}g sur ta cible`,
+      title: ct(lang, 'smart.nutrition.alert.carbsLimit'),
+      body: ct(lang, 'smart.nutrition.alert.carbsLimit.body', { delta }),
       delta,
     })
   }
@@ -71,8 +74,8 @@ export function computeNutritionAlerts(input: NutritionInput): NutritionAlert[] 
       alerts.push({
         code: 'hydration_low',
         severity: 'warning',
-        title: 'HYDRATATION FAIBLE',
-        body: `il manque ${deltaL}L`,
+        title: ct(lang, 'smart.nutrition.alert.hydrationLow'),
+        body: ct(lang, 'smart.nutrition.alert.hydrationLow.body', { delta: deltaL }),
         delta: deltaMl,
       })
     }
@@ -83,7 +86,7 @@ export function computeNutritionAlerts(input: NutritionInput): NutritionAlert[] 
     alerts.push({
       code: 'lunch_missing',
       severity: 'info',
-      title: 'PAS DE DÉJEUNER LOGUÉ',
+      title: ct(lang, 'smart.nutrition.alert.lunchMissing'),
     })
   }
 

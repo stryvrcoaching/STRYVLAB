@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { Upload, GitCompare, Pencil, Dna, X } from 'lucide-react'
 import { useClient } from '@/lib/client-context'
 import { useClientTopBar } from '@/components/clients/useClientTopBar'
+import HeaderIconButton from '@/components/layout/HeaderIconButton'
 import { MorphoGallery } from '@/components/morpho/MorphoGallery'
 import { MorphoUploadModal } from '@/components/morpho/MorphoUploadModal'
 import { MorphoCompare } from '@/components/morpho/MorphoCompare'
@@ -66,46 +67,37 @@ export default function MorphoProPage() {
 
   const topBarRight = count > 0 ? (
     <div className="flex items-center gap-1.5">
-      <span className="text-[10px] text-white/40 mr-1">{count} sélectionnée{count > 1 ? 's' : ''}</span>
-      <button
+      <HeaderIconButton
         onClick={() => setComparePhotos(selectedPhotos)}
         disabled={count < 2 || count > 4}
-        className="flex items-center gap-1.5 px-3 h-8 rounded-lg bg-white/[0.04] text-white/55 text-[10px] font-bold hover:bg-white/[0.08] hover:text-white/80 disabled:opacity-30 transition-all"
-      >
-        <GitCompare size={12} />
-        Comparer
-      </button>
-      <button
+        icon={<GitCompare size={12} />}
+        label="Comparer les photos sélectionnées"
+      />
+      <HeaderIconButton
         onClick={() => selectedPhotos[0] && setCanvasPhoto(selectedPhotos[0])}
         disabled={count !== 1}
-        className="flex items-center gap-1.5 px-3 h-8 rounded-lg bg-white/[0.04] text-white/55 text-[10px] font-bold hover:bg-white/[0.08] hover:text-white/80 disabled:opacity-30 transition-all"
-      >
-        <Pencil size={12} />
-        Annoter
-      </button>
-      <button
+        icon={<Pencil size={12} />}
+        label="Annoter la photo sélectionnée"
+      />
+      <HeaderIconButton
         onClick={onAnalyze}
         disabled={analyzing}
-        className="flex items-center gap-1.5 px-3 h-8 rounded-lg bg-[#1f8a65] text-white text-[10px] font-bold hover:bg-[#217356] disabled:opacity-50 transition-all"
-      >
-        <Dna size={12} className={analyzing ? 'animate-pulse' : ''} />
-        {analyzing ? 'Analyse…' : 'Analyser IA'}
-      </button>
-      <button
+        icon={<Dna size={12} className={analyzing ? 'animate-pulse' : ''} />}
+        label={analyzing ? 'Analyse en cours' : 'Analyser avec IA'}
+        variant="accent"
+      />
+      <HeaderIconButton
         onClick={() => setSelectionState(s => ({ ...s, selected: new Set(), selectedPhotos: [] }))}
-        className="p-1.5 text-white/30 hover:text-white/60 transition-colors"
-      >
-        <X size={14} />
-      </button>
+        icon={<X size={14} />}
+        label="Vider la sélection"
+      />
     </div>
   ) : (
-    <button
+    <HeaderIconButton
       onClick={() => setShowUpload(true)}
-      className="flex items-center gap-1.5 px-3 h-8 rounded-lg bg-white/[0.04] text-white/55 text-[10px] font-bold hover:bg-white/[0.08] hover:text-white/80 transition-all"
-    >
-      <Upload size={12} />
-      Photo
-    </button>
+      icon={<Upload size={12} />}
+      label="Ajouter une photo"
+    />
   )
 
   useClientTopBar('MorphoPro', topBarRight)

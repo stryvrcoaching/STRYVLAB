@@ -1,10 +1,13 @@
 import type { Metadata, Viewport } from 'next';
+import { Suspense } from 'react';
 import localFont from 'next/font/local';
 import { Barlow, Barlow_Condensed } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import AppFeedbackWidget from '@/components/feedback/AppFeedbackWidget'
+import TanstackProvider from '@/components/providers/TanstackProvider'
 
 
 /* =====================================================
@@ -61,7 +64,8 @@ const barlowCondensed = Barlow_Condensed({
    VIEWPORT
    ===================================================== */
 export const viewport: Viewport = {
-  themeColor: '#121212',
+  themeColor: '#09090a',
+  viewportFit: 'cover',
   width: 'device-width',
   initialScale: 1,
 };
@@ -77,6 +81,12 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'STRYV',
+  },
+
+  icons: {
+    icon: '/images/logo.png',
+    shortcut: '/images/logo.png',
+    apple: '/images/logo.png',
   },
 
   title: {
@@ -218,7 +228,14 @@ export default function RootLayout({
     // Injection des 3 variables de police pour utilisation CSS globale
     <html lang="fr" className={cn(lufga.variable, azonix.variable, onest.variable, unbounded.variable, barlow.variable, barlowCondensed.variable, "font-sans")}>
       <body className="antialiased min-h-screen bg-background text-primary">
-        <TooltipProvider delay={300}>{children}</TooltipProvider>
+        <TanstackProvider>
+          <TooltipProvider delay={300}>
+            {children}
+            <Suspense fallback={null}>
+              <AppFeedbackWidget />
+            </Suspense>
+          </TooltipProvider>
+        </TanstackProvider>
 
         {/* SCHEMA.ORG */}
         <Script

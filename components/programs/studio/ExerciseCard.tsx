@@ -1,10 +1,21 @@
 // components/programs/studio/ExerciseCard.tsx
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
+import useSWR from 'swr'
+import { calculateHRZones } from '@/lib/formulas'
 import Image from 'next/image'
 import {
-  Trash2, Upload, Library, Link2, Link2Off, ChevronUp, ChevronDown, GripVertical,
+  Trash2,
+  Upload,
+  Library,
+  Link2,
+  Link2Off,
+  ChevronUp,
+  ChevronDown,
+  GripVertical,
+  CheckSquare,
+  Square,
 } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -13,7 +24,6 @@ import ExerciseClientAlternatives, { type ExerciseClientAlternativesHandle } fro
 import { MorphoCoherenceBadge } from '@/components/morpho/MorphoCoherenceBadge'
 import type { IntelligenceAlert } from '@/lib/programs/intelligence'
 import type { CoherenceResult } from '@/lib/morpho/exerciseCoherence'
-import { parseTempo } from '@/lib/training/tempo'
 import {
   applyDefaultFieldToSetPrescriptions,
   normalizeSetPrescriptions,
@@ -97,6 +107,9 @@ export interface ExerciseData {
   dbId?: string
   primaryMuscle?: string | null
   constraintProfile?: string | null
+  execution_type?: 'reps_rir' | 'time_rpe' | 'distance_rpe'
+  target_hr_zone?: string | null
+  target_rir?: number | null
 }
 
 interface Props {
@@ -126,6 +139,9 @@ interface Props {
   performanceTrend?: 'progression' | 'stagnation' | 'overtraining' | null
   performanceSuggestion?: string | null
   morphoCoherence?: CoherenceResult
+  isSelected?: boolean
+  onToggleSelect?: () => void
+  clientId?: string
 }
 
 const TEMPO_PRESETS = [
@@ -154,17 +170,12 @@ const TEMPO_PRESETS = [
     value: 'X-0-X-0',
     note: 'CON et ECC explosives — puissance athlétique',
   },
-  {
-    label: 'Manuel',
-    value: '__manual__',
-    note: '',
-  },
 ] as const
 
 function detectPreset(tempo: string | null): string {
-  if (!tempo) return '2-1-3-1'
-  const match = TEMPO_PRESETS.find(p => p.value === tempo && p.value !== '__manual__')
-  return match ? match.value : '__manual__'
+  if (!tempo) return ''
+  const match = TEMPO_PRESETS.find(p => p.value === tempo)
+  return match ? match.value : ''
 }
 
 const SUPERSET_COLORS = [
@@ -206,6 +217,9 @@ export default function ExerciseCard({
   performanceTrend,
   performanceSuggestion,
   morphoCoherence,
+  isSelected,
+  onToggleSelect,
+  clientId,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const altRef = useRef<ExerciseClientAlternativesHandle>(null)
@@ -215,19 +229,16 @@ export default function ExerciseCard({
     reps: exercise.reps,
     rest_sec: exercise.rest_sec,
     rir: exercise.rir,
+    execution_type: exercise.execution_type ?? 'reps_rir',
+    target_hr_zone: exercise.target_hr_zone ?? null,
+    target_rir: exercise.target_rir ?? null,
     tempo: exercise.tempo,
   })
 
   // ── Tempo selector state ──
   const [selectedPreset, setSelectedPreset] = useState<string>(() => detectPreset(exercise.tempo))
-  const [manualValue, setManualValue]       = useState<string>(exercise.tempo ?? '')
-  const [manualError, setManualError]       = useState(false)
-
   useEffect(() => {
     setSelectedPreset(detectPreset(exercise.tempo))
-    if (exercise.tempo && !TEMPO_PRESETS.find(p => p.value === exercise.tempo)) {
-      setManualValue(exercise.tempo)
-    }
   }, [exercise.tempo])
 
   const {
@@ -258,7 +269,8 @@ export default function ExerciseCard({
       }}
       className={[
         'rounded-xl border-[0.3px] bg-white/[0.02] transition-all duration-200',
-        isHighlighted
+        isSelected ? 'border-[#1f8a65]/60 bg-[#1f8a65]/5 ring-1 ring-[#1f8a65]/30'
+        : isHighlighted
           ? 'border-[#1f8a65]/60 ring-1 ring-[#1f8a65]/30'
           : isInSuperset
           ? 'border-transparent'
@@ -346,6 +358,21 @@ export default function ExerciseCard({
               >
                 <GripVertical size={13} />
               </div>
+
+              {onToggleSelect && (
+                <button
+                  type="button"
+                  onClick={onToggleSelect}
+                  className="text-white/45 hover:text-accent transition-colors shrink-0"
+                >
+                  {isSelected ? (
+                    <CheckSquare size={16} className="text-accent" />
+                  ) : (
+                    <Square size={16} />
+                  )}
+                </button>
+              )}
+
               <input
                 value={exercise.name}
                 onChange={e => onUpdate({ name: e.target.value })}
@@ -440,298 +467,328 @@ export default function ExerciseCard({
               </div>
             )}
 
-            {/* Sets / Reps / Rest / RIR */}
-            <div className="grid grid-cols-4 gap-1">
-              {[
-                { label: 'Séries', value: String(exercise.sets), key: 'sets', type: 'number' },
-                { label: 'Répétitions', value: exercise.reps, key: 'reps', type: 'text' },
-                { label: 'Repos', value: exercise.rest_sec != null ? String(exercise.rest_sec) : '', key: 'rest_sec', type: 'number' },
-                { label: 'RIR', value: exercise.rir != null ? String(exercise.rir) : '', key: 'rir', type: 'number' },
-              ].map(f => (
-                <div key={f.key} className="min-w-0">
-                  <label className="block text-[9px] text-white/30 mb-0.5 truncate">{f.label}</label>
-                  <input
-                    type={f.type}
-                    value={f.value}
-                    onChange={e => {
-                      const v = e.target.value
-                      if (f.key === 'sets') {
-                        const nextSets = Math.max(1, Number(v) || 1)
-                        onUpdate({
-                          sets: nextSets,
-                          set_prescriptions: normalizeSetPrescriptions(exercise.set_prescriptions, {
-                            sets: nextSets,
-                            reps: exercise.reps,
-                            rest_sec: exercise.rest_sec,
-                            rir: exercise.rir,
-                            tempo: exercise.tempo,
-                          }),
-                        })
-                      } else if (f.key === 'reps') {
-                        onUpdate({
-                          reps: v,
-                          set_prescriptions: applyDefaultFieldToSetPrescriptions(
-                            setPrescriptions,
-                            'reps',
-                            exercise.reps,
-                            v,
-                          ),
-                        })
-                      } else if (f.key === 'rest_sec') {
-                        const nextRest = v ? Number(v) : null
-                        onUpdate({
-                          rest_sec: nextRest,
-                          set_prescriptions: applyDefaultFieldToSetPrescriptions(
-                            setPrescriptions,
-                            'rest_sec',
-                            exercise.rest_sec,
-                            nextRest,
-                          ),
-                        })
-                      } else if (f.key === 'rir') {
-                        const nextRir = v ? Number(v) : null
-                        onUpdate({
-                          rir: nextRir,
-                          set_prescriptions: applyDefaultFieldToSetPrescriptions(
-                            setPrescriptions,
-                            'rir',
-                            exercise.rir,
-                            nextRir,
-                          ),
-                        })
-                      }
-                    }}
-                    className="w-full bg-[#0a0a0a] rounded-md border-[0.3px] border-white/[0.06] text-[11px] text-white/80 px-1.5 py-1 outline-none font-mono"
-                  />
-                </div>
+            {/* Selector of execution type */}
+            <div className="flex gap-1.5 mb-2 border-b border-white/[0.04] pb-1.5">
+              {(['reps_rir', 'time_rpe', 'distance_rpe'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => onUpdate({ execution_type: t })}
+                  className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors ${
+                    (exercise.execution_type ?? 'reps_rir') === t
+                      ? 'bg-accent text-white'
+                      : 'bg-white/[0.04] text-white/45 hover:text-white'
+                  }`}
+                >
+                  {t === 'reps_rir' ? 'Renforcement' : t === 'time_rpe' ? 'HIIT/Temps' : 'Distance'}
+                </button>
               ))}
             </div>
 
-            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px]">
-              {/* Tempo d'exécution */}
-              {(() => {
-                const activePreset = TEMPO_PRESETS.find(p => p.value === selectedPreset)
-                return (
-                  <div>
-                    <label className="block text-[9px] text-white/30 mb-0.5">
-                      Tempo (CON – ISO – ECC – PAUSE)
-                    </label>
-                    <select
-                      value={selectedPreset}
-                      onChange={e => {
-                        const v = e.target.value
-                        setSelectedPreset(v)
-                        setManualError(false)
-                        if (v !== '__manual__') {
-                          onUpdate({
-                            tempo: v,
-                            set_prescriptions: applyDefaultFieldToSetPrescriptions(
-                              setPrescriptions,
-                              'tempo',
-                              exercise.tempo,
-                              v,
-                            ),
-                          })
-                        }
-                      }}
-                      className="w-full bg-[#0a0a0a] rounded-md border-[0.3px] border-white/[0.06] text-[11px] text-white/80 px-1.5 py-1 outline-none cursor-pointer"
-                    >
-                      {TEMPO_PRESETS.map(p => (
-                        <option key={p.value} value={p.value} className="bg-[#0a0a0a]">
-                          {p.value === '__manual__' ? 'Manuel...' : `${p.label}  ·  ${p.value}`}
-                        </option>
-                      ))}
-                    </select>
-                    {activePreset && activePreset.note && (
-                      <p className="text-[9px] text-white/25 leading-relaxed mt-0.5">
-                        {activePreset.note}
-                      </p>
-                    )}
-                    {selectedPreset === '__manual__' && (
-                      <div className="mt-1">
+            {/* Fetch client details for specific HR Zones if client context is available */}
+            {(() => {
+              const { data: clientRes } = useSWR(clientId ? `/api/clients/${clientId}` : null, (url) => fetch(url).then(r => r.json()));
+              const client = clientRes?.client;
+
+              const hrZones = useMemo(() => {
+                if (!client) return null;
+                const dob = client.date_of_birth;
+                const gender = client.gender === 'female' ? 'female' : 'male';
+                const age = dob ? new Date().getFullYear() - new Date(dob).getFullYear() : 30;
+                return calculateHRZones({ age, gender });
+              }, [client]);
+
+              const isCardio = (exercise.execution_type ?? 'reps_rir') !== 'reps_rir';
+              const rpeLabel = (exercise.execution_type ?? 'reps_rir') === 'reps_rir' ? 'RIR' : 'RPE';
+              const repsLabel = (exercise.execution_type ?? 'reps_rir') === 'time_rpe' ? 'Durée' : (exercise.execution_type ?? 'reps_rir') === 'distance_rpe' ? 'Distance' : 'Répétitions';
+              const repsPlaceholder = (exercise.execution_type ?? 'reps_rir') === 'time_rpe' ? '30s' : (exercise.execution_type ?? 'reps_rir') === 'distance_rpe' ? '2 km' : '8-12';
+
+              return (
+                <>
+                  {/* Sets / Reps / Rest / RIR */}
+                  <div className="grid grid-cols-4 gap-1">
+                    {[
+                      { label: 'Séries', value: String(exercise.sets), key: 'sets', type: 'number' },
+                      { label: repsLabel, value: exercise.reps, key: 'reps', type: 'text' },
+                      { label: 'Repos', value: exercise.rest_sec != null ? String(exercise.rest_sec) : '', key: 'rest_sec', type: 'number' },
+                      { label: rpeLabel, value: (isCardio ? exercise.target_rir : exercise.rir) != null ? String(isCardio ? exercise.target_rir : exercise.rir) : '', key: 'rir_rpe', type: 'number' },
+                    ].map(f => (
+                      <div key={f.key} className="min-w-0">
+                        <label className="block text-[9px] text-white/30 mb-0.5 truncate">{f.label}</label>
                         <input
-                          type="text"
-                          value={manualValue}
+                          type={f.type}
+                          step={f.key === 'rir_rpe' ? 0.5 : undefined}
+                          value={f.value}
+                          placeholder={f.key === 'reps' ? repsPlaceholder : f.key === 'rir_rpe' ? (isCardio ? '8' : '2') : ''}
                           onChange={e => {
-                            setManualValue(e.target.value)
-                            setManualError(false)
-                          }}
-                          onBlur={() => {
-                            const v = manualValue.trim().toUpperCase()
-                            if (!v) {
+                            const v = e.target.value
+                            if (f.key === 'sets') {
+                              const nextSets = Math.max(1, Number(v) || 1)
                               onUpdate({
-                                tempo: null,
-                                set_prescriptions: applyDefaultFieldToSetPrescriptions(
-                                  setPrescriptions,
-                                  'tempo',
-                                  exercise.tempo,
-                                  null,
-                                ),
+                                sets: nextSets,
+                                set_prescriptions: normalizeSetPrescriptions(exercise.set_prescriptions, {
+                                  sets: nextSets,
+                                  reps: exercise.reps,
+                                  rest_sec: exercise.rest_sec,
+                                  rir: exercise.rir,
+                                  tempo: exercise.tempo,
+                                }),
                               })
-                              setManualError(false)
-                              return
-                            }
-                            if (parseTempo(v) !== null) {
+                            } else if (f.key === 'reps') {
                               onUpdate({
-                                tempo: v,
+                                reps: v,
                                 set_prescriptions: applyDefaultFieldToSetPrescriptions(
                                   setPrescriptions,
-                                  'tempo',
-                                  exercise.tempo,
+                                  'reps',
+                                  exercise.reps,
                                   v,
                                 ),
                               })
-                              setManualValue(v)
-                              setManualError(false)
-                            } else {
-                              setManualError(true)
+                            } else if (f.key === 'rest_sec') {
+                              const nextRest = v ? Number(v) : null
+                              onUpdate({
+                                rest_sec: nextRest,
+                                set_prescriptions: applyDefaultFieldToSetPrescriptions(
+                                  setPrescriptions,
+                                  'rest_sec',
+                                  exercise.rest_sec,
+                                  nextRest,
+                                ),
+                              })
+                            } else if (f.key === 'rir_rpe') {
+                              const val = v ? Number(v) : null
+                              if (isCardio) {
+                                onUpdate({
+                                  target_rir: val,
+                                  rir: val,
+                                })
+                              } else {
+                                onUpdate({
+                                  rir: val,
+                                  set_prescriptions: applyDefaultFieldToSetPrescriptions(
+                                    setPrescriptions,
+                                    'rir',
+                                    exercise.rir,
+                                    val,
+                                  ),
+                                })
+                              }
                             }
                           }}
-                          placeholder="ex: 2-2-3-1"
-                          className={`w-full bg-[#0a0a0a] rounded-md border-[0.3px] text-[11px] text-white/80 placeholder:text-white/20 px-1.5 py-1 outline-none font-mono ${
-                            manualError ? 'border-red-500/40' : 'border-white/[0.06]'
-                          }`}
+                          className="w-full bg-[#0a0a0a] rounded-md border-[0.3px] border-white/[0.06] text-[11px] text-white/80 px-1.5 py-1 outline-none font-mono"
                         />
-                        {manualError && (
-                          <p className="text-[9px] text-red-400/60 mt-0.5">
-                            Format attendu : 2-2-3-1  (chiffre ou X par phase)
-                          </p>
-                        )}
                       </div>
-                    )}
+                    ))}
                   </div>
-                )
-              })()}
 
-              {/* Palier de surcharge progressive */}
-              <div>
-                <label className="block text-[9px] text-white/30 mb-0.5">Kilo / overload</label>
-                <input
-                  type="number"
-                  step={0.5}
-                  min={0}
-                  value={exercise.weight_increment_kg != null ? String(exercise.weight_increment_kg) : ''}
-                  onChange={e => {
-                    const v = e.target.value
-                    onUpdate({ weight_increment_kg: v ? Number(v) : null })
-                  }}
-                  placeholder="2.5"
-                  className="w-full bg-[#0a0a0a] rounded-md border-[0.3px] border-white/[0.06] text-[11px] text-white/80 px-1.5 py-1 outline-none font-mono"
-                />
-                <p className="text-[9px] text-white/20 leading-relaxed mt-1">
-                  Charge ajoutée quand le haut de fourchette est atteint sur toutes les séries.
-                </p>
-              </div>
-            </div>
+                  {/* Target HR Zone recommendation selector */}
+                  {isCardio && (
+                    <div className="mt-2 pt-2 border-t border-white/[0.04]">
+                      <label className="block text-[9px] text-white/30 mb-1">
+                        Zone Cardiaque Recommandée
+                      </label>
+                      <select
+                        value={exercise.target_hr_zone ?? ''}
+                        onChange={e => onUpdate({ target_hr_zone: e.target.value || null })}
+                        className="w-full bg-[#0a0a0a] text-white/80 text-[11px] rounded-md border-[0.3px] border-white/[0.06] px-1.5 py-1 outline-none"
+                      >
+                        <option value="">— Sans zone spécifique —</option>
+                        {hrZones ? hrZones.zones.map(z => (
+                          <option key={z.zone} value={`Zone ${z.zone}`}>
+                            Zone {z.zone} ({z.name}) : {z.bpm} BPM
+                          </option>
+                        )) : (
+                          <>
+                            <option value="Zone 1">Zone 1 (Récupération Active)</option>
+                            <option value="Zone 2">Zone 2 (Endurance de Base)</option>
+                            <option value="Zone 3">Zone 3 (Aérobie)</option>
+                            <option value="Zone 4">Zone 4 (Seuil Lactique)</option>
+                    <option value="Zone 6">Zone 6 (Anaérobie)</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
-            <div className="rounded-lg border-[0.3px] border-white/[0.06] bg-[#0a0a0a] p-2.5">
-              <div className="mb-2 flex items-center justify-between gap-3">
+            {(!exercise.execution_type || exercise.execution_type === 'reps_rir') && (
+              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px]">
+                {/* Tempo d'exécution */}
+                {(() => {
+                  const activePreset = TEMPO_PRESETS.find(p => p.value === selectedPreset)
+                  return (
+                    <div>
+                      <label className="block text-[9px] text-white/30 mb-0.5">
+                        Tempo (CON – ISO – ECC – PAUSE)
+                      </label>
+                      <select
+                        value={selectedPreset}
+                        onChange={e => {
+                          const v = e.target.value
+                          setSelectedPreset(v)
+                          if (v) {
+                            onUpdate({
+                              tempo: v,
+                              set_prescriptions: applyDefaultFieldToSetPrescriptions(
+                                setPrescriptions,
+                                'tempo',
+                                exercise.tempo,
+                                v,
+                              ),
+                            })
+                          }
+                        }}
+                        className="w-full bg-[#0a0a0a] rounded-md border-[0.3px] border-white/[0.06] text-[11px] text-white/85 px-1 py-0.5 outline-none mb-1"
+                      >
+                        <option value="" disabled>— Sélectionner un tempo —</option>
+                        {TEMPO_PRESETS.map(p => (
+                          <option key={p.value} value={p.value}>{p.label}</option>
+                        ))}
+                      </select>
+
+                      {activePreset && (
+                        <p className="text-[9px] text-white/30 mt-1 leading-normal italic">
+                          {activePreset.note}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })()}
+
+                {/* Palier de surcharge progressive */}
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">
-                    Prescription par série
-                  </p>
-                  <p className="mt-0.5 text-[10px] leading-relaxed text-white/25">
-                    Chaque ligne hérite du défaut coach puis peut être ajustée indépendamment.
+                  <label className="block text-[9px] text-white/30 mb-0.5">Kilo / overload</label>
+                  <input
+                    type="number"
+                    step={0.5}
+                    min={0}
+                    value={exercise.weight_increment_kg != null ? String(exercise.weight_increment_kg) : ''}
+                    onChange={e => {
+                      const v = e.target.value
+                      onUpdate({ weight_increment_kg: v ? Number(v) : null })
+                    }}
+                    placeholder="2.5"
+                    className="w-full bg-[#0a0a0a] rounded-md border-[0.3px] border-white/[0.06] text-[11px] text-white/80 px-1.5 py-1 outline-none font-mono"
+                  />
+                  <p className="text-[9px] text-white/20 leading-relaxed mt-1">
+                    Charge ajoutée quand le haut de fourchette est atteint sur toutes les séries.
                   </p>
                 </div>
               </div>
+            )}
 
-              <div className="mb-1 grid grid-cols-[64px_minmax(0,1fr)_88px_72px_120px_124px] gap-1.5 px-1">
-                {['Série', 'Répétitions', 'Repos', 'RIR', 'Tempo', 'Type de série'].map((label) => (
-                  <div
-                    key={label}
-                    className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white/28"
-                  >
-                    {label}
+            {(!exercise.execution_type || exercise.execution_type === 'reps_rir') && (
+              <div className="rounded-lg border-[0.3px] border-white/[0.06] bg-[#0a0a0a] p-2.5">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">
+                      Prescription par série
+                    </p>
+                    <p className="text-[9px] text-white/20 leading-relaxed mt-0.5">
+                      Personnalisez les répétitions, le repos ou le RIR pour chaque série individuellement (ex: pyramide).
+                    </p>
                   </div>
-                ))}
-              </div>
+                </div>
 
-              <div className="space-y-2">
-                {setPrescriptions.map((row, index) => (
-                  <div
-                    key={`set-prescription-${index}`}
-                    className="grid grid-cols-[64px_minmax(0,1fr)_88px_72px_120px_124px] gap-1.5"
-                  >
-                    <div className="flex items-center rounded-md border-[0.3px] border-white/[0.06] bg-white/[0.03] px-2 text-[10px] font-semibold text-white/55">
-                      Série {row.set_number}
-                    </div>
-                    <input
-                      type="text"
-                      value={row.reps}
-                      onChange={(e) => {
-                        const next = [...setPrescriptions]
-                        next[index] = { ...row, reps: e.target.value }
-                        onUpdate({
-                          reps: index === 0 ? e.target.value : exercise.reps,
-                          set_prescriptions: next,
-                        })
-                      }}
-                      placeholder="8-12"
-                      className="w-full rounded-md border-[0.3px] border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-white/80 outline-none font-mono"
-                    />
-                    <input
-                      type="number"
-                      value={row.rest_sec ?? ''}
-                      onChange={(e) => {
-                        const next = [...setPrescriptions]
-                        next[index] = { ...row, rest_sec: e.target.value ? Number(e.target.value) : null }
-                        onUpdate({
-                          rest_sec: index === 0 ? (e.target.value ? Number(e.target.value) : null) : exercise.rest_sec,
-                          set_prescriptions: next,
-                        })
-                      }}
-                      placeholder="90"
-                      className="w-full rounded-md border-[0.3px] border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-white/80 outline-none font-mono"
-                    />
-                    <input
-                      type="number"
-                      value={row.rir ?? ''}
-                      onChange={(e) => {
-                        const next = [...setPrescriptions]
-                        next[index] = { ...row, rir: e.target.value ? Number(e.target.value) : null }
-                        onUpdate({
-                          rir: index === 0 ? (e.target.value ? Number(e.target.value) : null) : exercise.rir,
-                          set_prescriptions: next,
-                        })
-                      }}
-                      placeholder="2"
-                      className="w-full rounded-md border-[0.3px] border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-white/80 outline-none font-mono"
-                    />
-                    <input
-                      type="text"
-                      value={row.tempo ?? ''}
-                      onChange={(e) => {
-                        const next = [...setPrescriptions]
-                        next[index] = { ...row, tempo: e.target.value || null }
-                        onUpdate({
-                          tempo: index === 0 ? (e.target.value || null) : exercise.tempo,
-                          set_prescriptions: next,
-                        })
-                      }}
-                      placeholder="2-1-3-1"
-                      className="w-full rounded-md border-[0.3px] border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[11px] text-white/80 outline-none font-mono"
-                    />
-                    <select
-                      value={row.set_type ?? ''}
-                      onChange={(e) => {
-                        const value = (e.target.value || null) as PlannedSetType
-                        const next = [...setPrescriptions]
-                        next[index] = { ...row, set_type: value }
-                        onUpdate({ set_prescriptions: next })
-                      }}
-                      className="w-full rounded-md border-[0.3px] border-white/[0.06] bg-white/[0.02] px-2 py-1 text-[10px] text-white/75 outline-none"
-                    >
-                      {SET_TYPE_OPTIONS.map((option) => (
-                        <option key={option.value ?? 'none'} value={option.value ?? ''} className="bg-[#0a0a0a]">
-                          {option.label}
-                        </option>
+                <div className="overflow-x-auto">
+                  <div className="min-w-[450px]">
+                    <div className="grid grid-cols-6 gap-2 mb-1.5 pb-1 border-b border-white/[0.04]">
+                      {['Série', 'Répétitions', 'Repos', 'RIR', 'Tempo', 'Type de série'].map((label) => (
+                        <span key={label} className="text-[8px] font-bold uppercase tracking-wider text-white/30">{label}</span>
                       ))}
-                    </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      {setPrescriptions.map((row, index) => (
+                        <div key={index} className="grid grid-cols-6 gap-2 items-center">
+                          <span className="text-[10px] font-mono text-white/40">#{index + 1}</span>
+
+                          <input
+                            value={row.reps ?? ''}
+                            onChange={e => {
+                              const next = [...setPrescriptions]
+                              next[index] = { ...row, reps: e.target.value }
+                              onUpdate({
+                                set_prescriptions: next,
+                                reps: index === 0 ? e.target.value : exercise.reps,
+                              })
+                            }}
+                            className="bg-[#121212] rounded-md border-[0.3px] border-white/[0.06] text-[10px] text-white/80 px-1 py-0.5 outline-none font-mono"
+                          />
+
+                          <input
+                            type="number"
+                            value={row.rest_sec ?? ''}
+                            onChange={e => {
+                              const next = [...setPrescriptions]
+                              next[index] = { ...row, rest_sec: e.target.value ? Number(e.target.value) : null }
+                              onUpdate({
+                                set_prescriptions: next,
+                                rest_sec: index === 0 ? (e.target.value ? Number(e.target.value) : null) : exercise.rest_sec,
+                              })
+                            }}
+                            className="bg-[#121212] rounded-md border-[0.3px] border-white/[0.06] text-[10px] text-white/80 px-1 py-0.5 outline-none font-mono"
+                          />
+
+                          <input
+                            type="number"
+                            value={row.rir ?? ''}
+                            onChange={e => {
+                              const next = [...setPrescriptions]
+                              next[index] = { ...row, rir: e.target.value ? Number(e.target.value) : null }
+                              onUpdate({
+                                set_prescriptions: next,
+                                rir: index === 0 ? (e.target.value ? Number(e.target.value) : null) : exercise.rir,
+                              })
+                            }}
+                            className="bg-[#121212] rounded-md border-[0.3px] border-white/[0.06] text-[10px] text-white/80 px-1 py-0.5 outline-none font-mono"
+                          />
+
+                          <select
+                            value={TEMPO_PRESETS.some(p => p.value === row.tempo) ? row.tempo ?? '' : ''}
+                            onChange={e => {
+                              const next = [...setPrescriptions]
+                              next[index] = { ...row, tempo: e.target.value || null }
+                              onUpdate({
+                                set_prescriptions: next,
+                                tempo: index === 0 ? e.target.value : exercise.tempo,
+                              })
+                            }}
+                            className="bg-[#121212] rounded-md border-[0.3px] border-white/[0.06] text-[9px] text-white/70 px-1 py-0.5 outline-none"
+                          >
+                            <option value="">Tempo exercice</option>
+                            {TEMPO_PRESETS.map(p => (
+                              <option key={p.value} value={p.value}>{p.label}</option>
+                            ))}
+                          </select>
+
+                          <select
+                            value={row.set_type ?? ''}
+                            onChange={e => {
+                              const next = [...setPrescriptions]
+                              next[index] = {
+                                ...row,
+                                set_type: (e.target.value || null) as PlannedSetType,
+                              }
+                              onUpdate({ set_prescriptions: next })
+                            }}
+                            className="bg-[#121212] rounded-md border-[0.3px] border-white/[0.06] text-[9px] text-white/70 px-1 py-0.5 outline-none font-medium"
+                          >
+                            <option value="">Normale</option>
+                            <option value="warmup">Échauffement</option>
+                            <option value="working">Travail</option>
+                            <option value="dropset">Série dégressive</option>
+                            <option value="cooldown">Retour au calme</option>
+                          </select>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Unilatéral toggle */}
             <button

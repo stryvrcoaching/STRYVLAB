@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { isMeaningfulSession } from '@/lib/training/sessionLogUtils'
 import { estimateOneRM } from '@/lib/training/oneRepMax'
 import { resolveCanonicalExerciseKey, resolveCanonicalExerciseName } from '@/lib/training/exerciseHistoryKey'
+import { computeRobustAverageRestSec } from '@/lib/training/restMetrics'
 
 function service() {
   return createServiceClient(
@@ -237,10 +238,7 @@ export async function GET(req: NextRequest, { params }: { params: { clientId: st
     durationValues.length > 0
       ? Math.round(durationValues.reduce((sum, value) => sum + value, 0) / durationValues.length)
       : 0
-  const avgRestSec =
-    restValues.length > 0
-      ? Math.round(restValues.reduce((sum, value) => sum + value, 0) / restValues.length)
-      : null
+  const avgRestSec = computeRobustAverageRestSec(restValues)
   const completionRate = totalSessions > 0 ? completedSessions / totalSessions : 0
 
   const durationBuckets = meaningfulLogs

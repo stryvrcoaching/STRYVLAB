@@ -13,6 +13,10 @@ import type {
 } from './types'
 import { buildReasons, buildMicroCopy, buildAlerts, type PhaseEngineLocale } from './copy'
 import { evaluatePhaseMatrix } from './matrix'
+import {
+  hasPhaseInterpretationSignals,
+  getMissingPhaseInterpretationReason,
+} from './signals'
 
 export const ENGINE_VERSION = 'v1'
 
@@ -273,6 +277,13 @@ export function computePhaseOptimization(
   ctx: ComputeContext = {},
 ): PhaseOptimizationResult {
   const { latestBodyFat = null, gender = null, prefs, locale = 'fr' } = ctx
+  const analysisReady = hasPhaseInterpretationSignals(signals)
+  const analysisState: PhaseOptimizationResult['analysisState'] =
+    signals.insufficientData && !analysisReady ? 'insufficient_data' : 'ready'
+  const analysisStateReason =
+    analysisState === 'insufficient_data'
+      ? getMissingPhaseInterpretationReason(signals, locale)
+      : null
 
   const dirResult = scoreEnergeticDirection(signals, latestBodyFat, gender ?? null, prefs)
   const adaptResult = scoreAdaptiveState(signals)
@@ -331,6 +342,8 @@ export function computePhaseOptimization(
   const microCopy = buildMicroCopy(currentDirection, recDirection, currentAdaptState, locale)
 
   return {
+    analysisState,
+    analysisStateReason,
     phaseFit: {
       score: phaseFitScore,
       band: phaseFitBandFromScore(phaseFitScore),

@@ -40,7 +40,7 @@ export async function GET(
   const [responsesRes, streakRes, configRes] = await Promise.all([
     service()
       .from('client_daily_checkins')
-      .select('date, flow_type, sleep_hours, sleep_quality, energy_level, stress_level, muscle_soreness, hunger_level')
+      .select('date, flow_type, sleep_hours, sleep_quality, energy_level, stress_level, muscle_soreness, hunger_level, weight_kg, rhr_morning, daily_steps')
       .eq('client_id', params.clientId)
       .gte('date', since.slice(0, 10))
       .order('date', { ascending: true }),
@@ -67,10 +67,13 @@ export async function GET(
     if (isMorning) {
       if (r.sleep_hours != null) responsesObj.sleep_duration = Number(r.sleep_hours)
       if (r.sleep_quality != null) responsesObj.sleep_quality = Number(r.sleep_quality)
+      if (r.rhr_morning != null) responsesObj.rhr_morning = Number(r.rhr_morning)
+      if (r.weight_kg != null) responsesObj.weight_kg = Number(r.weight_kg)
     } else {
       if (r.stress_level != null) responsesObj.stress = Number(r.stress_level)
       if (r.hunger_level != null) responsesObj.hunger = Number(r.hunger_level)
       if (r.muscle_soreness != null) responsesObj.muscle_soreness = Number(r.muscle_soreness)
+      if (r.daily_steps != null) responsesObj.daily_steps = Number(r.daily_steps)
     }
     return {
       moment: isMorning ? 'morning' : 'evening',

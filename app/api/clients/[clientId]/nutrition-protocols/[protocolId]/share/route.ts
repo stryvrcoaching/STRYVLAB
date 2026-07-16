@@ -3,6 +3,7 @@ import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { ensureProtocolSharedAnnotation } from '@/lib/nutrition/protocolAnnotations'
 import { activateNutritionProtocolAssignment, closeNutritionProtocolAssignment } from '@/lib/assignments/clientAssignments'
+import { createClientAppNotification } from '@/lib/notifications/create-client-app-notification'
 
 function serviceClient() {
   return createServiceClient(
@@ -81,6 +82,17 @@ export async function POST(
     protocolId,
     startedBy: user.id,
     sourceAnnotationId: annotationId ?? null,
+  })
+
+  await createClientAppNotification(db, {
+    clientId,
+    coachId: user.id,
+    type: 'program_updated',
+    copyKey: 'nutrition.available',
+    actionUrl: '/client/nutrition',
+    pushKind: 'program',
+    pushTag: `stryv-nutrition-shared-${protocolId}`,
+    payload: { protocol_id: protocolId },
   })
 
   return NextResponse.json({ success: true })

@@ -1,6 +1,7 @@
 import catalogData from '@/data/exercise-catalog.json'
 import type { InjuryRestriction, BiomechData } from './types'
 import type { CanonicalMuscle } from './muscle-normalization'
+import { deriveFiberTargets } from './exercise-fibers'
 
 // ─── Muscle Volume Grouping ──────────────────────────────────────────────────
 // Authoritative mapping from canonical muscles to volume tracking groups
@@ -76,6 +77,7 @@ export const MUSCLE_TO_VOLUME_GROUP: Record<CanonicalMuscle, string> = {
 
   // Internal catch-all (should not appear in normalized data)
   dos_large: 'Dos - Général',
+  cardio: 'Cardio',
 }
 
 /**
@@ -105,6 +107,7 @@ interface CatalogEntry {
   primaryMuscle?: string | null
   primaryActivation?: number | null
   secondaryMuscles?: string[]
+  fiberTargets?: string[]
   secondaryActivations?: number[]
   stabilizers?: string[]
   jointStressSpine?: number | null
@@ -114,6 +117,8 @@ interface CatalogEntry {
   coordinationDemand?: number | null
   constraintProfile?: string | null
 }
+
+export const DEFAULT_EXERCISE_MEDIA_URL = '/bibliotheque_exercices/_placeholders/exercice-sans-media.svg'
 
 const catalog = catalogData as CatalogEntry[]
 // For duplicate slugs, prefer the most enriched entry (has primaryMuscle > has jointStressSpine > first)
@@ -184,6 +189,13 @@ export function getSecondaryMusclesFromCatalog(exerciseName: string): string[] {
   return (entry as any)?.secondaryMuscles ?? []
 }
 
+export function getFiberTargetsFromCatalog(exerciseName: string): string[] {
+  const slug = toSlug(exerciseName)
+  const entry = catalogBySlug.get(slug) ?? catalog.find(e => toSlug(e.name) === slug)
+  if (!entry) return []
+  return entry.fiberTargets?.length ? entry.fiberTargets : deriveFiberTargets(entry)
+}
+
 export interface CatalogExerciseLookup {
   name: string
   slug: string
@@ -198,6 +210,7 @@ export interface CatalogExerciseLookup {
   unilateral: boolean
   muscles: string[]
   secondaryMuscles: string[]
+  fiberTargets: string[]
 }
 
 export function getCatalogEntryByName(exerciseName: string): CatalogExerciseLookup | null {
@@ -207,7 +220,7 @@ export function getCatalogEntryByName(exerciseName: string): CatalogExerciseLook
   return {
     name: entry.name,
     slug: entry.slug,
-    gifUrl: entry.gifUrl ?? null,
+    gifUrl: entry.gifUrl?.trim() ? entry.gifUrl : DEFAULT_EXERCISE_MEDIA_URL,
     movementPattern: entry.movementPattern ?? null,
     equipment: entry.equipment ?? [],
     isCompound: entry.isCompound ?? false,
@@ -218,6 +231,7 @@ export function getCatalogEntryByName(exerciseName: string): CatalogExerciseLook
     unilateral: entry.unilateral ?? false,
     muscles: entry.muscles ?? [],
     secondaryMuscles: entry.secondaryMuscles ?? [],
+    fiberTargets: entry.fiberTargets?.length ? entry.fiberTargets : deriveFiberTargets(entry),
   }
 }
 
@@ -233,7 +247,7 @@ function resolveCatalogEntryByHeuristics(exerciseName: string): CatalogExerciseL
         return {
           name: entry.name,
           slug: entry.slug,
-          gifUrl: entry.gifUrl ?? null,
+          gifUrl: entry.gifUrl?.trim() ? entry.gifUrl : DEFAULT_EXERCISE_MEDIA_URL,
           movementPattern: entry.movementPattern ?? null,
           equipment: entry.equipment ?? [],
           isCompound: entry.isCompound ?? false,
@@ -244,6 +258,7 @@ function resolveCatalogEntryByHeuristics(exerciseName: string): CatalogExerciseL
           unilateral: entry.unilateral ?? false,
           muscles: entry.muscles ?? [],
           secondaryMuscles: entry.secondaryMuscles ?? [],
+          fiberTargets: entry.fiberTargets?.length ? entry.fiberTargets : deriveFiberTargets(entry),
         }
       }
     }
@@ -456,6 +471,7 @@ export function getStimulusCoeff(slug: string, movementPattern: string, isCompou
     case 'shoulder_rotation': base = 0.30; break
     case 'scapular_retraction': base = 0.35; break
     case 'scapular_protraction': base = 0.28; break
+    case 'cardio': base = 0.00; break
     default: base = 0.50
   }
 
@@ -573,6 +589,7 @@ export const MUSCLE_TO_BODY_PART: Record<string, string[]> = {
   'pectoraux':           [],
   'abdos':               [],
   'mollets':             ['ankle_right', 'ankle_left'],
+  'cardio':              [],
 }
 
 const SEVERITY_ORDER: Record<string, number> = { avoid: 3, limit: 2, monitor: 1 }

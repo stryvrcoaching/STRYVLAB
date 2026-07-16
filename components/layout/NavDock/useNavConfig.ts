@@ -6,6 +6,7 @@ export type NavRowAItem = {
   id: string;
   label: string;
   href?: string;
+  matchHrefs?: string[];
   dropdown?: { id: string; label: string; href: string }[];
 };
 
@@ -52,24 +53,26 @@ export function useNavConfig(): NavConfig {
       { id: "profil", label: "Profil", href: `/coach/clients/${clientId}/profil` },
       {
         id: "data",
-        label: "Data",
+        label: "Suivi",
         dropdown: [
-          { id: "metriques", label: "Métriques", href: `/coach/clients/${clientId}/data/metriques` },
-          { id: "checkins", label: "Check-ins", href: `/coach/clients/${clientId}/data/checkins` },
           { id: "bilans", label: "Bilans", href: `/coach/clients/${clientId}/data/bilans` },
-          { id: "performances", label: "Performances", href: `/coach/clients/${clientId}/data/performances` },
-          { id: "nutrition", label: "Nutrition", href: `/coach/clients/${clientId}/data/nutrition` },
+          { id: "metriques", label: "Métriques", href: `/coach/clients/${clientId}/data/metriques` },
           { id: "morphopro", label: "MorphoPro", href: `/coach/clients/${clientId}/data/morphopro` },
+          { id: "checkins", label: "Check-ins", href: `/coach/clients/${clientId}/data/checkins` },
+          { id: "nutrition", label: "Nutrition", href: `/coach/clients/${clientId}/data/nutrition` },
+          { id: "performances", label: "Performances", href: `/coach/clients/${clientId}/data/performances` },
         ],
       },
       {
         id: "protocoles",
         label: "Protocoles",
+        matchHrefs: [
+          `/coach/clients/${clientId}/protocoles/cardio`,
+          `/coach/clients/${clientId}/protocoles/composition`,
+        ],
         dropdown: [
           { id: "nutrition", label: "Nutrition Studio", href: `/coach/clients/${clientId}/protocoles/nutrition` },
           { id: "entrainement", label: "Workout Studio", href: `/coach/clients/${clientId}/protocoles/entrainement` },
-          { id: "cardio", label: "Cardio", href: `/coach/clients/${clientId}/protocoles/cardio` },
-          { id: "composition", label: "Composition", href: `/coach/clients/${clientId}/protocoles/composition` },
         ],
       },
     ];
@@ -83,7 +86,6 @@ export function useNavConfig(): NavConfig {
       rowA: [
         { id: "programmes", label: "Programmes", href: "/coach/programs/templates" },
         { id: "bilans", label: "Bilans", href: "/coach/assessments" },
-        { id: "nutrition", label: "Nutrition", href: "/coach/programs/nutrition" },
       ],
       cta: { type: "hidden" },
     };

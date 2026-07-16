@@ -1,12 +1,15 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import ChatBubble, { type ChatMessage } from "./ChatBubble"
+import { useClientT } from "@/components/client/ClientI18nProvider"
 
 interface ChatConversationProps {
   messages: ChatMessage[]
   coachAvatarUrl?: string | null
   coachInitial?: string | null
+  clientAvatarUrl?: string | null
+  clientInitial?: string | null
   isLoading?: boolean
   onInteract?: (messageId: string, key: string, value: number) => void
   onSkip?: (messageId: string, key: string) => void
@@ -45,7 +48,7 @@ function LoadingAvatar({ url, initial }: { url?: string | null; initial: string 
   )
 }
 
-function formatDateSeparator(dateStr: string): string {
+function formatDateSeparator(dateStr: string, lang: "fr" | "en" | "es", t: ReturnType<typeof useClientT>["t"]): string {
   const d = new Date(dateStr)
   const today = new Date()
   const yesterday = new Date(today)
@@ -56,15 +59,21 @@ function formatDateSeparator(dateStr: string): string {
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
 
-  if (sameDay(d, today)) return "Aujourd'hui"
-  if (sameDay(d, yesterday)) return "Hier"
-  return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
+  if (sameDay(d, today)) return t("common.today")
+  if (sameDay(d, yesterday)) return t("common.yesterday")
+  return d.toLocaleDateString(lang === "es" ? "es-ES" : lang === "en" ? "en-US" : "fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  })
 }
 
 export default function ChatConversation({
   messages,
   coachAvatarUrl,
   coachInitial,
+  clientAvatarUrl,
+  clientInitial,
   isLoading,
   onInteract,
   onSkip,
@@ -72,14 +81,21 @@ export default function ChatConversation({
   onDelete,
   onMessagesSeen,
 }: ChatConversationProps) {
+  const { t, lang } = useClientT()
   const containerRef = useRef<HTMLDivElement>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
   const locallySeenIdsRef = useRef<Set<string>>(new Set())
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, isLoading])
+  useLayoutEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const frame = window.requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [messages.length, isLoading])
 
   useEffect(() => {
     for (const message of messages) {
@@ -156,14 +172,14 @@ export default function ChatConversation({
     }
     const day = msg.created_at.split("T")[0]
     if (day !== lastDate) {
-      items.push({ type: "separator", label: formatDateSeparator(msg.created_at), key: `sep-${day}` })
+      items.push({ type: "separator", label: formatDateSeparator(msg.created_at, lang, t), key: `sep-${day}` })
       lastDate = day
     }
     items.push({ type: "message", msg })
   }
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 flex flex-col gap-3">
+    <div ref={containerRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3 flex flex-col gap-3" style={{ overscrollBehaviorY: 'contain' }}>
       {items.map(item =>
         item.type === "separator" ? (
           <div key={item.key} className="flex items-center justify-center py-2">
@@ -177,6 +193,8 @@ export default function ChatConversation({
             message={item.msg}
             coachAvatarUrl={coachAvatarUrl}
             coachInitial={coachInitial}
+            clientAvatarUrl={clientAvatarUrl}
+            clientInitial={clientInitial}
             onInteract={onInteract}
             onSkip={onSkip}
             onEdit={onEdit}
@@ -205,7 +223,6 @@ export default function ChatConversation({
         </div>
       )}
 
-      <div ref={bottomRef} />
     </div>
   )
 }

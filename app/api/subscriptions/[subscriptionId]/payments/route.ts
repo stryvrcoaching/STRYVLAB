@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { sendPaymentReceiptEmail } from '@/lib/email/mailer'
+import { z } from 'zod'
+import { coachOwnsClient } from '@/lib/security/client-resource-access'
 
 function serviceClient() {
   return createServiceClient(
@@ -11,12 +13,26 @@ function serviceClient() {
 }
 
 type Params = { params: { subscriptionId: string } }
+const idSchema = z.string().uuid()
+const paymentSchema = z.object({
+  client_id: z.string().uuid(),
+  amount_eur: z.coerce.number().positive().max(1_000_000),
+  status: z.enum(['paid', 'pending', 'failed', 'refunded']).optional(),
+  payment_method: z.enum(['manual', 'bank_transfer', 'card', 'cash', 'stripe', 'other']).optional(),
+  payment_date: z.string().date().optional(),
+  due_date: z.string().date().nullable().optional(),
+  description: z.string().trim().max(500).nullable().optional(),
+  reference: z.string().trim().max(200).nullable().optional(),
+})
 
 // GET /api/subscriptions/[subscriptionId]/payments
 export async function GET(req: NextRequest, { params }: Params) {
   const supabase = createServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  if (!idSchema.safeParse(params.subscriptionId).success) {
+    return NextResponse.json({ error: 'Abonnement introuvable' }, { status: 404 })
+  }
 
   const { data, error } = await serviceClient()
     .from('subscription_payments')
@@ -35,14 +51,31 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const body = await req.json()
-  const { client_id, amount_eur, status, payment_method, payment_date, due_date, description, reference } = body
-
-  if (!client_id || amount_eur === undefined) {
-    return NextResponse.json({ error: 'client_id et amount_eur requis' }, { status: 400 })
+  if (!idSchema.safeParse(params.subscriptionId).success) {
+    return NextResponse.json({ error: 'Abonnement introuvable' }, { status: 404 })
   }
 
-  const { data, error } = await serviceClient()
+  const parsed = paymentSchema.safeParse(await req.json().catch(() => null))
+  if (!parsed.success) return NextResponse.json({ error: 'Paiement invalide' }, { status: 400 })
+
+  const { client_id, amount_eur, status, payment_method, payment_date, due_date, description, reference } = parsed.data
+  const db = serviceClient()
+
+  const [{ data: subscription }, ownsClient] = await Promise.all([
+    db
+      .from('client_subscriptions')
+      .select('id')
+      .eq('id', params.subscriptionId)
+      .eq('coach_id', user.id)
+      .eq('client_id', client_id)
+      .maybeSingle(),
+    coachOwnsClient({ db, coachUserId: user.id, clientId: client_id }),
+  ])
+  if (!subscription || !ownsClient) {
+    return NextResponse.json({ error: 'Abonnement introuvable' }, { status: 404 })
+  }
+
+  const { data, error } = await db
     .from('subscription_payments')
     .insert({
       coach_id: user.id,
@@ -65,10 +98,11 @@ export async function POST(req: NextRequest, { params }: Params) {
   const resolvedStatus = status ?? 'paid'
   if (resolvedStatus === 'paid') {
     try {
-      const { data: client } = await serviceClient()
+      const { data: client } = await db
         .from('coach_clients')
         .select('first_name, last_name, email')
         .eq('id', client_id)
+        .eq('coach_id', user.id)
         .single()
       if (client?.email) {
         const coachMeta = (await createServerClient().auth.getUser()).data.user?.user_metadata

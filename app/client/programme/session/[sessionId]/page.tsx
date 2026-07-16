@@ -1,10 +1,20 @@
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { notFound, redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { resolveClientFromUser } from '@/lib/client/resolve-client'
+import { indexExerciseHistoryEntry } from '@/lib/training/exerciseHistoryKey'
 import SessionLogger from './SessionLogger'
 
-export default async function SessionLogPage({ params }: { params: { sessionId: string } }) {
+export default async function SessionLogPage({
+  params,
+  searchParams,
+}: {
+  params: { sessionId: string }
+  searchParams?: { fromDow?: string }
+}) {
+  const fallbackDow = searchParams?.fromDow
+  const fallbackHref = fallbackDow ? `/client/programme?dow=${encodeURIComponent(fallbackDow)}` : '/client/programme'
+
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -15,12 +25,20 @@ export default async function SessionLogPage({ params }: { params: { sessionId: 
 
   if (!user) redirect('/client/login')
 
-  const client = await resolveClientFromUser(user.id, user.email, service, 'id, gender')
-  if (!client) notFound()
+  const clientPromise = resolveClientFromUser(user.id, user.email, service, 'id, gender')
+  const [client] = await Promise.all([clientPromise])
+  if (!client) {
+    console.error('[programme/session] client resolution failed', {
+      sessionId: params.sessionId,
+      userId: user.id,
+      userEmail: user.email ?? null,
+      fallbackHref,
+    })
+    redirect(fallbackHref)
+  }
   const clientGender = (client as { gender?: string | null }).gender ?? null
 
-  // Fetch session avec exercices + colonnes double progression + image + unilatéral
-  const { data: session } = await service
+  const { data: session, error: sessionError } = await service
     .from('program_sessions')
     .select(`
       id, name, day_of_week,
@@ -29,30 +47,55 @@ export default async function SessionLogPage({ params }: { params: { sessionId: 
         id, name, sets, reps, rest_sec, rir, notes, position,
         target_rir, current_weight_kg, rep_min, rep_max, weight_increment_kg,
         image_url, is_unilateral, primary_muscles, secondary_muscles, group_id,
-        tempo, movement_pattern, set_prescriptions
+        tempo, movement_pattern, set_prescriptions, superset_rest_mode, execution_type, target_hr_zone
       )
     `)
     .eq('id', params.sessionId)
-    .single()
+    .maybeSingle()
 
-  if (!session) notFound()
+  if (!session?.id) {
+    console.error('[programme/session] session lookup failed', {
+      sessionId: params.sessionId,
+      clientId: client.id,
+      sessionError: sessionError?.message ?? null,
+      fallbackHref,
+    })
+    redirect(fallbackHref)
+  }
 
-  // Vérifier que la session appartient à un programme actif du client
-  const { data: program } = await service
-    .from('programs')
-    .select('id, progressive_overload_enabled, goal, level')
-    .eq('id', (session as any).program_id)
-    .eq('client_id', client.id)
-    .eq('status', 'active')
-    .single()
+  const { data: program, error: programError } = (session as any).program_id
+    ? await service
+        .from('programs')
+        .select('id, client_id, status, progressive_overload_enabled, goal, level, template_id')
+        .eq('id', (session as any).program_id)
+        .maybeSingle()
+    : { data: null as any, error: null as any }
 
-  if (!program) notFound()
+  if (program?.client_id && program.client_id !== client.id) {
+    console.error('[programme/session] program ownership mismatch', {
+      sessionId: params.sessionId,
+      clientId: client.id,
+      sessionProgramId: (session as any).program_id ?? null,
+      resolvedProgramClientId: program.client_id,
+      fallbackHref,
+    })
+    redirect(fallbackHref)
+  }
 
-  const progressionEnabled = (program as any).progressive_overload_enabled ?? false
-  const goal: string = (program as any).goal ?? 'hypertrophy'
-  const level: string = (program as any).level ?? 'intermediate'
+  if (!program?.id) {
+    console.warn('[programme/session] program lookup fallback', {
+      sessionId: params.sessionId,
+      clientId: client.id,
+      sessionProgramId: (session as any).program_id ?? null,
+      programError: programError?.message ?? null,
+    })
+  }
 
-  const exercises = (session.program_exercises ?? [])
+  const progressionEnabled = (program as any)?.progressive_overload_enabled ?? false
+  const goal: string = (program as any)?.goal ?? 'hypertrophy'
+  const level: string = (program as any)?.level ?? 'intermediate'
+
+  const exercises = ((session.program_exercises ?? []) as any[])
     .sort((a: any, b: any) => a.position - b.position)
     .map((ex: any) => ({
       ...ex,
@@ -64,14 +107,7 @@ export default async function SessionLogPage({ params }: { params: { sessionId: 
       clientAlternatives: [],  // Will be populated below
     }))
 
-  // Fetch the template_id for this session's program to get coach-pre-configured alternatives
-  const { data: sessionData } = await service
-    .from('program_sessions')
-    .select('program_id, programs!inner(template_id)')
-    .eq('id', params.sessionId)
-    .single()
-
-  const templateId = (sessionData as any)?.programs?.template_id as string | null
+  const templateId = (program as any)?.template_id as string | null
 
   // For each exercise, find coach-configured alternatives
   let alternativesMap: Record<string, string[]> = {}
@@ -107,11 +143,9 @@ export default async function SessionLogPage({ params }: { params: { sessionId: 
 
   // Fetch historique de la dernière séance pour cet exercice (par nom, derniers set_logs)
   // On récupère les set_logs de la dernière session_log pour chaque exercice de cette séance
-  const exerciseNames = exercises.map((ex: any) => ex.name)
+  let lastPerformance: Record<string, { weight: number | null; reps: number | null; rir?: number | null; side?: string | null; set_number?: number | null; completed_at?: string | null }[]> = {}
 
-  let lastPerformance: Record<string, { weight: number | null; reps: number | null; rir?: number | null; side?: string | null; set_number?: number | null }[]> = {}
-
-  if (exerciseNames.length > 0) {
+  if (exercises.length > 0) {
     // Query from client_session_logs (has client_id) then join set_logs — same pattern as exercise-history route
     // Embedded filter .eq('client_session_logs.client_id', ...) on client_set_logs doesn't restrict rows in Supabase JS
     const since = new Date()
@@ -130,24 +164,20 @@ export default async function SessionLogPage({ params }: { params: { sessionId: 
       .limit(50)
 
     if (sessionLogs) {
-      // Process sessions newest-first; keep first occurrence of each exercise+set+side combo
-      const seen = new Set<string>()
+      // Process sessions newest-first and index rows by canonical exercise identity.
       for (const session of sessionLogs) {
         const sets = ((session.client_set_logs ?? []) as any[])
-          .filter((s: any) => s.completed === true && exerciseNames.includes(s.exercise_name))
+          .filter((s: any) => s.completed === true && typeof s.exercise_name === 'string' && s.exercise_name.trim().length > 0)
         for (const s of sets) {
-          const key = `${s.exercise_name}__${s.set_number}__${s.side ?? 'bilateral'}`
-          if (!seen.has(key)) {
-            seen.add(key)
-            if (!lastPerformance[s.exercise_name]) lastPerformance[s.exercise_name] = []
-            lastPerformance[s.exercise_name].push({
-              weight: s.actual_weight_kg,
-              reps: s.actual_reps,
-              rir: s.rir_actual ?? null,
-              side: s.side,
-              set_number: s.set_number,
-            })
+          const entry = {
+            weight: s.actual_weight_kg,
+            reps: s.actual_reps,
+            rir: s.rir_actual ?? null,
+            side: s.side,
+            set_number: s.set_number,
+            completed_at: session.completed_at ?? null,
           }
+          indexExerciseHistoryEntry(lastPerformance, s.exercise_name, entry)
         }
       }
     }
@@ -186,7 +216,7 @@ export default async function SessionLogPage({ params }: { params: { sessionId: 
     <SessionLogger
       clientId={client.id}
       sessionId={params.sessionId}
-      session={{ id: session.id, name: session.name }}
+      session={{ id: session.id, name: session.name, programId: (program as any)?.id ?? (session as any).program_id ?? params.sessionId }}
       exercises={exercisesWithAlternatives}
       lastPerformance={lastPerformance}
       goal={goal}

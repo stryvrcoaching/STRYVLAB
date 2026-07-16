@@ -4,7 +4,12 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { CreateSubmissionPayload } from '@/types/assessment'
 import crypto from 'crypto'
 import { sendBilanEmail } from '@/lib/email/mailer'
-import { insertClientNotification } from '@/lib/notifications/insert-client-notification'
+import { createClientAppNotification } from '@/lib/notifications/create-client-app-notification'
+import {
+  extractTemplateName,
+  isSystemAssessmentTemplateName,
+  isSystemAssessmentSnapshot,
+} from '@/lib/assessments/templateSnapshot'
 
 function serviceClient() {
   return createServiceClient(
@@ -46,9 +51,10 @@ export async function GET(req: NextRequest) {
   }
 
   // Exclude system CSV import submissions from the bilans list
-  const filtered = (data ?? []).filter(
-    (s: { template?: { name?: string } }) => s.template?.name !== '__csv_import__'
-  )
+  const filtered = (data ?? []).filter((s: { template?: { name?: string | null }; template_snapshot?: unknown }) => {
+    const templateName = s.template?.name ?? extractTemplateName(s.template_snapshot as undefined | null | { name?: string | null }, '')
+    return !isSystemAssessmentTemplateName(templateName) && !isSystemAssessmentSnapshot(s.template_snapshot as undefined | null)
+  })
 
   return NextResponse.json({ submissions: filtered })
 }
@@ -120,12 +126,14 @@ export async function POST(req: NextRequest) {
   }
 
   // Notif coach + notif client (target_user_id)
-  await insertClientNotification(db, {
+  await createClientAppNotification(db, {
     coachId:      user.id,
     clientId:     body.client_id,
-    submissionId: submission.id,
-    type:         'assessment_sent',
-    message:      `Ton coach t'a envoyé un bilan : "${template.name}".`,
+    type:         'bilan_pending',
+    copyKey:      'assessment.available',
+    actionUrl:    `/bilan/${token}`,
+    payload:      { assessment_submission_id: submission.id, token },
+    pushKind:     'bilan',
   })
 
   const bilanUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/bilan/${token}`

@@ -4,22 +4,32 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Barbell, ForkKnife, Drop, CheckCircle, Circle } from "@phosphor-icons/react"
 import dynamic from "next/dynamic"
+import { useClientT } from "@/components/client/ClientI18nProvider"
+import { getPendingSlots, type CheckinAvailability } from "@/lib/client/checkin/pendingCheckins"
 
 const QuickWaterModal = dynamic(() => import("@/components/client/QuickWaterModal"), { ssr: false })
 
 interface TodayStrip {
-  sessions: { id: string; name: string }[]
+  timezone: string
+  sessions: { id: string; name: string; completed: boolean }[]
   calories: { logged: number; target: number }
   water: { logged: number; target: number }
   checkin: {
     morning: boolean
     evening: boolean
     pendingCount?: number
+    availability?: CheckinAvailability
+    sessions: { flow_type: string; date?: string; completed_at: string | null }[]
   }
 }
 
 interface ChatTodayStripProps {
+  data: TodayStrip | null
   onCheckinClick?: () => void
+  onWaterClick?: () => void
+  onRefresh?: () => void
+  className?: string
+  surfaceClassName?: string
 }
 
 /**
@@ -40,33 +50,40 @@ function progressColor(pct: number, lenient = false): string {
   return "#b84040"                  // >110%: significant overshoot → red
 }
 
-export default function ChatTodayStrip({ onCheckinClick }: ChatTodayStripProps) {
+export default function ChatTodayStrip({ data, onCheckinClick, onWaterClick, onRefresh, className, surfaceClassName }: ChatTodayStripProps) {
   const router = useRouter()
-  const [data, setData] = useState<TodayStrip | null>(null)
+  const { lang, t } = useClientT()
+  // waterOpen is only used when no external onWaterClick callback is provided
   const [waterOpen, setWaterOpen] = useState(false)
-
-  function refresh() {
-    fetch("/api/client/chat/today-strip")
-      .then(r => r.json())
-      .then(setData)
-      .catch(() => {})
+  const [, setClockTick] = useState(0)
+  const handleWaterClick = onWaterClick ?? (() => setWaterOpen(true))
+  const copy = {
+    checkinsDone: t('chat.today.checkinsDone'),
+    checkinsTwo: t('chat.today.checkinsTwo'),
+    checkinsOne: t('chat.today.checkinsOne'),
   }
 
-  useEffect(() => { refresh() }, [])
+  useEffect(() => {
+    const interval = window.setInterval(() => setClockTick((value) => value + 1), 60_000)
+    return () => window.clearInterval(interval)
+  }, [])
 
   if (!data || !data.checkin) {
     return (
-      <div className="shrink-0 h-[44px] bg-[#0d0d0d] flex items-center px-4 gap-2">
+      <div data-tour-id="daily-strip" className={`shrink-0 h-[44px] flex items-center px-3 gap-2 ${className ?? "bg-[#0d0d0d]"}`}>
         {[80, 120, 100].map(w => (
-          <div key={w} className="h-[26px] bg-[#111111] rounded-xl animate-pulse" style={{ width: w }} />
+          <div key={w} className={`h-[26px] rounded-xl animate-pulse ${surfaceClassName ?? "bg-[#111111]"}`} style={{ width: w }} />
         ))}
       </div>
     )
   }
 
-  const morningDone = data.checkin?.morning ?? false
-  const eveningDone = data.checkin?.evening ?? false
-  const pendingCount = data.checkin?.pendingCount ?? (Number(!morningDone) + Number(!eveningDone))
+  const pendingCount = getPendingSlots(
+    new Date(),
+    data.timezone,
+    data.checkin.sessions,
+    data.checkin.availability,
+  ).length
   const checkinDone = pendingCount === 0
 
   // Raw ratios (can exceed 1.0) — used for color; bar width is capped
@@ -81,23 +98,26 @@ export default function ChatTodayStrip({ onCheckinClick }: ChatTodayStripProps) 
 
   return (
     <>
-      <div className="shrink-0 bg-[#0d0d0d]">
-        <div className="flex items-center gap-2 px-3 py-2 overflow-x-auto scrollbar-none">
+      <div data-tour-id="daily-strip" className={`shrink-0 ${className ?? "bg-[#0d0d0d]"}`}>
+        <div className="flex items-center gap-2 px-3 py-2 overflow-x-auto no-scrollbar">
 
           {/* Check-in */}
           <button
             data-tour-strip="checkin"
-            onClick={onCheckinClick}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl shrink-0 active:opacity-70 transition-all ${
-              checkinDone ? "bg-[#222222]" : "bg-[#1a1a1a]"
+            data-tour-id="checkin"
+            onClick={checkinDone ? undefined : onCheckinClick}
+            disabled={checkinDone || !onCheckinClick}
+            aria-label={checkinDone ? copy.checkinsDone : pendingCount === 2 ? copy.checkinsTwo : copy.checkinsOne}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl shrink-0 enabled:active:opacity-70 transition-all disabled:cursor-default ${
+              surfaceClassName ?? (checkinDone ? "bg-[#5dba87]/10" : "bg-[#ff8660]/10")
             }`}
           >
             {checkinDone
-              ? <CheckCircle size={13} weight="fill" className="text-[#f2f2f2]" />
-              : <Circle size={13} className="text-[#808080]" />
+              ? <CheckCircle size={13} weight="fill" className="text-[#5dba87]" />
+              : <Circle size={13} weight="fill" className="text-[#ff8660]" />
             }
-            <span className={`text-[11px] font-barlow font-semibold whitespace-nowrap ${checkinDone ? "text-[#f2f2f2]" : "text-[#808080]"}`}>
-              {checkinDone ? "Check-ins ✓" : pendingCount === 2 ? "Check-ins (2)" : "Check-in (1)"}
+            <span className={`text-[11px] font-barlow font-semibold whitespace-nowrap ${checkinDone ? "text-[#5dba87]" : "text-[#ff8660]"}`}>
+              {checkinDone ? copy.checkinsDone : pendingCount === 2 ? copy.checkinsTwo : copy.checkinsOne}
             </span>
           </button>
 
@@ -107,10 +127,14 @@ export default function ChatTodayStrip({ onCheckinClick }: ChatTodayStripProps) 
               key={s.id}
               {...(idx === 0 ? { 'data-tour-strip': 'program' } : {})}
               onClick={() => router.push("/client/programme")}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#111111] shrink-0 active:opacity-70"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl shrink-0 active:opacity-70 ${
+                surfaceClassName ?? (s.completed ? "bg-[#5dba87]/10" : "bg-[#ff8660]/10")
+              }`}
             >
-              <Barbell size={13} className="text-[#5a5a5a]" />
-              <span className="text-[11px] font-barlow font-medium text-[#808080] whitespace-nowrap max-w-[100px] truncate">
+              <Barbell size={13} className={s.completed ? "text-[#5dba87]" : "text-[#ff8660]"} />
+              <span className={`text-[11px] font-barlow font-medium whitespace-nowrap max-w-[100px] truncate ${
+                s.completed ? "text-[#5dba87]" : "text-[#ff8660]"
+              }`}>
                 {s.name}
               </span>
             </button>
@@ -120,7 +144,7 @@ export default function ChatTodayStrip({ onCheckinClick }: ChatTodayStripProps) 
           <button
             data-tour-strip="calories"
             onClick={() => router.push("/client/nutrition")}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#111111] shrink-0 active:opacity-70"
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl shrink-0 active:opacity-70 ${surfaceClassName ?? "bg-[#111111]"}`}
           >
             <ForkKnife size={13} style={{ color: calColor }} />
             <span className="text-[11px] font-barlow font-medium whitespace-nowrap" style={{ color: calColor }}>
@@ -140,8 +164,8 @@ export default function ChatTodayStrip({ onCheckinClick }: ChatTodayStripProps) 
           {/* Eau */}
           <button
             data-tour-strip="water"
-            onClick={() => setWaterOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#111111] shrink-0 active:opacity-70"
+            onClick={handleWaterClick}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl shrink-0 active:opacity-70 ${surfaceClassName ?? "bg-[#111111]"}`}
           >
             <Drop size={13} style={{ color: waterColor }} />
             <span className="text-[11px] font-barlow font-medium whitespace-nowrap" style={{ color: waterColor }}>
@@ -161,10 +185,16 @@ export default function ChatTodayStrip({ onCheckinClick }: ChatTodayStripProps) 
         </div>
       </div>
 
-      <QuickWaterModal
-        open={waterOpen}
-        onClose={() => { setWaterOpen(false); refresh() }}
-      />
+      {/* Only render internal modal when no external onWaterClick is provided */}
+      {!onWaterClick && (
+        <QuickWaterModal
+          open={waterOpen}
+          onClose={() => {
+            setWaterOpen(false)
+            onRefresh?.()
+          }}
+        />
+      )}
     </>
   )
 }

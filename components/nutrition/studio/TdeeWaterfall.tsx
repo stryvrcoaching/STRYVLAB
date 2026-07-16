@@ -73,7 +73,7 @@ export default function TdeeWaterfall({ result }: TdeeWaterfallProps) {
 
       {/* Total */}
       <div className="flex items-center justify-between pt-1 border-t border-white/[0.04]">
-        <span className="text-[10px] text-white/40">TDEE estimé</span>
+        <span className="text-[10px] text-white/40">Référence formule</span>
         <span className="text-[15px] font-bold text-white">{tdee} <span className="text-[10px] font-normal text-white/40">kcal</span></span>
       </div>
 

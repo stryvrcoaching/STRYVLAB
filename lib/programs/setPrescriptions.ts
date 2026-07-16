@@ -1,4 +1,5 @@
 export type PlannedSetType = 'warmup' | 'working' | 'cooldown' | 'dropset' | null
+export type SupersetRestMode = 'after_exercise' | 'after_round'
 
 export interface SetPrescription {
   set_number: number
@@ -7,6 +8,7 @@ export interface SetPrescription {
   rir: number | null
   tempo: string | null
   set_type: PlannedSetType
+  superset_rest_mode: SupersetRestMode | null
 }
 
 export interface SetPrescriptionDefaults {
@@ -15,6 +17,7 @@ export interface SetPrescriptionDefaults {
   rest_sec: number | null
   rir: number | null
   tempo: string | null
+  superset_rest_mode?: SupersetRestMode | null
 }
 
 export function makeDefaultSetPrescription(
@@ -28,6 +31,7 @@ export function makeDefaultSetPrescription(
     rir: defaults.rir,
     tempo: defaults.tempo,
     set_type: null,
+    superset_rest_mode: defaults.superset_rest_mode ?? null,
   }
 }
 
@@ -48,6 +52,11 @@ export function normalizeSetPrescriptions(
       rest_sec: row?.rest_sec === null || typeof row?.rest_sec === 'number' ? row.rest_sec : defaults.rest_sec,
       rir: row?.rir === null || typeof row?.rir === 'number' ? row.rir : defaults.rir,
       tempo: row?.tempo === null || typeof row?.tempo === 'string' ? row.tempo : defaults.tempo,
+      superset_rest_mode:
+        row?.superset_rest_mode === 'after_exercise' ||
+        row?.superset_rest_mode === 'after_round'
+          ? row.superset_rest_mode
+          : defaults.superset_rest_mode ?? null,
       set_type:
         row?.set_type === 'warmup' ||
         row?.set_type === 'working' ||

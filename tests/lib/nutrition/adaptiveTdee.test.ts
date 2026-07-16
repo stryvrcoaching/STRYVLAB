@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcAdaptiveTdee, linearRegression } from '@/lib/nutrition/adaptiveTdee'
+import { calcAdaptiveTdee, filterWeightOutliers, linearRegression } from '@/lib/nutrition/adaptiveTdee'
 
 const DAY = (offset: number, weight: number) => ({
   date: new Date(Date.UTC(2026, 4, offset + 1)).toISOString().slice(0, 10),
@@ -29,6 +29,19 @@ describe('linearRegression', () => {
 })
 
 describe('calcAdaptiveTdee', () => {
+  it('excludes a single implausible weight spike before estimating the trend', () => {
+    const filtered = filterWeightOutliers([
+      DAY(0, 80),
+      DAY(3, 79.9),
+      DAY(6, 83),
+      DAY(9, 79.7),
+      DAY(12, 79.6),
+    ])
+
+    expect(filtered.outlierCount).toBe(1)
+    expect(filtered.samples.map((sample) => sample.weight_kg)).not.toContain(83)
+  })
+
   it('TDEE > intake when losing weight', () => {
     const result = calcAdaptiveTdee({
       weightSamples: [DAY(0, 80), DAY(7, 79.5), DAY(14, 79.0)],
@@ -130,13 +143,18 @@ describe('calcAdaptiveTdee', () => {
       caloriesSource: 'logs',
       windowDays: 14,
     })
-    const { slope } = linearRegression(samples)
+    const smoothed = [
+      { date: samples[0].date, weight_kg: 79.75 },
+      { date: samples[1].date, weight_kg: 79.5 },
+      { date: samples[2].date, weight_kg: 79.25 },
+    ]
+    const { slope } = linearRegression(smoothed)
     expect(result.weightDeltaKg).toBeCloseTo(slope * 14, 2)
   })
 
   it('handles rapid weight loss (1 kg/week)', () => {
     const result = calcAdaptiveTdee({
-      weightSamples: [DAY(0, 85), DAY(7, 84), DAY(14, 83)],
+      weightSamples: [DAY(0, 90), DAY(7, 86), DAY(14, 82)],
       avgIntakeKcal: 1800,
       caloriesSource: 'logs',
       windowDays: 14,

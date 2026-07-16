@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { NUTRITION_UI_COLORS } from '@/lib/nutrition/ui-colors'
 import { useChartScrubber } from '@/hooks/useChartScrubber'
+import { useClientT } from '@/components/client/ClientI18nProvider'
 
 type TdeePoint = {
   calculated_at: string
@@ -32,9 +33,9 @@ const INNER_H = H - PAD.top - PAD.bottom
 
 function isoDate(ts: string): string { return ts.slice(0, 10) }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   const d = new Date(iso + 'T00:00:00')
-  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(d)
+  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(d)
 }
 
 function svgPath(points: [number, number][]): string {
@@ -59,6 +60,10 @@ function ScrubTooltip({
   point: ChartPoint
   refColor: string
   refLabel: string
+  locale: string
+  intakeLabel: string
+  gapSuffix: string
+  numberLocale: string
 }) {
   const gap = point.gap
   const isDeficit = gap <= 0
@@ -87,7 +92,7 @@ function ScrubTooltip({
 
       {/* Date */}
       <text x={tx + 8} y={ty + 13} fontSize="8" fill="rgba(255,255,255,0.45)" fontWeight="600">
-        {formatDate(point.date)}
+        {formatDate(point.date, locale)}
       </text>
 
       {/* Reference line */}
@@ -96,16 +101,16 @@ function ScrubTooltip({
         {refLabel}
       </text>
       <text x={tx + tooltipW - 8} y={ty + 29} fontSize="8.5" fill="white" textAnchor="end" fontWeight="700">
-        {Math.round(point.reference).toLocaleString('fr-FR')}
+        {Math.round(point.reference).toLocaleString(numberLocale)}
       </text>
 
       {/* Intake line */}
       <circle cx={tx + 10} cy={ty + 40} r="3" fill="#f2f2f2" />
       <text x={tx + 17} y={ty + 44} fontSize="8" fill="rgba(255,255,255,0.55)">
-        Apport
+        {intakeLabel}
       </text>
       <text x={tx + tooltipW - 8} y={ty + 44} fontSize="8.5" fill="white" textAnchor="end" fontWeight="700">
-        {Math.round(point.intake).toLocaleString('fr-FR')}
+        {Math.round(point.intake).toLocaleString(numberLocale)}
       </text>
 
       {/* Gap badge */}
@@ -113,15 +118,16 @@ function ScrubTooltip({
         fill={isDeficit ? 'rgba(93,186,135,0.15)' : 'rgba(255,209,94,0.15)'} />
       <text x={tx + tooltipW / 2} y={ty + 60.5} fontSize="7.5" textAnchor="middle"
         fill={isDeficit ? '#5dba87' : '#ffd15e'} fontWeight="700">
-        {gap > 0 ? '+' : ''}{Math.round(gap)} kcal {isDeficit ? 'déficit' : 'surplus'}
+        {gap > 0 ? '+' : ''}{Math.round(gap)} kcal {gapSuffix}
       </text>
     </g>
   )
 }
 
 export default function TdeeVsIntakeChart({ days }: Props) {
+  const { lang, t } = useClientT()
   const [tdeeData, setTdeeData] = useState<TdeePoint[]>([])
-  const [protocolTdee, setProtocolTdee] = useState<number | null>(null)
+  const [clientTdee, setClientTdee] = useState<number | null>(null)
   const [trendData, setTrendData] = useState<DayPoint[]>([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<ViewMode>('tdee')
@@ -129,20 +135,18 @@ export default function TdeeVsIntakeChart({ days }: Props) {
   useEffect(() => {
     setLoading(true)
     Promise.all([
-      fetch(`/api/client/nutrition/tdee-history?days=${days}`).then(r => r.ok ? r.json() : { history: [], protocolTdee: null }),
+      fetch(`/api/client/nutrition/tdee-history?days=${days}`).then(r => r.ok ? r.json() : { history: [], clientTdee: null }),
       fetch(`/api/client/nutrition/weekly-trend?days=${days}`).then(r => r.ok ? r.json() : { trend: [] }),
-    ]).then(([tdeeRes, weekly]: [{ history: TdeePoint[]; protocolTdee: number | null }, { trend: DayPoint[] }]) => {
-      console.log('[TdeeVsIntakeChart] tdeeRes:', JSON.stringify(tdeeRes))
-      console.log('[TdeeVsIntakeChart] weekly:', JSON.stringify(weekly))
+    ]).then(([tdeeRes, weekly]: [{ history: TdeePoint[]; clientTdee: number | null }, { trend: DayPoint[] }]) => {
       setTdeeData(Array.isArray(tdeeRes?.history) ? tdeeRes.history : [])
-      setProtocolTdee(typeof tdeeRes?.protocolTdee === 'number' ? tdeeRes.protocolTdee : null)
+      setClientTdee(typeof tdeeRes?.clientTdee === 'number' ? tdeeRes.clientTdee : null)
       setTrendData(Array.isArray(weekly?.trend) ? weekly.trend : [])
       setLoading(false)
-    }).catch((e) => { console.error('[TdeeVsIntakeChart] fetch error:', e); setLoading(false) })
+    }).catch(() => { setLoading(false) })
   }, [days])
 
   const tdeeMerged = useMemo((): ChartPoint[] => {
-    if (protocolTdee === null || trendData.length === 0) return []
+    if (clientTdee === null || trendData.length === 0) return []
     const tdeeByDate = new Map<string, number>()
     for (const p of tdeeData) tdeeByDate.set(isoDate(p.calculated_at), p.tdee_adaptive)
     const sorted = [...tdeeData].sort((a, b) => a.calculated_at.localeCompare(b.calculated_at))
@@ -153,10 +157,10 @@ export default function TdeeVsIntakeChart({ days }: Props) {
         lastTdee = sorted[idx].tdee_adaptive
         idx++
       }
-      const ref = tdeeByDate.get(day.date) ?? lastTdee ?? protocolTdee
+      const ref = tdeeByDate.get(day.date) ?? lastTdee ?? clientTdee
       return { date: day.date, reference: ref, intake: day.consumed, gap: day.consumed - ref }
     }).filter(p => p.intake > 0) // inclut tous les jours avec au moins 1 repas loggé
-  }, [tdeeData, protocolTdee, trendData])
+  }, [tdeeData, clientTdee, trendData])
 
   const targetMerged = useMemo((): ChartPoint[] => {
     return trendData
@@ -164,12 +168,14 @@ export default function TdeeVsIntakeChart({ days }: Props) {
       .map(p => ({ date: p.date, reference: p.target, intake: p.consumed, gap: p.consumed - p.target }))
   }, [trendData])
 
-  // hasTdee = true dès que protocolTdee est calculé et qu'on a au moins 1 jour loggé.
+  // hasTdee = true dès que le TDEE client est calculé et qu'on a au moins 1 jour loggé.
   // Une ligne TDEE horizontale fixe est parfaitement lisible même avec 1 seul point.
-  const hasTdee = protocolTdee !== null && tdeeMerged.length >= 1
+  const hasTdee = clientTdee !== null && tdeeMerged.length >= 1
   const activePoints = view === 'tdee' && hasTdee ? tdeeMerged : targetMerged
 
   const { activeIndex, handlers, svgRef } = useChartScrubber(activePoints.length, W, PAD.left, PAD.right)
+  const locale = lang === 'es' ? 'es-ES' : lang === 'en' ? 'en-GB' : 'fr-FR'
+  const daySuffix = lang === 'es' ? 'd' : lang === 'en' ? 'd' : 'j'
 
   if (loading) {
     return (
@@ -215,8 +221,8 @@ export default function TdeeVsIntakeChart({ days }: Props) {
   const deficitDays = activePoints.filter(p => p.gap < -50).length
   const surplusDays = activePoints.filter(p => p.gap > 50).length
   const gapLabel = view === 'tdee' && hasTdee
-    ? (avgGap <= 0 ? 'déficit' : 'surplus')
-    : (avgGap <= 0 ? 'sous cible' : 'sur cible')
+    ? (avgGap <= 0 ? t('nutrition.chart.deficit') : t('nutrition.chart.surplus'))
+    : (avgGap <= 0 ? t('nutrition.chart.belowTarget') : t('nutrition.chart.aboveTarget'))
 
   return (
     <div className="bg-[#161616] rounded-2xl p-4">
@@ -224,11 +230,11 @@ export default function TdeeVsIntakeChart({ days }: Props) {
       <div className="flex items-start justify-between mb-3">
         <div>
           <p className="font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[11px] text-white/50 mb-0.5">
-            {view === 'tdee' && hasTdee ? 'TDEE vs Apport réel' : 'Consommé vs Cible'}
+            {view === 'tdee' && hasTdee ? t('nutrition.chart.tdeeVsIntake') : t('nutrition.chart.targetVsIntake')}
           </p>
           {displayPoint ? (
             <div className="flex items-baseline gap-1.5">
-              <span className="text-[13px] font-bold text-white/50 tabular-nums">{formatDate(displayPoint.date)}</span>
+              <span className="text-[13px] font-bold text-white/50 tabular-nums">{formatDate(displayPoint.date, locale)}</span>
               <span className={`text-[18px] font-black tabular-nums leading-none ${displayPoint.gap <= 0 ? 'text-[#5dba87]' : 'text-[#ffd15e]'}`}>
                 {displayPoint.gap > 0 ? '+' : ''}{Math.round(displayPoint.gap)}
               </span>
@@ -239,7 +245,7 @@ export default function TdeeVsIntakeChart({ days }: Props) {
               <span className={`text-[22px] font-black tabular-nums leading-none ${avgGap <= 0 ? 'text-[#5dba87]' : 'text-[#ffd15e]'}`}>
                 {avgGap > 0 ? '+' : ''}{Math.round(avgGap)}
               </span>
-              <span className="text-[10px] text-white/40">kcal moy. {gapLabel}</span>
+              <span className="text-[10px] text-white/40">{t('nutrition.chart.avgGap', { label: gapLabel })}</span>
             </div>
           )}
         </div>
@@ -262,7 +268,7 @@ export default function TdeeVsIntakeChart({ days }: Props) {
               view === 'target' || !hasTdee ? 'bg-white/[0.10] text-white' : 'text-white/30'
             }`}
           >
-            Cible
+            {t('common.target')}
           </button>
         </div>
       </div>
@@ -330,10 +336,10 @@ export default function TdeeVsIntakeChart({ days }: Props) {
           {activeIndex === null && activePoints.length >= 2 && (
             <>
               <text x={PAD.left} y={H - 2} textAnchor="start" fontSize="7" fill="rgba(255,255,255,0.25)">
-                {formatDate(activePoints[0].date)}
+                {formatDate(activePoints[0].date, locale)}
               </text>
               <text x={W - PAD.right} y={H - 2} textAnchor="end" fontSize="7" fill="rgba(255,255,255,0.25)">
-                {formatDate(activePoints[activePoints.length - 1].date)}
+                {formatDate(activePoints[activePoints.length - 1].date, locale)}
               </text>
             </>
           )}
@@ -347,6 +353,10 @@ export default function TdeeVsIntakeChart({ days }: Props) {
               point={activePoints[activeIndex]}
               refColor={refColor}
               refLabel={refLabel}
+              locale={locale}
+              intakeLabel={t('nutrition.chart.intake')}
+              gapSuffix={activePoints[activeIndex].gap <= 0 ? t('nutrition.chart.deficit') : t('nutrition.chart.surplus')}
+              numberLocale={locale}
             />
           )}
         </svg>
@@ -360,15 +370,15 @@ export default function TdeeVsIntakeChart({ days }: Props) {
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-6 h-[2px] bg-white/60 rounded" />
-          <span className="text-[9px] text-white/40">Apport</span>
+          <span className="text-[9px] text-white/40">{t('nutrition.chart.intake')}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-sm bg-[#5dba87]/20" />
-          <span className="text-[9px] text-white/40">{view === 'tdee' && hasTdee ? 'Déficit' : 'Sous cible'}</span>
+          <span className="text-[9px] text-white/40">{view === 'tdee' && hasTdee ? t('nutrition.chart.deficit') : t('nutrition.chart.belowTarget')}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-sm bg-[#ffd15e]/20" />
-          <span className="text-[9px] text-white/40">{view === 'tdee' && hasTdee ? 'Surplus' : 'Sur cible'}</span>
+          <span className="text-[9px] text-white/40">{view === 'tdee' && hasTdee ? t('nutrition.chart.surplus') : t('nutrition.chart.aboveTarget')}</span>
         </div>
       </div>
 
@@ -376,27 +386,27 @@ export default function TdeeVsIntakeChart({ days }: Props) {
       <div className="grid grid-cols-3 gap-2 pt-3 border-t border-white/[0.06]">
         <div>
           <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">
-            {view === 'tdee' && hasTdee ? 'Déficit' : 'Sous cible'}
+            {view === 'tdee' && hasTdee ? t('nutrition.chart.deficit') : t('nutrition.chart.belowTarget')}
           </p>
-          <p className="text-[12px] font-black text-[#5dba87] tabular-nums">{deficitDays}j</p>
+          <p className="text-[12px] font-black text-[#5dba87] tabular-nums">{deficitDays}{daySuffix}</p>
         </div>
         <div>
           <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">
-            {view === 'tdee' && hasTdee ? 'Surplus' : 'Sur cible'}
+            {view === 'tdee' && hasTdee ? t('nutrition.chart.surplus') : t('nutrition.chart.aboveTarget')}
           </p>
-          <p className="text-[12px] font-black text-[#ffd15e] tabular-nums">{surplusDays}j</p>
+          <p className="text-[12px] font-black text-[#ffd15e] tabular-nums">{surplusDays}{daySuffix}</p>
         </div>
         <div>
-          <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">Équilibre</p>
+          <p className="text-[9px] text-white/30 uppercase tracking-[0.1em] font-bold mb-0.5">{t('nutrition.chart.balance')}</p>
           <p className="text-[12px] font-black text-white tabular-nums">
-            {activePoints.length - deficitDays - surplusDays}j
+            {activePoints.length - deficitDays - surplusDays}{daySuffix}
           </p>
         </div>
       </div>
 
       {!hasTdee && (
         <p className="text-[10px] text-white/25 mt-2 leading-relaxed">
-          Vue TDEE disponible une fois que ton coach a calculé le TDEE adaptatif.
+          {t('nutrition.chart.tdeeUnlock')}
         </p>
       )}
     </div>

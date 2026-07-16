@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 import { Gear } from "@phosphor-icons/react"
 import BodyDataSection from "@/components/client/profile/BodyDataSection"
+import { useClientT } from "./ClientI18nProvider"
 
 interface MetricsPageProps {
   clientName: string
@@ -14,6 +15,7 @@ interface MetricsPageProps {
 
 export default function MetricsPage({ clientName, clientEmail, avatarInitials, avatarUrl, streak }: MetricsPageProps) {
   const router = useRouter()
+  const { t, lang } = useClientT()
 
   return (
     <div className="flex flex-col min-h-full bg-[#0d0d0d]">
@@ -21,14 +23,14 @@ export default function MetricsPage({ clientName, clientEmail, avatarInitials, a
       <div className="flex items-center justify-between px-4 pt-12 pb-3 shrink-0">
         <div>
           <p className="text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/30">
-            MON PROFIL
+            {t('metrics.profile.section')}
           </p>
-          <p className="text-[13px] font-barlow font-semibold text-white">Métriques</p>
+          <p className="text-[13px] font-barlow font-semibold text-white">{t('metrics.title')}</p>
         </div>
         <button
           onClick={() => router.push("/client/profil")}
           className="h-8 w-8 flex items-center justify-center rounded-xl bg-white/[0.04] text-white/40 active:bg-white/[0.08] transition-colors"
-          aria-label="Paramètres"
+          aria-label={t('metrics.settings')}
         >
           <Gear size={16} />
         </button>
@@ -53,7 +55,7 @@ export default function MetricsPage({ clientName, clientEmail, avatarInitials, a
         {streak > 0 && (
           <div className="px-2.5 py-1 bg-[#222222] rounded-full shrink-0">
             <span className="text-[11px] font-barlow-condensed font-bold text-[#f2f2f2]">
-              🔥 {streak}j
+              🔥 {streak}{lang === 'fr' ? 'j' : lang === 'es' ? 'd' : 'd'}
             </span>
           </div>
         )}
@@ -62,7 +64,7 @@ export default function MetricsPage({ clientName, clientEmail, avatarInitials, a
       {/* Body data */}
       <div className="flex-1 px-4 pb-24">
         <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/30 mb-3">
-          Données corporelles
+          {t('metrics.bodyComposition')}
         </p>
         <BodyDataSection />
       </div>

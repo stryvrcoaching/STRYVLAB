@@ -3,8 +3,11 @@ import {
   DocCard,
   DocSection,
 } from "@/components/coach/docs/CoachDocsArticle";
+import { requireCoachDocsAccess } from "@/lib/docs/server";
 
-export default function TransformationScoreDocumentationPage() {
+export default async function TransformationScoreDocumentationPage() {
+  await requireCoachDocsAccess()
+
   return (
     <CoachDocsArticle
       eyebrow="Score de transformation"

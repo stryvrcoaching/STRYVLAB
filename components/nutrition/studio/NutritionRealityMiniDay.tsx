@@ -63,7 +63,7 @@ function MiniBar({
       <div className="flex items-center justify-between gap-2">
         <p className="text-[9px] uppercase tracking-[0.12em] text-white/35">{label}</p>
         <p className="text-[10px] text-white/68">
-          {consumed} / {target ?? "N/A"} {unit}
+          {consumed} / {target ?? "—"} {unit}
         </p>
       </div>
       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">

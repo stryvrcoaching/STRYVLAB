@@ -8,7 +8,9 @@ import {
   Calendar,
   ChevronRight,
   Clock3,
+  Copy,
   Dumbbell,
+  Download,
   Eye,
   EyeOff,
   Layers3,
@@ -19,6 +21,10 @@ import {
 } from "lucide-react";
 import SaveAsTemplateModal from "@/components/programs/SaveAsTemplateModal";
 import { Skeleton } from "@/components/ui/skeleton";
+import ActionFeedbackBadge from "@/components/ui/ActionFeedbackBadge";
+import useTimedActionFeedback from "@/components/ui/useTimedActionFeedback";
+import useActionRequest from "@/components/ui/useActionRequest";
+import { getSessionsPerWeek, getTrainingDaysPerWeek } from "@/lib/programs/frequency";
 
 interface ProgramAnalytics {
   planned_sessions: number;
@@ -58,6 +64,7 @@ interface Props {
   onSelectProgram: (program: Program) => void;
   onCreateProgram?: () => void;
   onRequestAlign?: (program: Program) => void;
+  onRequestPdf?: (program: Program) => void | Promise<void>;
 }
 
 function formatShortDate(value: string) {
@@ -71,6 +78,14 @@ function formatShortDate(value: string) {
 function formatVolume(value: number) {
   if (value >= 1000) return `${(value / 1000).toFixed(1)} t`;
   return `${Math.round(value)} kg`;
+}
+
+function formatFrequencyLabel(program: Program) {
+  const sessionCount = getSessionsPerWeek(program.program_sessions ?? []);
+  const trainingDays = getTrainingDaysPerWeek(program.program_sessions ?? []);
+  const displayCount = sessionCount || program.frequency || 0;
+  const secondary = trainingDays > 0 ? ` · ${trainingDays} jours` : "";
+  return `${displayCount} séances/sem${secondary}`;
 }
 
 function prettifyGoal(goal?: string | null) {
@@ -185,14 +200,34 @@ function describeTrend(values: number[]) {
   return { label: "Stable", tone: "text-[#fcd34d]" };
 }
 
-export default function ClientProgramsList({ clientId, onSelectProgram, onRequestAlign }: Props) {
+export default function ClientProgramsList({ clientId, onSelectProgram, onRequestAlign, onRequestPdf }: Props) {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Program | null>(null);
   const [saveAsTemplateTarget, setSaveAsTemplateTarget] = useState<Program | null>(null);
+  const [pdfingId, setPdfingId] = useState<string | null>(null);
+  const { feedback: actionFeedback, pushFeedback: pushActionFeedback } =
+    useTimedActionFeedback<string>();
+  const { runAction } = useActionRequest<string>({
+    setLoadingKey: (value) => {
+      if (value === null) {
+        setTogglingId(null);
+        setDeletingId(null);
+        setDuplicatingId(null);
+        setPdfingId(null);
+        return;
+      }
+      if (value.startsWith("toggle-")) setTogglingId(value.slice("toggle-".length));
+      if (value.startsWith("delete-")) setDeletingId(value.slice("delete-".length));
+      if (value.startsWith("duplicate-")) setDuplicatingId(value.slice("duplicate-".length));
+      if (value.startsWith("pdf-")) setPdfingId(value.slice("pdf-".length));
+    },
+    pushFeedback: pushActionFeedback,
+  });
 
   const fetchPrograms = useCallback(async () => {
     setError("");
@@ -217,14 +252,22 @@ export default function ClientProgramsList({ clientId, onSelectProgram, onReques
       onRequestAlign(program);
       return;
     }
-    setTogglingId(program.id);
-    try {
-      const res = await fetch(`/api/programs/${program.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_client_visible: !program.is_client_visible }),
-      });
-      if (res.ok) {
+    await runAction({
+      scope: program.id,
+      loadingKey: `toggle-${program.id}`,
+      loadingMessage: program.is_client_visible ? "Retrait en cours..." : "Partage en cours...",
+      successMessage: program.is_client_visible ? "Programme retiré de l’app" : "Programme partagé",
+      request: async () => {
+        const res = await fetch(`/api/programs/${program.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ is_client_visible: !program.is_client_visible }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.error ?? "Mise à jour impossible");
+        return data;
+      },
+      onSuccess: async () => {
         setPrograms((prev) =>
           prev.map((p) =>
             p.id === program.id
@@ -232,25 +275,69 @@ export default function ClientProgramsList({ clientId, onSelectProgram, onReques
               : p,
           ),
         );
-      }
-    } finally {
-      setTogglingId(null);
-    }
+      },
+      getErrorMessage: (error) =>
+        error instanceof Error ? error.message : "Mise à jour impossible",
+    });
   }
 
   async function confirmAndDelete() {
     if (!confirmDelete) return;
     const program = confirmDelete;
     setConfirmDelete(null);
-    setDeletingId(program.id);
-    try {
-      const res = await fetch(`/api/programs/${program.id}`, { method: "DELETE" });
-      if (res.ok) {
+    await runAction({
+      scope: program.id,
+      loadingKey: `delete-${program.id}`,
+      loadingMessage: "Suppression en cours...",
+      successMessage: "Programme supprimé",
+      request: async () => {
+        const res = await fetch(`/api/programs/${program.id}`, { method: "DELETE" });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.error ?? "Suppression impossible");
+        return data;
+      },
+      onSuccess: async () => {
         setPrograms((prev) => prev.filter((p) => p.id !== program.id));
-      }
-    } finally {
-      setDeletingId(null);
-    }
+      },
+      getErrorMessage: (error) =>
+        error instanceof Error ? error.message : "Suppression impossible",
+    });
+  }
+
+  async function duplicateProgram(program: Program) {
+    await runAction({
+      scope: program.id,
+      loadingKey: `duplicate-${program.id}`,
+      loadingMessage: "Duplication en cours...",
+      successMessage: "Copie créée",
+      request: async () => {
+        const res = await fetch(`/api/programs/${program.id}/duplicate`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok || !data.program) {
+          throw new Error(data.error ?? "Duplication impossible");
+        }
+        return data.program as Program;
+      },
+      onSuccess: async (newProgram) => {
+        setPrograms((prev) => [newProgram, ...prev]);
+        onSelectProgram(newProgram);
+      },
+      getErrorMessage: (error) =>
+        error instanceof Error ? error.message : "Duplication impossible",
+    });
+  }
+
+  async function exportPdf(program: Program) {
+    if (!onRequestPdf) return;
+    await runAction({
+      scope: program.id,
+      loadingKey: `pdf-${program.id}`,
+      loadingMessage: "Préparation du PDF...",
+      successMessage: "PDF prêt",
+      request: () => onRequestPdf(program),
+      getErrorMessage: (error) =>
+        error instanceof Error ? error.message : "Export PDF impossible",
+    });
   }
 
   const activePrograms = programs.filter((p) => p.status === "active");
@@ -359,10 +446,15 @@ export default function ClientProgramsList({ clientId, onSelectProgram, onReques
                 program={program}
                 togglingId={togglingId}
                 deletingId={deletingId}
+                duplicatingId={duplicatingId}
+                pdfingId={pdfingId}
+                actionFeedback={actionFeedback?.scope === program.id ? actionFeedback : null}
                 onSelect={() => onSelectProgram(program)}
                 onToggle={() => toggleVisibility(program)}
                 onDelete={() => setConfirmDelete(program)}
+                onDuplicate={() => duplicateProgram(program)}
                 onSaveAsTemplate={() => setSaveAsTemplateTarget(program)}
+                onExportPdf={() => exportPdf(program)}
               />
             ))}
           </div>
@@ -380,10 +472,15 @@ export default function ClientProgramsList({ clientId, onSelectProgram, onReques
                   program={program}
                   togglingId={togglingId}
                   deletingId={deletingId}
+                  duplicatingId={duplicatingId}
+                  pdfingId={pdfingId}
+                  actionFeedback={actionFeedback?.scope === program.id ? actionFeedback : null}
                   onSelect={() => onSelectProgram(program)}
                   onToggle={() => toggleVisibility(program)}
                   onDelete={() => setConfirmDelete(program)}
+                  onDuplicate={() => duplicateProgram(program)}
                   onSaveAsTemplate={() => setSaveAsTemplateTarget(program)}
+                  onExportPdf={() => exportPdf(program)}
                 />
               ))}
             </div>
@@ -398,22 +495,38 @@ function ProgramCard({
   program,
   togglingId,
   deletingId,
+  duplicatingId,
+  pdfingId,
+  actionFeedback,
   onSelect,
   onToggle,
   onDelete,
+  onDuplicate,
   onSaveAsTemplate,
+  onExportPdf,
 }: {
   program: Program;
   togglingId: string | null;
   deletingId: string | null;
+  duplicatingId: string | null;
+  pdfingId: string | null;
+  actionFeedback: {
+    scope: string;
+    tone: "loading" | "success" | "error";
+    message: string;
+  } | null;
   onSelect: () => void;
   onToggle: () => void;
   onDelete: () => void;
+  onDuplicate: () => void;
   onSaveAsTemplate: () => void;
+  onExportPdf: () => void;
 }) {
   const analytics = program.analytics;
   const isToggling = togglingId === program.id;
   const isDeleting = deletingId === program.id;
+  const isDuplicating = duplicatingId === program.id;
+  const isPdfing = pdfingId === program.id;
   const goalLabel = prettifyGoal(program.goal);
   const levelLabel = prettifyLevel(program.level);
   const volumeDelta = analytics?.volume_delta_pct ?? null;
@@ -485,7 +598,7 @@ function ProgramCard({
             {program.frequency ? (
               <span className="inline-flex items-center gap-1.5">
                 <Activity size={11} />
-                {program.frequency} j/sem
+                {formatFrequencyLabel(program)}
               </span>
             ) : null}
           </div>
@@ -497,6 +610,13 @@ function ProgramCard({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          {actionFeedback ? (
+            <ActionFeedbackBadge
+              tone={actionFeedback.tone}
+              message={actionFeedback.message}
+              className="hidden md:flex"
+            />
+          ) : null}
           <button
             onClick={onToggle}
             disabled={isToggling}
@@ -508,6 +628,22 @@ function ProgramCard({
             }`}
           >
             {isToggling ? <Loader2 size={11} className="animate-spin" /> : program.is_client_visible ? <Eye size={11} /> : <EyeOff size={11} />}
+          </button>
+          <button
+            onClick={onDuplicate}
+            disabled={isDuplicating}
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] text-white/28 transition-colors hover:bg-white/[0.08] hover:text-white/60"
+            title="Dupliquer le programme"
+          >
+            {isDuplicating ? <Loader2 size={11} className="animate-spin" /> : <Copy size={12} />}
+          </button>
+          <button
+            onClick={onExportPdf}
+            disabled={isPdfing}
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] text-white/28 transition-colors hover:bg-white/[0.08] hover:text-white/60"
+            title="Enregistrer en PDF"
+          >
+            {isPdfing ? <Loader2 size={11} className="animate-spin" /> : <Download size={12} />}
           </button>
           <button
             onClick={onSaveAsTemplate}

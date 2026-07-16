@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/client";
-
-const supabase = createServiceClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+import { requireInternalDashboardAccess } from "@/lib/dashboard/internal-access";
 
 export async function GET(req: NextRequest) {
+  const access = await requireInternalDashboardAccess(req, "genesis_stats");
+  if ("error" in access) return access.error;
+
   try {
-    // Vérifier auth admin (à implémenter selon ton système)
-    // const isAdmin = await checkAdminAuth(req);
-    // if (!isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const supabase = access.db;
 
     // Stats sessions
     const { data: sessions } = await supabase
@@ -55,8 +51,8 @@ export async function GET(req: NextRequest) {
       responsesCount: responsesCount || 0,
       recentSessions,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Erreur stats admin:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Impossible de charger les statistiques" }, { status: 500 });
   }
 }

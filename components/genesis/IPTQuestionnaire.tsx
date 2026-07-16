@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ScanFace, Loader2, Save } from 'lucide-react';
 import { QuestionCard } from '@/components/genesis/QuestionCard';
@@ -57,14 +57,7 @@ export default function IPTQuestionnaire() {
     loadQuestions();
   }, []);
 
-  // Sauvegarde automatique
-  useEffect(() => {
-    if (Object.keys(responses).length > 0 && Object.keys(responses).length % 5 === 0) {
-      saveProgress();
-    }
-  }, [responses]);
-
-  const saveProgress = async () => {
+  const saveProgress = useCallback(async () => {
     if (!sessionId) return;
     try {
       await fetch('/api/genesis/save-progress', {
@@ -79,7 +72,14 @@ export default function IPTQuestionnaire() {
     } catch (error) {
       console.error('Auto-save error', error);
     }
-  };
+  }, [currentIndex, responses, sessionId]);
+
+  // Sauvegarde automatique
+  useEffect(() => {
+    if (Object.keys(responses).length > 0 && Object.keys(responses).length % 5 === 0) {
+      saveProgress();
+    }
+  }, [responses, saveProgress]);
 
   const handleAnswer = (questionId: string, value: any) => {
     setResponses(prev => ({ ...prev, [questionId]: value }));

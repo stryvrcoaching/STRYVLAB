@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "private-001-exemple",
+  "title": "Assiette pesée avec emballage",
+  "status": "needs_truth",
+  "split": "development",
+  "scenario": "hybrid",
+  "provenance": {
+    "source_type": "owned",
+    "source_url": null,
+    "license": "owned-private",
+    "attribution": null,
+    "consent_confirmed": true,
+    "notes": null
+  },
+  "input": {
+    "photos": [
+      { "path": "assets/01-assiette.jpg", "kind": "top", "role_hint": "before_meal" },
+      { "path": "assets/02-balance.jpg", "kind": "scale_zoom", "role_hint": "separate_weighing" },
+      { "path": "assets/03-etiquette.jpg", "kind": "context", "role_hint": "nutrition_label" }
+    ],
+    "text": "200 g de céréales",
+    "manual_weight_g": null,
+    "clarification_answers": {}
+  },
+  "truth": null
+}

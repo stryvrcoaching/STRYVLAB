@@ -8,6 +8,8 @@ import {
   ArrowLeft, Send, Download, Bell,
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import ActionFeedbackBadge from '@/components/ui/ActionFeedbackBadge'
+import useTimedActionFeedback from '@/components/ui/useTimedActionFeedback'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -123,11 +125,14 @@ export default function ClientFormulasTab({ clientId }: { clientId: string }) {
   // Invoice / reminder actions
   const [invoiceLoading, setInvoiceLoading] = useState<string | null>(null)
   const [remindLoading, setRemindLoading] = useState<string | null>(null)
-  const [actionToast, setActionToast] = useState<string | null>(null)
+  const { feedback: actionToast, pushFeedback: pushActionToast } = useTimedActionFeedback<null>(3000)
 
   function showActionToast(msg: string) {
-    setActionToast(msg)
-    setTimeout(() => setActionToast(null), 3000)
+    pushActionToast(null, 'success', msg)
+  }
+
+  function showActionError(msg: string) {
+    pushActionToast(null, 'error', msg)
   }
 
   async function downloadInvoice(paymentId: string) {
@@ -138,7 +143,7 @@ export default function ClientFormulasTab({ clientId }: { clientId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sendEmail: false }),
       })
-      if (!res.ok) { showActionToast('Erreur génération PDF'); return }
+      if (!res.ok) { showActionError('Erreur génération PDF'); return }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -160,7 +165,7 @@ export default function ClientFormulasTab({ clientId }: { clientId: string }) {
         body: JSON.stringify({ sendEmail: true }),
       })
       if (res.ok) showActionToast('Reçu envoyé au client')
-      else showActionToast('Erreur envoi reçu')
+      else showActionError('Erreur envoi reçu')
     } finally {
       setInvoiceLoading(null)
     }
@@ -173,7 +178,7 @@ export default function ClientFormulasTab({ clientId }: { clientId: string }) {
       if (res.ok) showActionToast('Rappel envoyé au client')
       else {
         const d = await res.json()
-        showActionToast(d.error ?? 'Erreur envoi rappel')
+        showActionError(d.error ?? 'Erreur envoi rappel')
       }
     } finally {
       setRemindLoading(null)
@@ -599,8 +604,12 @@ export default function ClientFormulasTab({ clientId }: { clientId: string }) {
 
       {/* ── Action toast ─────────────────────────────────────────────────────── */}
       {actionToast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-[#181818] rounded-xl text-sm font-semibold text-white shadow-lg">
-          {actionToast}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <ActionFeedbackBadge
+            tone={actionToast.tone}
+            message={actionToast.message}
+            className="px-4 py-2.5 text-sm font-semibold shadow-lg"
+          />
         </div>
       )}
 

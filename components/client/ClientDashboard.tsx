@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Bell,
+  Calendar,
   CheckCircle,
   ChevronRight,
   Droplets,
@@ -13,6 +15,9 @@ import {
   FileText,
   MessageSquareText,
   MoonStar,
+  Sparkles,
+  TrendingUp,
+  Trophy,
   Apple,
   Flame,
   Footprints,
@@ -20,12 +25,24 @@ import {
 import CheckinModal from "@/components/client/CheckinModal";
 import QuickWaterModal from "@/components/client/QuickWaterModal";
 import ChatTodayStrip from "@/components/client/ChatTodayStrip";
+import dynamic from "next/dynamic";
+import type { CycleState } from "@/lib/cycle/cycleEngine";
+import WeightTrackerWidget from "@/components/client/WeightTrackerWidget";
+import CoachMessageSheet from "@/components/client/CoachMessageSheet";
+import StrivrToken from "@/components/client/StrivrToken";
+import { getProgressionSummary, PROGRESSION_LEVEL_COLORS } from "@/lib/rewards/progression";
+
+const CycleArcIndicator = dynamic(() => import('@/components/client/cycle/CycleArcIndicator'), { ssr: false });
+const CyclePhaseModal = dynamic(() => import('@/components/client/cycle/CyclePhaseModal'), { ssr: false });
 import { determineSlotForClick } from "@/lib/client/checkin/checkinEngine";
 import { cn } from "@/app/lib/utils";
-import type { ClientLang } from "@/lib/i18n/clientTranslations";
+import { ct, type ClientLang } from "@/lib/i18n/clientTranslations";
 import type { ClientNotificationItem } from "@/lib/client/inbox";
 import type { ChatTodayStripData } from "@/lib/client/chat/today-strip";
 import { Flame as PhosphorFlame, Footprints as PhosphorFootprints, Barbell as PhosphorBarbell } from "@phosphor-icons/react";
+import { emitClientInboxUpdated } from "@/lib/client/inboxEvents";
+import { sendClientMutation } from "@/lib/client/offline-mutations";
+import { useInboxUnreadCount } from "@/lib/client/useInboxUnreadCount";
 
 type AssessmentSummary = {
   id: string;
@@ -43,6 +60,7 @@ type DashboardProps = {
   clientGoal?: string | null;
   clientPhase?: string | null;
   clientCreatedAt?: string | null;
+  clientGender?: string | null;
   lang: ClientLang;
   todayStrip: ChatTodayStripData | null;
   notifications: ClientNotificationItem[];
@@ -52,23 +70,36 @@ type DashboardProps = {
   };
   coach: {
     fullName: string | null;
+    avatarUrl?: string | null;
   };
   weeklyStepAvg?: number | null;
   stepTarget?: number | null;
   weeklyCalorieAvg?: number | null;
   weeklyVolume?: number;
+  streak?: { current_streak: number; longest_streak: number; total_points: number; available_points?: number; level: string } | null;
+  nextAppointment?: {
+    id: string;
+    title: string;
+    starts_at: string;
+    ends_at: string;
+    client_timezone: string;
+    meeting_kind: string;
+    meeting_url: string | null;
+    status: string;
+  } | null;
 };
 
 type PriorityItem = {
   key: string;
   title: string;
-  body?: string;
   label: string;
   href?: string;
   onClick?: () => void;
   icon: React.ElementType;
-  accent?: boolean;
+  tone: AlertTone;
 };
+
+type AlertTone = "success" | "warning" | "attention" | "info" | "neutral";
 
 // ── Design constants ──────────────────────────────────────────────────────────
 const SECTION_PANEL_CLASS =
@@ -88,8 +119,6 @@ const ICON_WELL_CLASS =
 const copyByLang: Record<ClientLang, Record<string, string>> = {
   fr: {
     greetingFallback: "Bonjour",
-    pendingCheckins: "check-ins du jour à faire",
-    completedCheckins: "check-ins du jour complétés",
     sessionsToday: "sessions prévues",
     coachSignals: "signaux coach",
     coachSpace: "Espace coach",
@@ -97,7 +126,6 @@ const copyByLang: Record<ClientLang, Record<string, string>> = {
     coachEmpty: "Aucun nouveau message coach.",
     hydration: "Hydratation",
     nutrition: "Nutrition",
-    checkinNow: "Faire mon check-in",
     openProgram: "Voir ma séance",
     openAssessment: "Remplir le bilan",
     allGood: "Tout est en ordre",
@@ -105,8 +133,6 @@ const copyByLang: Record<ClientLang, Record<string, string>> = {
   },
   en: {
     greetingFallback: "Hello",
-    pendingCheckins: "daily check-ins pending",
-    completedCheckins: "daily check-ins completed",
     sessionsToday: "sessions today",
     coachSignals: "coach signals",
     coachSpace: "Coach space",
@@ -114,7 +140,6 @@ const copyByLang: Record<ClientLang, Record<string, string>> = {
     coachEmpty: "No new coach message.",
     hydration: "Hydration",
     nutrition: "Nutrition",
-    checkinNow: "Do my check-in",
     openProgram: "Open workout",
     openAssessment: "Complete assessment",
     allGood: "Everything is up to date",
@@ -122,8 +147,6 @@ const copyByLang: Record<ClientLang, Record<string, string>> = {
   },
   es: {
     greetingFallback: "Hola",
-    pendingCheckins: "check-ins del día pendientes",
-    completedCheckins: "check-ins del día completados",
     sessionsToday: "sesiones previstas",
     coachSignals: "señales del coach",
     coachSpace: "Espacio coach",
@@ -131,7 +154,6 @@ const copyByLang: Record<ClientLang, Record<string, string>> = {
     coachEmpty: "No hay mensaje nuevo del coach.",
     hydration: "Hidratación",
     nutrition: "Nutrición",
-    checkinNow: "Hacer mi check-in",
     openProgram: "Ver sesión",
     openAssessment: "Completar balance",
     allGood: "Todo está al día",
@@ -141,6 +163,13 @@ const copyByLang: Record<ClientLang, Record<string, string>> = {
 
 function dashboardCopy(lang: ClientLang) {
   return copyByLang[lang] ?? copyByLang.fr;
+}
+
+function initialsFor(name: string | null | undefined, fallback = "C") {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return fallback;
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
 }
 
 function localeFor(lang: ClientLang) {
@@ -157,14 +186,20 @@ function formatLongDate(lang: ClientLang) {
   }).format(new Date());
 }
 
-function formatShortDate(date: string, lang: ClientLang) {
-  return new Intl.DateTimeFormat(localeFor(lang), {
-    day: "numeric",
-    month: "short",
-  }).format(new Date(date));
+function getTimeGreeting(lang: ClientLang) {
+  const hour = new Date().getHours();
+  if (lang === "en") return hour < 18 ? "Good morning" : "Good evening";
+  if (lang === "es") return hour < 18 ? "Buenos días" : "Buenas noches";
+  return hour < 18 ? "Bonjour" : "Bonsoir";
 }
 
 function notificationHref(notification: ClientNotificationItem): string {
+  const actionUrl =
+    typeof notification.payload?.action_url === "string"
+      ? notification.payload.action_url
+      : null
+  if (actionUrl) return actionUrl
+
   switch (notification.type) {
     case "bilan_pending": {
       const token =
@@ -175,11 +210,16 @@ function notificationHref(notification: ClientNotificationItem): string {
     }
     case "tdee_updated":
       return "/client/nutrition";
+    case "program_updated":
     case "program_assigned":
       return "/client/programme";
     default:
       return "/client/profil";
   }
+}
+
+function isCoachMessageNotification(notification: ClientNotificationItem) {
+  return notification.type === "coach_message" || notification.payload?.message_kind === "coach_message";
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -217,17 +257,37 @@ function ClientAvatar({
 }
 
 function getPhaseLabel(phase?: string | null) {
-  if (!phase) return 'Général';
+  if (!phase) return 'dashboard.phase.general';
   // Standardize the phase labels
   switch (phase.toLowerCase()) {
     case 'fat_loss':
-    case 'cut': return 'Perte de gras (Cut)';
+    case 'cut': return 'dashboard.phase.cut';
     case 'hypertrophy':
-    case 'bulk': return 'Prise de masse (Bulk)';
-    case 'recomp': return 'Recomposition';
-    case 'maintenance': return 'Maintien';
-    case 'strength': return 'Force maximale';
+    case 'bulk': return 'dashboard.phase.bulk';
+    case 'recomp': return 'dashboard.phase.recomp';
+    case 'maintenance': return 'dashboard.phase.maintenance';
+    case 'strength': return 'dashboard.phase.strength';
     default: return phase;
+  }
+}
+
+function getPhaseShortLabel(phase?: string | null) {
+  if (!phase) return null;
+  switch (phase.toLowerCase()) {
+    case 'fat_loss':
+    case 'cut':
+      return 'CUT';
+    case 'hypertrophy':
+    case 'bulk':
+      return 'BULK';
+    case 'recomp':
+      return 'RECOMP';
+    case 'maintenance':
+      return 'MAIN';
+    case 'strength':
+      return 'STR';
+    default:
+      return phase.toUpperCase();
   }
 }
 
@@ -281,33 +341,82 @@ function ProgressRail({
   );
 }
 
-/** Sleek minimalist action alert button for priority tasks. */
+const ALERT_TONE_STYLES: Record<AlertTone, { background: string; text: string }> = {
+  success: { background: "bg-[#5dba87]/5 border-[#5dba87]/15", text: "text-[#5dba87]" },
+  warning: { background: "bg-[#f2c94c]/5 border-[#f2c94c]/15", text: "text-[#f2c94c]" },
+  attention: { background: "bg-[#ff8660]/5 border-[#ff8660]/15", text: "text-[#ff8660]" },
+  info: { background: "bg-[#7aa7ff]/5 border-[#7aa7ff]/15", text: "text-[#7aa7ff]" },
+  neutral: { background: "bg-white/[0.03] border-white/[0.08]", text: "text-white/55" },
+};
+
 function ActionAlertButton({ item }: { item: PriorityItem }) {
-  const isBilan = item.key.startsWith('assessment-');
-  const bgStyle = isBilan ? "bg-[#ff8660]/5 border-[#ff8660]/15" : "bg-[#5dba87]/5 border-[#5dba87]/15";
-  const textStyle = isBilan ? "text-[#ff8660]" : "text-[#5dba87]";
+  const styles = ALERT_TONE_STYLES[item.tone];
 
   const content = (
-    <div className={cn("flex items-center justify-between gap-3 w-full px-4 py-3.5 border rounded-2xl text-left active:scale-[0.98] transition shadow-sm", bgStyle)}>
+    <div className={cn("flex items-center justify-between gap-3 w-full px-4 py-3.5 border rounded-2xl text-left active:scale-[0.98] transition shadow-sm", styles.background)}>
       <div className="flex items-center gap-2.5 min-w-0">
-        <item.icon size={16} className={cn("shrink-0", textStyle)} />
+        <item.icon size={16} className={cn("shrink-0", styles.text)} />
         <span className="text-[13px] font-medium text-white/90 truncate">
           {item.title}
         </span>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        <span className={cn("text-[10px] font-bold uppercase tracking-wider", textStyle)}>
+        <span className={cn("text-[10px] font-bold uppercase tracking-wider", styles.text)}>
           {item.label}
         </span>
-        <ChevronRight size={12} className={textStyle} />
+        <ChevronRight size={12} className={styles.text} />
       </div>
     </div>
   );
 
   if (item.href) {
-    return <Link href={item.href} className="block w-full">{content}</Link>;
+    return <Link href={item.href} onClick={item.onClick} className="block w-full">{content}</Link>;
   }
   return <button onClick={item.onClick} className="block w-full">{content}</button>;
+}
+
+function notificationAlertItem(notification: ClientNotificationItem): PriorityItem {
+  const isCoachMessage = isCoachMessageNotification(notification);
+  const isLevelUp = notification.payload?.event === "level_up";
+  const priority = typeof notification.payload?.priority === "string"
+    ? notification.payload.priority
+    : null;
+  const tone: AlertTone = priority === "urgent"
+    ? "attention"
+    : priority === "important"
+      ? "warning"
+      : notification.type === "bilan_pending"
+        ? "attention"
+        : isLevelUp
+          ? "warning"
+          : notification.type === "coach_message" || notification.type === "coach_feedback" || notification.type === "coach_note"
+          ? "info"
+          : notification.type === "system_reminder" || notification.type === "tdee_updated"
+            ? "warning"
+            : "success";
+
+  const icon = isLevelUp
+    ? Trophy
+    : notification.type === "bilan_pending"
+    ? FileText
+    : notification.type === "coach_message" || notification.type === "coach_feedback" || notification.type === "coach_note"
+      ? MessageSquareText
+      : notification.type === "system_reminder"
+        ? MoonStar
+        : notification.type === "tdee_updated"
+          ? TrendingUp
+          : notification.type === "program_assigned" || notification.type === "program_updated"
+            ? Sparkles
+            : Bell;
+
+  return {
+    key: `notification-${notification.id}`,
+    title: isCoachMessage ? (notification.body ?? notification.title) : notification.title,
+    label: "Ouvrir",
+    href: isCoachMessage ? undefined : notificationHref(notification),
+    icon,
+    tone,
+  };
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -319,6 +428,7 @@ export default function ClientDashboard({
   clientGoal,
   clientPhase,
   clientCreatedAt,
+  clientGender = "male",
   lang,
   todayStrip,
   notifications,
@@ -328,15 +438,106 @@ export default function ClientDashboard({
   stepTarget = null,
   weeklyCalorieAvg = null,
   weeklyVolume = 0,
+  streak = null,
+  nextAppointment = null,
 }: DashboardProps) {
   const router = useRouter();
+  const { chat: unreadCoachMessages } = useInboxUnreadCount();
   const copy = dashboardCopy(lang);
+  const t = useCallback(
+    (key: Parameters<typeof ct>[1], vars?: Record<string, string | number>) =>
+      ct(lang, key, vars),
+    [lang],
+  );
   const rootRef = useRef<HTMLDivElement | null>(null);
   const heroRef = useRef<HTMLDivElement | null>(null);
   const [checkinMoment, setCheckinMoment] = useState<"morning" | "evening" | null>(null);
   const [checkinDate, setCheckinDate] = useState<string | null>(null);
   const [waterOpen, setWaterOpen] = useState(false);
   const [heroCollapsed, setHeroCollapsed] = useState(false);
+  const [heroHeight, setHeroHeight] = useState(212);
+  const [isProgressionExpanded, setIsProgressionExpanded] = useState(false);
+  const [cycleState, setCycleState] = useState<CycleState | null>(null);
+  const [cycleModalOpen, setCycleModalOpen] = useState(false);
+  const [openCoachMessage, setOpenCoachMessage] = useState<ClientNotificationItem | null>(null);
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<Set<string>>(new Set());
+
+  const dismissNotifications = useCallback((notificationIds: string[]) => {
+    const uniqueIds = [...new Set(notificationIds)].filter(Boolean);
+    if (uniqueIds.length === 0) return;
+
+    setDismissedNotificationIds((current) => {
+      const next = new Set(current);
+      uniqueIds.forEach((id) => next.add(id));
+      return next;
+    });
+    emitClientInboxUpdated();
+
+    uniqueIds.forEach((id) => {
+      void sendClientMutation({
+        kind: "notification",
+        url: `/api/client/notifications/${id}`,
+        method: "PATCH",
+      }).then((result) => {
+        if (!result.queued) router.refresh();
+      });
+    });
+  }, [router]);
+
+  useEffect(() => {
+    fetch('/api/client/cycle/status')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.cycleState) setCycleState(data.cycleState) })
+      .catch(() => {})
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedCoachMessage = params.get('openCoachMessage');
+    const requestedMoment = params.get('openCheckin');
+    const requestedNotificationId = params.get('notificationId');
+    const requestedWater = params.get('openWater') === '1';
+
+    if (requestedCoachMessage) {
+      void fetch(`/api/client/notifications/${encodeURIComponent(requestedCoachMessage)}`)
+        .then((response) => response.ok ? response.json() : null)
+        .then((data) => {
+          if (data?.notification) setOpenCoachMessage(data.notification);
+        })
+        .catch(() => {});
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+
+    if (requestedMoment === 'morning' || requestedMoment === 'evening') {
+      if (requestedNotificationId) {
+        void fetch(`/api/client/notifications/${encodeURIComponent(requestedNotificationId)}`, { method: "PATCH" })
+          .then(() => router.refresh())
+          .catch(() => {});
+      }
+      setCheckinDate(params.get('date') || todayStrip?.date || null);
+      setCheckinMoment(requestedMoment);
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+
+    if (requestedWater) {
+      setWaterOpen(true);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [router, todayStrip?.date]);
+
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+
+    const updateHeroHeight = () => setHeroHeight(Math.ceil(hero.getBoundingClientRect().height));
+    updateHeroHeight();
+
+    const observer = new ResizeObserver(updateHeroHeight);
+    observer.observe(hero);
+    return () => observer.disconnect();
+  }, []);
 
   // ── Scroll detection: find the shell's scrollable <main> parent ──────────
   useEffect(() => {
@@ -378,12 +579,6 @@ export default function ClientDashboard({
   }, []);
 
   const plannedSessions = useMemo(() => todayStrip?.sessions ?? [], [todayStrip]);
-  const pendingCheckins = todayStrip?.checkin?.pendingCount ?? 0;
-  const unreadCount = notifications.filter((n) => !n.read_at).length;
-  const coachSignals = notifications.filter(
-    (n) => n.type === "coach_note" || n.type === "coach_feedback",
-  );
-
   // ── Check-in handler ──────────────────────────────────────────────────────
   const handleCheckinClick = useCallback(() => {
     if (!todayStrip) return;
@@ -394,21 +589,12 @@ export default function ClientDashboard({
       new Date(),
       todayStrip.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
       todayStrip.checkin.sessions,
+      todayStrip.checkin.availability,
     );
 
     if (slot?.flow_type === "morning" || slot?.flow_type === "evening") {
       setCheckinMoment(slot.flow_type);
       setCheckinDate(slot.date ?? null);
-      return;
-    }
-
-    if (!todayStrip.checkin.morning) {
-      setCheckinMoment("morning");
-      return;
-    }
-
-    if (!todayStrip.checkin.evening) {
-      setCheckinMoment("evening");
     }
   }, [todayStrip]);
 
@@ -425,64 +611,70 @@ export default function ClientDashboard({
           ? `/bilan/${assessments.pending[0].token}`
           : "/client/bilans",
         icon: FileText,
-        accent: true,
-      });
-    }
-
-    const missed = (todayStrip?.checkin as any)?.missed_checkins ?? [];
-    if (missed.length > 0) {
-      for (const m of missed) {
-        const title = `${m.flow_type === "morning" ? "Check-in matin" : "Check-in soir"} • ${formatShortDate(m.date, lang)}`;
-        items.push({
-          key: `checkin-${m.date}-${m.flow_type}`,
-          title,
-          label: copy.checkinNow,
-          onClick: () => {
-            setCheckinDate(m.date);
-            setCheckinMoment(m.flow_type);
-          },
-          icon: MoonStar,
-          accent: items.length === 0,
-        });
-      }
-    } else if (pendingCheckins > 0) {
-      items.push({
-        key: "checkin",
-        title:
-          pendingCheckins > 1
-            ? `${pendingCheckins} ${copy.pendingCheckins}`
-            : copy.checkinNow,
-        label: copy.checkinNow,
-        onClick: handleCheckinClick,
-        icon: MoonStar,
-        accent: items.length === 0,
-      });
-    }
-
-    if (plannedSessions[0]) {
-      items.push({
-        key: `session-${plannedSessions[0].id}`,
-        title: plannedSessions[0].name,
-        label: copy.openProgram,
-        href: "/client/programme",
-        icon: Dumbbell,
-        accent: items.length === 0,
+        tone: "attention",
       });
     }
 
     return items;
-  }, [assessments.pending, copy, handleCheckinClick, pendingCheckins, plannedSessions, lang, todayStrip]);
+  }, [assessments.pending, copy]);
 
-  const firstItem = priorityItems[0] ?? null;
-  const secondaryItems = priorityItems.slice(1);
+  const visibleNotifications = useMemo(
+    () => notifications.filter((notification) => !dismissedNotificationIds.has(notification.id)),
+    [dismissedNotificationIds, notifications],
+  );
+
+  const alertNotifications = useMemo(
+    () => visibleNotifications.filter((notification) =>
+      notification.payload?.event !== "checkin_reminder" && !isCoachMessageNotification(notification),
+    ),
+    [visibleNotifications],
+  );
+
+  const dashboardAlerts = useMemo(
+    () => [...priorityItems, ...alertNotifications.map((notification) => {
+      const item = notificationAlertItem(notification);
+      return {
+        ...item,
+        onClick: () => {
+          dismissNotifications([notification.id]);
+          if (isCoachMessageNotification(notification)) {
+            setOpenCoachMessage(notification);
+          }
+        },
+      };
+    })],
+    [alertNotifications, dismissNotifications, priorityItems],
+  );
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const heroName = clientFirstName?.trim() || copy.greetingFallback;
+  const normalizedGender = clientGender?.trim().toLowerCase();
+  const isFemaleClient = normalizedGender === "female" || normalizedGender === "femme";
+  const hasCycleIndicator = Boolean(
+    isFemaleClient && cycleState?.currentPhase && cycleState.currentCycleDay,
+  );
   const caloriesLogged = todayStrip?.calories?.logged ?? 0;
   const caloriesTarget = todayStrip?.calories?.target ?? 0;
   const waterLogged = todayStrip?.water?.logged ?? 0;
   const waterTarget = todayStrip?.water?.target ?? 0;
-  const notifBadge = unreadCount + pendingCheckins;
+  const unreadCount = unreadCoachMessages;
+  const greeting = getTimeGreeting(lang);
+
+  // ── Gamification Logic ────────────────────────────────────────────────────
+  let gamification = null;
+  if (streak) {
+    const progression = getProgressionSummary(streak.total_points);
+    const availablePoints = Math.max(0, streak.available_points ?? streak.total_points);
+    const levelColor = PROGRESSION_LEVEL_COLORS[progression.level];
+
+    gamification = {
+      ...streak,
+      level: progression.level,
+      availablePoints,
+      levelColor,
+      ...progression,
+    };
+  }
 
   return (
     <>
@@ -503,68 +695,217 @@ export default function ClientDashboard({
         onLogged={() => router.refresh()}
         onDeleted={() => router.refresh()}
       />
+      <CoachMessageSheet
+        notification={openCoachMessage}
+        coachAvatarUrl={coach.avatarUrl}
+        coachInitial={initialsFor(coach.fullName)}
+        clientAvatarUrl={clientAvatarUrl}
+        clientInitial={initialsFor(clientFirstName)}
+        onClose={() => {
+          setOpenCoachMessage(null);
+        }}
+      />
+      {hasCycleIndicator && cycleState?.currentPhase && cycleState.currentCycleDay && (
+        <CyclePhaseModal
+          open={cycleModalOpen}
+          phase={cycleState.currentPhase}
+          cycleDay={cycleState.currentCycleDay}
+          avgCycleLength={cycleState.avgCycleLengthDays}
+          context="training"
+          onClose={() => setCycleModalOpen(false)}
+        />
+      )}
 
       <div ref={rootRef} className="premium-dashboard-bg text-white">
+        <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+          <video
+            className="h-full w-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            poster="/images/lclient-dashboard-bg.jpg"
+          >
+            <source src="/videos/client-dashboard-bg.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,6,7,0.48),rgba(6,6,7,0.82))]" />
+        </div>
         <div className="premium-dashboard-content">
 
           {/* ── FIXED HEADER — stays locked at the top of the screen ── */}
           <div ref={heroRef} className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-xl z-30">
-            <div className="bg-[#0d0d0d] w-full rounded-b-[32px] border-b border-white/[0.04]">
+            <div className="w-full rounded-b-[32px] bg-[var(--client-chrome-bg)] pt-1 shadow-lg shadow-black/40">
               <div
                 className="mx-auto w-full max-w-xl px-4"
                 style={{ paddingTop: "max(env(safe-area-inset-top), 16px)" }}
               >
-                {/* Hero card: identity + date */}
-                <div className="flex items-center justify-between gap-4 pt-2 pb-4">
-                  <div className="flex items-center gap-3.5 min-w-0">
+                <div className="flex items-center justify-between pb-3 pt-2.5">
+                  <div className="flex items-center gap-2">
+                    <Image
+                      src="/logo/logo-stryvr-silver.png"
+                      alt="STRYVR Logo"
+                      width={20}
+                      height={20}
+                      className="w-5 h-5 object-contain"
+                    />
+                    <span className="text-[12px] font-bold tracking-[0.25em] text-white/90">STRYVR</span>
+                  </div>
+                </div>
+
+                <div className="flex min-w-0 items-center justify-between gap-3 pb-3">
+                  <div className="flex min-w-0 items-center gap-3">
                     <ClientAvatar
                       firstName={clientFirstName}
                       avatarUrl={clientAvatarUrl}
                     />
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#5dba87]">
-                          STRYVR
-                        </p>
-                      </div>
-                      <h1 className="text-[24px] font-semibold leading-none tracking-[-0.04em] text-white mt-0.5">
-                        {heroName}
+                      <h1 className="text-[20px] font-semibold leading-none tracking-[-0.03em] text-white">
+                        {clientFirstName?.trim() ? `${greeting}, ${heroName}` : greeting}
                       </h1>
-                      {/* Date */}
-                      <div className="overflow-hidden">
-                        <div className="flex items-center gap-2 mt-1">
-                          <p className="text-[13px] font-medium text-white/60">
-                            {formatLongDate(lang)}
-                          </p>
+                      <p className="text-[12px] text-white/50 mt-1.5 leading-none font-medium">
+                        {formatLongDate(lang)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {gamification && (
+                      <button
+                        type="button"
+                        data-tour-id="progression"
+                        onClick={() => setIsProgressionExpanded(!isProgressionExpanded)}
+                        aria-expanded={isProgressionExpanded}
+                        aria-label={`${t('dashboard.points')}: ${gamification.availablePoints}. ${gamification.level}`}
+                        className="flex h-12 min-w-[88px] flex-col justify-center rounded-2xl border border-white/[0.04] bg-[#111111] px-3 text-left transition-colors hover:bg-[#151515] active:scale-[0.98]"
+                      >
+                        <span className="flex items-center gap-1 text-[14px] font-bold leading-none tabular-nums text-white">
+                          {gamification.availablePoints}<StrivrToken size={14} />
+                        </span>
+                        <span className="mt-1 text-[10px] font-bold uppercase leading-none tracking-[0.1em]" style={{ color: gamification.levelColor }}>
+                          {gamification.level}
+                        </span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      data-tour-id="coach-chat"
+                      aria-label={t('feedback.openCoachMessage')}
+                      onClick={() => {
+                        setOpenCoachMessage({
+                          id: "header-coach-message",
+                          type: "coach_message",
+                          title: t('feedback.coachMessage'),
+                          body: null,
+                          payload: { message_kind: "coach_message", header_open: true },
+                          read_at: null,
+                          created_at: new Date().toISOString(),
+                        })
+                      }}
+                      className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.04] bg-[#111111] text-white/75 transition-colors hover:bg-[#151515] active:scale-[0.96]"
+                    >
+                      <MessageSquareText size={18} />
+                      {unreadCount > 0 && (
+                        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ff8660] px-1 text-[9px] font-bold text-[#140b08]">
+                          {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {hasCycleIndicator && cycleState?.currentPhase && cycleState.currentCycleDay && (
+                  <div className="mb-3 flex min-h-[58px] w-full items-center justify-between rounded-2xl border border-white/[0.04] bg-[#111111] px-3.5 py-2 text-left">
+                    <button
+                      type="button"
+                      onClick={() => setCycleModalOpen(true)}
+                      className="min-w-0 rounded-lg text-left outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-[#ef6a62]"
+                    >
+                      <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-white/40">{t('dashboard.phaseLabel')}</p>
+                      <p className="mt-1 truncate text-[13px] font-bold uppercase leading-none tracking-[0.08em] text-[#ef6a62]">
+                        {cycleState.currentPhase === 'menstrual' ? t('cycle.phase.menstrual.full') : t(`cycle.phase.${cycleState.currentPhase}`)}
+                      </p>
+                      {clientPhase && (
+                        <p className="mt-1.5 text-[10px] leading-none text-white/45">
+                          {t('programme.section')} · {getPhaseShortLabel(clientPhase)}
+                        </p>
+                      )}
+                    </button>
+                    <CycleArcIndicator
+                      phase={cycleState.currentPhase}
+                      cycleDay={cycleState.currentCycleDay}
+                      avgCycleLength={cycleState.avgCycleLengthDays}
+                      menstrualLength={cycleState.menstrualPhaseLengthDays}
+                      confidence={cycleState.confidence}
+                      onClick={() => setCycleModalOpen(true)}
+                    />
+                  </div>
+                )}
+
+                {!hasCycleIndicator && clientPhase && (
+                  <div className="mb-3 flex min-h-[52px] items-center justify-between rounded-2xl border border-white/[0.04] bg-[#111111] px-3.5 py-2.5">
+                    <div>
+                      <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-white/35">
+                        {t('dashboard.phaseLabel')}
+                      </p>
+                      <p className="mt-1 text-[13px] font-bold uppercase leading-none tracking-[0.08em] text-white">
+                        {getPhaseShortLabel(clientPhase)}
+                      </p>
+                    </div>
+                    <p className="max-w-[55%] text-right text-[11px] font-medium leading-tight text-white/48">
+                      {t(getPhaseLabel(clientPhase) as Parameters<typeof ct>[1]).replace(/ \(.*\)/, '')}
+                    </p>
+                  </div>
+                )}
+
+                {/* Progression Drawer (Accordion) */}
+                {gamification && (
+                  <div
+                    className="overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]"
+                    style={{
+                      maxHeight: isProgressionExpanded ? 200 : 0,
+                      opacity: isProgressionExpanded ? 1 : 0,
+                    }}
+                  >
+                    <div className="border-t border-white/[0.04] py-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-white/[0.04] bg-[#111111]" style={{ color: gamification.levelColor }}>
+                            {gamification.level}
+                          </span>
+                        </div>
+                        <Link href="/client/profil/rewards" className="text-[10px] font-bold uppercase tracking-wider text-white/50 hover:text-white transition-colors flex items-center gap-1">
+                          {t('dashboard.shop')} <ChevronRight size={10} />
+                        </Link>
+                      </div>
+
+                      <div className="w-full mt-3">
+                        <div className="flex justify-between items-end mb-1.5">
+                          <span className="text-[10px] font-medium text-white/40">
+                            {gamification.isMaxLevel ? t('dashboard.maxLevel') : ct(lang, 'rewards.remainingPts', { n: gamification.nextLevelMin - gamification.total_points })}
+                          </span>
+                          {!gamification.isMaxLevel && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-white/30">
+                              {t('dashboard.next')}: {gamification.nextLevelName}
+                            </span>
+                          )}
+                        </div>
+                        <div className="h-[5px] w-full bg-white/[0.04] rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${gamification.progressPercent}%`, backgroundColor: gamification.levelColor }}
+                          />
                         </div>
                       </div>
                     </div>
                   </div>
-                  
-                  {/* Phase Actuelle à droite */}
-                  {clientPhase && (
-                    <div className="flex flex-col items-end text-right">
-                      <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-white/30 mb-0.5">
-                        Phase
-                      </p>
-                      <p className="text-[18px] font-bold tracking-tight text-white uppercase leading-none mb-1">
-                        {clientPhase === 'fat_loss' ? 'CUT' : clientPhase === 'hypertrophy' ? 'BULK' : clientPhase}
-                      </p>
-                      <div className="bg-white/[0.04] px-1.5 py-0.5 rounded border border-white/[0.02]">
-                        <p className="text-[9px] font-semibold uppercase text-white/50">
-                          {getPhaseLabel(clientPhase).replace(/ \(.*\)/, '')}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                )}
 
                 {/* Today strip — below the hero card, in the shell gradient zone */}
                 <div
                   className="overflow-hidden transition-all duration-300 ease-out"
                   style={{
-                    maxHeight: heroCollapsed ? 0 : 60,
-                    opacity: heroCollapsed ? 0 : 1,
+                    maxHeight: heroCollapsed && !isProgressionExpanded ? 0 : 60,
+                    opacity: heroCollapsed && !isProgressionExpanded ? 0 : 1,
                   }}
                 >
                   <div className="border-t border-white/[0.04] py-1.5 pb-2">
@@ -574,6 +915,7 @@ export default function ClientDashboard({
                       onWaterClick={() => setWaterOpen(true)}
                       onRefresh={() => router.refresh()}
                       className="bg-transparent"
+                      surfaceClassName="border border-white/[0.04] bg-[#111111]"
                     />
                   </div>
                 </div>
@@ -583,12 +925,12 @@ export default function ClientDashboard({
           </div>
 
           {/* ── BODY ── */}
-          <main className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pb-28" style={{ paddingTop: "calc(max(env(safe-area-inset-top), 16px) + 132px)" }}>
+          <main className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pb-28" style={{ paddingTop: `${heroHeight + 16}px` }}>
 
             {/* ── Action alert buttons ── */}
-            {priorityItems.length > 0 && (
+            {dashboardAlerts.length > 0 && (
               <div className="flex flex-col gap-2.5">
-                {priorityItems.map((item) => (
+                {dashboardAlerts.map((item) => (
                   <ActionAlertButton key={item.key} item={item} />
                 ))}
               </div>
@@ -597,40 +939,77 @@ export default function ClientDashboard({
             {/* ── Transformation Score Widget ── */}
             <ClientTransformationWidget clientId={clientId} />
 
+            {/* ── Upcoming Coaching Appointment Card ── */}
+            {nextAppointment && (
+              <div 
+                onClick={() => router.push(`/client/rendez-vous/${nextAppointment.id}`)}
+                className="premium-panel bg-[#09090a] border border-[#c6b48b]/20 hover:border-[#c6b48b]/40 rounded-[22px] p-5 flex items-center justify-between shadow-sm cursor-pointer transition-all group"
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#c6b48b]/10 text-[#c6b48b]">
+                    <Calendar size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#c6b48b]">
+                      {nextAppointment.status === 'awaiting_confirmation' 
+                        ? '⏳ Confirmation requise' 
+                        : '📅 Appel coach'}
+                    </p>
+                    <h3 className="mt-1 text-[15px] font-bold tracking-tight text-white truncate">
+                      {nextAppointment.title}
+                    </h3>
+                    <p className="mt-1 text-[12px] text-white/55 font-medium">
+                      {new Intl.DateTimeFormat('fr-FR', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        timeZone: nextAppointment.client_timezone || undefined
+                      }).format(new Date(nextAppointment.starts_at))}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-white/20 group-hover:text-white/55 transition-colors shrink-0" />
+              </div>
+            )}
+
+            {/* ── Progression & Rewards Widget removed from here (now in header) ── */}
+
             {/* ── Weekly Calories Balance Widget ── */}
             {(() => {
               const calTarget = todayStrip?.calories?.target ?? 0;
               const hasCalData = weeklyCalorieAvg != null && calTarget > 0;
-              
-              let calStatusLabel = "En attente";
+
+              let calStatusLabel = t('dashboard.pending');
               let calStatusColor = "text-white/30 border-white/5 bg-white/[0.01]";
               let isCalGood = false;
-              let desc = "Enregistre tes repas pour voir ta balance énergétique hebdomadaire.";
+              let desc = t('dashboard.energy.empty');
 
               if (hasCalData && weeklyCalorieAvg) {
                 const isCut = clientPhase?.toLowerCase() === 'fat_loss' || clientPhase?.toLowerCase() === 'cut';
                 const isBulk = clientPhase?.toLowerCase() === 'hypertrophy' || clientPhase?.toLowerCase() === 'bulk';
-                
+
                 if (isCut) {
                   isCalGood = weeklyCalorieAvg <= calTarget + 50;
-                  desc = isCalGood 
-                    ? `Ta moyenne (${weeklyCalorieAvg} kcal) respecte ton déficit cible de ${calTarget} kcal.`
-                    : `Ta moyenne (${weeklyCalorieAvg} kcal) dépasse ton déficit cible de ${calTarget} kcal.`;
+                  desc = isCalGood
+                    ? t('dashboard.energy.deficit.ok', { avg: weeklyCalorieAvg, target: calTarget })
+                    : t('dashboard.energy.deficit.high', { avg: weeklyCalorieAvg, target: calTarget });
                 } else if (isBulk) {
                   isCalGood = weeklyCalorieAvg >= calTarget - 50;
-                  desc = isCalGood 
-                    ? `Ta moyenne (${weeklyCalorieAvg} kcal) soutient ton surplus cible de ${calTarget} kcal.`
-                    : `Ta moyenne (${weeklyCalorieAvg} kcal) est en dessous de ton surplus cible de ${calTarget} kcal.`;
+                  desc = isCalGood
+                    ? t('dashboard.energy.surplus.ok', { avg: weeklyCalorieAvg, target: calTarget })
+                    : t('dashboard.energy.surplus.low', { avg: weeklyCalorieAvg, target: calTarget });
                 } else {
                   isCalGood = Math.abs(weeklyCalorieAvg - calTarget) <= 100;
-                  desc = isCalGood 
-                    ? `Ta moyenne (${weeklyCalorieAvg} kcal) est alignée avec ta maintenance (${calTarget} kcal).`
-                    : `Ta moyenne (${weeklyCalorieAvg} kcal) dévie de ta maintenance (${calTarget} kcal).`;
+                  desc = isCalGood
+                    ? t('dashboard.energy.maintenance.ok', { avg: weeklyCalorieAvg, target: calTarget })
+                    : t('dashboard.energy.maintenance.off', { avg: weeklyCalorieAvg, target: calTarget });
                 }
 
-                calStatusLabel = isCalGood ? "Cible respectée" : "Hors cible";
-                calStatusColor = isCalGood 
-                  ? "text-[#5dba87] border-[#5dba87]/15 bg-[#5dba87]/5" 
+                calStatusLabel = isCalGood ? t('dashboard.energy.onTarget') : t('dashboard.energy.offTarget');
+                calStatusColor = isCalGood
+                  ? "text-[#5dba87] border-[#5dba87]/15 bg-[#5dba87]/5"
                   : "text-[#ff8660] border-[#ff8660]/15 bg-[#ff8660]/5";
               }
 
@@ -642,7 +1021,7 @@ export default function ClientDashboard({
                         <PhosphorFlame size={15} weight="fill" style={{ color: "#5dba87" }} />
                       </div>
                       <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
-                        Balance énergétique
+                        {t('dashboard.energy.balance')}
                       </p>
                     </div>
                     <span className={cn("text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border", calStatusColor)}>
@@ -655,10 +1034,10 @@ export default function ClientDashboard({
                       {weeklyCalorieAvg ? `${weeklyCalorieAvg}` : "—"}
                     </span>
                     <span className="text-[12px] text-white/35 pb-1">
-                      kcal / jour en moyenne
+                      {t('dashboard.avgPerDay')}
                     </span>
                   </div>
-                  
+
                   <p className="text-[11px] text-white/50 leading-snug">
                     {desc}
                   </p>
@@ -672,33 +1051,33 @@ export default function ClientDashboard({
               {(() => {
                 const targetSteps = stepTarget ?? 10000;
                 const pct = weeklyStepAvg ? Math.min(100, Math.round((weeklyStepAvg / targetSteps) * 100)) : 0;
-                
+
                 return (
                   <SurfaceCard className="bg-[#09090a] border border-white/[0.04] p-4 flex flex-col justify-between h-[135px]">
                     <div>
                       <div className="flex items-center gap-2">
                         <PhosphorFootprints size={15} weight="fill" style={{ color: "#5dba87" }} />
                         <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/50">
-                          Pas moyen
+                          {t('dashboard.avgSteps')}
                         </p>
                       </div>
                       <p className="text-[20px] font-bold text-white mt-3 leading-none">
-                        {weeklyStepAvg ? weeklyStepAvg.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US') : "—"}
+                        {weeklyStepAvg ? weeklyStepAvg.toLocaleString(lang === 'fr' ? 'fr-FR' : lang === 'es' ? 'es-ES' : 'en-US') : "—"}
                       </p>
                       <p className="text-[10px] text-white/35 mt-1">
-                        cible {targetSteps.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US')}
+                        {t('dashboard.targetWord')} {targetSteps.toLocaleString(lang === 'fr' ? 'fr-FR' : lang === 'es' ? 'es-ES' : 'en-US')}
                       </p>
                     </div>
 
                     <div className="w-full mt-3">
                       <div className="h-[4px] w-full bg-white/[0.04] rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-[#5dba87] rounded-full transition-all duration-500" 
-                          style={{ width: `${pct}%` }} 
+                        <div
+                          className="h-full bg-[#5dba87] rounded-full transition-all duration-500"
+                          style={{ width: `${pct}%` }}
                         />
                       </div>
                       <div className="flex justify-between items-center mt-1">
-                        <span className="text-[9px] text-white/30">Moyenne 7j</span>
+                        <span className="text-[9px] text-white/30">{t('dashboard.avg7d')}</span>
                         <span className="text-[9px] font-bold text-[#5dba87]">{pct}%</span>
                       </div>
                     </div>
@@ -712,53 +1091,25 @@ export default function ClientDashboard({
                   <div className="flex items-center gap-2">
                     <PhosphorBarbell size={15} weight="fill" style={{ color: "#5dba87" }} />
                     <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/50">
-                      Volume 7j
+                      {t('dashboard.volume7d')}
                     </p>
                   </div>
                   <p className="text-[20px] font-bold text-white mt-3 leading-none">
-                    {weeklyVolume ? `${weeklyVolume.toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US')} kg` : "—"}
+                    {weeklyVolume ? `${weeklyVolume.toLocaleString(lang === 'fr' ? 'fr-FR' : lang === 'es' ? 'es-ES' : 'en-US')} kg` : "—"}
                   </p>
                   <p className="text-[10px] text-white/35 mt-1">
-                    charge totale cumulée
+                    {t('dashboard.totalLoad')}
                   </p>
                 </div>
-                
+
                 <p className="text-[9px] text-white/40 leading-snug">
-                  Somme du travail effectué sur tes séances de la semaine.
+                  {t('dashboard.totalLoad.desc')}
                 </p>
               </SurfaceCard>
             </div>
 
-            {/* ── Coach signals (conditional — hidden when empty) ── */}
-            {coachSignals.length > 0 && (
-              <div className="bg-[#09090a] border border-white/[0.04] shadow-sm rounded-[22px] px-4 py-4">
-                <SectionHeader
-                  icon={MessageSquareText}
-                  title={copy.coachSpace}
-                />
-                <div className="mt-3 flex flex-col gap-2">
-                  {coachSignals.slice(0, 3).map((item) => (
-                    <Link
-                      key={item.id}
-                      href={notificationHref(item)}
-                      className="bg-[#141414] border border-white/[0.02] rounded-xl px-4 py-3.5 block"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className={CARD_TITLE_CLASS}>{item.title}</p>
-                          {item.body ? (
-                            <p className={CARD_BODY_CLASS}>{item.body}</p>
-                          ) : null}
-                        </div>
-                        <span className="shrink-0 text-[11px] text-white/30">
-                          {formatShortDate(item.created_at, lang)}
-                        </span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* ── Weight & Body Fat Tracker Widget ── */}
+            <WeightTrackerWidget />
           </main>
         </div>
       </div>

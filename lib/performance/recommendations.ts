@@ -6,6 +6,7 @@
  */
 
 import type { ExercisePerformanceSummary, PerformanceAnalysis } from './analyzer'
+import { resolveCanonicalExerciseKey } from '@/lib/training/exerciseHistoryKey'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,18 +65,21 @@ export function generateRecommendations(
   const programMap = new Map<string, ProgramExercise>()
   for (const ex of currentProgram.exercises) {
     programMap.set(ex.id, ex)
+    programMap.set(resolveCanonicalExerciseKey(ex.name), ex)
   }
 
   // Recommandations par exercice
   for (const summary of analysis.exercises) {
-    const programEx = programMap.get(summary.exercise_id)
+    const programEx =
+      programMap.get(summary.exercise_id) ??
+      programMap.get(resolveCanonicalExerciseKey(summary.exercise_name))
     const candidateRecs: PerformanceRecommendation[] = []
 
     // --- decrease_volume : overreaching (priority high) ---
     if (summary.overreaching) {
       const currentSets = programEx?.sets ?? 3
       candidateRecs.push({
-        exercise_id: summary.exercise_id,
+        exercise_id: programEx?.id ?? null,
         exercise_name: summary.exercise_name,
         type: 'decrease_volume',
         reason: `Taux de complétion < 80% sur les 2 dernières séances consécutives (${(summary.completion_rate * 100).toFixed(0)}% en moyenne). Réduire le volume permet la récupération.`,
@@ -93,7 +97,7 @@ export function generateRecommendations(
     ) {
       const currentWeight = programEx?.current_weight_kg ?? null
       candidateRecs.push({
-        exercise_id: summary.exercise_id,
+        exercise_id: programEx?.id ?? null,
         exercise_name: summary.exercise_name,
         type: 'increase_weight',
         reason: `Taux de complétion > 95% et RIR en hausse (exercice perçu comme plus facile). Augmenter la charge pour maintenir la stimulation.`,
@@ -116,7 +120,7 @@ export function generateRecommendations(
       const hasIncreaseWeight = candidateRecs.some(r => r.type === 'increase_weight')
       if (!hasIncreaseWeight) {
         candidateRecs.push({
-          exercise_id: summary.exercise_id,
+          exercise_id: programEx?.id ?? null,
           exercise_name: summary.exercise_name,
           type: 'increase_volume',
           reason: `RIR moyen de ${summary.avg_rir.toFixed(1)} (élevé) avec un taux de complétion > 95%. L'exercice est bien en dessous du seuil d'effort optimal — ajouter 1 série.`,
@@ -135,7 +139,7 @@ export function generateRecommendations(
       summary.overloads_last_4_weeks === 0
     ) {
       candidateRecs.push({
-        exercise_id: summary.exercise_id,
+        exercise_id: programEx?.id ?? null,
         exercise_name: summary.exercise_name,
         type: 'swap_exercise',
         reason: `Aucune surcharge progressive sur les 3 dernières semaines malgré un taux de complétion > 80%. L'exercice est bien toléré mais ne stimule plus l'adaptation — envisager une variante.`,

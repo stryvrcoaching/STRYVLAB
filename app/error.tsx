@@ -28,6 +28,16 @@ export default function Error({
         <p className="text-lg font-sans font-normal text-[#2D5168] mb-8">
           {error.message || 'Une erreur inattendue s\'est produite.'}
         </p>
+        {error.stack && (
+          <details className="rounded-xl bg-white/70 p-4 text-left text-xs text-[#2D5168]">
+            <summary className="cursor-pointer font-sans font-semibold text-[#0F2334]">
+              Détails techniques
+            </summary>
+            <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed">
+              {error.stack}
+            </pre>
+          </details>
+        )}
         <div className="flex gap-4 justify-center">
           <button
             onClick={reset}
@@ -46,7 +56,6 @@ export default function Error({
     </div>
   )
 }
-
 
 
 

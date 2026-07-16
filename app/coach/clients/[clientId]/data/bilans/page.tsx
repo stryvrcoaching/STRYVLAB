@@ -7,19 +7,19 @@ import { useClientTopBar } from "@/components/clients/useClientTopBar";
 import SubmissionsList from "@/components/assessments/dashboard/SubmissionsList";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SubmissionWithClient } from "@/types/assessment";
+import HeaderIconButton from "@/components/layout/HeaderIconButton";
 
 export default function BilansPage() {
   const { client, clientId } = useClient();
   const [sendModalOpen, setSendModalOpen] = useState(false);
 
   const topBarRight = useMemo(() => (
-    <button
+    <HeaderIconButton
       onClick={() => setSendModalOpen(true)}
-      className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[#1f8a65] text-white text-[12px] font-bold uppercase tracking-[0.1em] hover:bg-[#217356] transition-all active:scale-[0.98]"
-    >
-      <Send size={12} />
-      Envoyer un bilan
-    </button>
+      icon={<Send size={12} />}
+      label="Envoyer un bilan"
+      variant="accent"
+    />
   ), []);
 
   useClientTopBar("Bilans", topBarRight);
@@ -94,6 +94,7 @@ export default function BilansPage() {
             templates={templates}
             clientId={clientId}
             onSend={handleSend}
+            clientEmail={client.email ?? undefined}
             sendModalOpen={sendModalOpen}
             onSendModalClose={() => setSendModalOpen(false)}
           />

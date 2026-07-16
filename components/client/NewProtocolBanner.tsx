@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { ChevronRight, Utensils } from 'lucide-react'
+import { useClientT } from '@/components/client/ClientI18nProvider'
 
 interface NewProtocolBannerProps {
   unviewedCount: number
@@ -12,11 +13,12 @@ export default function NewProtocolBanner({
   unviewedCount,
   protocolName,
 }: NewProtocolBannerProps) {
+  const { t } = useClientT()
   if (unviewedCount === 0) return null
 
   const label = unviewedCount === 1
-    ? `Votre coach a partagé un protocole: "${protocolName || "Protocole nutritionnel"}"`
-    : `Votre coach a partagé ${unviewedCount} nouveaux protocoles`
+    ? t('protocol.banner.single', { name: protocolName || t('protocol.banner.defaultName') })
+    : t('protocol.banner.multiple', { n: unviewedCount })
 
   return (
     <Link href="/client/nutrition">
@@ -27,7 +29,7 @@ export default function NewProtocolBanner({
           </div>
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#f2f2f2] mb-0.5">
-              Nouveau
+              {t('protocol.banner.new')}
             </p>
             <p className="text-[13px] text-white/90 font-medium truncate">
               {label}

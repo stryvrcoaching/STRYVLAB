@@ -1,0 +1,24 @@
+{
+  "extraKnownMarketplaces": {
+    "aidd-framework-codex": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/user/Desktop/STRYVLAB/.tmp/aidd/extracted/aidd-framework-codex-marketplace-5.0.3"
+      }
+    },
+    "aidd-framework": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/user/Desktop/STRYVLAB/.tmp/aidd/extracted/aidd-framework-codex-marketplace-5.0.3"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "aidd-context@aidd-framework-codex": true,
+    "aidd-dev@aidd-framework-codex": true,
+    "aidd-vcs@aidd-framework-codex": true,
+    "aidd-pm@aidd-framework-codex": true,
+    "aidd-refine@aidd-framework-codex": true,
+    "aidd-orchestrator@aidd-framework-codex": true
+  }
+}

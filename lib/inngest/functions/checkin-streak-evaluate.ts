@@ -1,7 +1,9 @@
 import { inngest } from '@/lib/inngest/client'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { evaluateStreak, getPointsForAction } from '@/lib/checkins'
+import { evaluateStreak } from '@/lib/checkins'
+import { getPointsForAction } from '@/lib/checkins/points'
 import type { StreakState } from '@/lib/checkins/streak'
+import { awardProgression } from '@/lib/rewards/progression'
 
 function service() {
   return createServiceClient(
@@ -20,22 +22,22 @@ export const checkinStreakEvaluateFunction = inngest.createFunction(
       days_of_week: number[]
     }
 
-    await step.run('award-points', async () => {
-      const actionType = is_late ? 'checkin_late' : 'checkin'
-      const points = getPointsForAction(actionType)
-
-      await service().from('client_points').insert({
-        client_id,
-        action_type: actionType,
-        points,
-        reference_id: response_id,
-        earned_at: new Date().toISOString(),
+    await step.run('award-progression', async () => {
+      const referenceId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(response_id)
+        ? response_id
+        : null
+      const result = await awardProgression(service(), {
+        clientId: client_id,
+        action: is_late ? 'checkin_late' : 'checkin',
+        basePoints: getPointsForAction(is_late ? 'checkin_late' : 'checkin'),
+        sourceKey: `checkin:${response_id}`,
+        referenceId,
+        metadata: { is_late },
       })
-
-      return { points, actionType }
+      return result
     })
 
-    await step.run('evaluate-streak', async () => {
+    const newState = await step.run('evaluate-streak', async () => {
       const { data: existing } = await service()
         .from('client_streaks')
         .select('*')
@@ -68,17 +70,15 @@ export const checkinStreakEvaluateFunction = inngest.createFunction(
           current_streak: newState.current_streak,
           longest_streak: newState.longest_streak,
           last_checkin_date: newState.last_checkin_date,
-          level: 'bronze',
+          level: 'iron',
           total_points: 0,
         })
       }
 
-      return newState
+      return { oldStreak: currentState.current_streak, newState }
     })
 
-    await inngest.send({
-      name: 'points/level.update',
-      data: { client_id },
-    })
+    // Streaks remain motivational feedback only; they no longer create large
+    // point jumps that would bypass adherence to the prescribed plan.
   }
 )

@@ -3,8 +3,11 @@ import {
   DocCard,
   DocSection,
 } from "@/components/coach/docs/CoachDocsArticle";
+import { requireCoachDocsAccess } from "@/lib/docs/server";
 
-export default function PhaseOptimizationDocumentationPage() {
+export default async function PhaseOptimizationDocumentationPage() {
+  await requireCoachDocsAccess()
+
   return (
     <CoachDocsArticle
       eyebrow="Optimisation de phase"

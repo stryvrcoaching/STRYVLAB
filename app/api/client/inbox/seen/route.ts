@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
@@ -47,6 +48,25 @@ export async function POST(req: NextRequest) {
       .is('archived_at', null)
       .is('seen_at', null)
       .in('id', chatMessageIds)
+
+    const { data: pendingMessageNotifications } = await db
+      .from('coach_client_notifications')
+      .select('id, payload')
+      .eq('client_id', clientId)
+      .in('type', ['coach_note', 'coach_message'])
+      .is('dismissed_at', null)
+
+    const messageNotificationIds = (pendingMessageNotifications ?? [])
+      .filter((notification) => (notification.payload as Record<string, unknown> | null)?.message_kind === 'coach_message')
+      .map((notification) => notification.id)
+
+    if (messageNotificationIds.length > 0) {
+      await db
+        .from('coach_client_notifications')
+        .update({ read_at: now, dismissed_at: now })
+        .eq('client_id', clientId)
+        .in('id', messageNotificationIds)
+    }
   }
 
   const legacyIds = notificationIds
@@ -74,5 +94,7 @@ export async function POST(req: NextRequest) {
   }
 
   const counts = await getClientInboxUnreadCount(db, user.id, clientId)
+  revalidatePath('/client')
+  revalidatePath('/client/profil')
   return NextResponse.json(counts)
 }

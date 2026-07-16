@@ -2,6 +2,8 @@
 
 import { AnimatePresence, motion } from "framer-motion"
 import { FileText, Keyboard, Search, Sparkles, Star, X, type LucideIcon } from "lucide-react"
+import { useClientT } from "@/components/client/ClientI18nProvider"
+import useBodyScrollLock from "@/components/client/useBodyScrollLock"
 
 export type MealMethodAction =
   | "track_voice_text"
@@ -19,8 +21,8 @@ export interface MealMethodSheetProps {
 
 type Method = {
   key: MealMethodAction
-  label: string
-  description: string
+  labelKey: string
+  descriptionKey: string
   Icon: LucideIcon
   accent?: boolean
 }
@@ -28,38 +30,41 @@ type Method = {
 const METHODS: Method[] = [
   {
     key: "track_voice_text",
-    label: "Voix ou texte",
-    description: "Saisie rapide",
+    labelKey: "meal.method.voiceText.label",
+    descriptionKey: "meal.method.voiceText.desc",
     Icon: Keyboard,
   },
   {
     key: "track_search",
-    label: "Recherche",
-    description: "Un aliment précis",
+    labelKey: "meal.method.search.label",
+    descriptionKey: "meal.method.search.desc",
     Icon: Search,
   },
   {
     key: "track_favorites",
-    label: "Favoris",
-    description: "Rejouer un repas",
+    labelKey: "meal.method.favorites.label",
+    descriptionKey: "meal.method.favorites.desc",
     Icon: Star,
   },
   {
     key: "track_categories",
-    label: "Catégories",
-    description: "Par familles d'aliments",
+    labelKey: "meal.method.categories.label",
+    descriptionKey: "meal.method.categories.desc",
     Icon: FileText,
   },
   {
     key: "compose_guide",
-    label: "Composer",
-    description: "Selon ce qu'il me reste",
+    labelKey: "meal.method.compose.label",
+    descriptionKey: "meal.method.compose.desc",
     Icon: Sparkles,
     accent: true,
   },
 ]
 
 export default function MealMethodSheet({ open, onClose, onSelect }: MealMethodSheetProps) {
+  const { t } = useClientT()
+  useBodyScrollLock(open)
+
   function handleSelect(action: MealMethodAction) {
     onSelect(action)
   }
@@ -78,7 +83,7 @@ export default function MealMethodSheet({ open, onClose, onSelect }: MealMethodS
 
           <motion.div
             className="fixed bottom-0 left-0 right-0 z-[90] rounded-t-2xl"
-            style={{ background: "#080808", maxHeight: "88vh", display: "flex", flexDirection: "column", paddingBottom: "max(env(safe-area-inset-bottom), 16px)" }}
+            style={{ background: "#080808", maxHeight: "88dvh", display: "flex", flexDirection: "column", paddingBottom: "16px" }}
             initial={{ y: "100%" }}
             animate={{ y: 0, transition: { type: "spring", stiffness: 300, damping: 30 } }}
             exit={{ y: "100%", transition: { duration: 0.2, ease: "easeIn" } }}
@@ -87,7 +92,7 @@ export default function MealMethodSheet({ open, onClose, onSelect }: MealMethodS
             <div className="relative flex items-center justify-between px-5 pt-5 pb-4 shrink-0">
               <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-white/[0.10]" />
               <p className="text-[15px] font-barlow-condensed font-bold uppercase tracking-[0.12em] text-white">
-                Repas
+                {t('meal.method.title')}
               </p>
               <button
                 onClick={onClose}
@@ -100,7 +105,7 @@ export default function MealMethodSheet({ open, onClose, onSelect }: MealMethodS
             {/* Grid 2×2 + Composer pleine largeur */}
             <div className="px-4 pb-4 flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-3">
-                {METHODS.filter(m => !m.accent).map(({ key, label, description, Icon }) => (
+                {METHODS.filter(m => !m.accent).map(({ key, labelKey, descriptionKey, Icon }) => (
                   <button
                     key={key}
                     onClick={() => handleSelect(key)}
@@ -110,39 +115,39 @@ export default function MealMethodSheet({ open, onClose, onSelect }: MealMethodS
                       <Icon size={18} className="text-white" />
                     </div>
                     <div>
-                      <div className="text-[14px] font-semibold text-white leading-tight">{label}</div>
-                      <div className="text-[11px] mt-0.5 text-white/40 leading-snug">{description}</div>
+                      <div className="text-[14px] font-semibold text-white leading-tight">{t(labelKey as never)}</div>
+                      <div className="text-[11px] mt-0.5 text-white/40 leading-snug">{t(descriptionKey as never)}</div>
                     </div>
                   </button>
                 ))}
               </div>
 
-              {/* Composer — pleine largeur, accent indigo */}
-              {METHODS.filter(m => m.accent).map(({ key, label, description, Icon }) => (
+              {/* Composer — pleine largeur, palette neutre */}
+              {METHODS.filter(m => m.accent).map(({ key, labelKey, descriptionKey, Icon }) => (
                 <button
                   key={key}
                   onClick={() => handleSelect(key)}
                   className="w-full rounded-2xl active:scale-[0.98] transition-transform text-left p-4 flex items-center gap-4"
                   style={{
-                    backgroundImage: 'radial-gradient(circle, rgba(129,140,248,0.10) 1px, transparent 1px)',
+                    backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)',
                     backgroundSize: '16px 16px',
-                    backgroundColor: 'rgba(129,140,248,0.12)',
+                    backgroundColor: 'rgba(255,255,255,0.05)',
                   }}
                 >
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-[#818cf8]/14 shrink-0">
-                    <Icon size={20} className="text-[#818cf8]" />
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-white/[0.08] shrink-0">
+                    <Icon size={20} className="text-white/82" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-[14px] font-semibold text-white leading-tight">{label}</span>
-                      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.18em] bg-[#818cf8]/12 text-[#818cf8]">
+                      <span className="text-[14px] font-semibold text-white leading-tight">{t(labelKey as never)}</span>
+                      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.18em] bg-white/[0.08] text-white/80">
                         <Sparkles size={9} />
                         Smart
                       </span>
                     </div>
-                    <div className="text-[11px] mt-0.5 text-white/50 leading-snug">{description}</div>
+                    <div className="text-[11px] mt-0.5 text-white/50 leading-snug">{t(descriptionKey as never)}</div>
                   </div>
-                  <div className="text-[#818cf8]/60 text-[12px]">→</div>
+                  <div className="text-white/35 text-[12px]">→</div>
                 </button>
               ))}
             </div>

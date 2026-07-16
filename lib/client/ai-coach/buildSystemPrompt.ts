@@ -4,6 +4,7 @@ import { resolveClientTimezone } from '@/lib/client/checkin/resolveClientTimezon
 import { utcRangeForPhysiologicalDate } from '@/lib/client/checkin/timeWindows'
 import { computeDailySignals } from '@/lib/client/ai-coach/chatSignals'
 import { resolveTone } from '@/lib/client/ai-coach/resolveTone'
+import { resolveClientLanguage } from '@/lib/client/resolve-language'
 
 function svc() {
   return createServiceClient(
@@ -51,7 +52,7 @@ export async function buildSystemPrompt(clientId: string): Promise<string> {
   const tdee         = profileData?.tdee          ?? 0
   const fitnessLevel = profileData?.fitness_level ?? 'intermédiaire'
   const coachId      = profileData?.coach_id      ?? null
-  const clientDisplayLang = (profileData?.display_lang ?? 'fr') as 'fr' | 'es' | 'en'
+  const clientDisplayLang = await resolveClientLanguage(db, clientId, profileData?.display_lang ?? 'fr')
 
   const [
     coachProfileResult,
@@ -71,7 +72,7 @@ export async function buildSystemPrompt(clientId: string): Promise<string> {
     plannedPrepsResult,
   ] = await Promise.allSettled([
     coachId
-      ? db.from('user_profiles').select('first_name, last_name').eq('id', coachId).single()
+      ? db.from('coach_profiles').select('full_name').eq('coach_id', coachId).maybeSingle()
       : Promise.resolve({ data: null }),
     db.from('nutrition_protocols')
       .select('name, nutrition_protocol_days(calories, protein_g, fat_g, carbs_g, hydration_ml)')
@@ -182,11 +183,7 @@ export async function buildSystemPrompt(clientId: string): Promise<string> {
 
   // ── Coach identity ─────────────────────────────────────────────────────────
   const coachProfile = coachProfileResult.status === 'fulfilled' ? (coachProfileResult.value as any)?.data : null
-  const coachFirstName = coachProfile?.first_name ?? null
-  const coachLastName  = coachProfile?.last_name  ?? null
-  const coachName = coachFirstName
-    ? [coachFirstName, coachLastName].filter(Boolean).join(' ')
-    : 'ton coach'
+  const coachName = coachProfile?.full_name?.trim() || 'ton coach'
 
   // ── Macros targets ────────────────────────────────────────────────────────
   const protocol = nutritionProtocol.status === 'fulfilled' ? nutritionProtocol.value.data : null

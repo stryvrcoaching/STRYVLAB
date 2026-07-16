@@ -4,6 +4,9 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { upsertProtocolUpdatedAnnotation } from '@/lib/nutrition/protocolAnnotations'
 import { closeNutritionProtocolAssignment } from '@/lib/assignments/clientAssignments'
+import { inferNutritionDayRole } from '@/lib/nutrition/day-role'
+import { createClientAppNotification } from '@/lib/notifications/create-client-app-notification'
+import { setClientTdeeAutoEnabled } from '@/lib/nutrition/tdee-state'
 
 function serviceClient() {
   return createServiceClient(
@@ -11,6 +14,23 @@ function serviceClient() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 }
+
+function isMissingNutritionProtocolDayRoleColumnError(error: { message?: string | null } | null | undefined) {
+  const message = String(error?.message ?? '').toLowerCase()
+  return (
+    message.includes("could not find the 'role' column") &&
+    message.includes('nutrition_protocol_days')
+  ) || (
+    message.includes('nutrition_protocol_days') &&
+    message.includes('schema cache') &&
+    message.includes('role')
+  )
+}
+
+const cycleSyncProfileSchema = z.object({
+  mode: z.enum(['conservative', 'standard', 'custom']).optional().default('standard'),
+  intensity_percent: z.number().int().min(25).max(125).optional().default(100),
+})
 
 async function resolveProtocol(coachId: string, clientId: string, protocolId: string) {
   const db = serviceClient()
@@ -74,6 +94,12 @@ const updateDaySchema = z.object({
     items: z.array(z.object({
       id: z.string().min(1).max(120),
       quantity_g: z.number().positive().max(10000),
+      cycle_adjustment: z.object({
+        locked: z.boolean().optional(),
+        priority: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+        min_quantity_g: z.number().min(1).max(10000).optional(),
+        max_quantity_g: z.number().min(1).max(10000).optional(),
+      }).optional(),
       food: z.object({
         id: z.string().uuid(),
         name_fr: z.string().min(1).max(240),
@@ -115,6 +141,7 @@ const updateSchema = z.object({
   notes: z.string().nullable().optional(),
   schedule_start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   cycle_sync_enabled: z.boolean().optional(),
+  cycle_sync_profile: cycleSyncProfileSchema.optional(),
   tdee_auto_enabled: z.boolean().optional(),
   tdee_adaptive_active: z.boolean().optional(),
   tdee_reference: z.number().int().positive().optional(),
@@ -149,83 +176,111 @@ export async function PATCH(
       body.data.notes !== undefined ||
       body.data.schedule_start_date !== undefined ||
       body.data.cycle_sync_enabled !== undefined ||
+      body.data.cycle_sync_profile !== undefined ||
       body.data.days !== undefined ||
       body.data.schedule_slots !== undefined
     )
 
-  if (body.data.name !== undefined || body.data.notes !== undefined || body.data.schedule_start_date !== undefined || body.data.cycle_sync_enabled !== undefined || body.data.tdee_auto_enabled !== undefined || body.data.tdee_adaptive_active !== undefined || body.data.tdee_reference !== undefined) {
+  if (body.data.name !== undefined || body.data.notes !== undefined || body.data.schedule_start_date !== undefined || body.data.cycle_sync_enabled !== undefined || body.data.cycle_sync_profile !== undefined || body.data.tdee_auto_enabled !== undefined || body.data.tdee_adaptive_active !== undefined || body.data.tdee_reference !== undefined) {
     const updates: Record<string, unknown> = {}
     if (body.data.name !== undefined) updates.name = body.data.name
     if (body.data.notes !== undefined) updates.notes = body.data.notes
     if (body.data.schedule_start_date !== undefined) updates.schedule_start_date = body.data.schedule_start_date
     if (body.data.cycle_sync_enabled !== undefined) updates.cycle_sync_enabled = body.data.cycle_sync_enabled
+    if (body.data.cycle_sync_profile !== undefined) updates.cycle_sync_profile = body.data.cycle_sync_profile
     if (body.data.tdee_auto_enabled !== undefined) updates.tdee_auto_enabled = body.data.tdee_auto_enabled
     if (body.data.tdee_adaptive_active !== undefined) updates.tdee_adaptive_active = body.data.tdee_adaptive_active
-    if (body.data.tdee_reference !== undefined) updates.tdee_reference = body.data.tdee_reference
-    await db.from('nutrition_protocols').update(updates).eq('id', protocolId)
+    if (body.data.tdee_reference !== undefined) {
+      updates.tdee_reference = body.data.tdee_reference
+      updates.tdee_snapshot_source = 'manual'
+      updates.tdee_snapshot_used_at = new Date().toISOString()
+    }
+    const { error } = await db.from('nutrition_protocols').update(updates).eq('id', protocolId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (body.data.tdee_auto_enabled !== undefined) {
+      await setClientTdeeAutoEnabled(db as any, clientId, body.data.tdee_auto_enabled)
+    }
   }
 
-    if (body.data.days !== undefined) {
-      const allDaysHaveIds =
-        body.data.days.length > 0 && body.data.days.every((d) => Boolean(d.id))
+  if (body.data.days !== undefined) {
+    const invalidDay = body.data.days.find((d) => !d.name || d.position === undefined)
+    if (invalidDay) {
+      return NextResponse.json(
+        { error: 'Each protocol day requires name and position.' },
+        { status: 400 },
+      )
+    }
 
-      if (allDaysHaveIds) {
-        for (const d of body.data.days) {
-          const updates: Record<string, unknown> = {}
+    const remainingExistingDayIds = new Set(
+      ((existing.days ?? []) as Array<{ id: string }>).map((day) => day.id),
+    )
 
-          if (d.name !== undefined) updates.name = d.name
-          if (d.position !== undefined) updates.position = d.position
-          if (d.calories !== undefined) updates.calories = d.calories
-          if (d.protein_g !== undefined) updates.protein_g = d.protein_g
-          if (d.carbs_g !== undefined) updates.carbs_g = d.carbs_g
-          if (d.fat_g !== undefined) updates.fat_g = d.fat_g
-          if (d.hydration_ml !== undefined) updates.hydration_ml = d.hydration_ml
-          if (d.role !== undefined) updates.role = d.role
-          if (d.carb_cycle_type !== undefined) updates.carb_cycle_type = d.carb_cycle_type
-          if (d.cycle_sync_phase !== undefined) updates.cycle_sync_phase = d.cycle_sync_phase
-          if (d.recommendations !== undefined) updates.recommendations = d.recommendations
-          if (d.meal_plan !== undefined) updates.meal_plan = d.meal_plan
+    for (const day of body.data.days) {
+      const payload = {
+        name: day.name!,
+        position: day.position!,
+        calories: day.calories ?? null,
+        protein_g: day.protein_g ?? null,
+        carbs_g: day.carbs_g ?? null,
+        fat_g: day.fat_g ?? null,
+        hydration_ml: day.hydration_ml ?? null,
+        role: day.role ?? 'neutral',
+        carb_cycle_type: day.carb_cycle_type ?? null,
+        cycle_sync_phase: day.cycle_sync_phase ?? null,
+        recommendations: day.recommendations ?? null,
+        meal_plan: day.meal_plan ?? [],
+      }
 
-          if (Object.keys(updates).length > 0) {
-            await db
-              .from('nutrition_protocol_days')
-              .update(updates)
-              .eq('protocol_id', protocolId)
-              .eq('id', d.id)
-          }
+      if (day.id) {
+        let { error } = await db
+          .from('nutrition_protocol_days')
+          .update(payload)
+          .eq('protocol_id', protocolId)
+          .eq('id', day.id)
+        if (error && isMissingNutritionProtocolDayRoleColumnError(error)) {
+          const { role, ...fallbackPayload } = payload
+          const fallbackResult = await db
+            .from('nutrition_protocol_days')
+            .update(fallbackPayload)
+            .eq('protocol_id', protocolId)
+            .eq('id', day.id)
+          error = fallbackResult.error
         }
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+        remainingExistingDayIds.delete(day.id)
       } else {
-        const invalidDay = body.data.days.find((d) => !d.name || d.position === undefined)
-
-        if (invalidDay) {
-          return NextResponse.json(
-            { error: 'Each protocol day requires name and position when replacing days.' },
-            { status: 400 },
-          )
+        let { error } = await db
+          .from('nutrition_protocol_days')
+          .insert({ protocol_id: protocolId, ...payload })
+        if (error && isMissingNutritionProtocolDayRoleColumnError(error)) {
+          const { role, ...fallbackPayload } = payload
+          const fallbackResult = await db
+            .from('nutrition_protocol_days')
+            .insert({ protocol_id: protocolId, ...fallbackPayload })
+          error = fallbackResult.error
         }
-
-        await db.from('nutrition_protocol_days').delete().eq('protocol_id', protocolId)
-        const daysToInsert = body.data.days.map(d => ({
-          protocol_id: protocolId,
-          name: d.name!,
-          position: d.position!,
-          calories: d.calories ?? null,
-          protein_g: d.protein_g ?? null,
-          carbs_g: d.carbs_g ?? null,
-          fat_g: d.fat_g ?? null,
-          hydration_ml: d.hydration_ml ?? null,
-          role: d.role ?? 'neutral',
-          carb_cycle_type: d.carb_cycle_type ?? null,
-          cycle_sync_phase: d.cycle_sync_phase ?? null,
-          recommendations: d.recommendations ?? null,
-          meal_plan: d.meal_plan ?? [],
-        }))
-        await db.from('nutrition_protocol_days').insert(daysToInsert)
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       }
     }
 
+    for (const dayId of Array.from(remainingExistingDayIds)) {
+      const { error } = await db
+        .from('nutrition_protocol_days')
+        .delete()
+        .eq('protocol_id', protocolId)
+        .eq('id', dayId)
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+  }
+
   if (body.data.schedule_slots !== undefined) {
-    await db.from('nutrition_protocol_schedule_slots').delete().eq('protocol_id', protocolId)
+    const { error: deleteSlotsError } = await db
+      .from('nutrition_protocol_schedule_slots')
+      .delete()
+      .eq('protocol_id', protocolId)
+    if (deleteSlotsError) {
+      return NextResponse.json({ error: deleteSlotsError.message }, { status: 500 })
+    }
     if (body.data.schedule_slots.length > 0) {
       const slotsToInsert = body.data.schedule_slots.map((slot) => ({
         protocol_id: protocolId,
@@ -233,7 +288,8 @@ export async function PATCH(
         dow: slot.dow,
         protocol_day_position: slot.protocol_day_position,
       }))
-      await db.from('nutrition_protocol_schedule_slots').insert(slotsToInsert)
+      const { error } = await db.from('nutrition_protocol_schedule_slots').insert(slotsToInsert)
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     }
   }
 
@@ -244,9 +300,26 @@ export async function PATCH(
       protocolId,
       protocolName: body.data.name ?? existing.name,
     })
+
+    await createClientAppNotification(db, {
+      clientId,
+      coachId: user.id,
+      type: 'program_updated',
+      copyKey: 'nutrition.updated',
+      actionUrl: '/client/nutrition',
+      pushKind: 'program',
+      pushTag: `stryv-nutrition-updated-${protocolId}`,
+      payload: { protocol_id: protocolId },
+    })
   }
 
   const updated = await resolveProtocol(user.id, clientId, protocolId)
+  if (updated?.days) {
+    updated.days = updated.days.map((day: any) => ({
+      ...day,
+      role: day.role ?? inferNutritionDayRole(day),
+    }))
+  }
   return NextResponse.json({ protocol: updated })
 }
 

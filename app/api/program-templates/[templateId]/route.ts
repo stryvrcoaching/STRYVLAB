@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { resolveStoredFrequency } from '@/lib/programs/frequency'
 
 function service() {
   return createServiceClient(
@@ -10,11 +11,11 @@ function service() {
 }
 
 const SELECT = `
-  id, name, description, goal, level, frequency, weeks, muscle_tags, notes, is_public, equipment_archetype, created_at,
+  id, name, description, goal, level, frequency, weeks, muscle_tags, notes, is_public, equipment_archetype, session_mode, volume_focus, created_at,
   coach_program_template_sessions (
     id, name, day_of_week, days_of_week, position, notes,
     coach_program_template_exercises (
-      id, name, sets, reps, rest_sec, rir, weight_increment_kg, notes, position, image_url, movement_pattern, equipment_required, primary_muscles, secondary_muscles, group_id, is_unilateral, set_prescriptions,
+      id, name, sets, reps, rest_sec, rir, target_rir, weight_increment_kg, notes, position, image_url, movement_pattern, equipment_required, primary_muscles, secondary_muscles, group_id, is_unilateral, set_prescriptions, superset_rest_mode, execution_type, target_hr_zone,
       plane, mechanic, unilateral, primary_muscle, primary_activation,
       secondary_muscles_detail, secondary_activations, stabilizers,
       joint_stress_spine, joint_stress_knee, joint_stress_shoulder,
@@ -49,7 +50,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (authError || !user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
   const body = await req.json()
-  const { name, description, goal, level, frequency, weeks, muscle_tags, notes, equipment_archetype, session_mode } = body
+  const { name, description, goal, level, frequency, weeks, muscle_tags, notes, equipment_archetype, session_mode, volume_focus } = body
 
   const db = service()
 
@@ -143,7 +144,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             group_id: e.group_id ?? null,
             weight_increment_kg: e.weight_increment_kg != null ? Number(e.weight_increment_kg) : null,
             is_unilateral: e.is_unilateral ?? false,
+            target_rir: e.target_rir ?? null,
             set_prescriptions: e.set_prescriptions ?? null,
+            superset_rest_mode: e.superset_rest_mode ?? 'after_round',
             // Biomech fields
             plane: e.plane ?? null,
             mechanic: e.mechanic ?? null,
@@ -160,6 +163,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             coordination_demand: e.coordination_demand != null ? Number(e.coordination_demand) : null,
             constraint_profile: e.constraint_profile ?? null,
             tempo: e.tempo ?? null,
+            execution_type: e.execution_type ?? 'reps_rir',
+            target_hr_zone: e.target_hr_zone ?? null,
           }
 
           if (existingExId) {
@@ -205,11 +210,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
   }
 
-  const effectiveFrequency = body.sessions?.length ?? frequency
+  const effectiveFrequency = resolveStoredFrequency(body.sessions ?? [], frequency ?? null)
 
   const { data, error } = await db
     .from('coach_program_templates')
-    .update({ name, description, goal, level, frequency: effectiveFrequency, weeks, muscle_tags, notes, equipment_archetype: equipment_archetype || null, session_mode: session_mode ?? 'day' })
+    .update({ name, description, goal, level, frequency: effectiveFrequency, weeks, muscle_tags, notes, equipment_archetype: equipment_archetype || null, session_mode: session_mode ?? 'day', volume_focus: volume_focus ?? {} })
     .eq('id', params.templateId)
     .eq('coach_id', user.id)
     .select(SELECT)
@@ -245,9 +250,11 @@ export async function POST(_req: NextRequest, { params }: Params) {
   const { data: source } = await db.from('coach_program_templates').select(SELECT).eq('id', params.templateId).or(`coach_id.eq.${user.id},is_system.eq.true`).single()
   if (!source) return NextResponse.json({ error: 'Introuvable' }, { status: 404 })
 
+  const computedTemplateFrequency = resolveStoredFrequency((source.coach_program_template_sessions as any[]) ?? [], source.frequency ?? null)
+
   const { data: copy } = await db
     .from('coach_program_templates')
-    .insert({ coach_id: user.id, name: `${source.name} (copie)`, description: source.description, goal: source.goal, level: source.level, frequency: source.frequency, weeks: source.weeks, muscle_tags: source.muscle_tags, notes: source.notes, equipment_archetype: (source as any).equipment_archetype ?? null })
+    .insert({ coach_id: user.id, name: `${source.name} (copie)`, description: source.description, goal: source.goal, level: source.level, frequency: computedTemplateFrequency, weeks: source.weeks, muscle_tags: source.muscle_tags, notes: source.notes, equipment_archetype: (source as any).equipment_archetype ?? null, session_mode: (source as any).session_mode ?? 'day', volume_focus: (source as any).volume_focus ?? {} })
     .select('id')
     .single()
 
@@ -278,7 +285,11 @@ export async function POST(_req: NextRequest, { params }: Params) {
           group_id: e.group_id ?? null,
           weight_increment_kg: e.weight_increment_kg != null ? Number(e.weight_increment_kg) : null,
           is_unilateral: e.is_unilateral ?? false,
+          target_rir: e.target_rir ?? e.rir ?? null,
           set_prescriptions: e.set_prescriptions ?? null,
+          superset_rest_mode: e.superset_rest_mode ?? 'after_round',
+          execution_type: e.execution_type ?? 'reps_rir',
+          target_hr_zone: e.target_hr_zone ?? null,
           // Biomech fields
           plane: e.plane ?? null,
           mechanic: e.mechanic ?? null,

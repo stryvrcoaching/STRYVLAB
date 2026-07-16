@@ -1,5 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { shouldProactiveInitNow } from '@/lib/client/checkin/checkinEngine'
+import { createCheckinAvailability } from '@/lib/client/checkin/pendingCheckins'
+import {
+  hasPendingInteractivePrompt,
+  hasPendingInteractivePromptForFlow,
+} from '@/lib/client/checkin/initMessages'
 import {
   addDaysToDateKey,
   computePhysiologicalDateInTimezone,
@@ -9,6 +14,8 @@ import {
 } from '@/lib/client/checkin/timeWindows'
 import { evaluateClientPatterns } from '@/lib/client/ai-coach/patternDetector'
 import { buildRoutineMessage } from '@/lib/client/ai-coach/routineMessages'
+import { filterSessionsForJsWeekday } from '@/lib/client/plannedSessions'
+import { resolveClientLanguage } from '@/lib/client/resolve-language'
 
 type AiRoutineSettings = {
   ai_llm_enabled?: boolean | null
@@ -120,7 +127,7 @@ export async function runChatCheckinInitForFlow(
 
   const { data: schedules } = await db
     .from('daily_checkin_schedules')
-    .select('client_id, timezone')
+    .select('client_id, moment, scheduled_time, timezone')
 
   const [{ data: coachProfiles }, { data: clientSettings }] = await Promise.all([
     coachIds.length > 0
@@ -143,6 +150,11 @@ export async function runChatCheckinInitForFlow(
 
   const tzByClient = new Map(
     (schedules ?? []).map(s => [s.client_id as string, (s.timezone as string) || 'Europe/Paris']),
+  )
+  const scheduledTimeByClient = new Map(
+    (schedules ?? [])
+      .filter((schedule) => schedule.moment === flow)
+      .map((schedule) => [schedule.client_id as string, String(schedule.scheduled_time).slice(0, 5)]),
   )
   const globalAiByCoach = new Map(
     (coachProfiles ?? []).map((row) => [row.coach_id as string, Boolean(row.has_ai_llm)]),
@@ -175,9 +187,18 @@ export async function runChatCheckinInitForFlow(
     )
 
     const timezone = tzByClient.get(client.id) ?? 'Europe/Paris'
-    const isEligibleTime = flow === 'morning'
-      ? isLocalTimeInRange(now, timezone, 6, 0, 7, 0)
-      : isLocalTimeNear(now, timezone, targetHour, targetMinute)
+    const scheduled = scheduledTimeByClient.get(client.id)
+    const [scheduledHour, scheduledMinute] = (scheduled ?? `${String(targetHour).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')}`)
+      .split(':')
+      .map(Number)
+    const isEligibleTime = isLocalTimeInRange(
+      now,
+      timezone,
+      scheduledHour,
+      scheduledMinute,
+      scheduledHour + 1,
+      scheduledMinute,
+    )
 
     if (!isEligibleTime) {
       noteSkip('outside_time_window')
@@ -189,7 +210,7 @@ export async function runChatCheckinInitForFlow(
     const routineDayRange = utcRangeForPhysiologicalDate(today, timezone)
     const localWeekday = getLocalWeekday(now, timezone)
 
-    const [{ data: checkin }, { data: existing }, { data: checkinRows }, { data: todaySessions }] = await Promise.all([
+    const [{ data: checkin }, { data: existing }, { data: checkinRows }, { data: todaySessions }, { data: recentInteractiveMessages }] = await Promise.all([
       db.from('client_daily_checkins')
         .select('id')
         .eq('client_id', client.id)
@@ -210,12 +231,25 @@ export async function runChatCheckinInitForFlow(
       db.from('program_sessions')
         .select('name, day_of_week, days_of_week, programs!inner(status, client_id)')
         .eq('programs.client_id', client.id)
-        .eq('programs.status', 'active')
-        .or(`day_of_week.eq.${localWeekday},days_of_week.cs.{${localWeekday}}`),
+        .eq('programs.status', 'active'),
+      db.from('chat_messages')
+        .select('metadata')
+        .eq('client_id', client.id)
+        .eq('role', 'assistant')
+        .is('archived_at', null)
+        .gte('created_at', routineDayRange.start.toISOString()),
     ])
 
     if (existing) {
       noteSkip('existing_init_message')
+      continue
+    }
+
+    if (hasPendingInteractivePromptForFlow(
+      ((recentInteractiveMessages ?? []) as Array<{ metadata?: Record<string, unknown> | null }>),
+      flow,
+    )) {
+      noteSkip('pending_interactive_prompt')
       continue
     }
 
@@ -225,13 +259,19 @@ export async function runChatCheckinInitForFlow(
       completed_at: 'done',
     }))
     const checkinConfig = checkinConfigByClient.get(client.id)
+    const availability = createCheckinAvailability(
+      checkinConfig,
+      (schedules ?? [])
+        .filter((schedule) => schedule.client_id === client.id)
+        .map((schedule) => ({ moment: String(schedule.moment), scheduled_time: String(schedule.scheduled_time) })),
+    )
     const checkinMoment = (checkinConfig?.moments ?? [])
       .find((moment) => moment.moment === flow)
     const isCheckinConfiguredToday = isCheckinMomentConfiguredToday(checkinConfig, flow, localWeekday)
     const shouldPromptCheckin = Boolean(
       !checkin
       && isCheckinConfiguredToday
-      && shouldProactiveInitNow(now, timezone, flow, sessionRows),
+      && shouldProactiveInitNow(now, timezone, flow, sessionRows, availability),
     )
 
     if (!shouldInsertAutomatedInit(routineAllowed, shouldPromptCheckin)) {
@@ -239,14 +279,19 @@ export async function runChatCheckinInitForFlow(
       continue
     }
 
-    const sessionList = (todaySessions ?? []) as Array<{
-      name?: string | null
-      day_of_week?: number | null
-      days_of_week?: number[] | null
-    }>
+    const sessionList = filterSessionsForJsWeekday(
+      (todaySessions ?? []) as Array<{
+        name?: string | null
+        day_of_week?: number | null
+        days_of_week?: number[] | null
+      }>,
+      localWeekday,
+    )
     const primarySessionName = sessionList[0]?.name ?? null
+    const lang = await resolveClientLanguage(db, client.id)
     const routine = buildRoutineMessage({
       flowType: flow,
+      lang,
       firstName: client.first_name,
       tone: settingsByClient.get(clientSettingsKey)?.ai_tone ?? null,
       hasTrainingToday: sessionList.length > 0,
@@ -272,7 +317,7 @@ export async function runChatCheckinInitForFlow(
     inserted++
 
     const pattern = await evaluateClientPatterns(client.id, db)
-    if (pattern && insertedMsg) {
+    if (pattern && insertedMsg && !hasPendingInteractivePrompt([{ metadata: routine.metadata as Record<string, unknown> | null }])) {
       await db.from('chat_messages').insert({
         client_id: client.id,
         role: 'assistant',

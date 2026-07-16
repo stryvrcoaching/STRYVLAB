@@ -1,0 +1,34 @@
+exercise_id,name,pattern,plane,mechanic,unilateral,primary_muscle,primary_activation,secondary_muscles,secondary_activations,stabilizers,joint_stress_spine,joint_stress_knee,joint_stress_shoulder,global_instability,coordination_demand,constraint_profile
+CAR-001,Rameur,cardio,sagittal,compound,false,cardio,1.0,,,core,2,2,2,2,3,rowing_machine
+CAR-002,Stepper,cardio,sagittal,compound,false,cardio,1.0,,,ankle,1,2,1,1,2,stepper_machine
+CAR-003,Tapis-de-course-inclinaison,cardio,sagittal,compound,false,cardio,1.0,,,core,2,3,1,3,3,incline_treadmill
+CAR-004,Velo-elliptique,cardio,sagittal,compound,false,cardio,1.0,,,core,1,1,1,1,2,elliptical_machine
+CAR-005,Velo-stationnaire,cardio,sagittal,compound,false,cardio,1.0,,,core,1,2,1,1,2,stationary_bike
+CAR-006,Sauts écartés (hommes),cardio,sagittal,compound,false,cardio,0.8,glutes|hamstrings|quads|core,0.2|0.2|0.3|0.15,core,2,3,1,5,6,bodyweight_basic
+CAR-007,Pas en avant et en arrière,locomotion,sagittal,compound,false,quadriceps,0.7,glutes|hamstrings|core,0.2|0.2|0.15,core,2,3,1,4,5,bodyweight_basic
+CAR-008,Rampement de l'ours,core_stability,transverse,compound,true,core_global,0.75,shoulders|glutes|hamstrings,0.2|0.15|0.1,core|shoulders,2,1,3,6,7,bodyweight_basic
+CAR-009,Burpee,complex_stability,sagittal,compound,false,cardio,0.9,glutes|quads|pectoralis_major|core,0.25|0.2|0.15|0.1,core|shoulders,2,4,3,5,6,bodyweight_basic
+CAR-010,Burpee avec haltères,cardio,sagittal,compound,false,core,0.8,quadriceps|pectoralis_major|triceps_brachii,0.2|0.25|0.15,core|shoulders,3,2,3,6,7,bodyweight_basic
+CAR-011,Demi flexions de genoux (homme),squat,sagittal,compound,false,quadriceps,0.6,glutes|core,0.25|0.15,core,2,2,1,4,5,bodyweight_basic
+CAR-012,Genoux hauts contre le mur,cardio,sagittal,compound,false,core,0.7,hip_flexors|quads,0.2|0.15,core,2,2,1,4,6,bodyweight_basic
+CAR-013,Burpee jumping jack,cardio,sagittal,compound,false,core,0.8,quadriceps|pectoralis_major,0.25|0.2,core|shoulders,3,2,3,7,8,bodyweight_basic
+CAR-014,Saut de jack (homme),cardio,sagittal,compound,false,core,0.6,quadriceps|shoulders,0.2|0.15,core,2,2,2,5,6,bodyweight_basic
+CAR-015,Saut à la corde,cardio,sagittal,compound,false,cardio,0.7,glutes|quads,0.15|0.1,core,2,2,1,4,7,rope
+CAR-016,Poussée pour courir,cardio,sagittal,compound,false,pectoralis_major,0.8,core|quadriceps,0.25|0.15,core,3,2,4,6,7,bodyweight_basic
+CAR-017,Course,cardio,sagittal,compound,false,cardio,0.6,hip_flexors|quads,0.2|0.2,core,2,2,1,5,5,bodyweight_basic
+CAR-018,Course (équipement),cardio,sagittal,compound,false,cardio,0.6,hip_flexors|quads,0.2|0.2,core,2,2,1,5,5,bodyweight_basic
+CAR-019,Sauts ciseaux (homme),cardio,sagittal,compound,false,core,0.65,glutes|quads,0.2|0.15,core,2,3,1,6,7,bodyweight_basic
+CAR-020,Saut semi squat (homme),squat_jump,sagittal,compound,false,quadriceps,0.75,glutes|calves,0.2|0.1,core,3,3,1,6,6,bodyweight_basic
+CAR-021,Course à foulées courtes,cardio,sagittal,compound,false,cardio,0.6,hip_flexors|quads,0.2|0.15,core,2,2,1,5,5,bodyweight_basic
+CAR-022,Sauts de patineur,cardio,sagittal,compound,true,core,0.6,glutes|quads,0.2|0.15,core,2,2,1,6,7,bodyweight_basic
+CAR-023,Pas de ski,cardio,sagittal,compound,true,core,0.6,glutes|quads,0.2|0.15,core,2,2,1,6,7,bodyweight_basic
+CAR-024,Saut étoile (homme),cardio,frontal,compound,false,cardio,0.7,,,core,1,2,1,5,6,bodyweight_basic
+CAR-025,Course sur vélo stationnaire v. 3,cardio,sagittal,compound,false,cardio,0.6,quads|hamstrings|glutes,0.2|0.15|0.2,core,1,2,1,3,4,machine_stability
+CAR-026,Marche sur vélo stationnaire,cardio,sagittal,compound,false,cardio,0.6,quads|hamstrings|glutes,0.15|0.1|0.15,core,1,2,1,3,4,machine_stability
+CAR-027,Balançoire 360,cardio,transverse,compound,false,cardio,0.65,core,0.3,core,2,1,1,4,7,bodyweight_basic
+CAR-028,Marche sur vélo elliptique,cardio,sagittal,compound,false,cardio,0.6,quads|glutes,0.2|0.15,core,1,2,1,3,4,machine_stability
+CAR-029,Fente avec genoux haut en marchant,hip_hinge,sagittal,compound,true,glutes,0.8,hamstrings|quads,0.25|0.2,core,2,2,1,5,6,bodyweight_basic
+CAR-030,Marche sur tapis roulant incliné,cardio,sagittal,compound,false,cardio,0.6,quads|glutes,0.15|0.15,core,1,2,1,3,4,machine_stability
+CAR-031,Marche sur stepmill,cardio,sagittal,compound,false,cardio,0.6,quads|glutes,0.2|0.15,core,1,2,1,3,4,machine_stability
+CAR-032,Course avec roue,core_anti_extension,sagittal,compound,false,core,0.75,shoulders,0.25,core,2,1,2,6,6,bodyweight_basic
+CAR-033,Burpee avec haltères,cardio,sagittal,compound,false,cardio,0.8,glutes|hamstrings,0.2|0.15,core,4,3,4,5,7,free_weight_complex

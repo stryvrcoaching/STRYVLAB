@@ -2,15 +2,19 @@
 
 import { useState, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Save, ChevronLeft } from "lucide-react";
+import { Save, ChevronLeft, ChevronRight, Eye, Settings2 } from "lucide-react";
 import {
   BlockConfig,
   AssessmentTemplate,
+  ResponseMap,
   TemplateType,
 } from "@/types/assessment";
 import { AssessmentModule } from "@/types/assessment";
 import { createDefaultBlock } from "@/lib/assessments/modules";
+import { evaluateCondition } from "@/lib/assessments/condition";
 import { useSetTopBar } from "@/components/layout/useSetTopBar";
+import HeaderIconButton from "@/components/layout/HeaderIconButton";
+import MetricField from "@/components/assessments/form/MetricField";
 import BlockPalette from "./BlockPalette";
 import BlockCard from "./BlockCard";
 
@@ -25,8 +29,141 @@ const TEMPLATE_TYPES: { value: TemplateType; label: string }[] = [
   { value: "custom", label: "Personnalisé" },
 ];
 
+type BuilderMode = "builder" | "preview";
+
+function ClientPreview({
+  blocks,
+  name,
+  description,
+}: {
+  blocks: BlockConfig[];
+  name: string;
+  description: string;
+}) {
+  const [currentBlock, setCurrentBlock] = useState(0);
+  const [responses, setResponses] = useState<ResponseMap>({});
+
+  const block = blocks[currentBlock] ?? null;
+
+  function setValue(
+    blockId: string,
+    fieldKey: string,
+    value: string | number | string[] | boolean,
+  ) {
+    setResponses((prev) => ({
+      ...prev,
+      [blockId]: { ...(prev[blockId] ?? {}), [fieldKey]: value },
+    }));
+  }
+
+  if (!block) {
+    return (
+      <div className="flex min-h-[420px] items-center justify-center rounded-[28px] border border-white/[0.06] bg-[#111111] text-center">
+        <div>
+          <p className="text-[14px] font-semibold text-white">Aucun bloc à prévisualiser</p>
+          <p className="mt-2 text-[12px] text-white/45">
+            Ajoute d'abord un module pour voir le rendu client.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const visibleFields = block.fields.filter(
+    (field) => field.visible && evaluateCondition(field.show_if, responses),
+  );
+
+  return (
+    <div className="rounded-[30px] border border-white/[0.06] bg-[#111111] shadow-[0_18px_44px_rgba(0,0,0,0.2)]">
+      <div className="border-b border-white/[0.06] px-5 py-4 sm:px-6">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/28">
+              Aperçu client
+            </p>
+            <h3 className="mt-1 text-[18px] font-semibold text-white">
+              {name || "Nouveau template"}
+            </h3>
+            {description ? (
+              <p className="mt-1 text-[12px] leading-relaxed text-white/48">
+                {description}
+              </p>
+            ) : null}
+          </div>
+          <div className="rounded-full bg-white/[0.04] px-3 py-2 text-[11px] font-semibold text-white/72">
+            {currentBlock + 1} / {blocks.length}
+          </div>
+        </div>
+        <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.04]">
+          <div
+            className="h-full rounded-full bg-[#1f8a65] transition-all duration-300"
+            style={{ width: `${((currentBlock + 1) / blocks.length) * 100}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="px-5 py-5 sm:px-6 sm:py-6">
+        <div className="rounded-[24px] border border-white/[0.05] bg-[#0d0d0d] p-5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/30">
+            Bloc en cours
+          </p>
+          <h4 className="mt-2 text-[20px] font-semibold text-white">
+            {block.label}
+          </h4>
+
+          <div className="mt-6 flex flex-col gap-6">
+            {visibleFields.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.02] px-4 py-6 text-center">
+                <p className="text-[12px] font-medium text-white/68">
+                  Aucun champ visible dans ce bloc
+                </p>
+                <p className="mt-1 text-[11px] text-white/42">
+                  Vérifie les champs masqués ou les conditions d'affichage.
+                </p>
+              </div>
+            ) : (
+              visibleFields.map((field) => (
+                <MetricField
+                  key={field.key}
+                  field={field}
+                  value={responses[block.id]?.[field.key]}
+                  onChange={(value) => setValue(block.id, field.key, value)}
+                  previewMode
+                />
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setCurrentBlock((value) => Math.max(0, value - 1))}
+            disabled={currentBlock === 0}
+            className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-2.5 text-[12px] font-semibold text-white/72 transition-colors hover:bg-white/[0.05] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            Précédent
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setCurrentBlock((value) => Math.min(blocks.length - 1, value + 1))
+            }
+            disabled={currentBlock === blocks.length - 1}
+            className="inline-flex items-center gap-2 rounded-xl bg-[#1f8a65] px-4 py-2.5 text-[12px] font-bold text-white transition-colors hover:bg-[#217356] disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            Suivant
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TemplateBuilder({ initialTemplate }: Props) {
   const router = useRouter();
+  const [mode, setMode] = useState<BuilderMode>("builder");
   const [name, setName] = useState(initialTemplate?.name ?? "");
   const [description, setDescription] = useState(
     initialTemplate?.description ?? "",
@@ -161,14 +298,13 @@ export default function TemplateBuilder({ initialTemplate }: Props) {
         {error && (
           <p className="text-[11px] text-red-500 font-medium">{error}</p>
         )}
-        <button
+        <HeaderIconButton
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 bg-[#1f8a65] text-white text-[12px] font-bold uppercase tracking-[0.12em] px-4 h-8 rounded-lg hover:bg-[#217356] transition-colors disabled:opacity-50 active:scale-[0.99]"
-        >
-          <Save size={14} />
-          {saving ? "Sauvegarde…" : "Sauvegarder"}
-        </button>
+          icon={<Save size={14} />}
+          label={saving ? "Sauvegarde en cours" : "Sauvegarder"}
+          variant="accent"
+        />
       </div>
     ),
     [error, saving, handleSave],
@@ -194,6 +330,33 @@ export default function TemplateBuilder({ initialTemplate }: Props) {
 
         {/* Toolbar */}
         <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-1 rounded-xl border border-white/[0.06] bg-white/[0.02] p-1">
+            <button
+              type="button"
+              onClick={() => setMode("builder")}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold transition-colors ${
+                mode === "builder"
+                  ? "bg-[#1f8a65]/12 text-[#8ef0c7]"
+                  : "text-white/42 hover:text-white hover:bg-white/[0.05]"
+              }`}
+            >
+              <Settings2 size={13} />
+              Builder
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("preview")}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold transition-colors ${
+                mode === "preview"
+                  ? "bg-[#1f8a65]/12 text-[#8ef0c7]"
+                  : "text-white/42 hover:text-white hover:bg-white/[0.05]"
+              }`}
+            >
+              <Eye size={13} />
+              Aperçu client
+            </button>
+          </div>
+
           <div className="flex flex-col gap-2 flex-1 min-w-[200px]">
             <label className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">
               Type
@@ -236,37 +399,47 @@ export default function TemplateBuilder({ initialTemplate }: Props) {
       </div>
 
       {/* Body */}
-      <div className="max-w-5xl mx-auto px-6 py-8 flex gap-8">
-        <BlockPalette usedModules={usedModules} onAdd={addBlock} />
+      <div className="max-w-5xl mx-auto px-6 py-8">
+        {mode === "builder" ? (
+          <div className="flex gap-8">
+            <BlockPalette usedModules={usedModules} onAdd={addBlock} />
 
-        <div className="flex-1 flex flex-col gap-3">
-          {blocks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 rounded-2xl bg-white/[0.03] text-white/60 text-[12px]">
-              <p className="font-semibold mb-1">Aucun bloc ajouté</p>
-              <p className="text-[10px] text-white/40">
-                Cliquez sur un module à gauche pour l'ajouter
-              </p>
+            <div className="flex-1 flex flex-col gap-3">
+              {blocks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-64 rounded-2xl bg-white/[0.03] text-white/60 text-[12px]">
+                  <p className="font-semibold mb-1">Aucun bloc ajouté</p>
+                  <p className="text-[10px] text-white/40">
+                    Cliquez sur un module à gauche pour l'ajouter
+                  </p>
+                </div>
+              ) : (
+                blocks.map((block, i) => (
+                  <BlockCard
+                    key={block.id}
+                    block={block}
+                    index={i}
+                    total={blocks.length}
+                    onDelete={() => deleteBlock(i)}
+                    onUpdate={(b) => updateBlock(i, b)}
+                    onDragStart={(idx) => {
+                      dragFrom.current = idx;
+                    }}
+                    onDragOver={(idx) => {
+                      dragOver.current = idx;
+                    }}
+                    onDrop={handleDrop}
+                  />
+                ))
+              )}
             </div>
-          ) : (
-            blocks.map((block, i) => (
-              <BlockCard
-                key={block.id}
-                block={block}
-                index={i}
-                total={blocks.length}
-                onDelete={() => deleteBlock(i)}
-                onUpdate={(b) => updateBlock(i, b)}
-                onDragStart={(idx) => {
-                  dragFrom.current = idx;
-                }}
-                onDragOver={(idx) => {
-                  dragOver.current = idx;
-                }}
-                onDrop={handleDrop}
-              />
-            ))
-          )}
-        </div>
+          </div>
+        ) : (
+          <ClientPreview
+            blocks={blocks}
+            name={name}
+            description={description}
+          />
+        )}
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import {
   type RecoveryAlert,
   type CheckinData,
 } from '@/lib/client/smart/recoveryAlerts'
+import { useClientT } from '@/components/client/ClientI18nProvider'
 
 export type RecoveryStatusWidgetProps = {
   morningCheckin: CheckinData | null
@@ -17,6 +18,7 @@ export default function RecoveryStatusWidget({
   morningCheckin,
   plannedSessionToday,
 }: RecoveryStatusWidgetProps) {
+  const { t } = useClientT()
   const [alerts, setAlerts] = useState<RecoveryAlert[]>([])
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
@@ -113,7 +115,7 @@ export default function RecoveryStatusWidget({
           <button
             onClick={() => handleDismiss(alert.id)}
             className="absolute top-2 right-2 p-1 hover:bg-white/[0.06] rounded-lg transition-colors"
-            aria-label="Dismiss alert"
+            aria-label={t('deload.banner.dismiss')}
           >
             <X size={14} className="text-white/40 hover:text-white/60" />
           </button>

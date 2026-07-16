@@ -3,6 +3,10 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { stripe } from '@/lib/stripe/client'
 import { sendPaymentReceiptEmail } from '@/lib/email/mailer'
 import Stripe from 'stripe'
+import {
+  beginStripeWebhookProcessing,
+  finishStripeWebhookProcessing,
+} from '@/lib/security/stripe-webhook-idempotency'
 
 // Disable body parsing — Stripe requires raw body for signature verification
 export const runtime = 'nodejs'
@@ -13,9 +17,6 @@ function db() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 }
-
-const WEBHOOK_SECRET = process.env.STRIPE_COACHING_WEBHOOK_SECRET
-  ?? process.env.STRIPE_WEBHOOK_SECRET!
 
 /**
  * POST /api/stripe/coaching/webhook
@@ -35,12 +36,18 @@ const WEBHOOK_SECRET = process.env.STRIPE_COACHING_WEBHOOK_SECRET
  *   → sync statut abonnement (cancelled / paused / active)
  */
 export async function POST(req: NextRequest) {
+  const webhookSecret = process.env.STRIPE_COACHING_WEBHOOK_SECRET
+  if (!webhookSecret) {
+    return NextResponse.json({ error: 'Webhook non configuré' }, { status: 503 })
+  }
+
   const body = await req.text()
-  const sig  = req.headers.get('stripe-signature')!
+  const sig = req.headers.get('stripe-signature')
+  if (!sig) return NextResponse.json({ error: 'Signature absente' }, { status: 400 })
 
   let event: Stripe.Event
   try {
-    event = stripe.webhooks.constructEvent(body, sig, WEBHOOK_SECRET)
+    event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     console.error('⚠️ Coaching webhook signature failed:', msg)
@@ -48,6 +55,8 @@ export async function POST(req: NextRequest) {
   }
 
   const service = db()
+  const shouldProcess = await beginStripeWebhookProcessing(service, event)
+  if (!shouldProcess) return NextResponse.json({ received: true })
 
   try {
     switch (event.type) {
@@ -224,9 +233,16 @@ export async function POST(req: NextRequest) {
     }
   } catch (err) {
     console.error('Coaching webhook processing error:', err)
+    await finishStripeWebhookProcessing({
+      db: service,
+      eventId: event.id,
+      status: 'failed',
+      processingError: err instanceof Error ? err.message : 'Unknown error',
+    })
     return NextResponse.json({ error: 'Processing error' }, { status: 500 })
   }
 
+  await finishStripeWebhookProcessing({ db: service, eventId: event.id, status: 'processed' })
   return NextResponse.json({ received: true })
 }
 

@@ -53,7 +53,7 @@ export default async function ClientHomePage() {
     user.id,
     user.email,
     db,
-    "id, first_name, coach_id, timezone, profile_photo_url, training_goal, transformation_phase, created_at, step_target"
+    "id, first_name, coach_id, timezone, profile_photo_url, training_goal, transformation_phase, created_at, step_target, gender"
   )
 
   if (!client) {
@@ -69,6 +69,10 @@ export default async function ClientHomePage() {
       redirect("/client/login")
     }
   }
+
+  const timezone = (client as any)?.timezone || "Europe/Paris"
+  const todayPhysio = computePhysiologicalDateInTimezone(new Date(), timezone)
+  const { start: todayStartUtc } = utcRangeForPhysiologicalDate(todayPhysio, timezone)
 
   try {
     const coachId = (client as any)?.coach_id as string | null | undefined
@@ -89,11 +93,11 @@ export default async function ClientHomePage() {
               STRYVR
             </p>
             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white">
-              Espace client non active
+              Espace client indisponible
             </h1>
             <p className="mt-3 text-sm leading-6 text-white/65">
-              L’espace client n’est pas active pour ce suivi. Contactez votre coach pour activer
-              l’experience STRYVR.
+              L’espace client n’est pas actif pour ce suivi. Contactez votre coach pour activer
+              l’expérience STRYVR.
             </p>
           </div>
         </div>
@@ -103,9 +107,12 @@ export default async function ClientHomePage() {
     throw error
   }
 
-  const [todayStrip, notifications, submissionsRes, coachProfileRes] = await Promise.all([
+  const [todayStrip, notifications, submissionsRes, coachProfileRes, streakRes, progressionRes, walletRes, nextAppointmentRes] = await Promise.all([
     buildChatTodayStrip(db, (client as any)?.id as string),
-    listClientNotificationItems(db, user.id, (client as any)?.id as string, false),
+    listClientNotificationItems(db, user.id, (client as any)?.id as string, false, {
+      includeLegacy: false,
+      createdAfter: todayStartUtc.toISOString(),
+    }),
     db
       .from("assessment_responses")
       .select("id, template_snapshot, status, created_at, submitted_at, token, token_expires_at")
@@ -117,11 +124,34 @@ export default async function ClientHomePage() {
       .select("full_name, logo_url")
       .eq("coach_id", (client as any)?.coach_id as string)
       .maybeSingle(),
+    db
+      .from("client_streaks")
+      .select("current_streak, longest_streak")
+      .eq("client_id", (client as any)?.id as string)
+      .maybeSingle(),
+    db
+      .from("client_progression_profiles")
+      .select("total_points, level")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    db
+      .from("client_reward_wallets")
+      .select("earned_points, spent_points")
+      .eq("client_id", (client as any)?.id as string)
+      .eq("coach_id", (client as any)?.coach_id as string)
+      .maybeSingle(),
+    db
+      .from("coaching_appointments")
+      .select("id, title, starts_at, ends_at, client_timezone, meeting_kind, meeting_url, status")
+      .eq("client_id", (client as any)?.id as string)
+      .gte("starts_at", new Date().toISOString())
+      .lte("starts_at", new Date(Date.now() + 14 * 24 * 3600_000).toISOString())
+      .not("status", "in", '("cancelled")')
+      .order("starts_at", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
   ])
 
-  const now = new Date()
-  const timezone = (client as any)?.timezone || "Europe/Paris"
-  const todayPhysio = computePhysiologicalDateInTimezone(now, timezone)
   const startPhysio = addDaysToDateKey(todayPhysio, -6)
   const { start: startUtc } = utcRangeForPhysiologicalDate(startPhysio, timezone)
   const { end: endUtc } = utcRangeForPhysiologicalDate(todayPhysio, timezone)
@@ -229,6 +259,19 @@ export default async function ClientHomePage() {
       token: submission.token as string | null,
     }))
 
+  const legacyStreak = (streakRes as any)?.data
+  const progression = (progressionRes as any)?.data
+  const wallet = (walletRes as any)?.data
+  const dashboardProgression = progression
+    ? {
+        current_streak: legacyStreak?.current_streak ?? 0,
+        longest_streak: legacyStreak?.longest_streak ?? 0,
+        total_points: Number(progression.total_points) || 0,
+        available_points: Math.max(0, (Number(wallet?.earned_points) || 0) - (Number(wallet?.spent_points) || 0)),
+        level: progression.level,
+      }
+    : legacyStreak ?? null
+
   return (
     <ClientDashboard
       clientId={(client as any)?.id as string}
@@ -237,17 +280,21 @@ export default async function ClientHomePage() {
       clientGoal={(client as any)?.training_goal ?? null}
       clientPhase={(client as any)?.transformation_phase ?? null}
       clientCreatedAt={(client as any)?.created_at ?? null}
+      clientGender={(client as any)?.gender ?? "male"}
       lang={lang}
       todayStrip={todayStrip}
       notifications={notifications}
       assessments={{ pending, recent }}
       coach={{
         fullName: (coachProfileRes as any)?.data?.full_name ?? null,
+        avatarUrl: (coachProfileRes as any)?.data?.logo_url ?? null,
       }}
       weeklyStepAvg={weeklyStepAvg}
       stepTarget={(client as any)?.step_target ?? null}
       weeklyCalorieAvg={weeklyCalorieAvg}
       weeklyVolume={weeklyVolume}
+      streak={dashboardProgression}
+      nextAppointment={(nextAppointmentRes as any)?.data ?? null}
     />
   )
 }

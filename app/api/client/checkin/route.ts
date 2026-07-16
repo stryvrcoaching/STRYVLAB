@@ -19,12 +19,128 @@ import { getCycleStateFromLogs } from '@/lib/cycle/cycleEngine'
 import type { CycleLog } from '@/lib/cycle/cycleEngine'
 import { computePhysiologicalDateInTimezone, getLocalWeekday } from '@/lib/client/checkin/timeWindows'
 import { filterSessionsForJsWeekday } from '@/lib/client/plannedSessions'
+import { assertClientAppEnabledForCoach, ClientAppAccessError } from '@/lib/billing/assertClientAppEnabled'
+import { resolveClientLanguage } from '@/lib/client/resolve-language'
+import { getCheckinRecordedMessage } from '@/lib/client/checkin/flows'
 
 function svc() {
   return createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+}
+
+function buildCoachAlertPresentation(clientId: string, clientFirstName: string, alert: { category: string; reason: string }) {
+  if (alert.category === 'program_signal' && alert.reason === 'session_not_done') {
+    return {
+      subcategory: alert.reason,
+      title: 'Séance non réalisée',
+      body: `${clientFirstName} n'a pas réalisé sa séance prévue aujourd'hui.`,
+      payload: {
+        reason: alert.reason,
+        action_url: `/coach/clients/${clientId}/data/performances`,
+      },
+    }
+  }
+
+  if (alert.category === 'recovery_flag' && alert.reason === 'soreness_high') {
+    return {
+      subcategory: alert.reason,
+      title: 'Récupération à surveiller',
+      body: `${clientFirstName} a signalé des courbatures marquées dans son check-in du jour.`,
+      payload: {
+        reason: alert.reason,
+        action_url: `/coach/clients/${clientId}/data/performances`,
+      },
+    }
+  }
+
+  if (alert.category === 'recovery_flag' && alert.reason === 'rhr_elevated') {
+    return {
+      subcategory: alert.reason,
+      title: 'Fréquence cardiaque élevée',
+      body: `${clientFirstName} présente une fréquence cardiaque au repos élevée ce jour.`,
+      payload: {
+        reason: alert.reason,
+        action_url: `/coach/clients/${clientId}/data/performances`,
+      },
+    }
+  }
+
+  if (alert.category === 'nutrition_trend' && alert.reason === 'kcal_over_3d') {
+    return {
+      subcategory: alert.reason,
+      title: 'Apport calorique au-dessus de la cible',
+      body: `${clientFirstName} dépasse sa cible calorique depuis 3 jours.`,
+      payload: {
+        reason: alert.reason,
+        action_url: `/coach/clients/${clientId}/data/nutrition`,
+      },
+    }
+  }
+
+  if (alert.category === 'nutrition_trend' && alert.reason === 'protein_short_3d') {
+    return {
+      subcategory: alert.reason,
+      title: 'Protéines sous la cible',
+      body: `${clientFirstName} reste sous sa cible protéines depuis 3 jours.`,
+      payload: {
+        reason: alert.reason,
+        action_url: `/coach/clients/${clientId}/data/nutrition`,
+      },
+    }
+  }
+
+  return {
+    subcategory: alert.reason,
+    title: 'Signal à analyser',
+    body: `${clientFirstName} a généré un signal de suivi à analyser.`,
+    payload: {
+      reason: alert.reason,
+      action_url: `/coach/clients/${clientId}`,
+    },
+  }
+}
+
+function buildCheckinCompletionPresentation(
+  clientId: string,
+  clientFirstName: string,
+  flowType: 'morning' | 'evening',
+  date: string,
+  data: {
+    sleep_hours?: number
+    sleep_quality?: number
+    energy_level?: number
+    stress_level?: number
+    weight_kg?: number
+    daily_steps?: number
+    muscle_soreness?: number
+    rhr_morning?: number
+  },
+) {
+  const formatMetricNumber = (value: number) => value.toLocaleString('fr-FR', { maximumFractionDigits: 1 })
+
+  const metrics = [
+    flowType === 'morning' && typeof data.sleep_hours === 'number' ? `Sommeil ${formatMetricNumber(data.sleep_hours)} h` : null,
+    flowType === 'morning' && typeof data.rhr_morning === 'number' ? `FC repos ${formatMetricNumber(data.rhr_morning)} bpm` : null,
+    typeof data.energy_level === 'number' ? `Énergie ${data.energy_level}/5` : null,
+    typeof data.stress_level === 'number' ? `Stress ${data.stress_level}/5` : null,
+    typeof data.weight_kg === 'number' ? `Poids ${formatMetricNumber(data.weight_kg)} kg` : null,
+    flowType === 'evening' && typeof data.daily_steps === 'number' ? `${data.daily_steps.toLocaleString('fr-FR')} pas` : null,
+    flowType === 'evening' && typeof data.muscle_soreness === 'number' ? `Courbatures ${data.muscle_soreness}/4` : null,
+  ].filter(Boolean)
+
+  return {
+    subcategory: flowType === 'morning' ? 'morning_checkin_completed' : 'evening_checkin_completed',
+    title: flowType === 'morning' ? 'Check-in matin reçu' : 'Check-in soir reçu',
+    body: `${clientFirstName} a rempli son ${flowType === 'morning' ? 'check-in du matin' : 'check-in du soir'}${metrics.length > 0 ? ` · ${metrics.join(' · ')}` : ''}.`,
+    payload: {
+      checkin_date: date,
+      flow_type: flowType,
+      metrics,
+      action_url: `/coach/clients/${clientId}/data/performances`,
+    },
+  }
 }
 
 const checkinSchema = z.object({
@@ -126,7 +242,7 @@ async function projectCheckinToAssessment(
         coach_id: owner.coach_id,
         client_id: clientId,
         template_id: templateId,
-        template_snapshot: { blocks: [{ id: 'checkin_realtime_block', module: 'biometrics' }] },
+        template_snapshot: [{ id: 'checkin_realtime_block', module: 'biometrics', label: 'Check-in realtime', order: 0, fields: [] }],
         status: 'completed',
         filled_by: 'client',
         submitted_at: submittedAt,
@@ -157,8 +273,20 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const db = svc()
-  const cc = await resolveClientFromUser(user.id, user.email, db, 'id, first_name, timezone')
+  const cc = await resolveClientFromUser(user.id, user.email, db, 'id, first_name, timezone, coach_id')
   if (!cc) return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+  const lang = await resolveClientLanguage(db, cc.id as string)
+  try {
+    const coachId = (cc as any).coach_id as string | null
+    if (coachId) {
+      await assertClientAppEnabledForCoach(db, coachId)
+    }
+  } catch (error) {
+    if (error instanceof ClientAppAccessError) {
+      return NextResponse.json({ error: 'L’espace client n’est pas activé pour ce suivi.' }, { status: 403 })
+    }
+    throw error
+  }
 
   // Fetch data for daily brief in parallel with checkin processing (best-effort)
   const briefDataPromise = (async () => {
@@ -298,10 +426,57 @@ export async function POST(req: NextRequest) {
 
   // Deterministic, honest closing built on DailyFacts (no false praise, no program-touching).
   let closingMessage = flow_type === 'morning'
-    ? 'Check-in matin enregistré ✓'
-    : 'Check-in soir enregistré ✓'
+    ? getCheckinRecordedMessage(lang, 'morning')
+    : getCheckinRecordedMessage(lang, 'evening')
 
   try {
+    const clientFirstName = (cc as { first_name?: string }).first_name ?? 'Client'
+    const checkinPresentation = buildCheckinCompletionPresentation(
+      cc.id as string,
+      clientFirstName,
+      flow_type,
+      date,
+      data,
+    )
+
+    if ((cc as { coach_id?: string | null }).coach_id) {
+      const coachId = (cc as { coach_id?: string | null }).coach_id as string
+      const { data: existingCheckinNotif } = await db
+        .from('coach_notifications')
+        .select('id')
+        .eq('coach_id', coachId)
+        .eq('client_id', cc.id)
+        .eq('category', 'engagement')
+        .eq('subcategory', checkinPresentation.subcategory)
+        .contains('payload', { checkin_date: date, flow_type })
+        .eq('status', 'pending')
+        .maybeSingle()
+
+      if (existingCheckinNotif?.id) {
+        await db
+          .from('coach_notifications')
+          .update({
+            title: checkinPresentation.title,
+            body: checkinPresentation.body,
+            payload: checkinPresentation.payload,
+          })
+          .eq('id', existingCheckinNotif.id)
+      } else {
+        await db.from('coach_notifications').insert({
+          coach_id: coachId,
+          client_id: cc.id,
+          category: 'engagement',
+          subcategory: checkinPresentation.subcategory,
+          title: checkinPresentation.title,
+          body: checkinPresentation.body,
+          payload: checkinPresentation.payload,
+          status: 'pending',
+          priority: 4,
+          email_sent: false,
+        })
+      }
+    }
+
     const checkinSignals = {
       sleepHours: data.sleep_hours,
       sleepQuality: data.sleep_quality,
@@ -314,25 +489,33 @@ export async function POST(req: NextRequest) {
     const ctx = await loadDailyCoachContext(
       db, cc.id as string, date, (cc.timezone as string) || 'Europe/Paris', checkinSignals, data.daily_steps ?? null,
     )
-    const { tips, coachAlerts } = selectAdvice({ facts: ctx.facts, trend: ctx.trend, freedom: ctx.freedom, flow: flow_type })
+    const { tips, coachAlerts } = selectAdvice({ lang, facts: ctx.facts, trend: ctx.trend, freedom: ctx.freedom, flow: flow_type })
     closingMessage = composeClosingMessage({
       facts: ctx.facts,
       tips,
       tone: ctx.tone,
       flow: flow_type,
       name: (cc as { first_name?: string }).first_name ?? '',
+      lang,
     })
 
     // Silent coach alerts (D10) — back-end only, never shown to the client.
     if (ctx.coachId && coachAlerts.length > 0) {
       await db.from('coach_notifications').insert(
-        coachAlerts.map((a) => ({
-          coach_id: ctx.coachId,
-          client_id: cc.id,
-          category: a.category,
-          status: 'pending',
-          priority: a.priority,
-        })),
+        coachAlerts.map((a) => {
+          const presentation = buildCoachAlertPresentation(cc.id as string, clientFirstName, a)
+          return {
+            coach_id: ctx.coachId,
+            client_id: cc.id,
+            category: a.category,
+            subcategory: presentation.subcategory,
+            title: presentation.title,
+            body: presentation.body,
+            payload: presentation.payload,
+            status: 'pending',
+            priority: a.priority,
+          }
+        }),
       )
     }
   } catch {
@@ -340,15 +523,20 @@ export async function POST(req: NextRequest) {
   }
 
   if (flow_type === 'evening') {
+    const reminderMarker = lang === 'es'
+      ? 'Pequeño recordatorio para mañana por la mañana'
+      : lang === 'en'
+        ? 'Quick reminder for tomorrow morning'
+        : 'Petit rappel pour demain matin'
     try {
       const morningFields = await configuredMorningFieldsPromise
-      const reminder = buildMorningPreparationReminder(morningFields)
-      if (!closingMessage.includes('demain matin')) {
+      const reminder = buildMorningPreparationReminder(lang, morningFields)
+      if (!closingMessage.includes(reminderMarker)) {
         closingMessage = `${closingMessage}\n\n${reminder}`
       }
     } catch {
-      const reminder = buildMorningPreparationReminder()
-      if (!closingMessage.includes('demain matin')) {
+      const reminder = buildMorningPreparationReminder(lang)
+      if (!closingMessage.includes(reminderMarker)) {
         closingMessage = `${closingMessage}\n\n${reminder}`
       }
     }
@@ -370,6 +558,7 @@ export async function POST(req: NextRequest) {
   try {
     const briefData = await briefDataPromise
     const briefContent = await buildDailyBrief({
+      lang,
       flowType:       flow_type,
       sessionName:    briefData.sessionName,
       targetKcal:     briefData.targetKcal,

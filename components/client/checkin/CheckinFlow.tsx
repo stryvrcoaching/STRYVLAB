@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { type CheckinFlow, type CheckinData, type FlowStep } from "@/lib/client/checkin/flows"
+import { type CheckinFlow, type CheckinData, type FlowStep, buildCheckinSummary } from "@/lib/client/checkin/flows"
 import { type ChatMessage, type InteractiveMetadata } from "@/components/client/ChatBubble"
 import { formatSleepHours } from "@/lib/client/checkin/sleepTimeFormat"
+import { useClientT } from "@/components/client/ClientI18nProvider"
 
 export interface CheckinFlowHandle {
   handleInteract: (messageId: string, key: string, value: number) => void
@@ -68,6 +69,7 @@ export function ActiveCheckinFlow({
   onHandle,
   onProgress,
 }: ActiveCheckinFlowProps) {
+  const { lang, t } = useClientT()
   const collectedRef = useRef<Record<string, number>>(initialProgress?.collected ?? {})
   const stepIndexRef = useRef(initialProgress?.stepIndex ?? 0)
   const rhrEducationShownRef = useRef(false)
@@ -108,19 +110,7 @@ export function ActiveCheckinFlow({
       if (c.muscle_soreness !== undefined) data.muscle_soreness = c.muscle_soreness
       if (c.daily_steps      !== undefined) data.daily_steps      = c.daily_steps
 
-      const parts: string[] = []
-      if (data.sleep_hours    != null) parts.push(`Sommeil: ${formatSleepHours(data.sleep_hours)}`)
-      if (data.sleep_quality  != null) parts.push(`qualité ${data.sleep_quality}/4`)
-      if (data.energy_level   != null) parts.push(`énergie ${data.energy_level}/5`)
-      if (data.stress_level   != null) parts.push(`stress ${data.stress_level}/5`)
-      if (data.weight_kg      != null) parts.push(`poids ${data.weight_kg}kg`)
-      if (data.rhr_morning    != null) parts.push(`RHR ${data.rhr_morning} bpm`)
-      if (data.hunger_level   != null) parts.push(`faim ${data.hunger_level}/4`)
-      if (data.muscle_soreness != null) parts.push(`courbatures ${data.muscle_soreness}/4`)
-      if (data.daily_steps != null) parts.push(`${data.daily_steps} pas`)
-
-      const label = flow.type === 'morning' ? 'matin' : 'soir'
-      const summary = `Check-in ${label} — ${parts.join(', ')}`
+      const summary = buildCheckinSummary(lang, flow.type, data)
       onComplete(data, summary, flow.type)
       return
     }
@@ -132,7 +122,7 @@ export function ActiveCheckinFlow({
       onAddMessage({
         id: makeId(),
         role: 'assistant',
-        content: "Tu peux mesurer ton rythme cardiaque au repos au reveil, allonge ou assis calmement, sur 60 secondes. Si tu ne peux pas le prendre ce matin, passe simplement cette etape.",
+        content: t('checkin.rhr.education'),
         message_type: 'text',
         created_at: new Date().toISOString(),
       })
@@ -183,7 +173,7 @@ export function ActiveCheckinFlow({
       onAddMessage({
         id: makeId(),
         role: 'user',
-        content: 'Passer',
+        content: t('checkin.action.skip'),
         message_type: 'quick_reply',
         created_at: new Date().toISOString(),
       })
@@ -203,10 +193,10 @@ export function ActiveCheckinFlow({
     const greeting: ChatMessage = {
       id: makeId(),
       role: 'assistant',
-      content: stepIndexRef.current > 0
-        ? (clientFirstName
-          ? `${clientFirstName}, on reprend ton check-in.`
-          : 'On reprend ton check-in.')
+        content: stepIndexRef.current > 0
+          ? (clientFirstName
+          ? t('checkin.resume.named', { name: clientFirstName })
+          : t('checkin.resume.generic'))
         : (clientFirstName
           ? `${clientFirstName}, ${flow.greeting}`
           : flow.greeting),

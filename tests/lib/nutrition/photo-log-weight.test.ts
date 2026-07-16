@@ -316,7 +316,7 @@ describe("interpretPhotoMealWeight", () => {
     expect(result.components[0].quantity_g).toBeGreaterThan(result.components[1].quantity_g)
   })
 
-  it("adds a conservative fat estimate when hidden fats are skipped", () => {
+  it("does not add a phantom fat before the clarification is answered", () => {
     const result = interpretPhotoMealWeight({
       analysis: {
         ...baseAnalysis,
@@ -326,8 +326,39 @@ describe("interpretPhotoMealWeight", () => {
       clarificationAnswers: {},
     })
 
+    expect(result.components.some((component) => component.name_fr === "Matière grasse probable")).toBe(false)
+  })
+
+  it("uses a conservative fat fallback only after an explicit unknown answer", () => {
+    const result = interpretPhotoMealWeight({
+      analysis: {
+        ...baseAnalysis,
+        scale_weight_g: null,
+        ambiguity_tags: ["hidden_fats"],
+      },
+      clarificationAnswers: { fat_type: "unknown" },
+    })
+
     expect(result.components.at(-1)?.name_fr).toBe("Matière grasse probable")
     expect(result.components.at(-1)?.quantity_g).toBe(5)
+  })
+
+  it("preserves separate scale readings when a meal total is also present", () => {
+    const result = interpretPhotoMealWeight({
+      analysis: {
+        ...baseAnalysis,
+        scale_weight_g: 184,
+        scale_weight_confidence: 0.95,
+        components: [
+          { ...baseAnalysis.components[0], name_fr: "Granola", grams_estimate: 48, ambiguity_tags: ["partial_weight"] },
+          { ...baseAnalysis.components[1], name_fr: "Kéfir", grams_estimate: 20, ambiguity_tags: ["partial_weight"] },
+          { ...baseAnalysis.components[1], name_fr: "Banane", grams_estimate: 51, ambiguity_tags: [] },
+        ],
+      },
+      clarificationAnswers: {},
+    })
+
+    expect(result.components.map((component) => component.quantity_g)).toEqual([48, 20, 51])
   })
 
   it("does not globally rescale consumed estimates when after-meal leftovers were analyzed", () => {

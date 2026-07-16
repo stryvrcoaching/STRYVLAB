@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Send,
@@ -14,6 +14,9 @@ import {
   RotateCcw,
   Pencil,
   Mail,
+  CalendarClock,
+  Pause,
+  Play,
 } from "lucide-react";
 import { SubmissionWithClient } from "@/types/assessment";
 
@@ -32,6 +35,19 @@ interface Props {
   sendModalOpen?: boolean;
   onSendModalClose?: () => void;
 }
+
+type AssessmentAutomation = {
+  id: string;
+  template_id: string;
+  status: "active" | "paused";
+  day_of_week: number;
+  send_time: string;
+  timezone: string;
+  next_run_at: string;
+  template?: { id: string; name: string };
+};
+
+const WEEKDAYS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 
 const STATUS_CONFIG = {
   pending: {
@@ -92,16 +108,62 @@ export default function SubmissionsList({
   const [editingDateValue, setEditingDateValue] = useState("");
   const [localDates, setLocalDates] = useState<Record<string, string>>({});
   const [emailSentId, setEmailSentId] = useState<string | null>(null);
+  const [automations, setAutomations] = useState<AssessmentAutomation[]>([]);
+  const [automationEnabled, setAutomationEnabled] = useState(false);
+  const [automationDay, setAutomationDay] = useState(1);
+  const [automationTime, setAutomationTime] = useState("09:00");
+  const [automationSaving, setAutomationSaving] = useState(false);
+
+  async function loadAutomations() {
+    const res = await fetch(`/api/assessments/automations?client_id=${clientId}`);
+    if (res.ok) setAutomations((await res.json()).automations ?? []);
+  }
+
+  useEffect(() => {
+    void loadAutomations();
+  }, [clientId]);
 
   async function handleSend() {
     if (!selectedTemplate) return;
     setSending(true);
     await onSend(selectedTemplate, bilanDate, sendEmail);
+    if (automationEnabled) {
+      setAutomationSaving(true);
+      const res = await fetch("/api/assessments/automations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: clientId,
+          template_id: selectedTemplate,
+          day_of_week: automationDay,
+          send_time: automationTime,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          starts_on: bilanDate,
+        }),
+      });
+      if (res.ok) await loadAutomations();
+      setAutomationSaving(false);
+    }
     setSending(false);
     closeSendModal();
     setSelectedTemplate("");
     setBilanDate(new Date().toISOString().slice(0, 10));
     setSendEmail(false);
+    setAutomationEnabled(false);
+  }
+
+  async function updateAutomation(id: string, payload: Record<string, unknown>) {
+    const res = await fetch(`/api/assessments/automations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) await loadAutomations();
+  }
+
+  async function deleteAutomation(id: string) {
+    const res = await fetch(`/api/assessments/automations/${id}`, { method: "DELETE" });
+    if (res.ok) setAutomations((prev) => prev.filter((automation) => automation.id !== id));
   }
 
   async function handleDelete() {
@@ -264,6 +326,16 @@ export default function SubmissionsList({
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 shrink-0">
+                  {automations.some((automation) => automation.template_id === s.template_id) && (
+                    <button
+                      onClick={() => document.getElementById("assessment-automations")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                      className="flex items-center gap-1 text-[10px] text-[#1f8a65] px-2 py-1"
+                      title="Une automatisation est configurée pour ce template"
+                    >
+                      <CalendarClock size={13} />
+                      <span className="hidden lg:inline">Gérer</span>
+                    </button>
+                  )}
                   {s.status === "completed" && (
                     <button
                       onClick={() =>
@@ -330,9 +402,44 @@ export default function SubmissionsList({
                     <Trash2 size={13} />
                   </button>
                 </div>
+            </div>
+          );
+        })}
+      </div>
+      )}
+
+      {automations.length > 0 && (
+        <div id="assessment-automations" className="mt-5 rounded-xl border-subtle bg-white/[0.02] p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h4 className="text-[12px] font-semibold text-white">Automatisations</h4>
+              <p className="text-[11px] text-white/40">Bilans récurrents pour ce client</p>
+            </div>
+            <CalendarClock size={16} className="text-[#1f8a65]" />
+          </div>
+          <div className="flex flex-col gap-2">
+            {automations.map((automation) => (
+              <div key={automation.id} className="flex items-center gap-3 rounded-lg bg-white/[0.03] px-3 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12px] font-medium text-white truncate">{automation.template?.name ?? "Bilan"}</p>
+                  <p className="text-[11px] text-white/45">
+                    Chaque semaine, {WEEKDAYS[automation.day_of_week]} à {automation.send_time.slice(0, 5)} · prochaine échéance {new Date(automation.next_run_at).toLocaleDateString("fr-FR")}
+                  </p>
+                </div>
+                <span className={`text-[10px] font-semibold ${automation.status === "active" ? "text-[#1f8a65]" : "text-amber-500"}`}>
+                  {automation.status === "active" ? "Active" : "En pause"}
+                </span>
+                <button
+                  onClick={() => updateAutomation(automation.id, { status: automation.status === "active" ? "paused" : "active" })}
+                  className="w-7 h-7 rounded-md text-white/45 hover:text-white flex items-center justify-center"
+                  title={automation.status === "active" ? "Mettre en pause" : "Réactiver"}
+                >
+                  {automation.status === "active" ? <Pause size={13} /> : <Play size={13} />}
+                </button>
+                <button onClick={() => deleteAutomation(automation.id)} className="text-[11px] text-white/40 hover:text-red-400 px-1" title="Supprimer">Supprimer</button>
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
       )}
 
@@ -370,6 +477,34 @@ export default function SubmissionsList({
                 className="w-full bg-white/[0.04] rounded-lg px-4 py-3 text-sm text-white outline-none"
               />
             </div>
+            <p className="text-xs text-white/45 mb-3">
+              L’envoi dans l’application client est automatique. L’email est optionnel.
+            </p>
+            <div className="rounded-xl border-subtle bg-white/[0.02] p-3 mb-3">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={automationEnabled}
+                  onChange={(e) => setAutomationEnabled(e.target.checked)}
+                  className="accent-[#1f8a65]"
+                />
+                <div>
+                  <p className="text-sm font-medium text-white">Automatiser les prochains bilans</p>
+                  <p className="text-xs text-white/45">Créer un bilan chaque semaine pour ce client</p>
+                </div>
+              </label>
+              {automationEnabled && (
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  <select value={automationDay} onChange={(e) => setAutomationDay(Number(e.target.value))} className="bg-white/[0.04] rounded-lg px-3 py-2 text-xs text-white outline-none">
+                    {WEEKDAYS.slice(1).concat(WEEKDAYS[0]).map((label, index) => {
+                      const day = index === 6 ? 0 : index + 1;
+                      return <option key={day} value={day}>{label}</option>;
+                    })}
+                  </select>
+                  <input type="time" value={automationTime} onChange={(e) => setAutomationTime(e.target.value)} className="bg-white/[0.04] rounded-lg px-3 py-2 text-xs text-white outline-none" />
+                </div>
+              )}
+            </div>
             {clientEmail && (
               <label className="flex items-center gap-3 py-2 cursor-pointer group">
                 <div
@@ -390,8 +525,8 @@ export default function SubmissionsList({
             )}
             {!clientEmail && (
               <p className="text-xs text-white/45 italic">
-                Aucun email renseigné pour ce client — envoi par email
-                indisponible.
+                Aucun email renseigné pour ce client — l’envoi par email est indisponible,
+                mais le bilan sera bien envoyé dans l’application.
               </p>
             )}
             <div className="flex gap-3 mt-2">
@@ -403,14 +538,14 @@ export default function SubmissionsList({
               </button>
               <button
                 onClick={handleSend}
-                disabled={!selectedTemplate || sending}
+                disabled={!selectedTemplate || sending || automationSaving}
                 className="flex-1 py-2.5 rounded-xl bg-accent text-white text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
                 {sending
                   ? "Envoi…"
                   : sendEmail
-                    ? "Envoyer + email"
-                    : "Créer le lien"}
+                    ? "Envoyer app + email"
+                    : "Envoyer dans l’app"}
               </button>
             </div>
           </div>

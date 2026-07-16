@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { getExerciseHistoryKeys } from '@/lib/training/exerciseHistoryKey'
 
 export async function GET(req: NextRequest) {
   const supabase = createClient()
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
 
   const since = new Date()
   since.setDate(since.getDate() - 112) // 16 weeks
+  const requestedKeys = new Set(getExerciseHistoryKeys(exerciseName))
 
   // Query from client_session_logs (has client_id + completed_at) — same pattern as recap page
   const { data: sessionLogs, error } = await service
@@ -60,7 +62,10 @@ export async function GET(req: NextRequest) {
 
   for (const session of sessionLogs ?? []) {
     const relevantSets = ((session.client_set_logs ?? []) as any[])
-      .filter((s: any) => s.exercise_name === exerciseName && s.completed === true)
+      .filter((s: any) => {
+        if (s.completed !== true || typeof s.exercise_name !== 'string') return false
+        return getExerciseHistoryKeys(s.exercise_name).some((key) => requestedKeys.has(key))
+      })
 
     if (relevantSets.length === 0) continue
 

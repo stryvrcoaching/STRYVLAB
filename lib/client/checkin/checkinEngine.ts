@@ -1,9 +1,7 @@
-import {
-  activeWindowAt,
-  type CheckinFlowType,
-} from '@/lib/client/checkin/timeWindows'
+import { activeWindowAt, type CheckinFlowType } from '@/lib/client/checkin/timeWindows'
 import {
   getPendingSlots,
+  type CheckinAvailability,
   type CompletedSession,
   type PendingSlot,
 } from '@/lib/client/checkin/pendingCheckins'
@@ -11,27 +9,21 @@ import {
 export type { CompletedSession, PendingSlot }
 
 /**
- * Which check-in to open from the top bar (timezone-aware windows, max 2 backlog).
+ * Which pending check-in to open (timezone-aware, max 2 backlog).
+ *
+ * Slots are returned oldest first so a missed check-in is always completed before
+ * a more recent one, regardless of the current morning/evening window.
  */
 export function determineSlotForClick(
   now: Date,
   timezone: string,
   sessions: CompletedSession[],
+  availability?: CheckinAvailability,
 ): PendingSlot | null {
-  const pending = getPendingSlots(now, timezone, sessions)
+  const pending = getPendingSlots(now, timezone, sessions, availability)
   if (pending.length === 0) return null
 
-  const window = activeWindowAt(now, timezone)
-
-  if (window === 'evening') {
-    return pending.find(p => p.flow_type === 'evening') ?? pending[pending.length - 1] ?? null
-  }
-
-  if (window === 'morning') {
-    return pending.find(p => p.flow_type === 'morning') ?? pending[pending.length - 1] ?? null
-  }
-
-  return pending[0] ?? null
+  return pending[0]
 }
 
 export function determineFlowForClick(
@@ -50,11 +42,14 @@ export function shouldProactiveInitNow(
   timezone: string,
   flowType: CheckinFlowType,
   sessions: CompletedSession[],
+  availability?: CheckinAvailability,
 ): boolean {
-  const window = activeWindowAt(now, timezone)
-  if (window !== flowType) return false
+  if (!availability) {
+    const window = activeWindowAt(now, timezone)
+    if (window !== flowType) return false
+  }
 
-  const pending = getPendingSlots(now, timezone, sessions)
+  const pending = getPendingSlots(now, timezone, sessions, availability)
   return pending.some(p => p.flow_type === flowType)
 }
 

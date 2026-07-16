@@ -1,26 +1,29 @@
 'use client'
 
+import { useClientT } from '@/components/client/ClientI18nProvider'
+
 interface Props {
   score: number | null
   checkinCount: number
 }
 
-function scoreLabel(s: number): string {
-  if (s >= 90) return 'Excellent'
-  if (s >= 70) return 'Bonne forme'
-  if (s >= 50) return 'Attention'
-  return 'À surveiller'
+function scoreLabel(s: number, t: (key: string, params?: Record<string, any>) => string): string {
+  if (s >= 90) return t('vitality.excellent')
+  if (s >= 70) return t('vitality.good')
+  if (s >= 50) return t('vitality.attention')
+  return t('vitality.watch')
 }
 
 export default function VitalityScoreHero({ score, checkinCount }: Props) {
+  const { t } = useClientT()
   if (score == null || checkinCount === 0) {
     return (
       <div className="bg-[#161616] rounded-2xl p-4">
         <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.12em] text-[#5a5a5a] mb-2">
-          Score forme
+          {t('vitality.score')}
         </p>
         <p className="text-[12px] text-[#5a5a5a] leading-relaxed">
-          Complétez vos check-ins quotidiens pour voir votre score de forme.
+          {t('vitality.empty')}
         </p>
       </div>
     )
@@ -30,7 +33,7 @@ export default function VitalityScoreHero({ score, checkinCount }: Props) {
     <div className="bg-[#161616] rounded-2xl p-4 space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.12em] text-[#5a5a5a]">
-          Score forme
+          {t('vitality.score')}
         </p>
         <span className="text-[20px] font-black text-[#f2f2f2] leading-none">
           {score}
@@ -46,7 +49,10 @@ export default function VitalityScoreHero({ score, checkinCount }: Props) {
       </div>
 
       <p className="text-[11px] text-[#808080]">
-        {scoreLabel(score)} · {checkinCount} check-in{checkinCount > 1 ? 's' : ''} ce mois
+        {scoreLabel(score, t as any)} · {t('vitality.monthCheckins', {
+          count: checkinCount,
+          suffix: checkinCount > 1 ? t('vitality.monthCheckins.plural') : '',
+        })}
       </p>
     </div>
   )

@@ -83,7 +83,7 @@ describe('SRA heatmap', () => {
     const sessions = [{ name: 'A', day_of_week: 1, exercises: [benchEx] }]
     const { sraHeatmap } = scoreSRA(sessions, metaHypertrophy)
     const week1 = sraHeatmap[0]
-    const pectoraux = week1.muscles.find(m => m.name === 'pectoraux')
+    const pectoraux = week1.muscles.find(m => m.name === 'grand_pectoral')
     expect(pectoraux).toBeDefined()
     expect(pectoraux!.fatigue).toBeGreaterThan(0)
   })

@@ -8,6 +8,9 @@ import { resolveProtocolDayByDate, resolveRestProtocolDay } from '@/lib/nutritio
 import { shiftIsoDate } from '@/lib/utils/date'
 import type { NutritionMacros } from '@/components/client/smart/SmartNutritionWidget'
 import type { SmartNutritionPrep } from '@/components/client/smart/SmartNutritionPrepList'
+import { ct } from '@/lib/i18n/clientTranslations'
+import { resolveClientLanguage } from '@/lib/client/resolve-language'
+import { localizeNutritionScenarioLabel } from '@/lib/nutrition/scenario-labels'
 import ComposeClientPage from './ComposeClientPage'
 
 function svc() {
@@ -28,7 +31,7 @@ function clampComposeDate(candidate: string | null | undefined, todayIso: string
 export default async function ClientNutritionComposePage({
   searchParams,
 }: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>> | Record<string, string | string[] | undefined>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -36,12 +39,14 @@ export default async function ClientNutritionComposePage({
 
   const client = await resolveClientFromUser(user.id, user.email, svc(), 'id, gender')
   if (!client) return null
-  const clientRecord = client as { id: string; gender?: string | null }
+  const clientRecord = client as { id: string; gender?: string | null; timezone?: string | null }
   const clientId = clientRecord.id
-  const timezone = await resolveClientTimezone(svc(), clientId)
+  const lang = await resolveClientLanguage(svc(), clientId)
+  const timezone = String(clientRecord.timezone ?? '').trim() || await resolveClientTimezone(svc(), clientId)
   const todayDate = computePhysiologicalDate(new Date(), timezone)
   const resolvedSearchParams = searchParams ? await searchParams : {}
   const rawDate = Array.isArray(resolvedSearchParams?.date) ? resolvedSearchParams.date[0] : resolvedSearchParams?.date
+  const rawPrepId = Array.isArray(resolvedSearchParams?.prep_id) ? resolvedSearchParams.prep_id[0] : resolvedSearchParams?.prep_id
   const date = clampComposeDate(rawDate, todayDate)
   const { start, end } = utcRangeForPhysiologicalDate(date, timezone)
 
@@ -126,7 +131,7 @@ export default async function ClientNutritionComposePage({
     meal_slot: prep.meal_slot ?? prep.meal_type ?? 'snack',
     variant_group_id: prep.variant_group_id ?? prep.meal_slot ?? prep.meal_type ?? 'snack',
     scenario_key: prep.scenario_key ?? 'default',
-    scenario_label: prep.scenario_label ?? "Scénario principal",
+    scenario_label: localizeNutritionScenarioLabel(lang, prep.scenario_label),
     is_active: prep.is_active === true,
     entries: Array.isArray(prep.entries) ? prep.entries : [],
     total_calories: Number(prep.total_calories ?? 0),
@@ -135,6 +140,7 @@ export default async function ClientNutritionComposePage({
     total_fat_g: Number(prep.total_fat_g ?? 0),
     total_fiber_g: Number(prep.total_fiber_g ?? 0),
   }))
+  const initialEditingPrep = rawPrepId ? preps.find((prep) => prep.id === rawPrepId) ?? null : null
 
   const consumed: NutritionMacros = {
     kcal: meals.reduce((s, m) => s + Number(m.total_calories ?? 0), 0),
@@ -152,6 +158,7 @@ export default async function ClientNutritionComposePage({
       date={date}
       todayDate={todayDate}
       initialPreps={preps}
+      initialEditingPrep={initialEditingPrep}
       gender={clientRecord.gender ?? null}
       bodyWeightKg={bodyWeightKg}
     />

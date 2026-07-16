@@ -62,7 +62,7 @@ export function calcTUT(t: ParsedTempo, reps: number): number {
 //   Strength: explosive concentric (X), controlled eccentric for safety
 //   Endurance: moderate tempo (2-0-2-0) — sustainable over high reps
 //
-// Called at render-time only. Result is NEVER persisted when coach hasn't set tempo.
+// Used both by the session UI and when the coach creates a new prescription.
 
 type MovementPattern = string | null | undefined
 
@@ -106,31 +106,48 @@ const HYPERTROPHY_TEMPO_MAP: Record<string, string> = {
 const STRENGTH_COMPOUND  = 'X-0-2-0' // explosif concentrique
 const STRENGTH_ISOLATION = '2-0-2-0' // contrôlé même en force
 const ENDURANCE_DEFAULT  = '2-0-2-0'
-const FALLBACK_DEFAULT   = '2-0-2-0'
+const FAT_LOSS_DEFAULT   = '2-0-2-0' // densité et technique stable en circuit
+const ATHLETIC_DEFAULT   = 'X-0-X-0' // intention de vitesse sans pause
+const MAINTENANCE_DEFAULT = '2-0-2-0'
+// This matches the coach-facing "Hypertrophie standard" preset.
+const HYPERTROPHY_DEFAULT = '2-1-3-1'
+const SUPPORTED_TEMPOS = new Set([
+  HYPERTROPHY_DEFAULT,
+  '2-1-4-0',
+  STRENGTH_COMPOUND,
+  ENDURANCE_DEFAULT,
+  ATHLETIC_DEFAULT,
+])
 
 /**
  * Returns the recommended tempo string for a movement pattern and program goal.
  * Always returns a valid string — never null.
- * Called at render-time; result is NEVER persisted when coach hasn't set a tempo.
+ * The caller can persist the returned value as the exercise's default prescription.
  */
 export function getDefaultTempo(pattern: MovementPattern, goal: string): string {
   const g = (goal ?? '').toLowerCase()
 
-  if (g === 'endurance' || g === 'athletic') {
+  if (g === 'endurance' || g === 'fat_loss' || g === 'maintenance') {
     return ENDURANCE_DEFAULT
   }
 
-  if (g === 'strength' || g === 'fat_loss' || g === 'maintenance') {
-    if (pattern && ISOLATION_PATTERNS.has(pattern)) {
-      return STRENGTH_ISOLATION
-    }
+  if (g === 'athletic') return ATHLETIC_DEFAULT
+
+  if (g === 'strength' || g === 'power') {
     return STRENGTH_COMPOUND
   }
 
-  // hypertrophy, recomp, unknown → per-pattern hypertrophy map
-  if (pattern && HYPERTROPHY_TEMPO_MAP[pattern]) {
-    return HYPERTROPHY_TEMPO_MAP[pattern]
-  }
+  // Hypertrophy, recomposition and unknown all use the standard preset.
+  return HYPERTROPHY_DEFAULT
+}
 
-  return FALLBACK_DEFAULT
+/** Keeps stored prescriptions within the coach-approved preset catalogue. */
+export function normalizeTempoPreset(
+  tempo: string | null | undefined,
+  pattern: MovementPattern,
+  goal: string,
+): string {
+  return tempo && SUPPORTED_TEMPOS.has(tempo)
+    ? tempo
+    : getDefaultTempo(pattern, goal)
 }

@@ -63,6 +63,29 @@ function describeSignalIssue(
     };
   }
 
+  if (signal.reason === "estimated") {
+    return {
+      key: signal.key,
+      label,
+      reason: signal.reason,
+      summary: `${capitalize(label)} estimée.`,
+      action:
+        signal.key === "body_fat_pct"
+          ? "Le calcul peut avancer avec cette estimation, mais confirme-la par mesure directe si tu veux augmenter la fiabilité."
+          : `Garde cette estimation comme base de travail, puis confirme ${label} lors d'un bilan plus complet.`,
+    };
+  }
+
+  if (signal.reason === "optional_realtime_missing" && mode === "realtime") {
+    return {
+      key: signal.key,
+      label,
+      reason: signal.reason,
+      summary: `${capitalize(label)} absente, mais secondaire en temps réel.`,
+      action: "Tu peux continuer avec les signaux récents du jour. Mets à jour la composition corporelle si tu veux raffiner la base structurelle.",
+    };
+  }
+
   if (signal.reason === "base_structurelle" && mode === "realtime") {
     return {
       key: signal.key,

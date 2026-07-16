@@ -2,8 +2,16 @@ import type { Metadata, Viewport } from 'next'
 import ConditionalClientShell from '@/components/client/ConditionalClientShell'
 import ClientRouteMemory from '@/components/client/ClientRouteMemory'
 import ServiceWorkerRegistrar from '@/components/client/ServiceWorkerRegistrar'
+import OfflineMutationSync from '@/components/client/OfflineMutationSync'
+import ClientRealtimeSync from '@/components/client/ClientRealtimeSync'
+import ClientNotificationDeepLinkHandler from '@/components/client/ClientNotificationDeepLinkHandler'
+import NativeStatusBar from '@/components/client/NativeStatusBar'
 import { ClientI18nProvider } from '@/components/client/ClientI18nProvider'
-import SplashScreen from '@/components/client/SplashScreen'
+import { createClient } from '@/utils/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { resolveClientFromUser } from '@/lib/client/resolve-client'
+import { resolveClientLanguage } from '@/lib/client/resolve-language'
+import type { ClientLang } from '@/lib/i18n/clientTranslations'
 
 export const metadata: Metadata = {
   manifest: '/manifest.json',
@@ -20,10 +28,18 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#080808',
+  themeColor: '#09090a',
+  viewportFit: 'cover',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1, // Prevent iOS auto-zoom on input focus in PWA context
+}
+
+function service() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
 }
 
 // NOTE: Auth protection for client routes is handled entirely by the middleware
@@ -33,13 +49,37 @@ export const viewport: Viewport = {
 // /client/, including /client/login and /client/set-password. Adding a
 // redirect would cause an infinite redirect loop for unauthenticated users
 // trying to access those pages.
-export default function ClientLayout({ children }: { children: React.ReactNode }) {
+export default async function ClientLayout({ children }: { children: React.ReactNode }) {
+  let initialLang: ClientLang = 'fr'
+  let clientId: string | null = null
+
+  try {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const db = service()
+      const client = await resolveClientFromUser(user.id, user.email, db, 'id')
+      if (client?.id) {
+        clientId = client.id
+        initialLang = await resolveClientLanguage(db, client.id)
+      }
+    }
+  } catch {
+    // Non-blocking — fallback to the default provider language.
+  }
+
   return (
-    <ClientI18nProvider>
-      <div className="min-h-screen bg-[#0d0d0d] font-barlow">
-        <SplashScreen />
+    <ClientI18nProvider initialLang={initialLang}>
+      <div
+        data-client-app
+        className="min-h-dvh bg-[var(--client-chrome-bg)] font-barlow isolate"
+      >
         <ClientRouteMemory />
         <ServiceWorkerRegistrar />
+        <OfflineMutationSync />
+        <ClientRealtimeSync clientId={clientId} />
+        <ClientNotificationDeepLinkHandler />
+        <NativeStatusBar />
         <ConditionalClientShell>{children}</ConditionalClientShell>
       </div>
     </ClientI18nProvider>

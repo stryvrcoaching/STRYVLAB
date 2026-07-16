@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { buildTimeline, type TimelineSource } from '@/lib/client/smart/timelineBuilder'
+import { resolveClientFromUser } from '@/lib/client/resolve-client'
 import { resolveClientTimezone } from '@/lib/client/checkin/resolveClientTimezone'
 import { utcRangeForPhysiologicalDate } from '@/lib/client/checkin/timeWindows'
 import { computeMacroEnergy } from '@/lib/nutrition/energy'
 import { computePhysiologicalDate } from '@/lib/nutrition/physiological-date'
 import { fetchClientDayOverride, resolveEffectiveDayKind } from '@/lib/client/day-kind'
 import { buildTrainingWeekSchedule, normalizeProgramForSchedule, pickActiveProgramForSchedule } from '@/lib/nutrition/training-week-schedule'
+import { ct, type ClientLang } from '@/lib/i18n/clientTranslations'
+import { resolveClientLanguage } from '@/lib/client/resolve-language'
 
 function svc() {
   return createServiceClient(
@@ -16,13 +19,13 @@ function svc() {
   )
 }
 
-function mealTypeLabel(t: string): string {
+function mealTypeLabel(lang: ClientLang, t: string): string {
   switch (t) {
-    case 'breakfast': return 'Petit-déjeuner'
-    case 'lunch': return 'Déjeuner'
-    case 'dinner': return 'Dîner'
-    case 'snack': return 'Collation'
-    default: return 'Repas'
+    case 'breakfast': return ct(lang, 'meal.type.breakfast')
+    case 'lunch': return ct(lang, 'meal.type.lunch')
+    case 'dinner': return ct(lang, 'meal.type.dinner')
+    case 'snack': return ct(lang, 'meal.type.snack')
+    default: return ct(lang, 'smart.radial.meal')
   }
 }
 
@@ -31,10 +34,12 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: cc } = await svc().from('coach_clients').select('id').eq('user_id', user.id).single()
+  const db = svc()
+  const cc = await resolveClientFromUser(user.id, user.email, db, 'id, timezone')
   if (!cc) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const lang = await resolveClientLanguage(db, cc.id)
 
-  const timezone = await resolveClientTimezone(svc(), cc.id)
+  const timezone = String(cc.timezone ?? '').trim() || await resolveClientTimezone(db, cc.id)
   const url = new URL(req.url)
   const dateParam = url.searchParams.get('date')
   const date = dateParam ?? computePhysiologicalDate(new Date(), timezone)
@@ -42,7 +47,7 @@ export async function GET(req: NextRequest) {
   const dayStart = physiologicalStart.toISOString()
   const dayEnd = physiologicalEnd.toISOString()
 
-  const [mealsResult, waterResult, sessionResult, activitiesResult] = await Promise.allSettled([
+  const [mealsResult, waterResult, sessionResult, activitiesResult, appointmentsResult] = await Promise.allSettled([
     svc()
       .from('nutrition_meals')
       .select('id, meal_type, title, logged_at, total_calories, total_protein_g, total_carbs_g, total_fat_g, total_fiber_g')
@@ -71,15 +76,23 @@ export async function GET(req: NextRequest) {
       .eq('client_id', cc.id)
       .gte('started_at', dayStart)
       .lte('started_at', dayEnd),
+    svc()
+      .from('coaching_appointments')
+      .select('id, starts_at, title, meeting_kind')
+      .eq('client_id', cc.id)
+      .gte('starts_at', dayStart)
+      .lte('starts_at', dayEnd)
+      .not('status', 'in', '("cancelled")'),
   ])
 
   const meals = mealsResult.status === 'fulfilled' ? (mealsResult.value.data ?? []) : []
   const water = waterResult.status === 'fulfilled' ? (waterResult.value.data ?? []) : []
   const sessionRow = sessionResult.status === 'fulfilled' ? sessionResult.value.data : null
   const activities = activitiesResult.status === 'fulfilled' ? (activitiesResult.value.data ?? []) : []
+  const appointments = appointmentsResult.status === 'fulfilled' ? (appointmentsResult.value.data ?? []) : []
   const [dayOverride, activeProgramsResult, skippedResult] = await Promise.all([
-    fetchClientDayOverride(svc(), cc.id, date),
-    svc()
+    fetchClientDayOverride(db, cc.id, date),
+    db
       .from('programs')
       .select(`
         id, name, status, session_mode, is_client_visible, created_at,
@@ -90,7 +103,7 @@ export async function GET(req: NextRequest) {
       `)
       .eq('client_id', cc.id)
       .order('created_at', { ascending: false }),
-    svc()
+    db
       .from('client_workout_skips')
       .select('id')
       .eq('client_id', cc.id)
@@ -113,7 +126,7 @@ export async function GET(req: NextRequest) {
   let session: TimelineSource['session'] = null
   if (sessionRow) {
     // Get exercise count
-    const { count } = await svc()
+    const { count } = await db
       .from('client_set_logs')
       .select('exercise_name', { count: 'exact', head: true })
       .eq('session_log_id', sessionRow.id)
@@ -121,7 +134,7 @@ export async function GET(req: NextRequest) {
     session = {
       id: sessionRow.id,
       completed_at: sessionRow.completed_at as string,
-      title: 'Séance',
+      title: ct(lang, 'smart.timeline.workout'),
       duration_min: 0,
       exercises_count: count ?? 0,
     }
@@ -131,7 +144,7 @@ export async function GET(req: NextRequest) {
     meals: meals.map(m => ({
       id: m.id,
       logged_at: m.logged_at,
-      title: m.title ?? mealTypeLabel(m.meal_type),
+      title: m.title ?? mealTypeLabel(lang, m.meal_type),
       meal_type: m.meal_type as any,
       kcal: computeMacroEnergy({
         protein_g: Number(m.total_protein_g ?? 0),
@@ -154,8 +167,14 @@ export async function GET(req: NextRequest) {
       intensity: a.intensity,
     })),
     checkins: [],
+    appointments: appointments.map(appt => ({
+      id: appt.id,
+      starts_at: appt.starts_at,
+      title: appt.title,
+      meeting_kind: appt.meeting_kind,
+    })),
   }
 
-  const entries = buildTimeline(src)
+  const entries = buildTimeline(src, timezone, lang)
   return NextResponse.json({ date, entries, dayKind, sessionSkipped, dayOverride })
 }

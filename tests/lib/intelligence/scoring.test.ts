@@ -101,6 +101,16 @@ describe('scoreSRA', () => {
     // 48h < 60h (beginner window) → warning ou critical
     expect(alerts.some(a => a.code === 'SRA_VIOLATION')).toBe(true)
   })
+
+  it('humanizes canonical muscle names in SRA alerts', () => {
+    const sessions: BuilderSession[] = [
+      { name: 'J1', day_of_week: 1, exercises: [{ ...pushEx, primary_muscles: ['triceps'] }] },
+      { name: 'J2', day_of_week: 2, exercises: [{ ...pushEx, primary_muscles: ['triceps'] }] },
+    ]
+    const { alerts } = scoreSRA(sessions, hypertrophyMeta)
+    expect(alerts.some(a => a.title.includes('Triceps'))).toBe(true)
+    expect(alerts.some(a => a.title.includes('triceps'))).toBe(false)
+  })
 })
 
 // ── scoreRedundancy ───────────────────────────────────────────────────────────
@@ -202,5 +212,72 @@ describe('buildIntelligenceResult', () => {
     const result = buildIntelligenceResult([], hypertrophyMeta)
     expect(result.globalScore).toBe(0)
     expect(result.alerts).toHaveLength(0)
+  })
+
+  it('uses only scheduled occurrences in day mode for weekly program stats', () => {
+    const sessions: BuilderSession[] = [
+      { name: 'Planifiée', day_of_week: 1, days_of_week: [1], exercises: [{ ...pushEx, sets: 3 }] },
+      { name: 'Deux jours', day_of_week: 3, days_of_week: [3, 6], exercises: [{ ...pullEx, sets: 4 }] },
+      { name: 'Brouillon', day_of_week: null, days_of_week: [], exercises: [{ ...squatEx, sets: 10 }] },
+    ]
+
+    const result = buildIntelligenceResult(sessions, { ...hypertrophyMeta, sessionMode: 'day' })
+
+    expect(result.programStats.totalSets).toBe(11)
+    expect(result.programStats.totalEstimatedReps).toBe(88)
+    expect(result.programStats.sessionsStats.map(s => s.name)).toEqual(['Planifiée', 'Deux jours'])
+  })
+
+  it('normalizes biomechanical chest slugs into the radar stimulus distribution', () => {
+    const chestExercise = {
+      ...pushEx,
+      primary_muscles: ['pectoralis_major'],
+      primaryMuscle: 'pectoralis_major',
+      primaryActivation: 0.65,
+      secondaryMusclesDetail: [],
+      secondaryActivations: [],
+    }
+    const result = buildIntelligenceResult(
+      [{ name: 'Push', day_of_week: 1, days_of_week: [1], exercises: [chestExercise] }],
+      { ...hypertrophyMeta, sessionMode: 'day' },
+    )
+
+    expect(result.distribution.pectoraux).toBeCloseTo(1.95, 5)
+  })
+
+  it('applies Lab stimulus adjustments to derived volume, radar and score inputs', () => {
+    const chestExercise = {
+      ...pushEx,
+      primary_muscles: ['pectoralis_major'],
+      primaryMuscle: 'pectoralis_major',
+      primaryActivation: 0.65,
+      secondaryMusclesDetail: [],
+      secondaryActivations: [],
+    }
+    const sessions = [{ name: 'Push', day_of_week: 1, days_of_week: [1], exercises: [chestExercise] }]
+    const base = buildIntelligenceResult(sessions, { ...hypertrophyMeta, sessionMode: 'day' })
+    const adjusted = buildIntelligenceResult(
+      sessions,
+      { ...hypertrophyMeta, sessionMode: 'day' },
+      undefined,
+      { horizontal_push: 1.2 },
+    )
+
+    expect(adjusted.programStats.totalSets).toBe(base.programStats.totalSets)
+    expect(adjusted.volumeByMuscle.pectoraux_bas).toBeCloseTo(base.volumeByMuscle.pectoraux_bas * 1.2, 5)
+    expect(adjusted.distribution.pectoraux).toBeCloseTo(base.distribution.pectoraux * 1.2, 5)
+  })
+
+  it('includes superset imbalance alerts in the Smart Fit result', () => {
+    const supersetExercises = [
+      { ...pushEx, group_id: 'chest-superset' },
+      { ...pushEx, name: 'Développé incliné', group_id: 'chest-superset' },
+    ]
+    const result = buildIntelligenceResult(
+      [{ name: 'Push', day_of_week: 1, days_of_week: [1], exercises: supersetExercises }],
+      { ...hypertrophyMeta, sessionMode: 'day' },
+    )
+
+    expect(result.alerts.some(alert => alert.code === 'SUPERSET_IMBALANCE')).toBe(true)
   })
 })

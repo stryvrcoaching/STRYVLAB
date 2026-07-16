@@ -98,6 +98,7 @@ const CANONICAL_TO_BODYMAP: Record<CanonicalMuscle, MuscleGroup | null> = {
 
   // Internal (should not appear in real data)
   dos_large: "back_upper",
+  cardio: null,
 };
 
 /**

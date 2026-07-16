@@ -1,7 +1,47 @@
 /** @type {import('next').NextConfig} */
 
+const withSerwistInit = require("@serwist/next").default;
+
+const withSerwist = withSerwistInit({
+  swSrc: "app/sw.ts",
+  swDest: "public/sw.js",
+  disable: process.env.NODE_ENV === "development",
+});
+
 const PRODUCTION_URL = "https://stryvlab.com";
 const isDev = process.env.NODE_ENV === "development";
+
+const defaultCsp = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'" + (isDev ? " 'unsafe-eval'" : ""),
+  "style-src 'self' 'unsafe-inline'",
+  `img-src 'self' data: blob: ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} https://*.supabase.co`,
+  `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} https://*.supabase.co wss://*.supabase.co`,
+  "frame-src 'self' blob:",
+  "child-src 'self' blob:",
+  "font-src 'self' data:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  `form-action 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://*.supabase.co'}`,
+  "frame-ancestors 'none'",
+  "worker-src 'self'",
+].join("; ");
+
+const pdfPreviewCsp = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'" + (isDev ? " 'unsafe-eval'" : ""),
+  "style-src 'self' 'unsafe-inline'",
+  `img-src 'self' data: blob: ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} https://*.supabase.co`,
+  `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} https://*.supabase.co wss://*.supabase.co`,
+  "frame-src 'self' blob:",
+  "child-src 'self' blob:",
+  "font-src 'self' data:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  `form-action 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://*.supabase.co'}`,
+  "frame-ancestors 'self'",
+  "worker-src 'self'",
+].join("; ");
 
 const nextConfig = {
   images: {
@@ -16,6 +56,22 @@ const nextConfig = {
 
   async headers() {
     return [
+      // ─── PDF preview routes — allow same-origin iframe preview ───────────
+      {
+        source: "/api/programs/:programId/pdf",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: pdfPreviewCsp },
+        ],
+      },
+      {
+        source: "/api/program-templates/:templateId/pdf",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: pdfPreviewCsp },
+        ],
+      },
+
       // ─── Security headers — applied to all routes ───────────────────────
       {
         source: "/:path*",
@@ -36,22 +92,24 @@ const nextConfig = {
           // Content Security Policy
           {
             key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              // Next.js requires 'unsafe-inline' + 'unsafe-eval' for dev; in prod inline styles from Tailwind are needed
-              "script-src 'self' 'unsafe-inline'" + (isDev ? " 'unsafe-eval'" : ""),
-              "style-src 'self' 'unsafe-inline'",
-              // Supabase storage + auth
-              `img-src 'self' data: blob: ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} https://*.supabase.co`,
-              `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} https://*.supabase.co wss://*.supabase.co`,
-              "font-src 'self' data:",
-              "object-src 'none'",
-              "base-uri 'self'",
-              "form-action 'self'",
-              "frame-ancestors 'none'",
-              "worker-src 'self'",
-            ].join("; "),
+            value: defaultCsp,
           },
+        ],
+      },
+
+      // Sensitive bearer-link surfaces must never leak their full URL or be cached.
+      {
+        source: "/bilan/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+        ],
+      },
+      {
+        source: "/api/assessments/public/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store" },
+          { key: "Referrer-Policy", value: "no-referrer" },
         ],
       },
 
@@ -88,4 +146,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withSerwist(nextConfig);

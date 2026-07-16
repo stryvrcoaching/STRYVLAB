@@ -1,4 +1,5 @@
 import type { DailyFacts } from '@/lib/client/ai-coach/dailyFacts'
+import type { ClientLang } from '@/lib/i18n/clientTranslations'
 
 export type Freedom = 'none' | 'safe' | 'extended'
 export type CoachAlertCategory = 'program_signal' | 'nutrition_trend' | 'recovery_flag'
@@ -8,6 +9,7 @@ export type CoachAlert = { category: CoachAlertCategory; priority: number; reaso
 export type AdviceTrend = { kcalOverDays: number; proteinShortDays: number }
 
 export type AdviceInput = {
+  lang: ClientLang
   facts: DailyFacts
   trend: AdviceTrend
   freedom: Freedom
@@ -19,7 +21,7 @@ export type AdviceOutput = { tips: string[]; coachAlerts: CoachAlert[] }
 type Rule = {
   id: string
   /** lifestyle tip shown to client (freedom-gated), or null if alert-only */
-  tip: ((f: DailyFacts) => string) | null
+  tip: ((f: DailyFacts, lang: ClientLang) => string) | null
   /** minimum freedom to show the tip */
   freedomMin: Freedom
   alert: ((f: DailyFacts, t: AdviceTrend) => CoachAlert) | null
@@ -59,7 +61,11 @@ const RULES: Rule[] = [
   {
     id: 'kcal_over_trend',
     when: (_f, t) => t.kcalOverDays >= 3,
-    tip: () => 'Trois jours au-dessus de la cible : là on resserre dès aujourd’hui.',
+    tip: (_f, lang) => lang === 'es'
+      ? 'Tres días por encima del objetivo: hoy toca apretar.'
+      : lang === 'en'
+        ? 'Three days above target: time to tighten things up today.'
+        : 'Trois jours au-dessus de la cible : là on resserre dès aujourd’hui.',
     freedomMin: 'safe',
     alert: () => ({ category: 'nutrition_trend', priority: 2, reason: 'kcal_over_3d' }),
     priority: 75,
@@ -67,7 +73,11 @@ const RULES: Rule[] = [
   {
     id: 'protein_short_trend',
     when: (_f, t) => t.proteinShortDays >= 3,
-    tip: () => 'Protéines sous la cible depuis trois jours, à corriger en priorité.',
+    tip: (_f, lang) => lang === 'es'
+      ? 'Proteínas por debajo del objetivo desde hace tres días: corrígelo cuanto antes.'
+      : lang === 'en'
+        ? 'Protein has been below target for three days: fix that first.'
+        : 'Protéines sous la cible depuis trois jours, à corriger en priorité.',
     freedomMin: 'safe',
     alert: () => ({ category: 'nutrition_trend', priority: 2, reason: 'protein_short_3d' }),
     priority: 60,
@@ -76,7 +86,11 @@ const RULES: Rule[] = [
   {
     id: 'hydration_low',
     when: (f) => f.hydration.pct < 60,
-    tip: (f) => `Hydratation à ${f.hydration.pct}%. Le plus simple : ancre des gorgées à des moments-clés (réveil, chaque repas, séance) plutôt qu’une grosse quantité d’un coup.`,
+    tip: (f, lang) => lang === 'es'
+      ? `Hidratación al ${f.hydration.pct}%. Lo más simple: reparte sorbos en momentos clave (al despertar, en cada comida, en la sesión) en vez de beber mucho de golpe.`
+      : lang === 'en'
+        ? `Hydration is at ${f.hydration.pct}%. The easiest move: anchor a few sips to key moments (wake-up, each meal, training) instead of drinking a huge amount at once.`
+        : `Hydratation à ${f.hydration.pct}%. Le plus simple : ancre des gorgées à des moments-clés (réveil, chaque repas, séance) plutôt qu’une grosse quantité d’un coup.`,
     freedomMin: 'safe',
     alert: null,
     priority: 40,
@@ -84,7 +98,11 @@ const RULES: Rule[] = [
   {
     id: 'stress_high',
     when: (f) => (f.checkin.stress ?? 0) >= 4,
-    tip: () => 'Stress élevé noté. 5 min de respiration ou une courte marche avant le coucher aident concrètement.',
+    tip: (_f, lang) => lang === 'es'
+      ? 'Estrés alto detectado. Cinco minutos de respiración o un paseo corto antes de dormir ayudan de verdad.'
+      : lang === 'en'
+        ? 'High stress noted. Five minutes of breathing or a short walk before bed genuinely helps.'
+        : 'Stress élevé noté. 5 min de respiration ou une courte marche avant le coucher aident concrètement.',
     freedomMin: 'safe',
     alert: null,
     priority: 35,
@@ -92,7 +110,11 @@ const RULES: Rule[] = [
   {
     id: 'sleep_short',
     when: (f) => (f.checkin.sleepHours ?? 99) < 6,
-    tip: (f) => `Nuit courte (${f.checkin.sleepHours}h) — pense à t’hydrater dès le réveil pour relancer la machine.`,
+    tip: (f, lang) => lang === 'es'
+      ? `Noche corta (${f.checkin.sleepHours}h): hidrátate desde que te despiertes para ponerte en marcha.`
+      : lang === 'en'
+        ? `Short night (${f.checkin.sleepHours}h) — hydrate as soon as you wake up to get things moving.`
+        : `Nuit courte (${f.checkin.sleepHours}h) — pense à t’hydrater dès le réveil pour relancer la machine.`,
     freedomMin: 'extended',
     alert: null,
     priority: 30,
@@ -100,7 +122,11 @@ const RULES: Rule[] = [
   {
     id: 'protein_short_day',
     when: (f) => f.nutrition.proteinShort,
-    tip: (f) => `Protéines un peu courtes (${f.nutrition.proteinLogged}/${f.nutrition.proteinTarget}g) — facile à rattraper au prochain repas.`,
+    tip: (f, lang) => lang === 'es'
+      ? `Proteínas algo cortas (${f.nutrition.proteinLogged}/${f.nutrition.proteinTarget}g): fácil de corregir en la próxima comida.`
+      : lang === 'en'
+        ? `Protein is a bit low (${f.nutrition.proteinLogged}/${f.nutrition.proteinTarget}g) — easy to catch up at the next meal.`
+        : `Protéines un peu courtes (${f.nutrition.proteinLogged}/${f.nutrition.proteinTarget}g) — facile à rattraper au prochain repas.`,
     freedomMin: 'extended',
     alert: null,
     priority: 25,
@@ -129,7 +155,7 @@ export function selectAdvice(input: AdviceInput): AdviceOutput {
       input.freedom !== 'none' &&
       !(isMorning && EVENING_ONLY_TIPS.has(r.id))
     ) {
-      tips.push(r.tip(input.facts))
+      tips.push(r.tip(input.facts, input.lang))
     }
   }
 

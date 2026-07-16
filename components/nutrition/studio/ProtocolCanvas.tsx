@@ -7,7 +7,9 @@ import CoherenceScore from './CoherenceScore'
 import InfoModal from './InfoModal'
 import { INJECTION_INFO_MODALS } from '@/lib/nutrition/infoModalDefinitions'
 import type { DayDraft } from '@/lib/nutrition/types'
+import { NUTRITION_DAY_ROLE_LABELS, type NutritionDayRole } from '@/lib/nutrition/day-role'
 import type { TrainingWeekSchedule } from '@/lib/nutrition/training-week-schedule'
+import type { MealPlanDuplicationMode } from '@/lib/nutrition/meal-plan-duplication'
 import TrainingWeekSchedulePanel from './TrainingWeekSchedulePanel'
 import ProtocolScheduleHeatmap from './ProtocolScheduleHeatmap'
 import type { CoherenceScoreData, ScheduleSlotDraft, StudioShareIssue } from './useNutritionStudio'
@@ -31,10 +33,23 @@ interface Props {
   loading?: boolean
   trainingWeekSchedule?: TrainingWeekSchedule | null
   selectedScheduleDow?: number | null
-  onSelectScheduleDow?: (dow: number) => void
+  onSelectScheduleDow?: (dow: number | null) => void
   scheduleSlots: ScheduleSlotDraft[]
   onScheduleSlotsChange: (slots: ScheduleSlotDraft[]) => void
+  mealPlanDuplication?: {
+    sourceDayIndex: number
+    selectedTargetDayIndexes: number[]
+    mode: MealPlanDuplicationMode
+    replaceExisting: boolean
+    onToggleTargetDay: (dayIndex: number) => void
+    onModeChange: (mode: MealPlanDuplicationMode) => void
+    onReplaceExistingChange: (value: boolean) => void
+    onApply: () => void
+    onCancel: () => void
+  } | null
 }
+
+const DAY_ROLE_OPTIONS: NutritionDayRole[] = ['training', 'rest', 'neutral']
 
 function NumberField({ label, value, onChange, unit }: {
   label: string; value: string; onChange: (v: string) => void; unit?: string
@@ -70,6 +85,7 @@ export default function ProtocolCanvas({
   onSelectScheduleDow,
   scheduleSlots,
   onScheduleSlotsChange,
+  mealPlanDuplication = null,
 }: Props) {
   const [editingName, setEditingName] = useState(false)
   const [tempName, setTempName] = useState(protocolName)
@@ -234,6 +250,7 @@ export default function ProtocolCanvas({
           scheduleSlots={scheduleSlots}
           onScheduleSlotsChange={onScheduleSlotsChange}
           trainingWeekSchedule={trainingWeekSchedule}
+          mealPlanDuplication={mealPlanDuplication}
         />
 
         {/* Day cards overview */}
@@ -267,6 +284,9 @@ export default function ProtocolCanvas({
                     <X size={10} />
                   </button>
                   <p className="text-[10px] font-medium text-white/80 leading-tight pr-3">{day.name}</p>
+                  <p className="mt-1 text-[8px] font-semibold uppercase tracking-[0.12em] text-white/35">
+                    {NUTRITION_DAY_ROLE_LABELS[day.role]}
+                  </p>
                   {cal > 0 ? (
                     <>
                       <p className="text-[12px] font-bold text-white mt-1">{cal} <span className="text-[9px] font-normal text-white/40">kcal</span></p>
@@ -335,6 +355,29 @@ export default function ProtocolCanvas({
                   </button>
                 </>
               )}
+            </div>
+
+            <div>
+              <p className="mb-1 text-[9px] text-white/30">Rôle du jour</p>
+              <div className="grid grid-cols-3 gap-1">
+                {DAY_ROLE_OPTIONS.map((role) => {
+                  const isSelected = activeDay.role === role
+                  return (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => onUpdateDay(activeDayIndex, { role })}
+                      className={`rounded-lg border-[0.3px] px-2 py-1.5 text-[10px] font-semibold transition-all ${
+                        isSelected
+                          ? 'border-[#1f8a65]/45 bg-[#1f8a65]/15 text-[#6ee7b7]'
+                          : 'border-white/[0.06] bg-white/[0.03] text-white/45 hover:bg-white/[0.05] hover:text-white/70'
+                      }`}
+                    >
+                      {NUTRITION_DAY_ROLE_LABELS[role]}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             {/* Injection buttons */}
@@ -411,6 +454,7 @@ export default function ProtocolCanvas({
           description={INJECTION_INFO_MODALS[openInfoModal as keyof typeof INJECTION_INFO_MODALS].description}
           example={INJECTION_INFO_MODALS[openInfoModal as keyof typeof INJECTION_INFO_MODALS].example}
           whenToUse={INJECTION_INFO_MODALS[openInfoModal as keyof typeof INJECTION_INFO_MODALS].whenToUse}
+          tabs={INJECTION_INFO_MODALS[openInfoModal as keyof typeof INJECTION_INFO_MODALS].tabs}
           onClose={() => setOpenInfoModal(null)}
         />
       )}

@@ -68,6 +68,7 @@ type CheckinRow = {
   stress_level: number | null
   muscle_soreness: number | null
   rhr_morning: number | null
+  weight_kg: number | null
 }
 
 type AssessmentRow = {
@@ -140,7 +141,7 @@ describeIfReal('phase engine Supabase real-data runner', () => {
           .single(),
         db
           .from('client_daily_checkins')
-          .select('date, flow_type, sleep_hours, sleep_quality, energy_level, stress_level, muscle_soreness, rhr_morning')
+          .select('date, flow_type, sleep_hours, sleep_quality, energy_level, stress_level, muscle_soreness, rhr_morning, weight_kg')
           .eq('client_id', clientId)
           .gte('date', checkinStart)
           .lte('date', anchorDate)
@@ -168,6 +169,28 @@ describeIfReal('phase engine Supabase real-data runner', () => {
       .filter((row) => row.rhr_morning != null && row.rhr_morning > 0)
       .map((row) => ({ date: row.date, value: row.rhr_morning as number }))
     const body = buildBodySeries(submissionRows)
+    const weightByDate = new Map(
+      body.weightSeries
+        .filter((point) => point.date >= windowStart && point.date <= anchorDate)
+        .map((point) => [point.date, point]),
+    )
+    for (const row of checkinRows) {
+      if (row.date >= windowStart && row.weight_kg != null) {
+        weightByDate.set(row.date, { date: row.date, value: row.weight_kg, source: 'manual' })
+      }
+    }
+    body.weightSeries = Array.from(weightByDate.values()).sort((left, right) =>
+      left.date.localeCompare(right.date),
+    )
+    body.bodyFatSeries = body.bodyFatSeries.filter(
+      (point) => point.date >= windowStart && point.date <= anchorDate,
+    )
+    body.leanMassSeries = body.leanMassSeries.filter(
+      (point) => point.date >= windowStart && point.date <= anchorDate,
+    )
+    body.waistSeries = body.waistSeries.filter(
+      (point) => point.date >= windowStart && point.date <= anchorDate,
+    )
     const profile = buildPhaseClientProfile({
       fitnessLevel: client!.fitness_level,
       trainingGoal: client!.training_goal,
@@ -206,6 +229,8 @@ describeIfReal('phase engine Supabase real-data runner', () => {
         anchorDate,
         checkins: checkinRows.length,
         rhrPoints: rhrSeries.length,
+        weightPoints: body.weightSeries.length,
+        bodyFatPoints: body.bodyFatSeries.length,
         rhrStatus: decision.baselines.rhr.status,
         currentRhr: decision.baselines.rhr.current,
         baselineRhr: decision.baselines.rhr.baseline,

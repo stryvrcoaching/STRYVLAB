@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, ClipboardList, Sparkles, MessageSquare, Clock, TrendingUp } from "lucide-react";
+import { emitClientInboxUpdated } from "@/lib/client/inboxEvents";
+import { sendClientMutation } from "@/lib/client/offline-mutations";
 
 export type Notification = {
   id: string;
-  type: "coach_note" | "bilan_pending" | "program_assigned" | "system_reminder" | "tdee_updated" | "coach_feedback";
+  type: "coach_note" | "coach_message" | "bilan_pending" | "program_assigned" | "program_updated" | "system_reminder" | "tdee_updated" | "coach_feedback";
   title: string;
   body: string | null;
   payload: Record<string, unknown> | null;
@@ -16,8 +18,10 @@ export type Notification = {
 
 const TYPE_ICON: Record<Notification["type"], React.ElementType> = {
   coach_note: MessageSquare,
+  coach_message: MessageSquare,
   bilan_pending: ClipboardList,
   program_assigned: Sparkles,
+  program_updated: Sparkles,
   system_reminder: Clock,
   tdee_updated: TrendingUp,
   coach_feedback: MessageSquare,
@@ -35,16 +39,39 @@ export default function NotificationsBar({
 
   const dismiss = async (id: string) => {
     setItems((prev) => prev.filter((n) => n.id !== id));
-    await fetch(`/api/client/notifications/${id}`, { method: "PATCH" });
+    emitClientInboxUpdated();
+    const result = await sendClientMutation({ kind: "notification", url: `/api/client/notifications/${id}`, method: "PATCH" });
+    if (!result.queued && !result.response?.ok) emitClientInboxUpdated();
   };
 
   const handleClick = (n: Notification) => {
+    if (!n.read_at) {
+      setItems((prev) => prev.map((item) => (
+        item.id === n.id ? { ...item, read_at: new Date().toISOString() } : item
+      )));
+      emitClientInboxUpdated();
+      void sendClientMutation({ kind: "notification", url: `/api/client/notifications/${n.id}`, method: "PATCH" }).then((result) => {
+        if (!result.queued && !result.response?.ok) emitClientInboxUpdated();
+      });
+    }
+    const actionUrl =
+      n.payload && typeof n.payload.action_url === "string"
+        ? n.payload.action_url
+        : null;
+    if (actionUrl) {
+      router.push(actionUrl);
+      return;
+    }
     if (n.type === "bilan_pending" && n.payload?.assessment_submission_id) {
       router.push(`/client/bilans/${n.payload.assessment_submission_id}`);
-    } else if (n.type === "program_assigned") {
+    } else if (n.type === "program_assigned" || n.type === "program_updated") {
       router.push("/client/programme");
     } else if (n.type === "coach_note") {
-      router.push("/client/metrics");
+      if (n.payload?.entity_type === "nutrition_smoothing") {
+        router.push("/client/nutrition");
+      } else {
+        router.push("/client/metrics");
+      }
     } else if (n.type === "tdee_updated") {
       router.push("/client/nutrition");
     } else if (n.type === "coach_feedback") {
@@ -70,7 +97,7 @@ export default function NotificationsBar({
           router.push('/client')
       }
     } else {
-      fetch("/api/client/notifications", { method: "PATCH" });
+      void sendClientMutation({ kind: "notification", url: "/api/client/notifications", method: "PATCH" });
     }
   };
 

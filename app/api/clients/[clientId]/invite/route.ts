@@ -5,6 +5,7 @@ import { sendInvitationEmail, sendReactivationEmail, sendAccessLinkEmail } from 
 import { getCoachPlan } from '@/lib/billing/getCoachPlan'
 import { hasCapability } from '@/lib/billing/plans'
 import { assertCoachClientCapacity, ClientLimitReachedError } from '@/lib/billing/clientLimits'
+import { hasValidMinorAuthorization } from '@/lib/privacy/minor-authorization'
 
 function service() {
   return createServiceClient(
@@ -59,13 +60,19 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const { data: client } = await db
     .from('coach_clients')
-    .select('id, email, first_name, last_name, status, password_set')
+    .select('id, email, first_name, last_name, status, password_set, date_of_birth, minor_authorization_status, minor_guardian_name, minor_guardian_email, minor_authorization_confirmed_at')
     .eq('id', params.clientId)
     .eq('coach_id', user.id)
     .single()
 
   if (!client) return NextResponse.json({ error: 'Client introuvable' }, { status: 404 })
   if (!client.email) return NextResponse.json({ error: 'Ce client n\'a pas d\'email' }, { status: 422 })
+  if (!hasValidMinorAuthorization(client)) {
+    return NextResponse.json(
+      { error: 'Confirmez d’abord l’autorisation du représentant légal dans le profil du client.' },
+      { status: 422 },
+    )
+  }
 
   const requiresActivation = client.status !== 'active'
   if (requiresActivation) {
@@ -82,7 +89,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   }
 
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? '').replace(/\/$/, '')
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? new URL(req.url).origin).replace(/\/$/, '')
 
   const coachFirstName = (user.user_metadata?.first_name as string | undefined) ?? null
   const coachLastName  = (user.user_metadata?.last_name  as string | undefined) ?? null
@@ -140,7 +147,10 @@ export async function POST(req: NextRequest, { params }: Params) {
       const { data: magicLinkData, error: magicLinkError } = await db.auth.admin.generateLink({
         type: 'magiclink',
         email: client.email,
-        options: { redirectTo: `${siteUrl}/client` },
+        // A magic link needs its own public landing route. Redirecting to /client
+        // makes the auth middleware send a token-bearing URL to the generic login
+        // page, which is also used for onboarding and password recovery.
+        options: { redirectTo: `${siteUrl}/client/access/login` },
       })
 
       if (magicLinkError || !magicLinkData?.properties?.action_link) {
@@ -148,25 +158,17 @@ export async function POST(req: NextRequest, { params }: Params) {
         return NextResponse.json({ error: 'Impossible de générer le lien de connexion' }, { status: 500 })
       }
 
-      const { data: recoveryData, error: recoveryError } = await db.auth.admin.generateLink({
-        type: 'recovery',
-        email: client.email,
-        options: { redirectTo: `${siteUrl}/client/auth/reset-password` },
-      })
-
-      if (recoveryError || !recoveryData?.properties?.action_link) {
-        console.error('generateLink recovery error:', recoveryError)
-        return NextResponse.json({ error: 'Impossible de générer le lien de mot de passe' }, { status: 500 })
-      }
-
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1h
+      // Do not put Supabase's one-time action URL directly in the email. Some mail
+      // security scanners follow it automatically, which consumes the token before
+      // the client can use it. The interstitial only redirects after an explicit POST.
+      const accessUrl = `${siteUrl}/client/access/continue?target=${encodeURIComponent(magicLinkData.properties.action_link)}`
       try {
         await sendAccessLinkEmail({
           to: client.email,
           clientFirstName: client.first_name ?? 'vous',
           coachName,
-          accessUrl: magicLinkData.properties.action_link,
-          passwordUrl: recoveryData.properties.action_link,
+          accessUrl,
           expiresAt,
         })
       } catch (emailError) {

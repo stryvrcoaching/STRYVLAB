@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useClientT } from '../ClientI18nProvider'
+import useBodyScrollLock from '@/components/client/useBodyScrollLock'
 
 type ActivityType = 'running' | 'cycling' | 'swimming' | 'walking' | 'team_sport' | 'other'
 
@@ -15,23 +16,28 @@ export type FreeActivitySheetProps = {
 
 const TYPES: ActivityType[] = ['running', 'cycling', 'swimming', 'walking', 'team_sport', 'other']
 
-const formatDateTime = (iso: string) => {
+const formatDateTime = (iso: string, lang: 'fr' | 'en' | 'es') => {
   const d = new Date(iso)
+  const locale = lang === 'es' ? 'es-ES' : lang === 'en' ? 'en-US' : 'fr-FR'
+  const atWord = lang === 'es' ? 'a las' : lang === 'en' ? 'at' : 'à'
   return (
-    d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) +
-    ' à ' +
-    d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    d.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' }) +
+    ` ${atWord} ` +
+    d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
   )
 }
 
 export default function FreeActivitySheet({ open, onClose, onSaved }: FreeActivitySheetProps) {
-  const { t } = useClientT()
+  const { t, lang } = useClientT()
+  useBodyScrollLock(open)
+
   const [type, setType] = useState<ActivityType>('running')
   const [customLabel, setCustomLabel] = useState('')
   const [startedAt, setStartedAt] = useState(() => new Date().toISOString().slice(0, 16))
   const [duration, setDuration] = useState(30)
   const [intensity, setIntensity] = useState(5)
   const [notes, setNotes] = useState('')
+  const [steps, setSteps] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -47,6 +53,9 @@ export default function FreeActivitySheet({ open, onClose, onSaved }: FreeActivi
       }
       if (type === 'other' && customLabel.trim()) body.custom_label = customLabel.trim()
       if (notes.trim()) body.notes = notes.trim()
+      if ((type === 'walking' || type === 'running') && steps.trim()) {
+        body.steps = parseInt(steps, 10)
+      }
 
       const r = await fetch('/api/client/activity-logs', {
         method: 'POST',
@@ -55,12 +64,13 @@ export default function FreeActivitySheet({ open, onClose, onSaved }: FreeActivi
       })
       if (!r.ok) {
         const j = await r.json().catch(() => ({}))
-        throw new Error((j as any).error ?? 'Erreur')
+        throw new Error((j as any).error ?? t('common.error'))
       }
       onSaved?.()
+      setSteps('')
       onClose()
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Erreur')
+      setError(e instanceof Error ? e.message : t('common.error'))
     } finally {
       setSaving(false)
     }
@@ -78,8 +88,8 @@ export default function FreeActivitySheet({ open, onClose, onSaved }: FreeActivi
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           />
           <motion.div
-            className="fixed left-0 right-0 bottom-0 z-[70] rounded-t-2xl flex flex-col"
-            style={{ background: '#0d0d0d', maxHeight: '88vh' }}
+            className="client-native-bottom-sheet fixed left-0 right-0 bottom-0 z-[70] rounded-t-2xl flex flex-col"
+            style={{ background: '#0d0d0d', maxHeight: '88dvh', paddingBottom: 'var(--client-modal-bottom-padding)' }}
             initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           >
@@ -95,7 +105,7 @@ export default function FreeActivitySheet({ open, onClose, onSaved }: FreeActivi
 
             <div className="overflow-y-auto flex-1 min-h-0 px-5 pb-8 space-y-4">
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-white/55 mb-2">Type</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-white/55 mb-2">{t('activity.typeLabel')}</label>
                 <div className="grid grid-cols-3 gap-2">
                   {TYPES.map(tt => (
                     <button
@@ -119,7 +129,7 @@ export default function FreeActivitySheet({ open, onClose, onSaved }: FreeActivi
                     onChange={e => setCustomLabel(e.target.value)}
                     maxLength={80}
                     className="w-full min-w-0 h-11 px-3 rounded-xl bg-[#080808] text-white text-[14px] outline-none"
-                    placeholder="Ex: Tennis"
+                    placeholder={t('activity.placeholder.custom')}
                   />
                 </div>
               )}
@@ -128,7 +138,7 @@ export default function FreeActivitySheet({ open, onClose, onSaved }: FreeActivi
                 <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-white/55 mb-2">{t('activity.when')}</label>
                 <div className="relative w-full h-11">
                   <div className="w-full h-full flex items-center px-3 rounded-xl bg-[#080808] text-white text-[14px] pointer-events-none select-none">
-                    {formatDateTime(startedAt)}
+                    {formatDateTime(startedAt, lang)}
                   </div>
                   <input
                     type="datetime-local"
@@ -171,6 +181,20 @@ export default function FreeActivitySheet({ open, onClose, onSaved }: FreeActivi
                 />
               </div>
 
+              {(type === 'walking' || type === 'running') && (
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-white/55 mb-2">{t('activity.steps')}</label>
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder={t('activity.placeholder.steps')}
+                    value={steps}
+                    onChange={e => setSteps(e.target.value)}
+                    className="w-full min-w-0 h-11 px-3 rounded-xl bg-[#080808] text-white text-[14px] outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-[0.18em] text-white/55 mb-2">{t('activity.notesOpt')}</label>
                 <textarea
@@ -185,12 +209,13 @@ export default function FreeActivitySheet({ open, onClose, onSaved }: FreeActivi
               {error && <p className="text-[12px] text-red-400">{error}</p>}
 
               <button
-                disabled={saving}
-                onClick={submit}
-                className="w-full h-12 rounded-xl bg-white/[0.10] text-white font-bold uppercase tracking-[0.1em] text-[12px] disabled:opacity-50 active:scale-[0.98] transition-transform"
-              >
-                {saving ? '...' : t('smart.activity.save')}
-              </button>
+            onClick={submit}
+            disabled={saving}
+            className="mt-3 h-11 w-full rounded-xl font-barlow-condensed text-[12px] font-black uppercase tracking-[0.14em] active:scale-[0.98] transition-all disabled:opacity-50"
+            style={{ background: "#f2f2f2", color: "#080808" }}
+          >
+            {saving ? t('common.saving') : t('common.add')}
+          </button>
             </div>
           </motion.div>
         </>

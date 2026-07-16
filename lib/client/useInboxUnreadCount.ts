@@ -9,6 +9,7 @@ import { CLIENT_INBOX_UPDATED_EVENT } from '@/lib/client/inboxEvents'
 export function useInboxUnreadCount() {
   const pathname = usePathname()
   const [count, setCount] = useState(0)
+  const [chat, setChat] = useState(0)
 
   const refresh = useCallback(async () => {
     try {
@@ -17,6 +18,7 @@ export function useInboxUnreadCount() {
       const data = await res.json()
       const next = Number(data?.total ?? 0)
       setCount(next)
+      setChat(Number(data?.chat ?? 0))
       void syncAppBadge(next)
     } catch {
       // Silent fail — badge will refresh on next successful fetch.
@@ -48,5 +50,5 @@ export function useInboxUnreadCount() {
     }
   }, [refresh])
 
-  return { count, refresh }
+  return { count, chat, refresh }
 }

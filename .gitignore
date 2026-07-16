@@ -1,5 +1,6 @@
 node_modules/
 .next/
+.next.*
 .vercel/
 .env
 .env.*
@@ -16,6 +17,11 @@ out/
 
 # generated files
 *.tsbuildinfo
+.next_*
+tmp/
+artifacts/
+*.bak
+*.bak-*
 .superpowers/
 .DS_Store
 .vercel
@@ -29,6 +35,27 @@ out/
 !env.production.example
 node_modules/
 .next/
+.next.*
 out/
 .DS_Store
 *.tsbuildinfo
+.aidd/cache/
+
+# private nutrition benchmark assets
+benchmarks/nutrition_benchmark/
+benchmarks/nutrition-scan/cases/private/
+benchmarks/nutrition-scan/sources/private-sessions.json
+
+# local tooling and generated service state
+.tmp/
+supabase/.temp/
+framework/
+
+# Capacitor needs a local fallback page even though the native app uses a hosted URL.
+!out/
+out/*
+!out/index.html
+
+# generated service worker
+public/sw.js
+public/sw.js.map

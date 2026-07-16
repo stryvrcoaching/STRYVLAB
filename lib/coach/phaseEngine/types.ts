@@ -206,6 +206,8 @@ export interface PhaseAlert {
 }
 
 export interface PhaseOptimizationResult {
+  analysisState: 'ready' | 'insufficient_data'
+  analysisStateReason: string | null
   phaseFit: {
     score: number
     band: 'optimal' | 'workable' | 'fragile' | 'incoherent'

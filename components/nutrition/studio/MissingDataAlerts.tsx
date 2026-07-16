@@ -12,7 +12,7 @@ interface Props {
     breakdown: { bmr: number };
   } | null;
   dataMode?: NutritionDataMode;
-  dataSource?: Record<string, 'selected' | 'fallback' | 'manual'>;
+  dataSource?: Record<string, 'selected' | 'fallback' | 'manual' | 'estimated'>;
   onDataClick?: (key: MissingDataKey) => void;
 }
 

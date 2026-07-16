@@ -160,7 +160,7 @@ export default function ClientNutritionPrepsWidget({ clientId }: { clientId: str
             <Sparkles size={13} className="text-[#818cf8]" />
           </div>
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/80">Prépas Smart Nutrition</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/80">Repas planifiés</p>
             <p className="text-[10px] text-white/35 mt-0.5">
               {loading ? '...' : !hasAny ? 'Aucune prépa planifiée' : `${totalPlanned} planifiée${totalPlanned > 1 ? 's' : ''} en attente`}
             </p>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { listClientNotificationItems } from '@/lib/client/inbox'
@@ -43,5 +44,7 @@ export async function PATCH(_req: NextRequest) {
     .eq('client_id', clientId)
     .is('read_at', null)
 
+  revalidatePath('/client')
+  revalidatePath('/client/profil')
   return NextResponse.json({ ok: true })
 }

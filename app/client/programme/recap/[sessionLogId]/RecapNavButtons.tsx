@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
+import { resetBodyScrollLock } from '@/components/client/useBodyScrollLock'
 
 interface Props {
   label?: string
@@ -15,6 +16,7 @@ export default function RecapNavButtons({ label, icon, href = '/client' }: Props
   const router = useRouter()
 
   function go() {
+    resetBodyScrollLock()
     router.refresh()
     router.push(href)
   }

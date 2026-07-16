@@ -1,0 +1,2631 @@
+============================================================
+NUTRITION LOG CAFÉ / THÉ - Ven 12 jui 2026 12:41:43 CEST
+============================================================
+
+### 1. Fichier principal NutritionLogContent
+============================================================
+     1	"use client"
+     2	
+     3	import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type ForwardedRef } from "react"
+     4	import { useRouter, useSearchParams } from "next/navigation"
+     5	import { AnimatePresence, motion } from "framer-motion"
+     6	import { ChevronDown, ChevronLeft, ChevronUp, Search, Plus, Minus, Check, X, Pencil, Trash2, Mic } from "lucide-react"
+     7	import dynamic from "next/dynamic"
+     8	
+     9	const VoiceLogSheet = dynamic(() => import("@/components/client/smart/VoiceLogSheet"), { ssr: false })
+    10	import type { CategoryL1, EntryDraft, FoodItem } from "@/lib/nutrition/food-items"
+    11	import {
+    12	  PORTION_SIZES,
+    13	  PORTION_MULTIPLIERS,
+    14	  calcEntryMacros,
+    15	  getScaledPortionG,
+    16	  isHandOverrideSet,
+    17	  sumDraftMacros,
+    18	  type PortionScalingProfile,
+    19	} from "@/lib/nutrition/food-items"
+    20	import { useClientT } from "@/components/client/ClientI18nProvider"
+    21	import { NUTRITION_UI_COLORS } from "@/lib/nutrition/ui-colors"
+    22	import { evaluateFoodCompatibility, suggestQuantityForItem } from "@/lib/nutrition/compose-advisor"
+    23	import { computeActionableRemaining } from "@/lib/nutrition/actionable-remaining"
+    24	import { getRemainingNutritionTargets } from "@/lib/nutrition/remaining-targets"
+    25	import RemainingNutritionSummary from "@/components/client/nutrition/RemainingNutritionSummary"
+    26	import type { NutritionMacros } from "@/components/client/smart/SmartNutritionWidget"
+    27	import { matchesVisibleLeaf, sortVisibleLeafItems, type VisibleCategoryKey, type VisibleLeafKey } from "@/lib/nutrition/food-taxonomy"
+    28	
+    29	// ─── Icônes catégories ───────────────────────────────────────
+    30	const CATEGORY_ICONS: Record<VisibleCategoryKey, string> = {
+    31	  proteins: "🥩",
+    32	  carbs: "🌾",
+    33	  fats: "🥑",
+    34	  vegetables: "🥦",
+    35	  drinks: "💧",
+    36	  supplements: "💪",
+    37	}
+    38	
+    39	const LEAF_ICONS: Record<VisibleLeafKey, string> = {
+    40	  chicken: "🐔", beef: "🐄", pork: "🐖", turkey: "🦃", fish: "🐟", seafood: "🦐", eggs: "🥚", "dairy-protein": "🥛", "plant-protein": "🌿", charcuterie: "🥓", "other-proteins": "🍖",
+    41	  rice: "🍚", pasta: "🍝", bread: "🍞", cereals: "🥣", potatoes: "🥔", legumes: "🫘", "fresh-fruits": "🍎", "dried-fruits": "🍇", "sweet-products": "🍯", "sweet-sauces": "🫙",
+    42	  oils: "🫒", "nuts-seeds": "🌰", "avocado-olives": "🥑", "butter-spreads": "🧈", "nut-butters": "🥜", "fatty-sauces": "🍶",
+    43	  leafy: "🥬", cruciferous: "🥦", roots: "🥕", mediterranean: "🍆", "other-vegetables": "🥗",
+    44	  water: "💧", "hot-drinks": "☕", "juices-smoothies": "🍹", sodas: "🥤", "plant-milks": "🥛", "sports-drinks": "⚡", alcohol: "🍷",
+    45	  whey: "🥤", "gainers-bars": "🍫", performance: "💥", "other-supplements": "💊",
+    46	}
+    47	
+    48	const PORTION_ICON_BY_KEY: Record<string, string> = {
+    49	  palm: "🤚", "half-palm": "✋", fist: "✊", "fist-dry": "👊",
+    50	  thumb: "👍", pinch: "🤏", "cupped-hands": "🙌", "bowl-hands": "🥣",
+    51	  tbsp: "🥄", "tbsp-heaped": "🥄", tsp: "☕", plate: "🍽️",
+    52	  "bread-slice": "🍞", "egg-medium": "🥚", glass: "🥛",
+    53	}
+    54	
+    55	const SUBCATEGORIES: Record<CategoryL1, string[]> = {
+    56	  proteins: ["viandes", "poissons", "oeufs", "laitiers", "vegetales", "complements"],
+    57	  carbs: ["cereales", "fecules", "pain", "legumineuses"],
+    58	  vegetables: ["feuilles", "cruciferes", "autres-legumes"],
+    59	  fruits: ["frais", "secs"],
+    60	  fats: ["huiles", "noix-graines", "autres-lipides"],
+    61	  drinks: ["eau", "chauds", "jus-smoothies", "laits-vegetaux", "sports-drinks", "alcools"],
+    62	  extras: ["sauces", "boissons", "snacks-sales", "snacks-sucres", "fast-food", "divers"],
+    63	}
+    64	
+    65	const VISIBLE_LEAVES_BY_CATEGORY: Record<VisibleCategoryKey, VisibleLeafKey[]> = {
+    66	  proteins: ["chicken", "beef", "pork", "turkey", "fish", "seafood", "eggs", "dairy-protein", "plant-protein", "charcuterie", "other-proteins"],
+    67	  carbs: ["rice", "pasta", "bread", "cereals", "potatoes", "legumes", "fresh-fruits", "dried-fruits", "sweet-products", "sweet-sauces"],
+    68	  fats: ["oils", "nuts-seeds", "avocado-olives", "butter-spreads", "nut-butters", "fatty-sauces"],
+    69	  vegetables: ["leafy", "cruciferous", "roots", "mediterranean", "other-vegetables"],
+    70	  drinks: ["water", "hot-drinks", "juices-smoothies", "sodas", "plant-milks", "sports-drinks", "alcohol"],
+    71	  supplements: ["whey", "gainers-bars", "performance", "other-supplements"],
+    72	}
+    73	
+    74	const CATEGORY_FETCH_SCOPE: Record<VisibleCategoryKey, string[]> = {
+    75	  proteins: ["proteins", "extras"],
+    76	  carbs: ["carbs", "fruits", "extras"],
+    77	  fats: ["fats", "extras"],
+    78	  vegetables: ["vegetables"],
+    79	  drinks: ["drinks", "extras"],
+    80	  supplements: ["proteins", "extras"],
+    81	}
+    82	type Layer = "category" | "subcategory" | "item" | "quantity"
+    83	export type NutritionLogLayer = Layer
+    84	type MealSource = "manual" | "voice" | "text" | "composer" | "auto_adjusted" | "flash_estimate"
+    85	type SmartComposeSurface = "explore" | "library"
+    86	
+    87	const slideVariants = {
+    88	  enter: (dir: number) => ({ x: dir > 0 ? "100%" : "-100%", opacity: 0 }),
+    89	  center: { x: 0, opacity: 1 },
+    90	  exit: (dir: number) => ({ x: dir < 0 ? "100%" : "-100%", opacity: 0 }),
+    91	}
+    92	
+    93	interface FavoriteMeal {
+    94	  id: string
+    95	  name: string
+    96	  entries: any[]
+    97	  total_calories: number | null
+    98	  total_protein_g: number | null
+    99	  total_carbs_g: number | null
+   100	  total_fat_g: number | null
+   101	  use_count: number
+   102	  last_used_at: string
+   103	}
+   104	
+   105	interface CustomFoodCatalogItem extends FoodItem {
+   106	  client_id?: string | null
+   107	}
+   108	
+   109	export interface NutritionLogContentHandle {
+   110	  saveMeal: () => Promise<boolean>
+   111	  savePrep: () => Promise<boolean>
+   112	  clearDrafts: () => void
+   113	  openVoice?: (mode?: 'voice' | 'text') => void
+   114	}
+   115	
+   116	export interface NutritionLogContentProps {
+   117	  onSuccess?: () => void
+   118	  /** When true, renders without the fixed TopBar (used inside MealLogSheet which has its own header) */
+   119	  embedded?: boolean
+   120	  /** Pre-select a meal to add items to (overrides ?meal_id search param) */
+   121	  mealId?: string | null
+   122	  /** Existing Smart Nutrition Prep to update instead of creating a new one */
+   123	  prepId?: string | null
+   124	  prepScenario?: {
+   125	    key: string
+   126	    label: string
+   127	  }
+   128	  initialPrepEntries?: Array<{
+   129	    food_item_id: string
+   130	    name_fr: string
+   131	    quantity_g: number
+   132	    calories_kcal: number
+   133	    protein_g: number
+   134	    carbs_g: number
+   135	    fat_g: number
+   136	    fiber_g?: number
+   137	  }>
+   138	  /** Runtime behavior from meal method selector */
+   139	  composerMode?: "standard" | "guide" | "simulation"
+   140	  /** Preferred starting emphasis when tracking an already eaten meal */
+   141	  entryMode?: "default" | "search" | "favorites" | "categories"
+   142	  /** Current day balance used to propose an automatic quantity */
+   143	  balanceContext?: {
+   144	    consumed: NutritionMacros
+   145	    target: NutritionMacros
+   146	    profile?: {
+   147	      gender?: string | null
+   148	      weightKg?: number | null
+   149	    }
+   150	  }
+   151	  /** When true, suppresses internal save/log buttons — parent controls actions via ref */
+   152	  hideActions?: boolean
+   153	  /** Called whenever draft totals change — use to drive external simulation views */
+   154	  onDraftsChange?: (totals: {
+   155	    calories: number
+   156	    protein: number
+   157	    carbs: number
+   158	    fat: number
+   159	    count: number
+   160	  }) => void
+   161	  /** When true, parent page owns scrolling and this component expands naturally */
+   162	  externalScroll?: boolean
+   163	  /** Exposes current navigation depth so parent containers can compact surrounding chrome */
+   164	  onLayerChange?: (layer: NutritionLogLayer) => void
+   165	  /** Compose date (ISO YYYY-MM-DD) — used when saving preps to set the correct physiological_date */
+   166	  prepDate?: string | null
+   167	  /** Meal slot for this prep (breakfast/lunch/dinner/snack) — parent sets via slot picker */
+   168	  prepMealSlot?: 'breakfast' | 'lunch' | 'dinner' | 'snack' | null
+   169	  /** Optional prep title — displayed in coach view and prep list */
+   170	  prepTitle?: string | null
+   171	  /** Called when the parent wants to open the voice/text log — used in embedded smart mode where mic lives in parent header */
+   172	  onVoiceOpen?: () => void
+   173	}
+   174	
+   175	function NutritionLogContentImpl({
+   176	  onSuccess,
+   177	  embedded = false,
+   178	  mealId: mealIdProp,
+   179	  prepId,
+   180	  prepScenario,
+   181	  initialPrepEntries,
+   182	  composerMode = "standard",
+   183	  entryMode = "default",
+   184	  balanceContext,
+   185	  hideActions = false,
+   186	  onDraftsChange,
+   187	  externalScroll = false,
+   188	  onLayerChange,
+   189	  prepDate,
+   190	  prepMealSlot,
+   191	  prepTitle,
+   192	  onVoiceOpen,
+   193	}: NutritionLogContentProps, ref: ForwardedRef<NutritionLogContentHandle>) {
+   194	  const { t } = useClientT()
+   195	  const [voiceOpen, setVoiceOpen] = useState(false)
+   196	  const [voiceInputMode, setVoiceInputMode] = useState<"voice" | "text">("voice")
+   197	  const router = useRouter()
+   198	  const searchParams = useSearchParams()
+   199	
+   200	  const CATEGORY_LABELS_T: Record<VisibleCategoryKey, string> = {
+   201	    proteins: t('food.cat.proteins'),
+   202	    carbs: t('food.cat.carbs'),
+   203	    fats: t('food.cat.fats'),
+   204	    vegetables: t('food.cat.vegetables'),
+   205	    drinks: t('food.cat.drinks'),
+   206	    supplements: t('food.sub.complements'),
+   207	  }
+   208	
+   209	  const SUBCATEGORY_LABELS_T: Record<VisibleLeafKey, string> = {
+   210	    chicken: 'Poulet',
+   211	    beef: 'Boeuf',
+   212	    pork: 'Porc',
+   213	    turkey: 'Dinde',
+   214	    fish: t('food.sub.poissons'),
+   215	    seafood: 'Fruits de mer',
+   216	    eggs: t('food.sub.oeufs'),
+   217	    'dairy-protein': t('food.sub.laitiers'),
+   218	    'plant-protein': t('food.sub.vegetales'),
+   219	    charcuterie: 'Charcuterie',
+   220	    'other-proteins': 'Autres protéines',
+   221	    rice: 'Riz',
+   222	    pasta: 'Pâtes',
+   223	    bread: t('food.sub.pain'),
+   224	    cereals: t('food.sub.cereales'),
+   225	    potatoes: 'Pommes de terre',
+   226	    legumes: t('food.sub.legumineuses'),
+   227	    'fresh-fruits': t('food.sub.frais'),
+   228	    'dried-fruits': t('food.sub.secs'),
+   229	    'sweet-products': 'Produits sucrés',
+   230	    'sweet-sauces': 'Sauces sucrées',
+   231	    oils: t('food.sub.huiles'),
+   232	    'nuts-seeds': t('food.sub.noix-graines'),
+   233	    'avocado-olives': 'Avocat & olives',
+   234	    'butter-spreads': 'Beurres & tartinables',
+   235	    'nut-butters': "Purées d'oléagineux",
+   236	    'fatty-sauces': 'Sauces grasses',
+   237	    leafy: t('food.sub.feuilles'),
+   238	    cruciferous: t('food.sub.cruciferes'),
+   239	    roots: 'Légumes racines',
+   240	    mediterranean: 'Légumes méditerranéens',
+   241	    'other-vegetables': t('food.sub.autres-legumes'),
+   242	    water: t('food.sub.eau'),
+   243	    'hot-drinks': t('food.sub.chauds'),
+   244	    'juices-smoothies': t('food.sub.jus-smoothies'),
+   245	    sodas: 'Sodas',
+   246	    'plant-milks': t('food.sub.laits-vegetaux'),
+   247	    'sports-drinks': t('food.sub.sports-drinks'),
+   248	    alcohol: t('food.sub.alcools'),
+   249	    whey: 'Whey & protéines',
+   250	    'gainers-bars': 'Gainers & barres',
+   251	    performance: 'Créatine & performance',
+   252	    'other-supplements': 'Autres compléments',
+   253	  }
+   254	
+   255	  const existingMealId = mealIdProp ?? searchParams.get("meal_id")
+   256	
+   257	  const [favorites, setFavorites] = useState<FavoriteMeal[]>([])
+   258	  const [loadingFavorites, setLoadingFavorites] = useState(false)
+   259	  const [savingFavorite, setSavingFavorite] = useState(false)
+   260	  const [savingPrep, setSavingPrep] = useState(false)
+   261	  const [favoriteName, setFavoriteName] = useState("")
+   262	  const [showFavoriteSaveForm, setShowFavoriteSaveForm] = useState(false)
+   263	
+   264	  const [layer, setLayer] = useState<Layer>("category")
+   265	  const [direction, setDirection] = useState(1)
+   266	  const [selectedCategory, setSelectedCategory] = useState<VisibleCategoryKey | null>(null)
+   267	  const [selectedSubcategory, setSelectedSubcategory] = useState<VisibleLeafKey | null>(null)
+   268	  const [selectedItem, setSelectedItem] = useState<FoodItem | null>(null)
+   269	  const [items, setItems] = useState<FoodItem[]>([])
+   270	  const [loadingItems, setLoadingItems] = useState(false)
+   271	  const [searchQ, setSearchQ] = useState("")
+   272	  const [qMode, setQMode] = useState<"grams" | "portion">("grams")
+   273	  const [quantityG, setQuantityG] = useState<number>(100)
+   274	  const [quantityInput, setQuantityInput] = useState("100")
+   275	  const [selectedPortion, setSelectedPortion] = useState<number>(0)
+   276	  const [portionMult, setPortionMult] = useState<number>(1)
+   277	  const [scalingProfile, setScalingProfile] = useState<PortionScalingProfile | null>(null)
+   278	  const [didAutoAdjust, setDidAutoAdjust] = useState(false)
+   279	  const [showCustomForm, setShowCustomForm] = useState(false)
+   280	  const [showMyFoods, setShowMyFoods] = useState(false)
+   281	  const [myFoods, setMyFoods] = useState<CustomFoodCatalogItem[]>([])
+   282	  const [loadingMyFoods, setLoadingMyFoods] = useState(false)
+   283	  const [myFoodsQuery, setMyFoodsQuery] = useState("")
+   284	  const [editingCustomFood, setEditingCustomFood] = useState<CustomFoodCatalogItem | null>(null)
+   285	  const [smartSurface, setSmartSurface] = useState<SmartComposeSurface>(
+   286	    entryMode === "favorites" ? "library" : "explore",
+   287	  )
+   288	  const [drafts, setDrafts] = useState<EntryDraft[]>([])
+   289	  const [draftExpanded, setDraftExpanded] = useState(false)
+   290	  const [saving, setSaving] = useState(false)
+   291	  const footerRef = useRef<HTMLDivElement>(null)
+   292	  const [footerH, setFooterH] = useState(120)
+   293	
+   294	  useEffect(() => {
+   295	    let cancelled = false
+   296	    fetch('/api/client/profile-scaling')
+   297	      .then(r => r.ok ? r.json() : null)
+   298	      .then(d => { if (!cancelled && d) setScalingProfile(d) })
+   299	      .catch(() => {})
+   300	    return () => { cancelled = true }
+   301	  }, [])
+   302	
+   303	  useEffect(() => {
+   304	    if (!initialPrepEntries?.length) return
+   305	    setDrafts(initialPrepEntries.map((entry) => {
+   306	      const q = entry.quantity_g > 0 ? entry.quantity_g : 100
+   307	      const factor = 100 / q
+   308	      return {
+   309	        food_item: {
+   310	          id: entry.food_item_id,
+   311	          name_fr: entry.name_fr,
+   312	          category_l1: inferCategoryFromMacros(entry),
+   313	          category_l2: null,
+   314	          item_key: `prep-${entry.food_item_id}`,
+   315	          kcal_per_100g: Math.round(entry.calories_kcal * factor),
+   316	          protein_per_100g: Math.round(entry.protein_g * factor * 10) / 10,
+   317	          carbs_per_100g: Math.round(entry.carbs_g * factor * 10) / 10,
+   318	          fat_per_100g: Math.round(entry.fat_g * factor * 10) / 10,
+   319	          fiber_per_100g: Math.round((entry.fiber_g ?? 0) * factor * 10) / 10,
+   320	          source: "user",
+   321	          is_verified: false,
+   322	        },
+   323	        quantity_g: entry.quantity_g,
+   324	        input_mode: "composer" as const,
+   325	      }
+   326	    }))
+   327	  }, [initialPrepEntries])
+   328	
+   329	  useEffect(() => {
+   330	    let cancelled = false
+   331	    setLoadingFavorites(true)
+   332	    fetch('/api/client/nutrition/favorites')
+   333	      .then(r => r.ok ? r.json() : null)
+   334	      .then(d => { if (!cancelled && d?.data) setFavorites(d.data) })
+   335	      .catch(() => {})
+   336	      .finally(() => { if (!cancelled) setLoadingFavorites(false) })
+   337	    return () => { cancelled = true }
+   338	  }, [])
+   339	
+   340	  useEffect(() => {
+   341	    if (!footerRef.current) return
+   342	    const ro = new ResizeObserver(() => {
+   343	      setFooterH(footerRef.current?.offsetHeight ?? 120)
+   344	    })
+   345	    ro.observe(footerRef.current)
+   346	    return () => ro.disconnect()
+   347	  }, [])
+   348	
+   349	  function goTo(next: Layer, dir: number) { setDirection(dir); setLayer(next) }
+   350	  function selectCategory(cat: VisibleCategoryKey) { setSelectedCategory(cat); setSelectedSubcategory(null); goTo("subcategory", 1) }
+   351	  function selectSubcategory(sub: VisibleLeafKey) { setSelectedSubcategory(sub); setSearchQ(""); goTo("item", 1) }
+   352	  function applyQuantity(next: number) {
+   353	    const safe = Math.max(0, Math.round(next))
+   354	    setQuantityG(safe)
+   355	    setQuantityInput(String(safe))
+   356	  }
+   357	
+   358	  function handleQuantityInputChange(value: string) {
+   359	    if (value === "") {
+   360	      setQuantityInput("")
+   361	      setQuantityG(0)
+   362	      return
+   363	    }
+   364	    if (!/^\d+$/.test(value)) return
+   365	    const parsed = Number(value)
+   366	    if (!Number.isFinite(parsed)) return
+   367	    setQuantityInput(value)
+   368	    setQuantityG(Math.max(0, parsed))
+   369	  }
+   370	
+   371	  function handleQuantityInputBlur() {
+   372	    if (quantityInput.trim() === "") {
+   373	      setQuantityInput("0")
+   374	    }
+   375	  }
+   376	
+   377	  function selectItem(item: FoodItem) {
+   378	    setSelectedItem(item)
+   379	    const suggested = advisorRemaining ? suggestQuantityForItem(item, advisorRemaining) : null
+   380	    if (composerMode === "guide" && suggested) {
+   381	      applyQuantity(suggested.grams)
+   382	      setDidAutoAdjust(true)
+   383	    } else {
+   384	      applyQuantity(100)
+   385	      setDidAutoAdjust(false)
+   386	    }
+   387	    setSelectedPortion(0)
+   388	    setPortionMult(1)
+   389	    setQMode("grams")
+   390	    goTo("quantity", 1)
+   391	  }
+   392	
+   393	  function goBack() {
+   394	    if (layer === "quantity") { goTo("item", -1); setSelectedItem(null) }
+   395	    else if (layer === "item") { goTo("subcategory", -1); setSelectedSubcategory(null) }
+   396	    else if (layer === "subcategory") { goTo("category", -1); setSelectedCategory(null) }
+   397	    else if (!embedded) router.back()
+   398	  }
+   399	
+   400	  const loadMyFoods = useCallback(async (query: string = "") => {
+   401	    setLoadingMyFoods(true)
+   402	    try {
+   403	      const params = new URLSearchParams({ mine: "true", limit: "300" })
+   404	      if (query.trim()) params.set("q", query.trim())
+   405	      const res = await fetch(`/api/client/food-items?${params.toString()}`)
+   406	      const json = await res.json()
+   407	      setMyFoods(json.data ?? [])
+   408	    } catch {
+   409	      setMyFoods([])
+   410	    } finally {
+   411	      setLoadingMyFoods(false)
+   412	    }
+   413	  }, [])
+   414	
+   415	  const fetchItems = useCallback(async (sub: VisibleLeafKey | null, q: string) => {
+   416	    if (!selectedCategory || !sub) return
+   417	    setLoadingItems(true)
+   418	
+   419	    try {
+   420	      const pageSize = 1000
+   421	      const allItems: FoodItem[] = []
+   422	      let offset = 0
+   423	
+   424	      while (true) {
+   425	        const params = new URLSearchParams({
+   426	          limit: String(pageSize),
+   427	          offset: String(offset),
+   428	          categories: CATEGORY_FETCH_SCOPE[selectedCategory].join(","),
+   429	        })
+   430	
+   431	        if (q) params.set("q", q)
+   432	
+   433	        const res = await fetch(`/api/client/food-items?${params}`)
+   434	        const json = await res.json()
+   435	        const pageItems = (json.data ?? []) as FoodItem[]
+   436	
+   437	        allItems.push(...pageItems)
+   438	
+   439	        if (pageItems.length < pageSize) break
+   440	        offset += pageSize
+   441	
+   442	        // Safety guard: current catalog is around 3100 foods.
+   443	        if (offset > 6000) break
+   444	      }
+   445	
+   446	      setItems(sortVisibleLeafItems(allItems.filter((item) => matchesVisibleLeaf(item, sub)), sub))
+   447	    } catch {
+   448	      setItems([])
+   449	    } finally {
+   450	      setLoadingItems(false)
+   451	    }
+   452	  }, [selectedCategory])
+   453	
+   454	  useEffect(() => {
+   455	    if (layer === "item") {
+   456	      const timer = setTimeout(() => fetchItems(selectedSubcategory, searchQ), searchQ ? 300 : 0)
+   457	      return () => clearTimeout(timer)
+   458	    }
+   459	  }, [layer, selectedSubcategory, searchQ, fetchItems])
+   460	
+   461	  useEffect(() => {
+   462	    if (!showMyFoods) return
+   463	    const timer = setTimeout(() => loadMyFoods(myFoodsQuery), myFoodsQuery ? 250 : 0)
+   464	    return () => clearTimeout(timer)
+   465	  }, [showMyFoods, myFoodsQuery, loadMyFoods])
+   466	
+   467	  function applyPortion(idx: number, mult: number = portionMult) {
+   468	    setSelectedPortion(idx)
+   469	    applyQuantity(getScaledPortionG(PORTION_SIZES[idx], scalingProfile, mult))
+   470	  }
+   471	
+   472	  function applyMultiplier(mult: number) {
+   473	    setPortionMult(mult)
+   474	    if (qMode === "portion") applyQuantity(getScaledPortionG(PORTION_SIZES[selectedPortion], scalingProfile, mult))
+   475	  }
+   476	
+   477	  function addToMeal() {
+   478	    if (!selectedItem || quantityG <= 0) return
+   479	    setDrafts(prev => [...prev, { food_item: selectedItem, quantity_g: quantityG, input_mode: qMode === "portion" ? "portion" : "composer" }])
+   480	    setSelectedCategory(null); setSelectedSubcategory(null); setSelectedItem(null)
+   481	    setDirection(-1); setLayer("category")
+   482	  }
+   483	
+   484	  function removeDraft(idx: number) { setDrafts(prev => prev.filter((_, i) => i !== idx)) }
+   485	
+   486	  async function saveMeal() {
+   487	    if (!drafts.length) return
+   488	    return persistMeal(drafts, "composer")
+   489	  }
+   490	
+   491	  function inferSlotFromTime(): 'breakfast' | 'lunch' | 'dinner' | 'snack' {
+   492	    const h = new Date().getHours()
+   493	    if (h < 10) return 'breakfast'
+   494	    if (h < 14) return 'lunch'
+   495	    if (h < 18) return 'snack'
+   496	    return 'dinner'
+   497	  }
+   498	
+   499	  async function savePrep(): Promise<boolean> {
+   500	    if (!drafts.length) return false
+   501	    setSavingPrep(true)
+   502	    try {
+   503	      const plannedFor = prepDate
+   504	        ? new Date(`${prepDate}T12:00:00.000Z`).toISOString()
+   505	        : new Date().toISOString()
+   506	      const slot = prepMealSlot ?? inferSlotFromTime()
+   507	      const res = await fetch(prepId ? `/api/client/nutrition/preps/${prepId}` : "/api/client/nutrition/preps", {
+   508	        method: prepId ? "PATCH" : "POST",
+   509	        headers: { "Content-Type": "application/json" },
+   510	        body: JSON.stringify({
+   511	          scenario_key: prepScenario?.key,
+   512	          scenario_label: prepScenario?.label,
+   513	          planned_for: plannedFor,
+   514	          ...(prepTitle?.trim() ? { title: prepTitle.trim() } : {}),
+   515	          meal_slot: slot,
+   516	          meal_type: slot,
+   517	          entries: drafts.map(d => ({
+   518	            food_item_id: d.food_item.id,
+   519	            quantity_g: d.quantity_g,
+   520	          })),
+   521	        }),
+   522	      })
+   523	      if (res.ok) {
+   524	        if (onSuccess) onSuccess()
+   525	        return true
+   526	      }
+   527	      return false
+   528	    } catch {
+   529	      return false
+   530	    } finally {
+   531	      setSavingPrep(false)
+   532	    }
+   533	  }
+   534	
+   535	  async function persistMeal(entriesDraft: EntryDraft[], mealSource: MealSource): Promise<boolean> {
+   536	    if (!entriesDraft.length) return false
+   537	    setSaving(true)
+   538	    try {
+   539	      const body: Record<string, unknown> = {
+   540	        entries: entriesDraft.map(d => ({ food_item_id: d.food_item.id, quantity_g: d.quantity_g, input_mode: d.input_mode })),
+   541	        meal_source: mealSource,
+   542	      }
+   543	      if (existingMealId) body.meal_id = existingMealId
+   544	      // Pass logged_at as noon of the compose date so physiological_date is correct
+   545	      // regardless of server timezone — mirrors the pattern used in savePrep()
+   546	      if (prepDate) body.logged_at = `${prepDate}T12:00:00.000Z`
+   547	      if (prepMealSlot) body.meal_type = prepMealSlot
+   548	      const res = await fetch("/api/client/nutrition/meals", {
+   549	        method: "POST",
+   550	        headers: { "Content-Type": "application/json" },
+   551	        body: JSON.stringify(body),
+   552	      })
+   553	      if (res.ok) {
+   554	        if (onSuccess) onSuccess()
+   555	        return true
+   556	      }
+   557	      setSaving(false)
+   558	      return false
+   559	    } catch {
+   560	      setSaving(false)
+   561	      return false
+   562	    }
+   563	  }
+   564	
+   565	  async function validateAutoAdjustedMeal() {
+   566	    if (!selectedItem || quantityG <= 0 || !didAutoAdjust) return
+   567	    const entry: EntryDraft = {
+   568	      food_item: selectedItem,
+   569	      quantity_g: quantityG,
+   570	      input_mode: "composer",
+   571	    }
+   572	    await persistMeal([entry], "auto_adjusted")
+   573	  }
+   574	
+   575	  function quickLogFavorite(fav: FavoriteMeal) {
+   576	    if (isSmartPrepMode) {
+   577	      // In simulation mode, add entries to drafts instead of logging for real
+   578	      const newDrafts: EntryDraft[] = (fav.entries as any[]).map((entry) => {
+   579	        const q = entry.quantity_g > 0 ? entry.quantity_g : 100
+   580	        const factor = 100 / q
+   581	        return {
+   582	          food_item: {
+   583	            id: entry.food_item_id,
+   584	            name_fr: entry.name_fr,
+   585	            category_l1: inferCategoryFromMacros(entry) as CategoryL1,
+   586	            category_l2: null,
+   587	            item_key: `fav-${entry.food_item_id}`,
+   588	            kcal_per_100g: Math.round((entry.calories_kcal ?? 0) * factor),
+   589	            protein_per_100g: Math.round((entry.protein_g ?? 0) * factor * 10) / 10,
+   590	            carbs_per_100g: Math.round((entry.carbs_g ?? 0) * factor * 10) / 10,
+   591	            fat_per_100g: Math.round((entry.fat_g ?? 0) * factor * 10) / 10,
+   592	            fiber_per_100g: 0,
+   593	            source: 'user',
+   594	            is_verified: false,
+   595	          },
+   596	          quantity_g: entry.quantity_g,
+   597	          input_mode: 'composer' as const,
+   598	        }
+   599	      })
+   600	      setDrafts(prev => [...prev, ...newDrafts])
+   601	      return
+   602	    }
+   603	    setSaving(true)
+   604	    fetch(`/api/client/nutrition/favorites/${fav.id}/use`, {
+   605	      method: "POST",
+   606	      headers: { "Content-Type": "application/json" },
+   607	    })
+   608	      .then(res => {
+   609	        if (res.ok) {
+   610	          if (onSuccess) onSuccess()
+   611	          else router.push("/client/nutrition")
+   612	        } else {
+   613	          setSaving(false)
+   614	        }
+   615	      })
+   616	      .catch(() => { setSaving(false) })
+   617	  }
+   618	
+   619	  async function saveFavorite() {
+   620	    if (!favoriteName.trim() || !drafts.length) return
+   621	    setSavingFavorite(true)
+   622	    try {
+   623	      const totals = sumDraftMacros(drafts)
+   624	      const entries = drafts.map(d => ({
+   625	        food_item_id: d.food_item.id,
+   626	        name_fr: d.food_item.name_fr,
+   627	        quantity_g: d.quantity_g,
+   628	        calories_kcal: calcEntryMacros(d.food_item, d.quantity_g).calories_kcal,
+   629	        protein_g: calcEntryMacros(d.food_item, d.quantity_g).protein_g,
+   630	        carbs_g: calcEntryMacros(d.food_item, d.quantity_g).carbs_g,
+   631	        fat_g: calcEntryMacros(d.food_item, d.quantity_g).fat_g,
+   632	      }))
+   633	
+   634	      const res = await fetch("/api/client/nutrition/favorites", {
+   635	        method: "POST",
+   636	        headers: { "Content-Type": "application/json" },
+   637	        body: JSON.stringify({
+   638	          name: favoriteName.trim(),
+   639	          entries,
+   640	          total_calories: totals.calories,
+   641	          total_protein_g: totals.protein,
+   642	          total_carbs_g: totals.carbs,
+   643	          total_fat_g: totals.fat,
+   644	        }),
+   645	      })
+   646	
+   647	      if (res.ok) {
+   648	        // Refetch favorites
+   649	        const favRes = await fetch('/api/client/nutrition/favorites')
+   650	        if (favRes.ok) {
+   651	          const favData = await favRes.json()
+   652	          setFavorites(favData.data ?? [])
+   653	        }
+   654	        setFavoriteName("")
+   655	        setShowFavoriteSaveForm(false)
+   656	      }
+   657	    } catch {
+   658	      // silent fail
+   659	    } finally {
+   660	      setSavingFavorite(false)
+   661	    }
+   662	  }
+   663	
+   664	  const totals = sumDraftMacros(drafts)
+   665	
+   666	  useEffect(() => {
+   667	    onDraftsChange?.({
+   668	      calories: totals.calories,
+   669	      protein: totals.protein,
+   670	      carbs: totals.carbs,
+   671	      fat: totals.fat,
+   672	      count: drafts.length,
+   673	    })
+   674	  }, [drafts]) // eslint-disable-line react-hooks/exhaustive-deps
+   675	
+   676	  useEffect(() => {
+   677	    onLayerChange?.(layer)
+   678	  }, [layer, onLayerChange])
+   679	
+   680	  const effectiveConsumed = balanceContext
+   681	    ? {
+   682	        kcal: balanceContext.consumed.kcal + totals.calories,
+   683	        protein_g: balanceContext.consumed.protein_g + totals.protein,
+   684	        carbs_g: balanceContext.consumed.carbs_g + totals.carbs,
+   685	        fat_g: balanceContext.consumed.fat_g + totals.fat,
+   686	        water_ml: balanceContext.consumed.water_ml,
+   687	      }
+   688	    : null
+   689	  const selectedMacros = selectedItem ? calcEntryMacros(selectedItem, quantityG) : null
+   690	  const actionableRemaining = effectiveConsumed && balanceContext
+   691	    ? computeActionableRemaining({
+   692	        target: balanceContext.target,
+   693	        consumed: effectiveConsumed,
+   694	        profile: balanceContext.profile,
+   695	      })
+   696	    : null
+   697	  const remainingTargets = actionableRemaining?.actionableRemaining ?? null
+   698	  const informativeRemaining = effectiveConsumed && balanceContext
+   699	    ? getRemainingNutritionTargets({
+   700	        dailyTargets: balanceContext.target,
+   701	        consumedToday: effectiveConsumed,
+   702	      })
+   703	    : null
+   704	  const advisorRemaining = remainingTargets
+   705	    ? {
+   706	        protein_g: Math.max(0, remainingTargets.protein),
+   707	        carbs_g: Math.max(0, remainingTargets.carbs),
+   708	        fat_g: Math.max(0, remainingTargets.fat),
+   709	      }
+   710	    : null
+   711	  const quantitySuggestion = selectedItem && advisorRemaining
+   712	    ? suggestQuantityForItem(selectedItem, advisorRemaining)
+   713	    : null
+   714	  const compatibility = selectedItem && advisorRemaining
+   715	    ? evaluateFoodCompatibility({
+   716	        food: selectedItem,
+   717	        remainingTargets: advisorRemaining,
+   718	        alternativesPool: items,
+   719	      })
+   720	    : null
+   721	  const previewActionable = selectedMacros && effectiveConsumed && balanceContext
+   722	    ? computeActionableRemaining({
+   723	        target: balanceContext.target,
+   724	        consumed: {
+   725	          kcal: effectiveConsumed.kcal + selectedMacros.calories_kcal,
+   726	          protein_g: effectiveConsumed.protein_g + selectedMacros.protein_g,
+   727	          carbs_g: effectiveConsumed.carbs_g + selectedMacros.carbs_g,
+   728	          fat_g: effectiveConsumed.fat_g + selectedMacros.fat_g,
+   729	        },
+   730	        profile: balanceContext.profile,
+   731	      })
+   732	    : null
+   733	  const previewRemainingTargets = previewActionable?.actionableRemaining ?? null
+   734	  const layerTitle =
+   735	    layer === "category" ? t('log.title') :
+   736	    layer === "subcategory" ? (CATEGORY_LABELS_T[selectedCategory!] ?? "") :
+   737	    layer === "item" ? (selectedSubcategory ? (SUBCATEGORY_LABELS_T[selectedSubcategory] ?? "") : "") :
+   738	    selectedItem?.name_fr ?? ""
+   739	
+   740	  const topBarH = 56
+   741	  const showSearchFirst = false
+   742	  const showCategoriesFirst = entryMode === "categories"
+   743	  const isTrackSearchOnly = composerMode === "standard" && entryMode === "search"
+   744	  const isTrackFavoritesOnly = composerMode === "standard" && entryMode === "favorites"
+   745	  const isTrackCategoriesOnly = composerMode === "standard" && entryMode === "categories"
+   746	  const isSmartPrepMode = composerMode !== "standard"
+   747	  const showFavoritesBlock = favorites.length > 0 && (entryMode === "default" || isTrackFavoritesOnly)
+   748	  const showSearchBlock = layer === "item" && !!selectedSubcategory
+   749	  const showCategoryBlock = !isTrackFavoritesOnly && !isTrackSearchOnly
+   750	  const showPersonalFoodTools = !isTrackFavoritesOnly && !isTrackSearchOnly
+   751	  const showSmartSearchBlock = false
+   752	  // In smart mode: always show both explore (categories) and library (favorites + personal tools)
+   753	  const showSmartExploreBlock = isSmartPrepMode ? true : showCategoryBlock
+   754	  const showSmartLibraryBlock = isSmartPrepMode ? true : showFavoritesBlock || showPersonalFoodTools
+   755	  const compactSmartQuantity = isSmartPrepMode && layer === "quantity"
+   756	  const useCompactDraftDock = embedded && isSmartPrepMode && hideActions
+   757	
+   758	  useEffect(() => {
+   759	    if (drafts.length === 0) {
+   760	      setDraftExpanded(false)
+   761	    }
+   762	  }, [drafts.length])
+   763	
+   764	  // Expose handle to parent (ComposeClientPage uses this to save/clear from outside)
+   765	  useImperativeHandle(ref, () => ({
+   766	    saveMeal: async () => persistMeal(drafts, "composer"),
+   767	    savePrep: async () => savePrep(),
+   768	    clearDrafts: () => {
+   769	      setDrafts([])
+   770	      setLayer("category")
+   771	      setSelectedCategory(null)
+   772	      setSelectedSubcategory(null)
+   773	      setSelectedItem(null)
+   774	    },
+   775	    openVoice: (mode: 'voice' | 'text' = 'voice') => {
+   776	      setVoiceInputMode(mode)
+   777	      setVoiceOpen(true)
+   778	    }
+   779	  }), [drafts, prepId, prepScenario?.key, prepScenario?.label, prepDate, prepMealSlot, prepTitle, onSuccess])
+   780	
+   781	  return (
+   782	    <div className={embedded ? `flex flex-col bg-[#0d0d0d] ${externalScroll ? '' : 'h-full'}` : "min-h-screen bg-[#0d0d0d] flex flex-col"}>
+   783	      {/* TopBar — hidden in embedded mode */}
+   784	      {!embedded && (
+   785	        <div className="fixed top-0 left-0 right-0 z-50 h-14 flex items-center px-4 bg-[#0a0a0a]">
+   786	          <button onClick={goBack} className="h-8 w-8 flex items-center justify-center rounded-xl bg-white/[0.06] text-white/50 hover:text-white active:scale-95 transition-all mr-3">
+   787	            <ChevronLeft size={16} />
+   788	          </button>
+   789	          <p className="text-[13px] font-semibold text-white truncate flex-1">{layerTitle}</p>
+   790	          {layer !== "category" && (
+   791	            <p className="text-[10px] uppercase tracking-[0.14em] text-white/30 font-semibold">
+   792	              {layer === "subcategory" ? "1/3" : layer === "item" ? "2/3" : "3/3"}
+   793	            </p>
+   794	          )}
+   795	        </div>
+   796	      )}
+   797	
+   798	      {/* Embedded sub-header (layer title + back) — shown only when navigated past category layer */}
+   799	      {embedded && layer !== "category" && (
+   800	        <div className={`flex items-center gap-2 px-4 py-2 shrink-0 ${isSmartPrepMode ? 'border-b border-[#818cf8]/10' : ''}`}>
+   801	          <button
+   802	            onClick={goBack}
+   803	            className={`h-7 w-7 flex items-center justify-center rounded-lg active:scale-95 transition-all ${
+   804	              isSmartPrepMode ? 'bg-[#818cf8]/12 text-[#818cf8]' : 'bg-white/[0.06] text-white/50'
+   805	            }`}
+   806	          >
+   807	            <ChevronLeft size={14} />
+   808	          </button>
+   809	          <p className="text-[12px] font-semibold text-white truncate flex-1">{layerTitle}</p>
+   810	          <p className="text-[10px] uppercase tracking-[0.14em] text-white/30 font-semibold">
+   811	            {layer === "subcategory" ? "1/3" : layer === "item" ? "2/3" : "3/3"}
+   812	          </p>
+   813	        </div>
+   814	      )}
+   815	
+   816	      {/* Layers content — min-h-0 requis pour que flex-1 ait une hauteur réelle en embedded */}
+   817	      <div
+   818	        className={externalScroll ? "relative" : "flex-1 overflow-hidden relative min-h-0"}
+   819	        style={{ paddingTop: embedded ? 0 : topBarH }}
+   820	      >
+   821	        <AnimatePresence mode="wait" custom={direction}>
+   822	          <motion.div
+   823	            key={layer + (selectedCategory ?? "") + (selectedSubcategory ?? "")}
+   824	            custom={direction}
+   825	            variants={slideVariants}
+   826	            initial="enter"
+   827	            animate="center"
+   828	            exit="exit"
+   829	            transition={{ duration: 0.22, ease: "easeOut" }}
+   830	            className={externalScroll ? "relative" : "absolute inset-0 overflow-y-auto"}
+   831	            style={{ paddingBottom: footerH + 16 }}
+   832	          >
+   833	            {/* Layer 1: Categories */}
+   834	            {layer === "category" && (
+   835	              <div className="p-4">
+   836	                {composerMode !== "standard" && !externalScroll && (
+   837	                  <div
+   838	                    className="rounded-2xl p-4 mb-3"
+   839	                    style={{
+   840	                      background: isSmartPrepMode ? 'rgba(129,140,248,0.07)' : 'rgba(255,255,255,0.04)',
+   841	                      border: isSmartPrepMode ? '0.3px solid rgba(129,140,248,0.14)' : 'none',
+   842	                    }}
+   843	                  >
+   844	                    <p
+   845	                      className="text-[10px] uppercase tracking-[0.16em] font-bold"
+   846	                      style={{ color: isSmartPrepMode ? 'rgba(129,140,248,0.7)' : 'rgba(255,255,255,0.3)' }}
+   847	                    >
+   848	                      Composer maintenant
+   849	                    </p>
+   850	                    <p className="text-[12px] text-white/60 mt-1 leading-relaxed">
+   851	                      {composerMode === "guide"
+   852	                        ? "Choisis un aliment: la portion sera ajustée selon ce qu'il te reste aujourd'hui."
+   853	                        : "Teste un aliment et regarde son impact avant de valider."}
+   854	                    </p>
+   855	                  </div>
+   856	                )}
+   857	                {remainingTargets && !externalScroll && (
+   858	                  <RemainingNutritionSummary
+   859	                    remaining={remainingTargets}
+   860	                    variant={isSmartPrepMode ? "violet" : "neutral"}
+   861	                  />
+   862	                )}
+   863	
+   864	                {/* In smart mode: section header for the food picker — voice button lives in parent header */}
+   865	
+   866	                {/* Repas habituels / favoris */}
+   867	                {showFavoritesBlock && showSmartLibraryBlock && (
+   868	                  <div className="mb-4">
+   869	                    <p className="text-[10px] uppercase tracking-[0.16em] text-white/30 font-semibold mb-2">
+   870	                      {isSmartPrepMode ? "Bibliothèque rapide" : entryMode === "favorites" ? "Favoris rapides" : "Repas recents"}
+   871	                    </p>
+   872	                    <div className="bg-white/[0.04] rounded-2xl overflow-hidden">
+   873	                      {favorites.slice(0, 4).map((fav) => (
+   874	                        <button
+   875	                          key={fav.id}
+   876	                          onClick={() => quickLogFavorite(fav)}
+   877	                          disabled={saving}
+   878	                          className="w-full flex items-center justify-between px-4 py-3 active:scale-[0.98] transition-all hover:bg-white/[0.04] text-left disabled:opacity-50"
+   879	                        >
+   880	                          <div className="flex-1 min-w-0">
+   881	                            <p className="text-[13px] font-semibold text-white truncate">{fav.name}</p>
+   882	                            <p className="text-[11px] text-white/40 mt-1">
+   883	                              {Math.round(fav.total_calories ?? 0)} kcal · P {Math.round(fav.total_protein_g ?? 0)} · G {Math.round(fav.total_carbs_g ?? 0)} · L {Math.round(fav.total_fat_g ?? 0)}
+   884	                            </p>
+   885	                          </div>
+   886	                          <span className="text-[10px] text-[#f2f2f2] font-bold ml-2">↗ Ajouter</span>
+   887	                        </button>
+   888	                      ))}
+   889	                    </div>
+   890	                  </div>
+   891	                )}
+   892	
+   893	                {isTrackFavoritesOnly && favorites.length === 0 && !loadingFavorites && (
+   894	                  <div className="rounded-2xl bg-white/[0.04] px-4 py-8 text-center">
+   895	                    <p className="text-[13px] font-semibold text-white">Aucun favori pour le moment</p>
+   896	                    <p className="text-[12px] text-white/45 mt-1">Tes repas sauvegardes apparaitront ici.</p>
+   897	                  </div>
+   898	                )}
+   899	
+   900	                {showSmartSearchBlock && (
+   901	                  isSmartPrepMode ? (
+   902	                    <div className="mb-2">
+   903	                      <QuickSearch onSelect={selectItem} autoFocus={showSearchFirst} smartMode={isSmartPrepMode} />
+   904	                    </div>
+   905	                  ) : (
+   906	                    <div className="rounded-2xl mb-3 bg-white/[0.04] p-4">
+   907	                      <p className="text-[10px] uppercase tracking-[0.16em] font-semibold mb-3 text-white/30">
+   908	                        {showSearchFirst ? "Recherche d'aliment" : t('log.quickSearch')}
+   909	                      </p>
+   910	                      <QuickSearch onSelect={selectItem} autoFocus={showSearchFirst} smartMode={isSmartPrepMode} />
+   911	                    </div>
+   912	                  )
+   913	                )}
+   914	
+   915	                {showSmartExploreBlock && (
+   916	                  isSmartPrepMode ? (
+   917	                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 mb-2">
+   918	                      {(Object.entries(CATEGORY_LABELS_T) as [VisibleCategoryKey, string][]).map(([cat, label]) => (
+   919	                        <button
+   920	                          key={cat}
+   921	                          onClick={() => selectCategory(cat)}
+   922	                          className="flex items-center gap-1.5 shrink-0 rounded-xl px-3 py-1.5 bg-[#111114] hover:bg-[#818cf8]/10 active:scale-95 transition-all text-[#818cf8] border border-[#818cf8]/10"
+   923	                        >
+   924	                          <span className="text-base">{CATEGORY_ICONS[cat]}</span>
+   925	                          <span className="text-[11px] font-semibold text-white/80">{label}</span>
+   926	                        </button>
+   927	                      ))}
+   928	                    </div>
+   929	                  ) : (
+   930	                    <div className="rounded-2xl bg-white/[0.04] p-4 mb-3">
+   931	                      <p className="text-[10px] uppercase tracking-[0.16em] font-semibold mb-4 text-white/30">
+   932	                        {showCategoriesFirst ? "Choix par categories" : t('log.chooseCategory')}
+   933	                      </p>
+   934	                      <div className="grid grid-cols-2 gap-2">
+   935	                        {(Object.entries(CATEGORY_LABELS_T) as [VisibleCategoryKey, string][]).map(([cat, label]) => (
+   936	                          <button
+   937	                            key={cat}
+   938	                            onClick={() => selectCategory(cat)}
+   939	                            className="flex flex-col items-center gap-2 rounded-xl p-4 bg-white/[0.06] hover:bg-white/[0.10] active:scale-95 transition-all"
+   940	                          >
+   941	                            <span className="text-2xl">{CATEGORY_ICONS[cat]}</span>
+   942	                            <span className={`text-[11px] font-semibold text-white/80`}>{label}</span>
+   943	                          </button>
+   944	                        ))}
+   945	                      </div>
+   946	                    </div>
+   947	                  )
+   948	                )}
+   949	
+   950	                {showPersonalFoodTools && showSmartLibraryBlock && (
+   951	                  <div className={`space-y-2 ${isSmartPrepMode ? 'mt-2' : ''}`}>
+   952	                    {isSmartPrepMode && favorites.length > 0 && (
+   953	                      <div className="mb-1">
+   954	                        <p className="text-[10px] uppercase tracking-[0.16em] text-white/30 font-semibold mb-2">Favoris rapides</p>
+   955	                        <div className="bg-[#111114] rounded-2xl overflow-hidden">
+   956	                          {favorites.slice(0, 4).map((fav) => (
+   957	                            <button
+   958	                              key={fav.id}
+   959	                              onClick={() => quickLogFavorite(fav)}
+   960	                              disabled={saving}
+   961	                              className="w-full flex items-center justify-between px-4 py-3 active:scale-[0.98] transition-all hover:bg-[#818cf8]/8 text-left disabled:opacity-50"
+   962	                            >
+   963	                              <div className="flex-1 min-w-0">
+   964	                                <p className="text-[13px] font-semibold text-white truncate">{fav.name}</p>
+   965	                                <p className="text-[11px] text-white/40 mt-0.5">
+   966	                                  {Math.round(fav.total_calories ?? 0)} kcal · P {Math.round(fav.total_protein_g ?? 0)} · G {Math.round(fav.total_carbs_g ?? 0)} · L {Math.round(fav.total_fat_g ?? 0)}
+   967	                                </p>
+   968	                              </div>
+   969	                              <span className="text-[10px] text-[#818cf8] font-bold ml-2 shrink-0">↗ Ajouter</span>
+   970	                            </button>
+   971	                          ))}
+   972	                        </div>
+   973	                      </div>
+   974	                    )}
+   975	                    <div className="grid grid-cols-2 gap-2">
+   976	                      <button
+   977	                        onClick={() => {
+   978	                          setShowCustomForm(v => !v)
+   979	                          if (showMyFoods) setShowMyFoods(false)
+   980	                          setEditingCustomFood(null)
+   981	                        }}
+   982	                        className={`w-full flex items-center justify-center gap-2 h-9 rounded-xl text-[12px] active:scale-[0.98] transition-all ${
+   983	                          isSmartPrepMode
+   984	                            ? (showCustomForm ? 'bg-[#818cf8]/16 text-[#818cf8] font-semibold' : 'bg-[#111114] text-white/50 hover:text-white/80 hover:bg-[#818cf8]/10')
+   985	                            : 'bg-white/[0.04] text-white/40 hover:text-white/70 hover:bg-white/[0.08]'
+   986	                        }`}
+   987	                      >
+   988	                        <Pencil size={13} />
+   989	                        {isSmartPrepMode ? 'Créer perso' : t('log.createCustom')}
+   990	                      </button>
+   991	                      <button
+   992	                        onClick={() => {
+   993	                          const next = !showMyFoods
+   994	                          setShowMyFoods(next)
+   995	                          setShowCustomForm(false)
+   996	                          setEditingCustomFood(null)
+   997	                          if (next) loadMyFoods(myFoodsQuery)
+   998	                        }}
+   999	                        className={`w-full flex items-center justify-center gap-2 h-9 rounded-xl text-[12px] active:scale-[0.98] transition-all ${
+  1000	                          isSmartPrepMode
+  1001	                            ? (showMyFoods ? 'bg-[#818cf8]/16 text-[#818cf8] font-semibold' : 'bg-[#111114] text-white/50 hover:text-white/80 hover:bg-[#818cf8]/10')
+  1002	                            : 'bg-white/[0.04] text-white/40 hover:text-white/70 hover:bg-white/[0.08]'
+  1003	                        }`}
+  1004	                      >
+  1005	                        <Search size={13} />
+  1006	                        {isSmartPrepMode ? 'Ma bibliothèque' : 'Mes aliments'}
+  1007	                      </button>
+  1008	                    </div>
+  1009	                  </div>
+  1010	                )}
+  1011	                {showPersonalFoodTools && showCustomForm && <CustomFoodForm onCreated={item => { setShowCustomForm(false); selectItem(item) }} onClose={() => setShowCustomForm(false)} />}
+  1012	                {showPersonalFoodTools && showMyFoods && (
+  1013	                  <MyFoodsManager
+  1014	                    items={myFoods}
+  1015	                    loading={loadingMyFoods}
+  1016	                    query={myFoodsQuery}
+  1017	                    onQueryChange={setMyFoodsQuery}
+  1018	                    editingItem={editingCustomFood}
+  1019	                    onEdit={setEditingCustomFood}
+  1020	                    onEditDone={() => {
+  1021	                      setEditingCustomFood(null)
+  1022	                      loadMyFoods(myFoodsQuery)
+  1023	                    }}
+  1024	                    onDeleteDone={() => {
+  1025	                      if (editingCustomFood) setEditingCustomFood(null)
+  1026	                      loadMyFoods(myFoodsQuery)
+  1027	                    }}
+  1028	                    onSelect={selectItem}
+  1029	                    onClose={() => {
+  1030	                      setShowMyFoods(false)
+  1031	                      setEditingCustomFood(null)
+  1032	                    }}
+  1033	                  />
+  1034	                )}
+  1035	              </div>
+  1036	            )}
+  1037	
+  1038	            {/* Layer 2: Subcategories */}
+  1039	            {layer === "subcategory" && selectedCategory && (
+  1040	              <div className="p-4">
+  1041	                <div className={`rounded-2xl overflow-hidden ${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.04]'}`}>
+  1042	                  {VISIBLE_LEAVES_BY_CATEGORY[selectedCategory].map((sub) => (
+  1043	                    <button
+  1044	                      key={sub}
+  1045	                      onClick={() => selectSubcategory(sub)}
+  1046	                      className={`w-full flex items-center justify-between px-4 py-3.5 active:scale-[0.99] transition-all ${isSmartPrepMode ? 'hover:bg-[#818cf8]/10' : 'hover:bg-white/[0.04]'}`}
+  1047	                    >
+  1048	                      <div className="flex items-center gap-3">
+  1049	                        <span className="text-xl">{LEAF_ICONS[sub] ?? "•"}</span>
+  1050	                        <span className="text-[13px] font-medium text-white">{SUBCATEGORY_LABELS_T[sub] ?? sub}</span>
+  1051	                      </div>
+  1052	                      <ChevronLeft size={14} className="text-white/30 rotate-180" />
+  1053	                    </button>
+  1054	                  ))}
+  1055	                </div>
+  1056	              </div>
+  1057	            )}
+  1058	
+  1059	            {/* Layer 3: Items */}
+  1060	            {layer === "item" && (
+  1061	              <div className="p-4">
+  1062	                {showSearchBlock && (
+  1063	                  <div className="mb-3 space-y-2">
+  1064	                    <div className={`rounded-xl flex items-center px-3 ${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.04]'}`}>
+  1065	                      <Search size={14} className={`${isSmartPrepMode ? 'text-[#818cf8]' : 'text-white/30'} shrink-0`} />
+  1066	                      <input
+  1067	                        type="text"
+  1068	                        placeholder={t('log.searchPlaceholder2')}
+  1069	                        value={searchQ}
+  1070	                        onChange={e => setSearchQ(e.target.value)}
+  1071	                        className="w-full h-10 pl-2 pr-3 bg-transparent text-[13px] text-white placeholder:text-white/20 outline-none"
+  1072	                      />
+  1073	                    </div>
+  1074	                    <p className="text-[10px] uppercase tracking-[0.14em] text-white/28 font-semibold px-1">
+  1075	                      Recherche dans {selectedSubcategory ? (SUBCATEGORY_LABELS_T[selectedSubcategory] ?? selectedSubcategory) : ''}
+  1076	                    </p>
+  1077	                  </div>
+  1078	                )}
+  1079	                {loadingItems ? (
+  1080	                  <div className={`space-y-1 rounded-2xl overflow-hidden p-2 ${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.04]'}`}>{[1, 2, 3, 4].map(i => <div key={i} className={`h-12 rounded-xl animate-pulse ${isSmartPrepMode ? 'bg-[#818cf8]/10' : 'bg-white/[0.06]'}`} />)}</div>
+  1081	                ) : items.length === 0 ? (
+  1082	                  <p className="text-[12px] text-white/30 text-center py-8">{t('log.noResults')}</p>
+  1083	                ) : (
+  1084	                  <div className={`rounded-2xl overflow-hidden ${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.04]'}`}>
+  1085	                    {items.map((item) => {
+  1086	                      const kcal = item.kcal_per_100g || 1
+  1087	                      const pPct = Math.round((item.protein_per_100g * 4 / kcal) * 100)
+  1088	                      const gPct = Math.round((item.carbs_per_100g * 4 / kcal) * 100)
+  1089	                      const lPct = Math.round((item.fat_per_100g * 9 / kcal) * 100)
+  1090	                      const chipSuggestion = (composerMode !== "standard" && advisorRemaining)
+  1091	                        ? suggestQuantityForItem(item, advisorRemaining)
+  1092	                        : null
+  1093	                      return (
+  1094	                        <button key={item.id} onClick={() => selectItem(item)} className={`w-full flex items-center justify-between px-4 py-3 active:scale-[0.99] transition-all text-left ${isSmartPrepMode ? 'hover:bg-[#818cf8]/10' : 'hover:bg-white/[0.04]'}`}>
+  1095	                          <div className="flex-1 min-w-0">
+  1096	                            <p className="text-[13px] font-medium text-white">{item.name_fr}</p>
+  1097	                            <div className="flex items-center gap-2 mt-1">
+  1098	                              <span className="text-[11px] text-white/40">{item.kcal_per_100g} kcal</span>
+  1099	                              <div className="flex h-[4px] w-[64px] rounded-full overflow-hidden gap-[1px]">
+  1100	                                <div style={{ width: `${pPct}%`, backgroundColor: NUTRITION_UI_COLORS.protein }} />
+  1101	                                <div style={{ width: `${gPct}%`, backgroundColor: NUTRITION_UI_COLORS.carbs }} />
+  1102	                                <div style={{ width: `${lPct}%`, backgroundColor: NUTRITION_UI_COLORS.fat }} />
+  1103	                              </div>
+  1104	                              <span className="text-[10px] text-white/25">P·G·L</span>
+  1105	                            </div>
+  1106	                          </div>
+  1107	                          {chipSuggestion ? (
+  1108	                            <span className="text-[10px] font-bold text-[#818cf8] shrink-0 ml-2 tabular-nums">~{chipSuggestion.grams}g</span>
+  1109	                          ) : (
+  1110	                            <span className="text-white/20 text-[11px] shrink-0 ml-2">/ 100g</span>
+  1111	                          )}
+  1112	                        </button>
+  1113	                      )
+  1114	                    })}
+  1115	                  </div>
+  1116	                )}
+  1117	              </div>
+  1118	            )}
+  1119	
+  1120	            {/* Layer 4: Quantity */}
+  1121	            {layer === "quantity" && selectedItem && (
+  1122	              <div className="p-4 space-y-4">
+  1123	                <div className={`flex gap-1 rounded-xl p-0.5 ${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.04]'}`}>
+  1124	                  {(["grams", "portion"] as const).map(m => (
+  1125	                    <button key={m} onClick={() => setQMode(m)} className={`flex-1 h-8 text-[11px] font-semibold rounded-xl transition-all ${qMode === m ? (isSmartPrepMode ? "bg-[#818cf8]/16 text-white" : "bg-white/[0.10] text-white") : "text-white/40"}`}>
+  1126	                      {m === "grams" ? t('log.gramsMode') : t('log.portionMode')}
+  1127	                    </button>
+  1128	                  ))}
+  1129	                </div>
+  1130	                <div className="space-y-3">
+  1131	                  {compactSmartQuantity && (quantitySuggestion || previewRemainingTargets) && (
+  1132	                    <div className="bg-[#111114] rounded-[24px] p-4 space-y-3">
+  1133	                      <div className="flex items-start justify-between gap-3">
+  1134	                        <div className="min-w-0">
+  1135	                          <div className="flex items-center gap-2">
+  1136	                            <p className="text-[10px] uppercase tracking-[0.16em] text-[#818cf8] font-semibold">Decision</p>
+  1137	                            {prepMealSlot && (
+  1138	                              <span className="rounded-full bg-[#818cf8]/10 px-2 py-0.5 text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.12em] text-[#818cf8]/80">
+  1139	                                {t(`compose.slot.${prepMealSlot}` as any)}
+  1140	                              </span>
+  1141	                            )}
+  1142	                          </div>
+  1143	                          <p className="mt-1 text-[16px] font-black text-white truncate">{selectedItem.name_fr}</p>
+  1144	                          <p className="mt-1 text-[12px] text-white/62 leading-relaxed">
+  1145	                            {quantitySuggestion ? quantitySuggestion.reason : "Ajuste la portion et regarde l'impact reel avant d'ajouter."}
+  1146	                          </p>
+  1147	                        </div>
+  1148	                        <div className="shrink-0 rounded-2xl bg-[#818cf8]/12 px-3 py-2 text-right min-w-[88px]">
+  1149	                          <p className="text-[18px] font-black text-white leading-none">{quantityG} g</p>
+  1150	                          <p className="text-[9px] uppercase tracking-[0.12em] text-white/28 mt-1">portion</p>
+  1151	                        </div>
+  1152	                      </div>
+  1153	
+  1154	                      {quantitySuggestion && quantityG !== quantitySuggestion.grams && (
+  1155	                        <button
+  1156	                          onClick={() => {
+  1157	                            applyQuantity(quantitySuggestion.grams)
+  1158	                            setDidAutoAdjust(true)
+  1159	                          }}
+  1160	                          className="h-9 rounded-xl bg-white/[0.06] px-3 text-[11px] font-bold uppercase tracking-[0.1em] text-white active:scale-[0.98] transition-all"
+  1161	                        >
+  1162	                          Appliquer {quantitySuggestion.grams} g
+  1163	                        </button>
+  1164	                      )}
+  1165	
+  1166	                      {compatibility?.status === "poor_fit" && (
+  1167	                        <div className="rounded-xl bg-[#ff8660]/10 px-3 py-2">
+  1168	                          <p className="text-[12px] text-[#ffd7cc] leading-relaxed">{compatibility.reasons[0]}</p>
+  1169	                        </div>
+  1170	                      )}
+  1171	
+  1172	                      <div className="grid grid-cols-2 gap-2">
+  1173	                        {selectedMacros && (
+  1174	                          <div className="rounded-2xl bg-[#818cf8]/10 px-3 py-3">
+  1175	                            <p className="text-[10px] uppercase tracking-[0.12em] text-white/28 font-semibold">Pour cette portion</p>
+  1176	                            <p className="mt-2 text-[18px] font-black text-white">{Math.round(selectedMacros.calories_kcal)} kcal</p>
+  1177	                            <div className="mt-2 flex gap-3 text-[12px] font-semibold">
+  1178	                              <span style={{ color: NUTRITION_UI_COLORS.protein }}>P {selectedMacros.protein_g}g</span>
+  1179	                              <span style={{ color: NUTRITION_UI_COLORS.carbs }}>G {selectedMacros.carbs_g}g</span>
+  1180	                              <span style={{ color: NUTRITION_UI_COLORS.fat }}>L {selectedMacros.fat_g}g</span>
+  1181	                            </div>
+  1182	                          </div>
+  1183	                        )}
+  1184	                        {previewRemainingTargets && previewActionable && (
+  1185	                          <div className="rounded-2xl bg-[#818cf8]/10 px-3 py-3">
+  1186	                            <p className="text-[10px] uppercase tracking-[0.12em] text-white/28 font-semibold">Il reste après</p>
+  1187	                            <div className="mt-2 space-y-1.5 text-[12px]">
+  1188	                              {([
+  1189	                                { label: 'Protéines', key: 'protein' as const, color: NUTRITION_UI_COLORS.protein },
+  1190	                                { label: 'Glucides', key: 'carbs' as const, color: NUTRITION_UI_COLORS.carbs },
+  1191	                                { label: 'Lipides', key: 'fat' as const, color: NUTRITION_UI_COLORS.fat },
+  1192	                              ]).map(({ label, key, color }) => {
+  1193	                                const overflowKey = `${key}_g` as 'protein_g' | 'carbs_g' | 'fat_g'
+  1194	                                const isOver = previewActionable.overflow[overflowKey] > 0
+  1195	                                return (
+  1196	                                  <div key={key} className="flex items-center justify-between">
+  1197	                                    <span className="text-white/48">{label}</span>
+  1198	                                    <span
+  1199	                                      className="font-semibold tabular-nums"
+  1200	                                      style={{ color: isOver ? '#ef4444' : color }}
+  1201	                                    >
+  1202	                                      {isOver
+  1203	                                        ? `+${Math.round(previewActionable.overflow[overflowKey])}g`
+  1204	                                        : `${Math.round(previewRemainingTargets[key])}g`}
+  1205	                                    </span>
+  1206	                                  </div>
+  1207	                                )
+  1208	                              })}
+  1209	                            </div>
+  1210	                          </div>
+  1211	                        )}
+  1212	                      </div>
+  1213	                    </div>
+  1214	                  )}
+  1215	
+  1216	                  {composerMode === "guide" && quantitySuggestion && !isSmartPrepMode && (
+  1217	                    <div className={`${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.05]'} rounded-2xl p-3 space-y-3`}>
+  1218	                      <div className="flex items-start justify-between gap-3">
+  1219	                        <div>
+  1220	                          <p className="text-[10px] uppercase tracking-[0.16em] text-white/30 font-semibold">Guide intelligent</p>
+  1221	                          <p className="text-[15px] font-black text-white mt-1">Suggestion concrete</p>
+  1222	                          <p className="text-[12px] text-white/70 mt-1">
+  1223	                            {quantitySuggestion.grams} g de {selectedItem.name_fr.toLowerCase()} pour avancer surtout sur les {quantitySuggestion.macro}.
+  1224	                          </p>
+  1225	                        </div>
+  1226	                        <div className={`rounded-xl px-3 py-2 text-right shrink-0 ${isSmartPrepMode ? 'bg-[#818cf8]/10' : 'bg-white/[0.03]'}`}>
+  1227	                          <p className="text-[16px] font-black text-white">{quantitySuggestion.grams} g</p>
+  1228	                          <p className="text-[9px] text-white/30 uppercase tracking-[0.12em] mt-1">portion cible</p>
+  1229	                        </div>
+  1230	                      </div>
+  1231	                      <button
+  1232	                        onClick={() => {
+  1233	                          applyQuantity(quantitySuggestion.grams)
+  1234	                          setDidAutoAdjust(true)
+  1235	                        }}
+  1236	                        className="w-full h-10 rounded-xl bg-[#f2f2f2] text-[#080808] text-[11px] font-bold uppercase tracking-[0.1em] active:scale-[0.98] transition-all"
+  1237	                      >
+  1238	                        Appliquer la suggestion
+  1239	                      </button>
+  1240	                    </div>
+  1241	                  )}
+  1242	
+  1243	
+  1244	                  {quantitySuggestion && !isSmartPrepMode && (
+  1245	                    <div className={`${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.04]'} rounded-2xl p-3 space-y-2`}>
+  1246	                      <div className="flex items-start justify-between gap-3">
+  1247	                        <div>
+  1248	                          <p className="text-[10px] uppercase tracking-[0.16em] text-white/30 font-semibold">Assistant de portion</p>
+  1249	                          <p className="text-[12px] text-white/70 mt-1 leading-relaxed">
+  1250	                            {quantitySuggestion.reason}
+  1251	                          </p>
+  1252	                        </div>
+  1253	                        <span className="text-[10px] uppercase tracking-[0.12em] text-[#f2f2f2]/70 font-bold shrink-0">
+  1254	                          {quantitySuggestion.macro}
+  1255	                        </span>
+  1256	                      </div>
+  1257	                      {compatibility?.status === "poor_fit" && (
+  1258	                        <div className="rounded-xl bg-[#ff8660]/10 px-3 py-2">
+  1259	                          <p className="text-[12px] text-[#ffd7cc] leading-relaxed">
+  1260	                            {compatibility.reasons[0]}
+  1261	                          </p>
+  1262	                          <p className="text-[11px] text-white/60 mt-1">
+  1263	                            Tu peux l&apos;ajouter manuellement, ou choisir une option plus legere.
+  1264	                          </p>
+  1265	                        </div>
+  1266	                      )}
+  1267	                      <div className="grid grid-cols-4 gap-2 text-center">
+  1268	                        <button
+  1269	                          onClick={() => {
+  1270	                            applyQuantity(quantitySuggestion.grams)
+  1271	                            setDidAutoAdjust(true)
+  1272	                          }}
+  1273	                          className="col-span-2 h-10 rounded-xl bg-[#f2f2f2] text-[#080808] text-[11px] font-bold uppercase tracking-[0.1em] active:scale-[0.98] transition-all"
+  1274	                        >
+  1275	                          Ajuster automatiquement
+  1276	                        </button>
+  1277	                        <div className={`col-span-2 rounded-xl px-3 py-2 ${isSmartPrepMode ? 'bg-[#818cf8]/10' : 'bg-white/[0.03]'}`}>
+  1278	                          <p className="text-[14px] font-black text-white leading-none">{Math.round(quantitySuggestion.preview.kcal)} kcal</p>
+  1279	                          <p className="text-[9px] text-white/30 uppercase tracking-[0.12em] mt-1">prévu</p>
+  1280	                        </div>
+  1281	                      </div>
+  1282	                      {didAutoAdjust && (
+  1283	                        <p className="text-[11px] text-white/60">
+  1284	                          Portion proposee: {quantitySuggestion.grams} g (modifiable).
+  1285	                        </p>
+  1286	                      )}
+  1287	                    </div>
+  1288	                  )}
+  1289	
+  1290	                  {didAutoAdjust && selectedItem && composerMode !== "simulation" && !isSmartPrepMode && (
+  1291	                    <div className={`${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.05]'} rounded-2xl p-3 space-y-3`}>
+  1292	                      <div>
+  1293	                        <p className="text-[10px] uppercase tracking-[0.16em] text-white/30 font-semibold">Pour completer ta journee</p>
+  1294	                        <p className="text-[15px] font-black text-white mt-1">Prepare ca</p>
+  1295	                        <p className="text-[13px] text-white/80 mt-2">
+  1296	                          - {quantityG} g {selectedItem.name_fr.toLowerCase()}
+  1297	                        </p>
+  1298	                        <p className="text-[11px] text-white/60 mt-2">
+  1299	                          Cela t&apos;aide a completer tes besoins sans surcharger le reste.
+  1300	                        </p>
+  1301	                      </div>
+  1302	                      <div className="grid grid-cols-1 gap-2">
+  1303	                        <button
+  1304	                          onClick={validateAutoAdjustedMeal}
+  1305	                          disabled={saving}
+  1306	                          className="h-10 rounded-xl bg-[#f2f2f2] text-[#080808] text-[11px] font-bold uppercase tracking-[0.1em] active:scale-[0.98] transition-all disabled:opacity-40"
+  1307	                        >
+  1308	                          {saving ? "Validation..." : "Valider ce repas"}
+  1309	                        </button>
+  1310	                        <button
+  1311	                          onClick={() => setDidAutoAdjust(false)}
+  1312	                          className="h-9 rounded-xl bg-white/[0.04] text-white/70 text-[11px] font-semibold active:scale-[0.98] transition-all"
+  1313	                        >
+  1314	                          Modifier les quantites
+  1315	                        </button>
+  1316	                        <button
+  1317	                          onClick={() => {
+  1318	                            setDidAutoAdjust(false)
+  1319	                            goTo("item", -1)
+  1320	                          }}
+  1321	                          className="h-9 rounded-xl bg-white/[0.04] text-white/70 text-[11px] font-semibold active:scale-[0.98] transition-all"
+  1322	                        >
+  1323	                          Choisir d&apos;autres aliments
+  1324	                        </button>
+  1325	                      </div>
+  1326	                    </div>
+  1327	                  )}
+  1328	
+  1329	                  {previewRemainingTargets && !isSmartPrepMode && (
+  1330	                    <div className={`${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.03]'} rounded-2xl p-3`}>
+  1331	                      <div className="flex items-center justify-between gap-3 mb-2">
+  1332	                        <p className="text-[10px] uppercase tracking-[0.16em] text-white/30 font-semibold">Impact instantané</p>
+  1333	                        <p className="text-[10px] uppercase tracking-[0.12em] text-white/25 font-semibold">après ajout</p>
+  1334	                      </div>
+  1335	                      <div className="grid grid-cols-3 gap-2">
+  1336	                        <div className={`rounded-xl p-2.5 ${isSmartPrepMode ? 'bg-[#818cf8]/10' : 'bg-white/[0.03]'}`}>
+  1337	                          <p className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-semibold">Prot.</p>
+  1338	                          <p className="text-[15px] font-black mt-1" style={{ color: NUTRITION_UI_COLORS.protein }}>
+  1339	                            {Math.max(0, Math.round(previewRemainingTargets.protein))}g
+  1340	                          </p>
+  1341	                        </div>
+  1342	                        <div className={`rounded-xl p-2.5 ${isSmartPrepMode ? 'bg-[#818cf8]/10' : 'bg-white/[0.03]'}`}>
+  1343	                          <p className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-semibold">Gluc.</p>
+  1344	                          <p className="text-[15px] font-black mt-1" style={{ color: NUTRITION_UI_COLORS.carbs }}>
+  1345	                            {Math.max(0, Math.round(previewRemainingTargets.carbs))}g
+  1346	                          </p>
+  1347	                        </div>
+  1348	                        <div className={`rounded-xl p-2.5 ${isSmartPrepMode ? 'bg-[#818cf8]/10' : 'bg-white/[0.03]'}`}>
+  1349	                          <p className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-semibold">Lip.</p>
+  1350	                          <p className="text-[15px] font-black mt-1" style={{ color: NUTRITION_UI_COLORS.fat }}>
+  1351	                            {Math.max(0, Math.round(previewRemainingTargets.fat))}g
+  1352	                          </p>
+  1353	                        </div>
+  1354	                      </div>
+  1355	                    </div>
+  1356	                  )}
+  1357	
+  1358	                  {qMode === "grams" && (
+  1359	                    <div className="space-y-3">
+  1360	                      <div className={`${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.03]'} rounded-2xl p-3`}>
+  1361	                        <p className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-semibold mb-2">Quantite en grammes</p>
+  1362	                        <div className="flex items-center gap-2">
+  1363	                          <button
+  1364	                            onClick={() => applyQuantity(quantityG - 5)}
+  1365	                            className="h-10 w-10 rounded-xl bg-white/[0.06] text-white/70 flex items-center justify-center"
+  1366	                          >
+  1367	                            <Minus size={14} />
+  1368	                          </button>
+  1369	                          <input
+  1370	                            type="text"
+  1371	                            inputMode="numeric"
+  1372	                            value={quantityInput}
+  1373	                            onChange={e => handleQuantityInputChange(e.target.value)}
+  1374	                            onBlur={handleQuantityInputBlur}
+  1375	                            className={`flex-1 h-10 rounded-xl text-center text-[16px] font-bold text-white outline-none ${isSmartPrepMode ? 'bg-[#818cf8]/10' : 'bg-white/[0.06]'}`}
+  1376	                          />
+  1377	                          <button
+  1378	                            onClick={() => applyQuantity(quantityG + 5)}
+  1379	                            className="h-10 w-10 rounded-xl bg-white/[0.06] text-white/70 flex items-center justify-center"
+  1380	                          >
+  1381	                            <Plus size={14} />
+  1382	                          </button>
+  1383	                        </div>
+  1384	                      </div>
+  1385	                    </div>
+  1386	                  )}
+  1387	                  {qMode === "portion" && (
+  1388	                    <>
+  1389	                      <div className="flex items-center justify-between">
+  1390	                        <p className="text-[10px] uppercase tracking-[0.16em] text-white/30 font-semibold">{t('log.choosePortion')}</p>
+  1391	                        {isHandOverrideSet(scalingProfile) && <span className="text-[9px] uppercase tracking-[0.12em] text-[#f2f2f2]/70 font-bold">ajusté à ta main</span>}
+  1392	                      </div>
+  1393	                      <div className="flex gap-1 overflow-x-auto pb-1">
+  1394	                        {PORTION_MULTIPLIERS.map(m => (
+  1395	                          <button key={m} onClick={() => applyMultiplier(m)} className={`shrink-0 h-8 px-3 rounded-xl text-[11px] font-bold transition-all ${portionMult === m ? "bg-white/[0.10] text-white" : "bg-white/[0.03] text-white/40"}`}>×{m}</button>
+  1396	                        ))}
+  1397	                      </div>
+  1398	                      <div className="space-y-2">
+  1399	                        {PORTION_SIZES.map((p, i) => {
+  1400	                          const scaledG = getScaledPortionG(p, scalingProfile, portionMult)
+
+### 2. Occurrences café/thé/eau/caféine dans le dossier log
+============================================================
+app/client/nutrition/log/NutritionLogContent.tsx:44:  water: "💧", "hot-drinks": "☕", "juices-smoothies": "🍹", sodas: "🥤", "plant-milks": "🥛", "sports-drinks": "⚡", alcohol: "🍷",
+app/client/nutrition/log/NutritionLogContent.tsx:70:  drinks: ["water", "hot-drinks", "juices-smoothies", "sodas", "plant-milks", "sports-drinks", "alcohol"],
+app/client/nutrition/log/NutritionLogContent.tsx:122:  /** Existing Smart Nutrition Prep to update instead of creating a new one */
+app/client/nutrition/log/NutritionLogContent.tsx:242:    water: t('food.sub.eau'),
+app/client/nutrition/log/NutritionLogContent.tsx:577:      // In simulation mode, add entries to drafts instead of logging for real
+app/client/nutrition/log/NutritionLogContent.tsx:686:        water_ml: balanceContext.consumed.water_ml,
+
+### 3. Fichiers locaux du dossier log
+============================================================
+app/client/nutrition/log/NutritionLogContent.tsx
+app/client/nutrition/log/page.tsx
+
+### 4. Dumps des fichiers locaux suspects
+============================================================
+
+------------------------------------------------------------
+FILE: app/client/nutrition/log/NutritionLogContent.tsx
+------------------------------------------------------------
+     1	"use client"
+     2	
+     3	import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type ForwardedRef } from "react"
+     4	import { useRouter, useSearchParams } from "next/navigation"
+     5	import { AnimatePresence, motion } from "framer-motion"
+     6	import { ChevronDown, ChevronLeft, ChevronUp, Search, Plus, Minus, Check, X, Pencil, Trash2, Mic } from "lucide-react"
+     7	import dynamic from "next/dynamic"
+     8	
+     9	const VoiceLogSheet = dynamic(() => import("@/components/client/smart/VoiceLogSheet"), { ssr: false })
+    10	import type { CategoryL1, EntryDraft, FoodItem } from "@/lib/nutrition/food-items"
+    11	import {
+    12	  PORTION_SIZES,
+    13	  PORTION_MULTIPLIERS,
+    14	  calcEntryMacros,
+    15	  getScaledPortionG,
+    16	  isHandOverrideSet,
+    17	  sumDraftMacros,
+    18	  type PortionScalingProfile,
+    19	} from "@/lib/nutrition/food-items"
+    20	import { useClientT } from "@/components/client/ClientI18nProvider"
+    21	import { NUTRITION_UI_COLORS } from "@/lib/nutrition/ui-colors"
+    22	import { evaluateFoodCompatibility, suggestQuantityForItem } from "@/lib/nutrition/compose-advisor"
+    23	import { computeActionableRemaining } from "@/lib/nutrition/actionable-remaining"
+    24	import { getRemainingNutritionTargets } from "@/lib/nutrition/remaining-targets"
+    25	import RemainingNutritionSummary from "@/components/client/nutrition/RemainingNutritionSummary"
+    26	import type { NutritionMacros } from "@/components/client/smart/SmartNutritionWidget"
+    27	import { matchesVisibleLeaf, sortVisibleLeafItems, type VisibleCategoryKey, type VisibleLeafKey } from "@/lib/nutrition/food-taxonomy"
+    28	
+    29	// ─── Icônes catégories ───────────────────────────────────────
+    30	const CATEGORY_ICONS: Record<VisibleCategoryKey, string> = {
+    31	  proteins: "🥩",
+    32	  carbs: "🌾",
+    33	  fats: "🥑",
+    34	  vegetables: "🥦",
+    35	  drinks: "💧",
+    36	  supplements: "💪",
+    37	}
+    38	
+    39	const LEAF_ICONS: Record<VisibleLeafKey, string> = {
+    40	  chicken: "🐔", beef: "🐄", pork: "🐖", turkey: "🦃", fish: "🐟", seafood: "🦐", eggs: "🥚", "dairy-protein": "🥛", "plant-protein": "🌿", charcuterie: "🥓", "other-proteins": "🍖",
+    41	  rice: "🍚", pasta: "🍝", bread: "🍞", cereals: "🥣", potatoes: "🥔", legumes: "🫘", "fresh-fruits": "🍎", "dried-fruits": "🍇", "sweet-products": "🍯", "sweet-sauces": "🫙",
+    42	  oils: "🫒", "nuts-seeds": "🌰", "avocado-olives": "🥑", "butter-spreads": "🧈", "nut-butters": "🥜", "fatty-sauces": "🍶",
+    43	  leafy: "🥬", cruciferous: "🥦", roots: "🥕", mediterranean: "🍆", "other-vegetables": "🥗",
+    44	  water: "💧", "hot-drinks": "☕", "juices-smoothies": "🍹", sodas: "🥤", "plant-milks": "🥛", "sports-drinks": "⚡", alcohol: "🍷",
+    45	  whey: "🥤", "gainers-bars": "🍫", performance: "💥", "other-supplements": "💊",
+    46	}
+    47	
+    48	const PORTION_ICON_BY_KEY: Record<string, string> = {
+    49	  palm: "🤚", "half-palm": "✋", fist: "✊", "fist-dry": "👊",
+    50	  thumb: "👍", pinch: "🤏", "cupped-hands": "🙌", "bowl-hands": "🥣",
+    51	  tbsp: "🥄", "tbsp-heaped": "🥄", tsp: "☕", plate: "🍽️",
+    52	  "bread-slice": "🍞", "egg-medium": "🥚", glass: "🥛",
+    53	}
+    54	
+    55	const SUBCATEGORIES: Record<CategoryL1, string[]> = {
+    56	  proteins: ["viandes", "poissons", "oeufs", "laitiers", "vegetales", "complements"],
+    57	  carbs: ["cereales", "fecules", "pain", "legumineuses"],
+    58	  vegetables: ["feuilles", "cruciferes", "autres-legumes"],
+    59	  fruits: ["frais", "secs"],
+    60	  fats: ["huiles", "noix-graines", "autres-lipides"],
+    61	  drinks: ["eau", "chauds", "jus-smoothies", "laits-vegetaux", "sports-drinks", "alcools"],
+    62	  extras: ["sauces", "boissons", "snacks-sales", "snacks-sucres", "fast-food", "divers"],
+    63	}
+    64	
+    65	const VISIBLE_LEAVES_BY_CATEGORY: Record<VisibleCategoryKey, VisibleLeafKey[]> = {
+    66	  proteins: ["chicken", "beef", "pork", "turkey", "fish", "seafood", "eggs", "dairy-protein", "plant-protein", "charcuterie", "other-proteins"],
+    67	  carbs: ["rice", "pasta", "bread", "cereals", "potatoes", "legumes", "fresh-fruits", "dried-fruits", "sweet-products", "sweet-sauces"],
+    68	  fats: ["oils", "nuts-seeds", "avocado-olives", "butter-spreads", "nut-butters", "fatty-sauces"],
+    69	  vegetables: ["leafy", "cruciferous", "roots", "mediterranean", "other-vegetables"],
+    70	  drinks: ["water", "hot-drinks", "juices-smoothies", "sodas", "plant-milks", "sports-drinks", "alcohol"],
+    71	  supplements: ["whey", "gainers-bars", "performance", "other-supplements"],
+    72	}
+    73	
+    74	const CATEGORY_FETCH_SCOPE: Record<VisibleCategoryKey, string[]> = {
+    75	  proteins: ["proteins", "extras"],
+    76	  carbs: ["carbs", "fruits", "extras"],
+    77	  fats: ["fats", "extras"],
+    78	  vegetables: ["vegetables"],
+    79	  drinks: ["drinks", "extras"],
+    80	  supplements: ["proteins", "extras"],
+    81	}
+    82	type Layer = "category" | "subcategory" | "item" | "quantity"
+    83	export type NutritionLogLayer = Layer
+    84	type MealSource = "manual" | "voice" | "text" | "composer" | "auto_adjusted" | "flash_estimate"
+    85	type SmartComposeSurface = "explore" | "library"
+    86	
+    87	const slideVariants = {
+    88	  enter: (dir: number) => ({ x: dir > 0 ? "100%" : "-100%", opacity: 0 }),
+    89	  center: { x: 0, opacity: 1 },
+    90	  exit: (dir: number) => ({ x: dir < 0 ? "100%" : "-100%", opacity: 0 }),
+    91	}
+    92	
+    93	interface FavoriteMeal {
+    94	  id: string
+    95	  name: string
+    96	  entries: any[]
+    97	  total_calories: number | null
+    98	  total_protein_g: number | null
+    99	  total_carbs_g: number | null
+   100	  total_fat_g: number | null
+   101	  use_count: number
+   102	  last_used_at: string
+   103	}
+   104	
+   105	interface CustomFoodCatalogItem extends FoodItem {
+   106	  client_id?: string | null
+   107	}
+   108	
+   109	export interface NutritionLogContentHandle {
+   110	  saveMeal: () => Promise<boolean>
+   111	  savePrep: () => Promise<boolean>
+   112	  clearDrafts: () => void
+   113	  openVoice?: (mode?: 'voice' | 'text') => void
+   114	}
+   115	
+   116	export interface NutritionLogContentProps {
+   117	  onSuccess?: () => void
+   118	  /** When true, renders without the fixed TopBar (used inside MealLogSheet which has its own header) */
+   119	  embedded?: boolean
+   120	  /** Pre-select a meal to add items to (overrides ?meal_id search param) */
+   121	  mealId?: string | null
+   122	  /** Existing Smart Nutrition Prep to update instead of creating a new one */
+   123	  prepId?: string | null
+   124	  prepScenario?: {
+   125	    key: string
+   126	    label: string
+   127	  }
+   128	  initialPrepEntries?: Array<{
+   129	    food_item_id: string
+   130	    name_fr: string
+   131	    quantity_g: number
+   132	    calories_kcal: number
+   133	    protein_g: number
+   134	    carbs_g: number
+   135	    fat_g: number
+   136	    fiber_g?: number
+   137	  }>
+   138	  /** Runtime behavior from meal method selector */
+   139	  composerMode?: "standard" | "guide" | "simulation"
+   140	  /** Preferred starting emphasis when tracking an already eaten meal */
+   141	  entryMode?: "default" | "search" | "favorites" | "categories"
+   142	  /** Current day balance used to propose an automatic quantity */
+   143	  balanceContext?: {
+   144	    consumed: NutritionMacros
+   145	    target: NutritionMacros
+   146	    profile?: {
+   147	      gender?: string | null
+   148	      weightKg?: number | null
+   149	    }
+   150	  }
+   151	  /** When true, suppresses internal save/log buttons — parent controls actions via ref */
+   152	  hideActions?: boolean
+   153	  /** Called whenever draft totals change — use to drive external simulation views */
+   154	  onDraftsChange?: (totals: {
+   155	    calories: number
+   156	    protein: number
+   157	    carbs: number
+   158	    fat: number
+   159	    count: number
+   160	  }) => void
+   161	  /** When true, parent page owns scrolling and this component expands naturally */
+   162	  externalScroll?: boolean
+   163	  /** Exposes current navigation depth so parent containers can compact surrounding chrome */
+   164	  onLayerChange?: (layer: NutritionLogLayer) => void
+   165	  /** Compose date (ISO YYYY-MM-DD) — used when saving preps to set the correct physiological_date */
+   166	  prepDate?: string | null
+   167	  /** Meal slot for this prep (breakfast/lunch/dinner/snack) — parent sets via slot picker */
+   168	  prepMealSlot?: 'breakfast' | 'lunch' | 'dinner' | 'snack' | null
+   169	  /** Optional prep title — displayed in coach view and prep list */
+   170	  prepTitle?: string | null
+   171	  /** Called when the parent wants to open the voice/text log — used in embedded smart mode where mic lives in parent header */
+   172	  onVoiceOpen?: () => void
+   173	}
+   174	
+   175	function NutritionLogContentImpl({
+   176	  onSuccess,
+   177	  embedded = false,
+   178	  mealId: mealIdProp,
+   179	  prepId,
+   180	  prepScenario,
+   181	  initialPrepEntries,
+   182	  composerMode = "standard",
+   183	  entryMode = "default",
+   184	  balanceContext,
+   185	  hideActions = false,
+   186	  onDraftsChange,
+   187	  externalScroll = false,
+   188	  onLayerChange,
+   189	  prepDate,
+   190	  prepMealSlot,
+   191	  prepTitle,
+   192	  onVoiceOpen,
+   193	}: NutritionLogContentProps, ref: ForwardedRef<NutritionLogContentHandle>) {
+   194	  const { t } = useClientT()
+   195	  const [voiceOpen, setVoiceOpen] = useState(false)
+   196	  const [voiceInputMode, setVoiceInputMode] = useState<"voice" | "text">("voice")
+   197	  const router = useRouter()
+   198	  const searchParams = useSearchParams()
+   199	
+   200	  const CATEGORY_LABELS_T: Record<VisibleCategoryKey, string> = {
+   201	    proteins: t('food.cat.proteins'),
+   202	    carbs: t('food.cat.carbs'),
+   203	    fats: t('food.cat.fats'),
+   204	    vegetables: t('food.cat.vegetables'),
+   205	    drinks: t('food.cat.drinks'),
+   206	    supplements: t('food.sub.complements'),
+   207	  }
+   208	
+   209	  const SUBCATEGORY_LABELS_T: Record<VisibleLeafKey, string> = {
+   210	    chicken: 'Poulet',
+   211	    beef: 'Boeuf',
+   212	    pork: 'Porc',
+   213	    turkey: 'Dinde',
+   214	    fish: t('food.sub.poissons'),
+   215	    seafood: 'Fruits de mer',
+   216	    eggs: t('food.sub.oeufs'),
+   217	    'dairy-protein': t('food.sub.laitiers'),
+   218	    'plant-protein': t('food.sub.vegetales'),
+   219	    charcuterie: 'Charcuterie',
+   220	    'other-proteins': 'Autres protéines',
+   221	    rice: 'Riz',
+   222	    pasta: 'Pâtes',
+   223	    bread: t('food.sub.pain'),
+   224	    cereals: t('food.sub.cereales'),
+   225	    potatoes: 'Pommes de terre',
+   226	    legumes: t('food.sub.legumineuses'),
+   227	    'fresh-fruits': t('food.sub.frais'),
+   228	    'dried-fruits': t('food.sub.secs'),
+   229	    'sweet-products': 'Produits sucrés',
+   230	    'sweet-sauces': 'Sauces sucrées',
+   231	    oils: t('food.sub.huiles'),
+   232	    'nuts-seeds': t('food.sub.noix-graines'),
+   233	    'avocado-olives': 'Avocat & olives',
+   234	    'butter-spreads': 'Beurres & tartinables',
+   235	    'nut-butters': "Purées d'oléagineux",
+   236	    'fatty-sauces': 'Sauces grasses',
+   237	    leafy: t('food.sub.feuilles'),
+   238	    cruciferous: t('food.sub.cruciferes'),
+   239	    roots: 'Légumes racines',
+   240	    mediterranean: 'Légumes méditerranéens',
+   241	    'other-vegetables': t('food.sub.autres-legumes'),
+   242	    water: t('food.sub.eau'),
+   243	    'hot-drinks': t('food.sub.chauds'),
+   244	    'juices-smoothies': t('food.sub.jus-smoothies'),
+   245	    sodas: 'Sodas',
+   246	    'plant-milks': t('food.sub.laits-vegetaux'),
+   247	    'sports-drinks': t('food.sub.sports-drinks'),
+   248	    alcohol: t('food.sub.alcools'),
+   249	    whey: 'Whey & protéines',
+   250	    'gainers-bars': 'Gainers & barres',
+   251	    performance: 'Créatine & performance',
+   252	    'other-supplements': 'Autres compléments',
+   253	  }
+   254	
+   255	  const existingMealId = mealIdProp ?? searchParams.get("meal_id")
+   256	
+   257	  const [favorites, setFavorites] = useState<FavoriteMeal[]>([])
+   258	  const [loadingFavorites, setLoadingFavorites] = useState(false)
+   259	  const [savingFavorite, setSavingFavorite] = useState(false)
+   260	  const [savingPrep, setSavingPrep] = useState(false)
+   261	  const [favoriteName, setFavoriteName] = useState("")
+   262	  const [showFavoriteSaveForm, setShowFavoriteSaveForm] = useState(false)
+   263	
+   264	  const [layer, setLayer] = useState<Layer>("category")
+   265	  const [direction, setDirection] = useState(1)
+   266	  const [selectedCategory, setSelectedCategory] = useState<VisibleCategoryKey | null>(null)
+   267	  const [selectedSubcategory, setSelectedSubcategory] = useState<VisibleLeafKey | null>(null)
+   268	  const [selectedItem, setSelectedItem] = useState<FoodItem | null>(null)
+   269	  const [items, setItems] = useState<FoodItem[]>([])
+   270	  const [loadingItems, setLoadingItems] = useState(false)
+   271	  const [searchQ, setSearchQ] = useState("")
+   272	  const [qMode, setQMode] = useState<"grams" | "portion">("grams")
+   273	  const [quantityG, setQuantityG] = useState<number>(100)
+   274	  const [quantityInput, setQuantityInput] = useState("100")
+   275	  const [selectedPortion, setSelectedPortion] = useState<number>(0)
+   276	  const [portionMult, setPortionMult] = useState<number>(1)
+   277	  const [scalingProfile, setScalingProfile] = useState<PortionScalingProfile | null>(null)
+   278	  const [didAutoAdjust, setDidAutoAdjust] = useState(false)
+   279	  const [showCustomForm, setShowCustomForm] = useState(false)
+   280	  const [showMyFoods, setShowMyFoods] = useState(false)
+   281	  const [myFoods, setMyFoods] = useState<CustomFoodCatalogItem[]>([])
+   282	  const [loadingMyFoods, setLoadingMyFoods] = useState(false)
+   283	  const [myFoodsQuery, setMyFoodsQuery] = useState("")
+   284	  const [editingCustomFood, setEditingCustomFood] = useState<CustomFoodCatalogItem | null>(null)
+   285	  const [smartSurface, setSmartSurface] = useState<SmartComposeSurface>(
+   286	    entryMode === "favorites" ? "library" : "explore",
+   287	  )
+   288	  const [drafts, setDrafts] = useState<EntryDraft[]>([])
+   289	  const [draftExpanded, setDraftExpanded] = useState(false)
+   290	  const [saving, setSaving] = useState(false)
+   291	  const footerRef = useRef<HTMLDivElement>(null)
+   292	  const [footerH, setFooterH] = useState(120)
+   293	
+   294	  useEffect(() => {
+   295	    let cancelled = false
+   296	    fetch('/api/client/profile-scaling')
+   297	      .then(r => r.ok ? r.json() : null)
+   298	      .then(d => { if (!cancelled && d) setScalingProfile(d) })
+   299	      .catch(() => {})
+   300	    return () => { cancelled = true }
+   301	  }, [])
+   302	
+   303	  useEffect(() => {
+   304	    if (!initialPrepEntries?.length) return
+   305	    setDrafts(initialPrepEntries.map((entry) => {
+   306	      const q = entry.quantity_g > 0 ? entry.quantity_g : 100
+   307	      const factor = 100 / q
+   308	      return {
+   309	        food_item: {
+   310	          id: entry.food_item_id,
+   311	          name_fr: entry.name_fr,
+   312	          category_l1: inferCategoryFromMacros(entry),
+   313	          category_l2: null,
+   314	          item_key: `prep-${entry.food_item_id}`,
+   315	          kcal_per_100g: Math.round(entry.calories_kcal * factor),
+   316	          protein_per_100g: Math.round(entry.protein_g * factor * 10) / 10,
+   317	          carbs_per_100g: Math.round(entry.carbs_g * factor * 10) / 10,
+   318	          fat_per_100g: Math.round(entry.fat_g * factor * 10) / 10,
+   319	          fiber_per_100g: Math.round((entry.fiber_g ?? 0) * factor * 10) / 10,
+   320	          source: "user",
+   321	          is_verified: false,
+   322	        },
+   323	        quantity_g: entry.quantity_g,
+   324	        input_mode: "composer" as const,
+   325	      }
+   326	    }))
+   327	  }, [initialPrepEntries])
+   328	
+   329	  useEffect(() => {
+   330	    let cancelled = false
+   331	    setLoadingFavorites(true)
+   332	    fetch('/api/client/nutrition/favorites')
+   333	      .then(r => r.ok ? r.json() : null)
+   334	      .then(d => { if (!cancelled && d?.data) setFavorites(d.data) })
+   335	      .catch(() => {})
+   336	      .finally(() => { if (!cancelled) setLoadingFavorites(false) })
+   337	    return () => { cancelled = true }
+   338	  }, [])
+   339	
+   340	  useEffect(() => {
+   341	    if (!footerRef.current) return
+   342	    const ro = new ResizeObserver(() => {
+   343	      setFooterH(footerRef.current?.offsetHeight ?? 120)
+   344	    })
+   345	    ro.observe(footerRef.current)
+   346	    return () => ro.disconnect()
+   347	  }, [])
+   348	
+   349	  function goTo(next: Layer, dir: number) { setDirection(dir); setLayer(next) }
+   350	  function selectCategory(cat: VisibleCategoryKey) { setSelectedCategory(cat); setSelectedSubcategory(null); goTo("subcategory", 1) }
+   351	  function selectSubcategory(sub: VisibleLeafKey) { setSelectedSubcategory(sub); setSearchQ(""); goTo("item", 1) }
+   352	  function applyQuantity(next: number) {
+   353	    const safe = Math.max(0, Math.round(next))
+   354	    setQuantityG(safe)
+   355	    setQuantityInput(String(safe))
+   356	  }
+   357	
+   358	  function handleQuantityInputChange(value: string) {
+   359	    if (value === "") {
+   360	      setQuantityInput("")
+   361	      setQuantityG(0)
+   362	      return
+   363	    }
+   364	    if (!/^\d+$/.test(value)) return
+   365	    const parsed = Number(value)
+   366	    if (!Number.isFinite(parsed)) return
+   367	    setQuantityInput(value)
+   368	    setQuantityG(Math.max(0, parsed))
+   369	  }
+   370	
+   371	  function handleQuantityInputBlur() {
+   372	    if (quantityInput.trim() === "") {
+   373	      setQuantityInput("0")
+   374	    }
+   375	  }
+   376	
+   377	  function selectItem(item: FoodItem) {
+   378	    setSelectedItem(item)
+   379	    const suggested = advisorRemaining ? suggestQuantityForItem(item, advisorRemaining) : null
+   380	    if (composerMode === "guide" && suggested) {
+   381	      applyQuantity(suggested.grams)
+   382	      setDidAutoAdjust(true)
+   383	    } else {
+   384	      applyQuantity(100)
+   385	      setDidAutoAdjust(false)
+   386	    }
+   387	    setSelectedPortion(0)
+   388	    setPortionMult(1)
+   389	    setQMode("grams")
+   390	    goTo("quantity", 1)
+   391	  }
+   392	
+   393	  function goBack() {
+   394	    if (layer === "quantity") { goTo("item", -1); setSelectedItem(null) }
+   395	    else if (layer === "item") { goTo("subcategory", -1); setSelectedSubcategory(null) }
+   396	    else if (layer === "subcategory") { goTo("category", -1); setSelectedCategory(null) }
+   397	    else if (!embedded) router.back()
+   398	  }
+   399	
+   400	  const loadMyFoods = useCallback(async (query: string = "") => {
+   401	    setLoadingMyFoods(true)
+   402	    try {
+   403	      const params = new URLSearchParams({ mine: "true", limit: "300" })
+   404	      if (query.trim()) params.set("q", query.trim())
+   405	      const res = await fetch(`/api/client/food-items?${params.toString()}`)
+   406	      const json = await res.json()
+   407	      setMyFoods(json.data ?? [])
+   408	    } catch {
+   409	      setMyFoods([])
+   410	    } finally {
+   411	      setLoadingMyFoods(false)
+   412	    }
+   413	  }, [])
+   414	
+   415	  const fetchItems = useCallback(async (sub: VisibleLeafKey | null, q: string) => {
+   416	    if (!selectedCategory || !sub) return
+   417	    setLoadingItems(true)
+   418	
+   419	    try {
+   420	      const pageSize = 1000
+   421	      const allItems: FoodItem[] = []
+   422	      let offset = 0
+   423	
+   424	      while (true) {
+   425	        const params = new URLSearchParams({
+   426	          limit: String(pageSize),
+   427	          offset: String(offset),
+   428	          categories: CATEGORY_FETCH_SCOPE[selectedCategory].join(","),
+   429	        })
+   430	
+   431	        if (q) params.set("q", q)
+   432	
+   433	        const res = await fetch(`/api/client/food-items?${params}`)
+   434	        const json = await res.json()
+   435	        const pageItems = (json.data ?? []) as FoodItem[]
+   436	
+   437	        allItems.push(...pageItems)
+   438	
+   439	        if (pageItems.length < pageSize) break
+   440	        offset += pageSize
+   441	
+   442	        // Safety guard: current catalog is around 3100 foods.
+   443	        if (offset > 6000) break
+   444	      }
+   445	
+   446	      setItems(sortVisibleLeafItems(allItems.filter((item) => matchesVisibleLeaf(item, sub)), sub))
+   447	    } catch {
+   448	      setItems([])
+   449	    } finally {
+   450	      setLoadingItems(false)
+   451	    }
+   452	  }, [selectedCategory])
+   453	
+   454	  useEffect(() => {
+   455	    if (layer === "item") {
+   456	      const timer = setTimeout(() => fetchItems(selectedSubcategory, searchQ), searchQ ? 300 : 0)
+   457	      return () => clearTimeout(timer)
+   458	    }
+   459	  }, [layer, selectedSubcategory, searchQ, fetchItems])
+   460	
+   461	  useEffect(() => {
+   462	    if (!showMyFoods) return
+   463	    const timer = setTimeout(() => loadMyFoods(myFoodsQuery), myFoodsQuery ? 250 : 0)
+   464	    return () => clearTimeout(timer)
+   465	  }, [showMyFoods, myFoodsQuery, loadMyFoods])
+   466	
+   467	  function applyPortion(idx: number, mult: number = portionMult) {
+   468	    setSelectedPortion(idx)
+   469	    applyQuantity(getScaledPortionG(PORTION_SIZES[idx], scalingProfile, mult))
+   470	  }
+   471	
+   472	  function applyMultiplier(mult: number) {
+   473	    setPortionMult(mult)
+   474	    if (qMode === "portion") applyQuantity(getScaledPortionG(PORTION_SIZES[selectedPortion], scalingProfile, mult))
+   475	  }
+   476	
+   477	  function addToMeal() {
+   478	    if (!selectedItem || quantityG <= 0) return
+   479	    setDrafts(prev => [...prev, { food_item: selectedItem, quantity_g: quantityG, input_mode: qMode === "portion" ? "portion" : "composer" }])
+   480	    setSelectedCategory(null); setSelectedSubcategory(null); setSelectedItem(null)
+   481	    setDirection(-1); setLayer("category")
+   482	  }
+   483	
+   484	  function removeDraft(idx: number) { setDrafts(prev => prev.filter((_, i) => i !== idx)) }
+   485	
+   486	  async function saveMeal() {
+   487	    if (!drafts.length) return
+   488	    return persistMeal(drafts, "composer")
+   489	  }
+   490	
+   491	  function inferSlotFromTime(): 'breakfast' | 'lunch' | 'dinner' | 'snack' {
+   492	    const h = new Date().getHours()
+   493	    if (h < 10) return 'breakfast'
+   494	    if (h < 14) return 'lunch'
+   495	    if (h < 18) return 'snack'
+   496	    return 'dinner'
+   497	  }
+   498	
+   499	  async function savePrep(): Promise<boolean> {
+   500	    if (!drafts.length) return false
+   501	    setSavingPrep(true)
+   502	    try {
+   503	      const plannedFor = prepDate
+   504	        ? new Date(`${prepDate}T12:00:00.000Z`).toISOString()
+   505	        : new Date().toISOString()
+   506	      const slot = prepMealSlot ?? inferSlotFromTime()
+   507	      const res = await fetch(prepId ? `/api/client/nutrition/preps/${prepId}` : "/api/client/nutrition/preps", {
+   508	        method: prepId ? "PATCH" : "POST",
+   509	        headers: { "Content-Type": "application/json" },
+   510	        body: JSON.stringify({
+   511	          scenario_key: prepScenario?.key,
+   512	          scenario_label: prepScenario?.label,
+   513	          planned_for: plannedFor,
+   514	          ...(prepTitle?.trim() ? { title: prepTitle.trim() } : {}),
+   515	          meal_slot: slot,
+   516	          meal_type: slot,
+   517	          entries: drafts.map(d => ({
+   518	            food_item_id: d.food_item.id,
+   519	            quantity_g: d.quantity_g,
+   520	          })),
+   521	        }),
+   522	      })
+   523	      if (res.ok) {
+   524	        if (onSuccess) onSuccess()
+   525	        return true
+   526	      }
+   527	      return false
+   528	    } catch {
+   529	      return false
+   530	    } finally {
+   531	      setSavingPrep(false)
+   532	    }
+   533	  }
+   534	
+   535	  async function persistMeal(entriesDraft: EntryDraft[], mealSource: MealSource): Promise<boolean> {
+   536	    if (!entriesDraft.length) return false
+   537	    setSaving(true)
+   538	    try {
+   539	      const body: Record<string, unknown> = {
+   540	        entries: entriesDraft.map(d => ({ food_item_id: d.food_item.id, quantity_g: d.quantity_g, input_mode: d.input_mode })),
+   541	        meal_source: mealSource,
+   542	      }
+   543	      if (existingMealId) body.meal_id = existingMealId
+   544	      // Pass logged_at as noon of the compose date so physiological_date is correct
+   545	      // regardless of server timezone — mirrors the pattern used in savePrep()
+   546	      if (prepDate) body.logged_at = `${prepDate}T12:00:00.000Z`
+   547	      if (prepMealSlot) body.meal_type = prepMealSlot
+   548	      const res = await fetch("/api/client/nutrition/meals", {
+   549	        method: "POST",
+   550	        headers: { "Content-Type": "application/json" },
+   551	        body: JSON.stringify(body),
+   552	      })
+   553	      if (res.ok) {
+   554	        if (onSuccess) onSuccess()
+   555	        return true
+   556	      }
+   557	      setSaving(false)
+   558	      return false
+   559	    } catch {
+   560	      setSaving(false)
+   561	      return false
+   562	    }
+   563	  }
+   564	
+   565	  async function validateAutoAdjustedMeal() {
+   566	    if (!selectedItem || quantityG <= 0 || !didAutoAdjust) return
+   567	    const entry: EntryDraft = {
+   568	      food_item: selectedItem,
+   569	      quantity_g: quantityG,
+   570	      input_mode: "composer",
+   571	    }
+   572	    await persistMeal([entry], "auto_adjusted")
+   573	  }
+   574	
+   575	  function quickLogFavorite(fav: FavoriteMeal) {
+   576	    if (isSmartPrepMode) {
+   577	      // In simulation mode, add entries to drafts instead of logging for real
+   578	      const newDrafts: EntryDraft[] = (fav.entries as any[]).map((entry) => {
+   579	        const q = entry.quantity_g > 0 ? entry.quantity_g : 100
+   580	        const factor = 100 / q
+   581	        return {
+   582	          food_item: {
+   583	            id: entry.food_item_id,
+   584	            name_fr: entry.name_fr,
+   585	            category_l1: inferCategoryFromMacros(entry) as CategoryL1,
+   586	            category_l2: null,
+   587	            item_key: `fav-${entry.food_item_id}`,
+   588	            kcal_per_100g: Math.round((entry.calories_kcal ?? 0) * factor),
+   589	            protein_per_100g: Math.round((entry.protein_g ?? 0) * factor * 10) / 10,
+   590	            carbs_per_100g: Math.round((entry.carbs_g ?? 0) * factor * 10) / 10,
+   591	            fat_per_100g: Math.round((entry.fat_g ?? 0) * factor * 10) / 10,
+   592	            fiber_per_100g: 0,
+   593	            source: 'user',
+   594	            is_verified: false,
+   595	          },
+   596	          quantity_g: entry.quantity_g,
+   597	          input_mode: 'composer' as const,
+   598	        }
+   599	      })
+   600	      setDrafts(prev => [...prev, ...newDrafts])
+   601	      return
+   602	    }
+   603	    setSaving(true)
+   604	    fetch(`/api/client/nutrition/favorites/${fav.id}/use`, {
+   605	      method: "POST",
+   606	      headers: { "Content-Type": "application/json" },
+   607	    })
+   608	      .then(res => {
+   609	        if (res.ok) {
+   610	          if (onSuccess) onSuccess()
+   611	          else router.push("/client/nutrition")
+   612	        } else {
+   613	          setSaving(false)
+   614	        }
+   615	      })
+   616	      .catch(() => { setSaving(false) })
+   617	  }
+   618	
+   619	  async function saveFavorite() {
+   620	    if (!favoriteName.trim() || !drafts.length) return
+   621	    setSavingFavorite(true)
+   622	    try {
+   623	      const totals = sumDraftMacros(drafts)
+   624	      const entries = drafts.map(d => ({
+   625	        food_item_id: d.food_item.id,
+   626	        name_fr: d.food_item.name_fr,
+   627	        quantity_g: d.quantity_g,
+   628	        calories_kcal: calcEntryMacros(d.food_item, d.quantity_g).calories_kcal,
+   629	        protein_g: calcEntryMacros(d.food_item, d.quantity_g).protein_g,
+   630	        carbs_g: calcEntryMacros(d.food_item, d.quantity_g).carbs_g,
+   631	        fat_g: calcEntryMacros(d.food_item, d.quantity_g).fat_g,
+   632	      }))
+   633	
+   634	      const res = await fetch("/api/client/nutrition/favorites", {
+   635	        method: "POST",
+   636	        headers: { "Content-Type": "application/json" },
+   637	        body: JSON.stringify({
+   638	          name: favoriteName.trim(),
+   639	          entries,
+   640	          total_calories: totals.calories,
+   641	          total_protein_g: totals.protein,
+   642	          total_carbs_g: totals.carbs,
+   643	          total_fat_g: totals.fat,
+   644	        }),
+   645	      })
+   646	
+   647	      if (res.ok) {
+   648	        // Refetch favorites
+   649	        const favRes = await fetch('/api/client/nutrition/favorites')
+   650	        if (favRes.ok) {
+   651	          const favData = await favRes.json()
+   652	          setFavorites(favData.data ?? [])
+   653	        }
+   654	        setFavoriteName("")
+   655	        setShowFavoriteSaveForm(false)
+   656	      }
+   657	    } catch {
+   658	      // silent fail
+   659	    } finally {
+   660	      setSavingFavorite(false)
+   661	    }
+   662	  }
+   663	
+   664	  const totals = sumDraftMacros(drafts)
+   665	
+   666	  useEffect(() => {
+   667	    onDraftsChange?.({
+   668	      calories: totals.calories,
+   669	      protein: totals.protein,
+   670	      carbs: totals.carbs,
+   671	      fat: totals.fat,
+   672	      count: drafts.length,
+   673	    })
+   674	  }, [drafts]) // eslint-disable-line react-hooks/exhaustive-deps
+   675	
+   676	  useEffect(() => {
+   677	    onLayerChange?.(layer)
+   678	  }, [layer, onLayerChange])
+   679	
+   680	  const effectiveConsumed = balanceContext
+   681	    ? {
+   682	        kcal: balanceContext.consumed.kcal + totals.calories,
+   683	        protein_g: balanceContext.consumed.protein_g + totals.protein,
+   684	        carbs_g: balanceContext.consumed.carbs_g + totals.carbs,
+   685	        fat_g: balanceContext.consumed.fat_g + totals.fat,
+   686	        water_ml: balanceContext.consumed.water_ml,
+   687	      }
+   688	    : null
+   689	  const selectedMacros = selectedItem ? calcEntryMacros(selectedItem, quantityG) : null
+   690	  const actionableRemaining = effectiveConsumed && balanceContext
+   691	    ? computeActionableRemaining({
+   692	        target: balanceContext.target,
+   693	        consumed: effectiveConsumed,
+   694	        profile: balanceContext.profile,
+   695	      })
+   696	    : null
+   697	  const remainingTargets = actionableRemaining?.actionableRemaining ?? null
+   698	  const informativeRemaining = effectiveConsumed && balanceContext
+   699	    ? getRemainingNutritionTargets({
+   700	        dailyTargets: balanceContext.target,
+   701	        consumedToday: effectiveConsumed,
+   702	      })
+   703	    : null
+   704	  const advisorRemaining = remainingTargets
+   705	    ? {
+   706	        protein_g: Math.max(0, remainingTargets.protein),
+   707	        carbs_g: Math.max(0, remainingTargets.carbs),
+   708	        fat_g: Math.max(0, remainingTargets.fat),
+   709	      }
+   710	    : null
+   711	  const quantitySuggestion = selectedItem && advisorRemaining
+   712	    ? suggestQuantityForItem(selectedItem, advisorRemaining)
+   713	    : null
+   714	  const compatibility = selectedItem && advisorRemaining
+   715	    ? evaluateFoodCompatibility({
+   716	        food: selectedItem,
+   717	        remainingTargets: advisorRemaining,
+   718	        alternativesPool: items,
+   719	      })
+   720	    : null
+   721	  const previewActionable = selectedMacros && effectiveConsumed && balanceContext
+   722	    ? computeActionableRemaining({
+   723	        target: balanceContext.target,
+   724	        consumed: {
+   725	          kcal: effectiveConsumed.kcal + selectedMacros.calories_kcal,
+   726	          protein_g: effectiveConsumed.protein_g + selectedMacros.protein_g,
+   727	          carbs_g: effectiveConsumed.carbs_g + selectedMacros.carbs_g,
+   728	          fat_g: effectiveConsumed.fat_g + selectedMacros.fat_g,
+   729	        },
+   730	        profile: balanceContext.profile,
+   731	      })
+   732	    : null
+   733	  const previewRemainingTargets = previewActionable?.actionableRemaining ?? null
+   734	  const layerTitle =
+   735	    layer === "category" ? t('log.title') :
+   736	    layer === "subcategory" ? (CATEGORY_LABELS_T[selectedCategory!] ?? "") :
+   737	    layer === "item" ? (selectedSubcategory ? (SUBCATEGORY_LABELS_T[selectedSubcategory] ?? "") : "") :
+   738	    selectedItem?.name_fr ?? ""
+   739	
+   740	  const topBarH = 56
+   741	  const showSearchFirst = false
+   742	  const showCategoriesFirst = entryMode === "categories"
+   743	  const isTrackSearchOnly = composerMode === "standard" && entryMode === "search"
+   744	  const isTrackFavoritesOnly = composerMode === "standard" && entryMode === "favorites"
+   745	  const isTrackCategoriesOnly = composerMode === "standard" && entryMode === "categories"
+   746	  const isSmartPrepMode = composerMode !== "standard"
+   747	  const showFavoritesBlock = favorites.length > 0 && (entryMode === "default" || isTrackFavoritesOnly)
+   748	  const showSearchBlock = layer === "item" && !!selectedSubcategory
+   749	  const showCategoryBlock = !isTrackFavoritesOnly && !isTrackSearchOnly
+   750	  const showPersonalFoodTools = !isTrackFavoritesOnly && !isTrackSearchOnly
+   751	  const showSmartSearchBlock = false
+   752	  // In smart mode: always show both explore (categories) and library (favorites + personal tools)
+   753	  const showSmartExploreBlock = isSmartPrepMode ? true : showCategoryBlock
+   754	  const showSmartLibraryBlock = isSmartPrepMode ? true : showFavoritesBlock || showPersonalFoodTools
+   755	  const compactSmartQuantity = isSmartPrepMode && layer === "quantity"
+   756	  const useCompactDraftDock = embedded && isSmartPrepMode && hideActions
+   757	
+   758	  useEffect(() => {
+   759	    if (drafts.length === 0) {
+   760	      setDraftExpanded(false)
+   761	    }
+   762	  }, [drafts.length])
+   763	
+   764	  // Expose handle to parent (ComposeClientPage uses this to save/clear from outside)
+   765	  useImperativeHandle(ref, () => ({
+   766	    saveMeal: async () => persistMeal(drafts, "composer"),
+   767	    savePrep: async () => savePrep(),
+   768	    clearDrafts: () => {
+   769	      setDrafts([])
+   770	      setLayer("category")
+   771	      setSelectedCategory(null)
+   772	      setSelectedSubcategory(null)
+   773	      setSelectedItem(null)
+   774	    },
+   775	    openVoice: (mode: 'voice' | 'text' = 'voice') => {
+   776	      setVoiceInputMode(mode)
+   777	      setVoiceOpen(true)
+   778	    }
+   779	  }), [drafts, prepId, prepScenario?.key, prepScenario?.label, prepDate, prepMealSlot, prepTitle, onSuccess])
+   780	
+   781	  return (
+   782	    <div className={embedded ? `flex flex-col bg-[#0d0d0d] ${externalScroll ? '' : 'h-full'}` : "min-h-screen bg-[#0d0d0d] flex flex-col"}>
+   783	      {/* TopBar — hidden in embedded mode */}
+   784	      {!embedded && (
+   785	        <div className="fixed top-0 left-0 right-0 z-50 h-14 flex items-center px-4 bg-[#0a0a0a]">
+   786	          <button onClick={goBack} className="h-8 w-8 flex items-center justify-center rounded-xl bg-white/[0.06] text-white/50 hover:text-white active:scale-95 transition-all mr-3">
+   787	            <ChevronLeft size={16} />
+   788	          </button>
+   789	          <p className="text-[13px] font-semibold text-white truncate flex-1">{layerTitle}</p>
+   790	          {layer !== "category" && (
+   791	            <p className="text-[10px] uppercase tracking-[0.14em] text-white/30 font-semibold">
+   792	              {layer === "subcategory" ? "1/3" : layer === "item" ? "2/3" : "3/3"}
+   793	            </p>
+   794	          )}
+   795	        </div>
+   796	      )}
+   797	
+   798	      {/* Embedded sub-header (layer title + back) — shown only when navigated past category layer */}
+   799	      {embedded && layer !== "category" && (
+   800	        <div className={`flex items-center gap-2 px-4 py-2 shrink-0 ${isSmartPrepMode ? 'border-b border-[#818cf8]/10' : ''}`}>
+   801	          <button
+   802	            onClick={goBack}
+   803	            className={`h-7 w-7 flex items-center justify-center rounded-lg active:scale-95 transition-all ${
+   804	              isSmartPrepMode ? 'bg-[#818cf8]/12 text-[#818cf8]' : 'bg-white/[0.06] text-white/50'
+   805	            }`}
+   806	          >
+   807	            <ChevronLeft size={14} />
+   808	          </button>
+   809	          <p className="text-[12px] font-semibold text-white truncate flex-1">{layerTitle}</p>
+   810	          <p className="text-[10px] uppercase tracking-[0.14em] text-white/30 font-semibold">
+   811	            {layer === "subcategory" ? "1/3" : layer === "item" ? "2/3" : "3/3"}
+   812	          </p>
+   813	        </div>
+   814	      )}
+   815	
+   816	      {/* Layers content — min-h-0 requis pour que flex-1 ait une hauteur réelle en embedded */}
+   817	      <div
+   818	        className={externalScroll ? "relative" : "flex-1 overflow-hidden relative min-h-0"}
+   819	        style={{ paddingTop: embedded ? 0 : topBarH }}
+   820	      >
+   821	        <AnimatePresence mode="wait" custom={direction}>
+   822	          <motion.div
+   823	            key={layer + (selectedCategory ?? "") + (selectedSubcategory ?? "")}
+   824	            custom={direction}
+   825	            variants={slideVariants}
+   826	            initial="enter"
+   827	            animate="center"
+   828	            exit="exit"
+   829	            transition={{ duration: 0.22, ease: "easeOut" }}
+   830	            className={externalScroll ? "relative" : "absolute inset-0 overflow-y-auto"}
+   831	            style={{ paddingBottom: footerH + 16 }}
+   832	          >
+   833	            {/* Layer 1: Categories */}
+   834	            {layer === "category" && (
+   835	              <div className="p-4">
+   836	                {composerMode !== "standard" && !externalScroll && (
+   837	                  <div
+   838	                    className="rounded-2xl p-4 mb-3"
+   839	                    style={{
+   840	                      background: isSmartPrepMode ? 'rgba(129,140,248,0.07)' : 'rgba(255,255,255,0.04)',
+   841	                      border: isSmartPrepMode ? '0.3px solid rgba(129,140,248,0.14)' : 'none',
+   842	                    }}
+   843	                  >
+   844	                    <p
+   845	                      className="text-[10px] uppercase tracking-[0.16em] font-bold"
+   846	                      style={{ color: isSmartPrepMode ? 'rgba(129,140,248,0.7)' : 'rgba(255,255,255,0.3)' }}
+   847	                    >
+   848	                      Composer maintenant
+   849	                    </p>
+   850	                    <p className="text-[12px] text-white/60 mt-1 leading-relaxed">
+   851	                      {composerMode === "guide"
+   852	                        ? "Choisis un aliment: la portion sera ajustée selon ce qu'il te reste aujourd'hui."
+   853	                        : "Teste un aliment et regarde son impact avant de valider."}
+   854	                    </p>
+   855	                  </div>
+   856	                )}
+   857	                {remainingTargets && !externalScroll && (
+   858	                  <RemainingNutritionSummary
+   859	                    remaining={remainingTargets}
+   860	                    variant={isSmartPrepMode ? "violet" : "neutral"}
+   861	                  />
+   862	                )}
+   863	
+   864	                {/* In smart mode: section header for the food picker — voice button lives in parent header */}
+   865	
+   866	                {/* Repas habituels / favoris */}
+   867	                {showFavoritesBlock && showSmartLibraryBlock && (
+   868	                  <div className="mb-4">
+   869	                    <p className="text-[10px] uppercase tracking-[0.16em] text-white/30 font-semibold mb-2">
+   870	                      {isSmartPrepMode ? "Bibliothèque rapide" : entryMode === "favorites" ? "Favoris rapides" : "Repas recents"}
+   871	                    </p>
+   872	                    <div className="bg-white/[0.04] rounded-2xl overflow-hidden">
+   873	                      {favorites.slice(0, 4).map((fav) => (
+   874	                        <button
+   875	                          key={fav.id}
+   876	                          onClick={() => quickLogFavorite(fav)}
+   877	                          disabled={saving}
+   878	                          className="w-full flex items-center justify-between px-4 py-3 active:scale-[0.98] transition-all hover:bg-white/[0.04] text-left disabled:opacity-50"
+   879	                        >
+   880	                          <div className="flex-1 min-w-0">
+   881	                            <p className="text-[13px] font-semibold text-white truncate">{fav.name}</p>
+   882	                            <p className="text-[11px] text-white/40 mt-1">
+   883	                              {Math.round(fav.total_calories ?? 0)} kcal · P {Math.round(fav.total_protein_g ?? 0)} · G {Math.round(fav.total_carbs_g ?? 0)} · L {Math.round(fav.total_fat_g ?? 0)}
+   884	                            </p>
+   885	                          </div>
+   886	                          <span className="text-[10px] text-[#f2f2f2] font-bold ml-2">↗ Ajouter</span>
+   887	                        </button>
+   888	                      ))}
+   889	                    </div>
+   890	                  </div>
+   891	                )}
+   892	
+   893	                {isTrackFavoritesOnly && favorites.length === 0 && !loadingFavorites && (
+   894	                  <div className="rounded-2xl bg-white/[0.04] px-4 py-8 text-center">
+   895	                    <p className="text-[13px] font-semibold text-white">Aucun favori pour le moment</p>
+   896	                    <p className="text-[12px] text-white/45 mt-1">Tes repas sauvegardes apparaitront ici.</p>
+   897	                  </div>
+   898	                )}
+   899	
+   900	                {showSmartSearchBlock && (
+   901	                  isSmartPrepMode ? (
+   902	                    <div className="mb-2">
+   903	                      <QuickSearch onSelect={selectItem} autoFocus={showSearchFirst} smartMode={isSmartPrepMode} />
+   904	                    </div>
+   905	                  ) : (
+   906	                    <div className="rounded-2xl mb-3 bg-white/[0.04] p-4">
+   907	                      <p className="text-[10px] uppercase tracking-[0.16em] font-semibold mb-3 text-white/30">
+   908	                        {showSearchFirst ? "Recherche d'aliment" : t('log.quickSearch')}
+   909	                      </p>
+   910	                      <QuickSearch onSelect={selectItem} autoFocus={showSearchFirst} smartMode={isSmartPrepMode} />
+   911	                    </div>
+   912	                  )
+   913	                )}
+   914	
+   915	                {showSmartExploreBlock && (
+   916	                  isSmartPrepMode ? (
+   917	                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 mb-2">
+   918	                      {(Object.entries(CATEGORY_LABELS_T) as [VisibleCategoryKey, string][]).map(([cat, label]) => (
+   919	                        <button
+   920	                          key={cat}
+   921	                          onClick={() => selectCategory(cat)}
+   922	                          className="flex items-center gap-1.5 shrink-0 rounded-xl px-3 py-1.5 bg-[#111114] hover:bg-[#818cf8]/10 active:scale-95 transition-all text-[#818cf8] border border-[#818cf8]/10"
+   923	                        >
+   924	                          <span className="text-base">{CATEGORY_ICONS[cat]}</span>
+   925	                          <span className="text-[11px] font-semibold text-white/80">{label}</span>
+   926	                        </button>
+   927	                      ))}
+   928	                    </div>
+   929	                  ) : (
+   930	                    <div className="rounded-2xl bg-white/[0.04] p-4 mb-3">
+   931	                      <p className="text-[10px] uppercase tracking-[0.16em] font-semibold mb-4 text-white/30">
+   932	                        {showCategoriesFirst ? "Choix par categories" : t('log.chooseCategory')}
+   933	                      </p>
+   934	                      <div className="grid grid-cols-2 gap-2">
+   935	                        {(Object.entries(CATEGORY_LABELS_T) as [VisibleCategoryKey, string][]).map(([cat, label]) => (
+   936	                          <button
+   937	                            key={cat}
+   938	                            onClick={() => selectCategory(cat)}
+   939	                            className="flex flex-col items-center gap-2 rounded-xl p-4 bg-white/[0.06] hover:bg-white/[0.10] active:scale-95 transition-all"
+   940	                          >
+   941	                            <span className="text-2xl">{CATEGORY_ICONS[cat]}</span>
+   942	                            <span className={`text-[11px] font-semibold text-white/80`}>{label}</span>
+   943	                          </button>
+   944	                        ))}
+   945	                      </div>
+   946	                    </div>
+   947	                  )
+   948	                )}
+   949	
+   950	                {showPersonalFoodTools && showSmartLibraryBlock && (
+   951	                  <div className={`space-y-2 ${isSmartPrepMode ? 'mt-2' : ''}`}>
+   952	                    {isSmartPrepMode && favorites.length > 0 && (
+   953	                      <div className="mb-1">
+   954	                        <p className="text-[10px] uppercase tracking-[0.16em] text-white/30 font-semibold mb-2">Favoris rapides</p>
+   955	                        <div className="bg-[#111114] rounded-2xl overflow-hidden">
+   956	                          {favorites.slice(0, 4).map((fav) => (
+   957	                            <button
+   958	                              key={fav.id}
+   959	                              onClick={() => quickLogFavorite(fav)}
+   960	                              disabled={saving}
+   961	                              className="w-full flex items-center justify-between px-4 py-3 active:scale-[0.98] transition-all hover:bg-[#818cf8]/8 text-left disabled:opacity-50"
+   962	                            >
+   963	                              <div className="flex-1 min-w-0">
+   964	                                <p className="text-[13px] font-semibold text-white truncate">{fav.name}</p>
+   965	                                <p className="text-[11px] text-white/40 mt-0.5">
+   966	                                  {Math.round(fav.total_calories ?? 0)} kcal · P {Math.round(fav.total_protein_g ?? 0)} · G {Math.round(fav.total_carbs_g ?? 0)} · L {Math.round(fav.total_fat_g ?? 0)}
+   967	                                </p>
+   968	                              </div>
+   969	                              <span className="text-[10px] text-[#818cf8] font-bold ml-2 shrink-0">↗ Ajouter</span>
+   970	                            </button>
+   971	                          ))}
+   972	                        </div>
+   973	                      </div>
+   974	                    )}
+   975	                    <div className="grid grid-cols-2 gap-2">
+   976	                      <button
+   977	                        onClick={() => {
+   978	                          setShowCustomForm(v => !v)
+   979	                          if (showMyFoods) setShowMyFoods(false)
+   980	                          setEditingCustomFood(null)
+   981	                        }}
+   982	                        className={`w-full flex items-center justify-center gap-2 h-9 rounded-xl text-[12px] active:scale-[0.98] transition-all ${
+   983	                          isSmartPrepMode
+   984	                            ? (showCustomForm ? 'bg-[#818cf8]/16 text-[#818cf8] font-semibold' : 'bg-[#111114] text-white/50 hover:text-white/80 hover:bg-[#818cf8]/10')
+   985	                            : 'bg-white/[0.04] text-white/40 hover:text-white/70 hover:bg-white/[0.08]'
+   986	                        }`}
+   987	                      >
+   988	                        <Pencil size={13} />
+   989	                        {isSmartPrepMode ? 'Créer perso' : t('log.createCustom')}
+   990	                      </button>
+   991	                      <button
+   992	                        onClick={() => {
+   993	                          const next = !showMyFoods
+   994	                          setShowMyFoods(next)
+   995	                          setShowCustomForm(false)
+   996	                          setEditingCustomFood(null)
+   997	                          if (next) loadMyFoods(myFoodsQuery)
+   998	                        }}
+   999	                        className={`w-full flex items-center justify-center gap-2 h-9 rounded-xl text-[12px] active:scale-[0.98] transition-all ${
+  1000	                          isSmartPrepMode
+  1001	                            ? (showMyFoods ? 'bg-[#818cf8]/16 text-[#818cf8] font-semibold' : 'bg-[#111114] text-white/50 hover:text-white/80 hover:bg-[#818cf8]/10')
+  1002	                            : 'bg-white/[0.04] text-white/40 hover:text-white/70 hover:bg-white/[0.08]'
+  1003	                        }`}
+  1004	                      >
+  1005	                        <Search size={13} />
+  1006	                        {isSmartPrepMode ? 'Ma bibliothèque' : 'Mes aliments'}
+  1007	                      </button>
+  1008	                    </div>
+  1009	                  </div>
+  1010	                )}
+  1011	                {showPersonalFoodTools && showCustomForm && <CustomFoodForm onCreated={item => { setShowCustomForm(false); selectItem(item) }} onClose={() => setShowCustomForm(false)} />}
+  1012	                {showPersonalFoodTools && showMyFoods && (
+  1013	                  <MyFoodsManager
+  1014	                    items={myFoods}
+  1015	                    loading={loadingMyFoods}
+  1016	                    query={myFoodsQuery}
+  1017	                    onQueryChange={setMyFoodsQuery}
+  1018	                    editingItem={editingCustomFood}
+  1019	                    onEdit={setEditingCustomFood}
+  1020	                    onEditDone={() => {
+  1021	                      setEditingCustomFood(null)
+  1022	                      loadMyFoods(myFoodsQuery)
+  1023	                    }}
+  1024	                    onDeleteDone={() => {
+  1025	                      if (editingCustomFood) setEditingCustomFood(null)
+  1026	                      loadMyFoods(myFoodsQuery)
+  1027	                    }}
+  1028	                    onSelect={selectItem}
+  1029	                    onClose={() => {
+  1030	                      setShowMyFoods(false)
+  1031	                      setEditingCustomFood(null)
+  1032	                    }}
+  1033	                  />
+  1034	                )}
+  1035	              </div>
+  1036	            )}
+  1037	
+  1038	            {/* Layer 2: Subcategories */}
+  1039	            {layer === "subcategory" && selectedCategory && (
+  1040	              <div className="p-4">
+  1041	                <div className={`rounded-2xl overflow-hidden ${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.04]'}`}>
+  1042	                  {VISIBLE_LEAVES_BY_CATEGORY[selectedCategory].map((sub) => (
+  1043	                    <button
+  1044	                      key={sub}
+  1045	                      onClick={() => selectSubcategory(sub)}
+  1046	                      className={`w-full flex items-center justify-between px-4 py-3.5 active:scale-[0.99] transition-all ${isSmartPrepMode ? 'hover:bg-[#818cf8]/10' : 'hover:bg-white/[0.04]'}`}
+  1047	                    >
+  1048	                      <div className="flex items-center gap-3">
+  1049	                        <span className="text-xl">{LEAF_ICONS[sub] ?? "•"}</span>
+  1050	                        <span className="text-[13px] font-medium text-white">{SUBCATEGORY_LABELS_T[sub] ?? sub}</span>
+  1051	                      </div>
+  1052	                      <ChevronLeft size={14} className="text-white/30 rotate-180" />
+  1053	                    </button>
+  1054	                  ))}
+  1055	                </div>
+  1056	              </div>
+  1057	            )}
+  1058	
+  1059	            {/* Layer 3: Items */}
+  1060	            {layer === "item" && (
+  1061	              <div className="p-4">
+  1062	                {showSearchBlock && (
+  1063	                  <div className="mb-3 space-y-2">
+  1064	                    <div className={`rounded-xl flex items-center px-3 ${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.04]'}`}>
+  1065	                      <Search size={14} className={`${isSmartPrepMode ? 'text-[#818cf8]' : 'text-white/30'} shrink-0`} />
+  1066	                      <input
+  1067	                        type="text"
+  1068	                        placeholder={t('log.searchPlaceholder2')}
+  1069	                        value={searchQ}
+  1070	                        onChange={e => setSearchQ(e.target.value)}
+  1071	                        className="w-full h-10 pl-2 pr-3 bg-transparent text-[13px] text-white placeholder:text-white/20 outline-none"
+  1072	                      />
+  1073	                    </div>
+  1074	                    <p className="text-[10px] uppercase tracking-[0.14em] text-white/28 font-semibold px-1">
+  1075	                      Recherche dans {selectedSubcategory ? (SUBCATEGORY_LABELS_T[selectedSubcategory] ?? selectedSubcategory) : ''}
+  1076	                    </p>
+  1077	                  </div>
+  1078	                )}
+  1079	                {loadingItems ? (
+  1080	                  <div className={`space-y-1 rounded-2xl overflow-hidden p-2 ${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.04]'}`}>{[1, 2, 3, 4].map(i => <div key={i} className={`h-12 rounded-xl animate-pulse ${isSmartPrepMode ? 'bg-[#818cf8]/10' : 'bg-white/[0.06]'}`} />)}</div>
+  1081	                ) : items.length === 0 ? (
+  1082	                  <p className="text-[12px] text-white/30 text-center py-8">{t('log.noResults')}</p>
+  1083	                ) : (
+  1084	                  <div className={`rounded-2xl overflow-hidden ${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.04]'}`}>
+  1085	                    {items.map((item) => {
+  1086	                      const kcal = item.kcal_per_100g || 1
+  1087	                      const pPct = Math.round((item.protein_per_100g * 4 / kcal) * 100)
+  1088	                      const gPct = Math.round((item.carbs_per_100g * 4 / kcal) * 100)
+  1089	                      const lPct = Math.round((item.fat_per_100g * 9 / kcal) * 100)
+  1090	                      const chipSuggestion = (composerMode !== "standard" && advisorRemaining)
+  1091	                        ? suggestQuantityForItem(item, advisorRemaining)
+  1092	                        : null
+  1093	                      return (
+  1094	                        <button key={item.id} onClick={() => selectItem(item)} className={`w-full flex items-center justify-between px-4 py-3 active:scale-[0.99] transition-all text-left ${isSmartPrepMode ? 'hover:bg-[#818cf8]/10' : 'hover:bg-white/[0.04]'}`}>
+  1095	                          <div className="flex-1 min-w-0">
+  1096	                            <p className="text-[13px] font-medium text-white">{item.name_fr}</p>
+  1097	                            <div className="flex items-center gap-2 mt-1">
+  1098	                              <span className="text-[11px] text-white/40">{item.kcal_per_100g} kcal</span>
+  1099	                              <div className="flex h-[4px] w-[64px] rounded-full overflow-hidden gap-[1px]">
+  1100	                                <div style={{ width: `${pPct}%`, backgroundColor: NUTRITION_UI_COLORS.protein }} />
+  1101	                                <div style={{ width: `${gPct}%`, backgroundColor: NUTRITION_UI_COLORS.carbs }} />
+  1102	                                <div style={{ width: `${lPct}%`, backgroundColor: NUTRITION_UI_COLORS.fat }} />
+  1103	                              </div>
+  1104	                              <span className="text-[10px] text-white/25">P·G·L</span>
+  1105	                            </div>
+  1106	                          </div>
+  1107	                          {chipSuggestion ? (
+  1108	                            <span className="text-[10px] font-bold text-[#818cf8] shrink-0 ml-2 tabular-nums">~{chipSuggestion.grams}g</span>
+  1109	                          ) : (
+  1110	                            <span className="text-white/20 text-[11px] shrink-0 ml-2">/ 100g</span>
+  1111	                          )}
+  1112	                        </button>
+  1113	                      )
+  1114	                    })}
+  1115	                  </div>
+  1116	                )}
+  1117	              </div>
+  1118	            )}
+  1119	
+  1120	            {/* Layer 4: Quantity */}
+  1121	            {layer === "quantity" && selectedItem && (
+  1122	              <div className="p-4 space-y-4">
+  1123	                <div className={`flex gap-1 rounded-xl p-0.5 ${isSmartPrepMode ? 'bg-[#111114]' : 'bg-white/[0.04]'}`}>
+  1124	                  {(["grams", "portion"] as const).map(m => (
+  1125	                    <button key={m} onClick={() => setQMode(m)} className={`flex-1 h-8 text-[11px] font-semibold rounded-xl transition-all ${qMode === m ? (isSmartPrepMode ? "bg-[#818cf8]/16 text-white" : "bg-white/[0.10] text-white") : "text-white/40"}`}>
+  1126	                      {m === "grams" ? t('log.gramsMode') : t('log.portionMode')}
+  1127	                    </button>
+  1128	                  ))}
+  1129	                </div>
+  1130	                <div className="space-y-3">
+  1131	                  {compactSmartQuantity && (quantitySuggestion || previewRemainingTargets) && (
+  1132	                    <div className="bg-[#111114] rounded-[24px] p-4 space-y-3">
+  1133	                      <div className="flex items-start justify-between gap-3">
+  1134	                        <div className="min-w-0">
+  1135	                          <div className="flex items-center gap-2">
+  1136	                            <p className="text-[10px] uppercase tracking-[0.16em] text-[#818cf8] font-semibold">Decision</p>
+  1137	                            {prepMealSlot && (
+  1138	                              <span className="rounded-full bg-[#818cf8]/10 px-2 py-0.5 text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.12em] text-[#818cf8]/80">
+  1139	                                {t(`compose.slot.${prepMealSlot}` as any)}
+  1140	                              </span>
+  1141	                            )}
+  1142	                          </div>
+  1143	                          <p className="mt-1 text-[16px] font-black text-white truncate">{selectedItem.name_fr}</p>
+  1144	                          <p className="mt-1 text-[12px] text-white/62 leading-relaxed">
+  1145	                            {quantitySuggestion ? quantitySuggestion.reason : "Ajuste la portion et regarde l'impact reel avant d'ajouter."}
+  1146	                          </p>
+  1147	                        </div>
+  1148	                        <div className="shrink-0 rounded-2xl bg-[#818cf8]/12 px-3 py-2 text-right min-w-[88px]">
+  1149	                          <p className="text-[18px] font-black text-white leading-none">{quantityG} g</p>
+  1150	                          <p className="text-[9px] uppercase tracking-[0.12em] text-white/28 mt-1">portion</p>
+  1151	                        </div>
+  1152	                      </div>
+  1153	
+  1154	                      {quantitySuggestion && quantityG !== quantitySuggestion.grams && (
+  1155	                        <button
+  1156	                          onClick={() => {
+  1157	                            applyQuantity(quantitySuggestion.grams)
+  1158	                            setDidAutoAdjust(true)
+  1159	                          }}
+  1160	                          className="h-9 rounded-xl bg-white/[0.06] px-3 text-[11px] font-bold uppercase tracking-[0.1em] text-white active:scale-[0.98] transition-all"
+  1161	                        >
+  1162	                          Appliquer {quantitySuggestion.grams} g
+  1163	                        </button>
+  1164	                      )}
+  1165	
+  1166	                      {compatibility?.status === "poor_fit" && (
+  1167	                        <div className="rounded-xl bg-[#ff8660]/10 px-3 py-2">
+  1168	                          <p className="text-[12px] text-[#ffd7cc] leading-relaxed">{compatibility.reasons[0]}</p>
+  1169	                        </div>
+  1170	                      )}
+  1171	
+  1172	                      <div className="grid grid-cols-2 gap-2">
+  1173	                        {selectedMacros && (
+  1174	                          <div className="rounded-2xl bg-[#818cf8]/10 px-3 py-3">
+  1175	                            <p className="text-[10px] uppercase tracking-[0.12em] text-white/28 font-semibold">Pour cette portion</p>
+  1176	                            <p className="mt-2 text-[18px] font-black text-white">{Math.round(selectedMacros.calories_kcal)} kcal</p>
+  1177	                            <div className="mt-2 flex gap-3 text-[12px] font-semibold">
+  1178	                              <span style={{ color: NUTRITION_UI_COLORS.protein }}>P {selectedMacros.protein_g}g</span>
+  1179	                              <span style={{ color: NUTRITION_UI_COLORS.carbs }}>G {selectedMacros.carbs_g}g</span>
+  1180	                              <span style={{ color: NUTRITION_UI_COLORS.fat }}>L {selectedMacros.fat_g}g</span>
+  1181	                            </div>
+  1182	                          </div>
+  1183	                        )}
+  1184	                        {previewRemainingTargets && previewActionable && (
+  1185	                          <div className="rounded-2xl bg-[#818cf8]/10 px-3 py-3">
+  1186	                            <p className="text-[10px] uppercase tracking-[0.12em] text-white/28 font-semibold">Il reste après</p>
+  1187	                            <div className="mt-2 space-y-1.5 text-[12px]">
+  1188	                              {([
+  1189	                                { label: 'Protéines', key: 'protein' as const, color: NUTRITION_UI_COLORS.protein },
+  1190	                                { label: 'Glucides', key: 'carbs' as const, color: NUTRITION_UI_COLORS.carbs },
+  1191	                                { label: 'Lipides', key: 'fat' as const, color: NUTRITION_UI_COLORS.fat },
+  1192	                              ]).map(({ label, key, color }) => {
+  1193	                                const overflowKey = `${key}_g` as 'protein_g' | 'carbs_g' | 'fat_g'
+  1194	                                const isOver = previewActionable.overflow[overflowKey] > 0
+  1195	                                return (
+  1196	                                  <div key={key} className="flex items-center justify-between">
+  1197	                                    <span className="text-white/48">{label}</span>
+  1198	                                    <span
+  1199	                                      className="font-semibold tabular-nums"
+  1200	                                      style={{ color: isOver ? '#ef4444' : color }}
+
+============================================================
+FIN NUTRITION LOG CAFÉ / THÉ
+============================================================

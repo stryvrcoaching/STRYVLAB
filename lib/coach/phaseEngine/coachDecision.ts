@@ -237,6 +237,60 @@ function buildSevenDayTrajectory(
       : 'Capacité de récupération au-dessus de 60%',
   ]
 
+  if (result.phaseMatrix.rule === 'fat_gain_mismatch') {
+    const compositionCriteria = [
+      locale === 'en'
+        ? '7-day average weight returns to the planned pace'
+        : 'La moyenne de poids sur 7 jours revient au rythme prévu',
+      locale === 'en'
+        ? 'Body-fat or waist measurement confirms the trend'
+        : 'Une mesure BF ou du tour de taille confirme la tendance',
+      locale === 'en'
+        ? 'Training performance remains stable'
+        : 'La performance d’entraînement reste stable',
+    ]
+
+    return {
+      strategy: 'maintain',
+      title: locale === 'en' ? '7-day composition control' : 'Contrôle compositionnel 7 jours',
+      summary: locale === 'en'
+        ? 'Keep training stable, verify calorie execution, and confirm the body-composition trend before changing the phase.'
+        : 'Garder l’entraînement stable, vérifier l’exécution calorique et confirmer la tendance corporelle avant de modifier la phase.',
+      days: Array.from({ length: 7 }, (_, i) => ({
+        day: i + 1,
+        focus: i < 3
+          ? (locale === 'en' ? 'Protocol audit' : 'Audit du protocole')
+          : (locale === 'en' ? 'Trend confirmation' : 'Confirmation de tendance'),
+        intensityPct: 75,
+        nutrition: locale === 'en'
+          ? 'Hit the current calorie target; do not add surplus'
+          : 'Respecter la cible calorique actuelle, sans ajouter de surplus',
+        exitCriteria: compositionCriteria,
+      })),
+    }
+  }
+
+  if (result.phaseMatrix.rule === 'body_response_mismatch') {
+    return {
+      strategy: 'maintain',
+      title: locale === 'en' ? '7-day response check' : 'Vérification de réponse 7 jours',
+      summary: locale === 'en'
+        ? 'Hold the current lane while checking weight, body composition, adherence, and performance on the same window.'
+        : 'Maintenir le cap le temps de vérifier poids, composition, adhérence et performance sur une même fenêtre.',
+      days: Array.from({ length: 7 }, (_, i) => ({
+        day: i + 1,
+        focus: locale === 'en' ? 'Stable execution' : 'Exécution stable',
+        intensityPct: 75,
+        nutrition: locale === 'en' ? 'Follow the current target exactly' : 'Suivre précisément la cible actuelle',
+        exitCriteria: [
+          locale === 'en' ? 'At least four morning weights logged' : 'Au moins quatre poids matin renseignés',
+          locale === 'en' ? 'Body-fat or waist measurement available' : 'Une mesure BF ou tour de taille disponible',
+          locale === 'en' ? 'Nutrition adherence can be interpreted' : 'Adhérence nutrition interprétable',
+        ],
+      })),
+    }
+  }
+
   if (strategy === 'deload') {
     return {
       strategy,

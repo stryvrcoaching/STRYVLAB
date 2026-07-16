@@ -7,6 +7,7 @@ import Image from "next/image";
 
 import {
   LayoutDashboard,
+  Brain,
   Users,
   ClipboardList,
   Calculator,
@@ -30,6 +31,12 @@ const NAV_SECTIONS = [
         label: "Dashboard",
         href: "/dashboard",
         match: (p: string) => p === "/dashboard",
+      },
+      {
+        icon: Brain,
+        label: "AI Nutrition Ops",
+        href: "/dashboard/ai-nutrition-ops",
+        match: (p: string) => p.startsWith("/dashboard/ai-nutrition-ops"),
       },
       {
         icon: Users,

@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { extractTemplateBlocks } from "@/lib/assessments/templateSnapshot";
+import { isValidPublicAssessmentToken } from "@/lib/assessments/public-response-security";
+import {
+  checkPublicRateLimit,
+  rateLimitResponse,
+} from "@/lib/security/public-rate-limit";
 
 function serviceClient() {
   return createServiceClient(
@@ -10,10 +16,27 @@ function serviceClient() {
 
 // GET /api/assessments/public/[token] — sans auth, vérifie token + expiry
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { token: string } },
 ) {
   const db = serviceClient();
+  const rateLimit = await checkPublicRateLimit({
+    db,
+    req,
+    scope: "public_assessment_read",
+    subject: params.token,
+    maxRequests: 60,
+    windowSeconds: 10 * 60,
+  });
+
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit);
+
+  if (!isValidPublicAssessmentToken(params.token)) {
+    return NextResponse.json(
+      { error: "Lien invalide" },
+      { status: 404, headers: { "Cache-Control": "no-store" } },
+    );
+  }
 
   const { data: submission, error } = await db
     .from("assessment_submissions")
@@ -27,18 +50,24 @@ export async function GET(
     .single();
 
   if (error || !submission) {
-    return NextResponse.json({ error: "Lien invalide" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Lien invalide" },
+      { status: 404, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   if (submission.status === "completed") {
     return NextResponse.json(
       { error: "Ce bilan a déjà été complété" },
-      { status: 410 },
+      { status: 410, headers: { "Cache-Control": "no-store" } },
     );
   }
 
   if (submission.status === "expired") {
-    return NextResponse.json({ error: "Ce lien a expiré" }, { status: 410 });
+    return NextResponse.json(
+      { error: "Ce lien a expiré" },
+      { status: 410, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const expiresAt = new Date(submission.token_expires_at);
@@ -49,7 +78,10 @@ export async function GET(
       .update({ status: "expired" })
       .eq("token", params.token);
 
-    return NextResponse.json({ error: "Ce lien a expiré" }, { status: 410 });
+    return NextResponse.json(
+      { error: "Ce lien a expiré" },
+      { status: 410, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   // Marquer in_progress si pending
@@ -68,14 +100,17 @@ export async function GET(
     )
     .eq("submission_id", submission.id);
 
-  return NextResponse.json({
-    submission: {
-      id: submission.id,
-      status: submission.status,
-      filled_by: submission.filled_by,
-      template_snapshot: submission.template_snapshot,
-      client: submission.client,
-      responses: responses ?? [],
+  return NextResponse.json(
+    {
+      submission: {
+        id: submission.id,
+        status: submission.status,
+        filled_by: submission.filled_by,
+        template_snapshot: extractTemplateBlocks(submission.template_snapshot as any),
+        client: submission.client,
+        responses: responses ?? [],
+      },
     },
-  });
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

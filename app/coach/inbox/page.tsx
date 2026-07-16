@@ -2,45 +2,61 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Inbox,
   CheckCircle2,
   AlertCircle,
-  Search,
-  MessageSquareWarning,
-  MessageCircle,
+  Dumbbell,
+  ClipboardList,
+  HeartPulse,
   CornerDownRight,
-  ShieldAlert,
   Loader2,
   X,
   Send,
+  Salad,
+  Activity,
+  MessageSquare,
+  CreditCard,
 } from "lucide-react";
 import { useSetTopBar } from "@/components/layout/useSetTopBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDock } from "@/components/layout/DockContext";
+import CoachConversationSheet from "@/components/coach/CoachConversationSheet";
 
 type Notification = {
   id: string;
+  source: "coach" | "shared" | "legacy";
   clientId: string;
   clientName: string;
   chatMessageId: string | null;
+  title?: string | null;
+  body?: string | null;
+  payload?: Record<string, unknown> | null;
   messageExcerpt: string | null;
   category: string;
+  categoryLabel: string;
   subcategory: string | null;
+  eventLabel: string | null;
   priority: number;
   status: string;
+  read: boolean;
   emailSent: boolean;
+  actionUrl: string;
   createdAt: string;
 };
 
 const CATEGORY_LABELS: Record<string, { label: string; icon: any; color: string; bg: string }> = {
-  safety:           { label: "Urgence / Santé",  icon: ShieldAlert, color: "text-red-400", bg: "bg-red-500/10" },
-  out_of_scope:     { label: "Hors scope IA",    icon: AlertCircle, color: "text-amber-400", bg: "bg-amber-500/10" },
-  pattern_inquiry:  { label: "Incompréhension",  icon: MessageSquareWarning, color: "text-blue-400", bg: "bg-blue-500/10" },
-  engagement:       { label: "Baisse engagement", icon: AlertCircle, color: "text-purple-400", bg: "bg-purple-500/10" },
-  weight_off_track: { label: "Poids stagnant",   icon: AlertCircle, color: "text-orange-400", bg: "bg-orange-500/10" },
+  assessment: { label: "Bilans", icon: ClipboardList, color: "text-sky-300", bg: "bg-sky-500/10" },
+  training: { label: "Entraînement", icon: Dumbbell, color: "text-violet-300", bg: "bg-violet-500/10" },
+  nutrition: { label: "Nutrition", icon: Salad, color: "text-[#8ef0c7]", bg: "bg-[#1f8a65]/10" },
+  recovery: { label: "Récupération", icon: HeartPulse, color: "text-amber-300", bg: "bg-amber-500/10" },
+  progress: { label: "Évolution", icon: Activity, color: "text-cyan-300", bg: "bg-cyan-500/10" },
+  feedback: { label: "Feedback", icon: MessageSquare, color: "text-pink-300", bg: "bg-pink-500/10" },
+  engagement: { label: "Engagement", icon: AlertCircle, color: "text-orange-300", bg: "bg-orange-500/10" },
+  admin: { label: "Administratif", icon: CreditCard, color: "text-emerald-300", bg: "bg-emerald-500/10" },
+  critical: { label: "À traiter", icon: AlertCircle, color: "text-red-300", bg: "bg-red-500/10" },
+  system: { label: "Suivi", icon: Inbox, color: "text-white/70", bg: "bg-white/[0.06]" },
 };
 
 export default function InboxPage() {
@@ -49,11 +65,10 @@ export default function InboxPage() {
 
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "safety" | "out_of_scope" | "engagement">("all");
+  const [clientFilter, setClientFilter] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "assessment" | "training" | "nutrition" | "recovery" | "progress" | "engagement" | "admin">("all");
 
   const [replyingTo, setReplyingTo] = useState<Notification | null>(null);
-  const [replyContent, setReplyContent] = useState("");
-  const [sendingReply, setSendingReply] = useState(false);
 
   const unreadCount = notifs.length;
 
@@ -78,7 +93,8 @@ export default function InboxPage() {
   const fetchInbox = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/coach/inbox");
+      const url = clientFilter ? `/api/coach/inbox?client=${clientFilter}` : "/api/coach/inbox";
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setNotifs(data.notifications || []);
@@ -87,6 +103,12 @@ export default function InboxPage() {
       console.error(e);
     }
     setLoading(false);
+  }, [clientFilter]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setClientFilter(params.get("client"));
   }, []);
 
   useEffect(() => {
@@ -95,41 +117,27 @@ export default function InboxPage() {
 
   async function handleAcknowledge(id: string) {
     setNotifs((prev) => prev.filter((n) => n.id !== id));
-    await fetch(`/api/coach/inbox/${id}`, {
+    await fetch(`/api/coach/inbox`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "acknowledged" }),
+      body: JSON.stringify({ ids: [id] }),
     });
   }
 
-  async function handleReplySubmit() {
-    if (!replyingTo || !replyContent.trim()) return;
-    setSendingReply(true);
-
-    try {
-      const res = await fetch(`/api/coach/clients/${replyingTo.clientId}/reply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: replyContent }),
-      });
-      if (res.ok) {
-        // Enlève toutes les notifs de ce client car le reply résout tout
-        setNotifs((prev) => prev.filter((n) => n.clientId !== replyingTo.clientId));
-        setReplyingTo(null);
-        setReplyContent("");
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    setSendingReply(false);
+  async function handleMarkAllRead() {
+    const notificationIds = notifs.map((notification) => notification.id);
+    setNotifs([]);
+    if (notificationIds.length === 0) return;
+    await fetch(`/api/coach/inbox`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: notificationIds }),
+    });
   }
 
   const filtered = notifs.filter((n) => {
     if (filter === "all") return true;
-    if (filter === "safety") return n.category === "safety";
-    if (filter === "out_of_scope") return n.category === "out_of_scope" || n.category === "pattern_inquiry";
-    if (filter === "engagement") return n.category === "engagement" || n.category === "weight_off_track";
-    return true;
+    return n.category === filter;
   });
 
   if (loading) {
@@ -156,17 +164,32 @@ export default function InboxPage() {
         <div className="mb-6">
           <h1 className="text-xl font-black text-white tracking-tight">Inbox IA</h1>
           <p className="text-[13px] text-white/40 mt-1">
-            Les conversations que l'IA vous a transférées
+            {clientFilter ? "Notifications filtrées pour cet athlète" : "Les conversations que l'IA vous a transférées"}
           </p>
         </div>
+
+        {filtered.length > 0 && (
+          <div className="mb-4 flex justify-end">
+            <button
+              onClick={() => void handleMarkAllRead()}
+              className="rounded-xl bg-white/[0.06] px-3 py-2 text-[11px] font-semibold text-white/70 hover:bg-white/[0.09]"
+            >
+              Tout marquer comme lu
+            </button>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
           {[
             { id: "all", label: "Toutes" },
-            { id: "safety", label: "Urgences 🔴" },
-            { id: "out_of_scope", label: "Hors scope" },
+            { id: "assessment", label: "Bilans" },
+            { id: "training", label: "Entraînement" },
             { id: "engagement", label: "Engagement" },
+            { id: "nutrition", label: "Nutrition" },
+            { id: "recovery", label: "Récupération" },
+            { id: "progress", label: "Évolution" },
+            { id: "admin", label: "Administratif" },
           ].map((f) => (
             <button
               key={f.id}
@@ -196,8 +219,9 @@ export default function InboxPage() {
           <div className="space-y-3">
             <AnimatePresence>
               {filtered.map((notif) => {
-                const config = CATEGORY_LABELS[notif.category] || CATEGORY_LABELS.out_of_scope;
+                const config = CATEGORY_LABELS[notif.category] || CATEGORY_LABELS.system;
                 const Icon = config.icon;
+                const isClientReply = notif.subcategory === "coach_message_reply";
                 return (
                   <motion.div
                     layout
@@ -239,16 +263,17 @@ export default function InboxPage() {
                           </div>
                           <div className={`mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md ${config.bg} ${config.color}`}>
                             <Icon size={10} />
-                            <span className="text-[9px] font-bold uppercase tracking-wider">{config.label}</span>
+                            <span className="text-[9px] font-bold uppercase tracking-wider">{notif.categoryLabel}</span>
                           </div>
-                          {notif.subcategory && (
-                            <span className="ml-2 text-[10px] text-white/40">→ {notif.subcategory}</span>
-                          )}
 
-                          {notif.messageExcerpt && (
+                          <p className="mt-3 text-sm font-semibold text-white">
+                            {notif.title || "Notification coach"}
+                          </p>
+
+                          {(notif.body || notif.messageExcerpt) && (
                             <div className="mt-3 bg-white/[0.03] p-3 rounded-xl border border-white/[0.05]">
-                              <p className="text-[12px] text-white/80 leading-relaxed italic">
-                                "{notif.messageExcerpt}"
+                              <p className="text-[12px] text-white/80 leading-relaxed">
+                                {notif.body || notif.messageExcerpt}
                               </p>
                             </div>
                           )}
@@ -268,6 +293,19 @@ export default function InboxPage() {
                         >
                           <CheckCircle2 size={12} /> Marquer lu
                         </button>
+                        <button
+                          onClick={() => {
+                            if (isClientReply) {
+                              setReplyingTo(notif);
+                              return;
+                            }
+                            openClient({ id: notif.clientId, firstName: notif.clientName.split(' ')[0], lastName: '' });
+                            router.push(notif.actionUrl);
+                          }}
+                          className="flex items-center justify-center gap-1.5 px-3 h-8 rounded-lg bg-white/[0.05] text-white/60 text-[11px] font-semibold hover:bg-white/[0.1] hover:text-white transition-colors"
+                        >
+                          {isClientReply ? "Ouvrir la conversation" : "Ouvrir"}
+                        </button>
                       </div>
                     </div>
                   </motion.div>
@@ -278,75 +316,13 @@ export default function InboxPage() {
         )}
       </div>
 
-      {/* Reply Drawer / Modal */}
-      <AnimatePresence>
-        {replyingTo && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70]"
-              onClick={() => !sendingReply && setReplyingTo(null)}
-            />
-            <motion.div
-              initial={{ opacity: 0, y: 100 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 100 }}
-              className="fixed bottom-0 left-0 right-0 z-[75] bg-[#181818] border-t border-white/[0.1] rounded-t-3xl shadow-2xl p-6 md:p-8 md:max-w-2xl md:mx-auto md:bottom-10 md:rounded-3xl md:border"
-            >
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h3 className="text-white font-bold text-lg">Répondre à {replyingTo.clientName}</h3>
-                  <p className="text-white/40 text-xs mt-1">Le client recevra ce message dans son chat.</p>
-                </div>
-                <button
-                  onClick={() => setReplyingTo(null)}
-                  disabled={sendingReply}
-                  className="w-8 h-8 rounded-full bg-white/[0.05] flex items-center justify-center text-white/50 hover:text-white hover:bg-white/[0.1]"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              {replyingTo.messageExcerpt && (
-                <div className="bg-white/[0.03] p-3 rounded-xl border border-white/[0.05] mb-4">
-                  <p className="text-[12px] text-white/70 italic line-clamp-2">
-                    "{replyingTo.messageExcerpt}"
-                  </p>
-                </div>
-              )}
-
-              <textarea
-                value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
-                placeholder="Écrivez votre réponse..."
-                rows={4}
-                className="w-full bg-[#0a0a0a] border border-white/[0.1] rounded-xl p-4 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#1f8a65]/50 resize-none mb-4"
-                autoFocus
-              />
-
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setReplyingTo(null)}
-                  disabled={sendingReply}
-                  className="px-5 py-2.5 rounded-xl text-xs font-semibold text-white/60 hover:text-white"
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={handleReplySubmit}
-                  disabled={sendingReply || !replyContent.trim()}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1f8a65] text-white text-xs font-bold hover:bg-[#217356] disabled:opacity-50 transition-colors"
-                >
-                  {sendingReply ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                  Envoyer au client
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      <CoachConversationSheet
+        notification={replyingTo}
+        onClose={() => setReplyingTo(null)}
+        onSent={() => {
+          if (replyingTo) setNotifs((prev) => prev.filter((n) => n.clientId !== replyingTo.clientId));
+        }}
+      />
     </main>
   );
 }

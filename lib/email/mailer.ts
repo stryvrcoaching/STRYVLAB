@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { renderStryvEmail } from '@/lib/email/template'
 
 // ─── Transport ────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,7 @@ async function sendMail(options: {
 // ─── Brand tokens (DS v2.0) ───────────────────────────────────────────────────
 
 const FROM = `STRYVR <${process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'}>`
+const CONNECT_FROM = `STRYV Connect <${process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'}>`
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://stryvlab.com'
 
 const DS = {
@@ -44,54 +46,7 @@ const DS = {
 // ─── Base template ────────────────────────────────────────────────────────────
 
 function emailTemplate({ body, senderLabel }: { body: string; senderLabel?: string }): string {
-  return `<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="color-scheme" content="dark" />
-  <meta name="supported-color-schemes" content="dark" />
-  <title>STRYVR</title>
-  <style>
-    :root { color-scheme: dark; }
-    /* Prevent email clients from auto-inverting our dark design in dark mode */
-    @media (prefers-color-scheme: dark) {
-      body, table, td, div { background-color: inherit !important; color: inherit !important; }
-    }
-  </style>
-</head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#0a0a0a;margin:0;padding:40px 16px;color-scheme:dark;">
-  <div style="max-width:520px;margin:0 auto;">
-
-    <!-- Header -->
-    <div style="background:${DS.bg};border-radius:16px 16px 0 0;padding:20px 36px;border-bottom:1px solid ${DS.border};">
-      <table style="width:100%;border-collapse:collapse;">
-        <tr>
-          <td style="vertical-align:middle;">
-            <img src="${SITE_URL}/logo/logo-stryvr-silver.png" alt="STRYVR" width="32" height="32" style="display:inline-block;vertical-align:middle;width:32px;height:32px;object-fit:contain;" />
-            ${senderLabel ? `<span style="font-size:11px;color:${DS.textVeryMuted};margin-left:10px;font-weight:500;vertical-align:middle;">${senderLabel}</span>` : ''}
-          </td>
-          <td style="text-align:right;vertical-align:middle;">
-            <span style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${DS.textVeryMuted};">STRYVR</span>
-          </td>
-        </tr>
-      </table>
-    </div>
-
-    <!-- Body -->
-    <div style="background:${DS.card};border-radius:0 0 16px 16px;padding:36px;">
-      ${body}
-    </div>
-
-    <!-- Footer -->
-    <p style="text-align:center;font-size:11px;color:rgba(255,255,255,0.20);margin:20px 0 0;line-height:1.6;">
-      © ${new Date().getFullYear()} STRYVR —
-      <a href="${SITE_URL}" style="color:rgba(255,255,255,0.25);text-decoration:none;">stryvlab.com</a>
-    </p>
-
-  </div>
-</body>
-</html>`
+  return renderStryvEmail({ body, senderLabel })
 }
 
 // ─── CTA button ───────────────────────────────────────────────────────────────
@@ -145,6 +100,10 @@ function directLink(url: string): string {
   return `<p style="font-size:11px;color:rgba(255,255,255,0.20);margin:0;">
     Lien direct : <a href="${url}" style="color:${DS.accent};text-decoration:none;">${url}</a>
   </p>`
+}
+
+function connectEmailTemplate(body: string): string {
+  return renderStryvEmail({ body, productLabel: 'STRYV Connect' })
 }
 
 // ─── Exports — Types ──────────────────────────────────────────────────────────
@@ -213,6 +172,34 @@ export interface SendInvitationEmailParams {
   setupPasswordUrl: string
 }
 
+export interface SendSalesPartnerInvitationEmailParams {
+  to: string
+  partnerName: string
+  activationUrl: string
+}
+
+export interface SendProgramPdfEmailParams {
+  to: string
+  clientFirstName: string
+  coachName: string | null
+  programName: string
+  customMessage?: string | null
+  pdfBuffer: Buffer
+  filename: string
+  fromName?: string
+}
+
+export interface SendNutritionProtocolPdfEmailParams {
+  to: string
+  clientFirstName: string
+  coachName: string | null
+  protocolName: string
+  customMessage?: string | null
+  pdfBuffer: Buffer
+  filename: string
+  fromName?: string
+}
+
 // ─── Method labels ────────────────────────────────────────────────────────────
 
 const METHOD_LABELS: Record<string, string> = {
@@ -270,12 +257,12 @@ export async function sendAccessLinkEmail(params: SendAccessLinkEmailParams) {
   })
 
   const intro = coachName
-    ? `Votre coach <strong style="color:${DS.white};">${coachName}</strong> vous invite à accéder à votre espace personnel STRYVR.`
-    : `Votre coach vous invite à accéder à votre espace personnel STRYVR.`
+    ? `Votre espace personnel STRYVR avec <strong style="color:${DS.white};">${coachName}</strong> est déjà actif.`
+    : `Votre espace personnel STRYVR est déjà actif.`
 
   const subject = coachName
-    ? `${coachName} vous invite sur STRYVR`
-    : 'Votre accès à STRYVR est prêt'
+    ? `${coachName} vous a envoyé un accès STRYVR`
+    : 'Votre accès STRYVR'
 
   await sendMail({
     from: FROM,
@@ -286,11 +273,9 @@ export async function sendAccessLinkEmail(params: SendAccessLinkEmailParams) {
       body: `
         ${greeting(clientFirstName)}
         ${bodyText(intro)}
-        ${bodyText('Cliquez sur le bouton ci-dessous pour vous connecter en un clic — aucun mot de passe requis.')}
-        ${ctaButton(accessUrl, 'Accéder à mon espace')}
-        ${hint(`Ce lien expire le ${expiryFormatted}. Ne partagez pas cet email.`)}
-        ${separator()}
-        ${directLink(accessUrl)}
+        ${bodyText('Utilisez le lien sécurisé ci-dessous pour vous connecter en un clic.')}
+        ${ctaButton(accessUrl, 'Se connecter')}
+        ${hint(`Ce lien de connexion expire le ${expiryFormatted}. Ne partagez pas cet email.`)}
         ${coachSignature(coachName)}
       `,
     }),
@@ -420,8 +405,8 @@ export async function sendInvitationEmail(params: SendInvitationEmailParams) {
   const { to, clientFirstName, coachName, setupPasswordUrl } = params
 
   const intro = coachName
-    ? `Votre coach <strong style="color:${DS.white};">${coachName}</strong> vous a créé un espace personnel sur STRYVR. Définissez votre mot de passe pour accéder à vos bilans et votre programme.`
-    : `Votre coach vous a créé un espace personnel sur STRYVR. Définissez votre mot de passe pour y accéder.`
+    ? `Votre coach <strong style="color:${DS.white};">${coachName}</strong> vous a ouvert un espace personnel sur STRYVR. Vous y retrouverez votre suivi, votre entraînement, votre nutrition, vos bilans et les points clés de votre progression.`
+    : `Votre espace personnel STRYVR est prêt. Vous y retrouverez votre suivi, votre entraînement, votre nutrition et vos indicateurs de progression.`
 
   const subject = coachName
     ? `${coachName} vous invite sur STRYVR — Créez votre accès`
@@ -436,13 +421,148 @@ export async function sendInvitationEmail(params: SendInvitationEmailParams) {
       body: `
         ${greeting(clientFirstName)}
         ${bodyText(intro)}
-        ${ctaButton(setupPasswordUrl, 'Créer mon mot de passe')}
+        ${bodyText('Définissez maintenant votre mot de passe pour activer votre accès et rejoindre votre espace client en toute sécurité.')}
+        ${ctaButton(setupPasswordUrl, 'Créer mon accès')}
         ${hint('Ce lien est valable 1 heure. Si vous n\'avez pas demandé cet accès, ignorez ce message.')}
         ${separator()}
         ${directLink(setupPasswordUrl)}
         ${coachSignature(coachName)}
       `,
     }),
+  })
+}
+
+// ─── 7a. Invitation STRYV Connect (partenaire commercial) ────────────────────
+
+export async function sendSalesPartnerInvitationEmail(params: SendSalesPartnerInvitationEmailParams) {
+  const { to, partnerName, activationUrl } = params
+  const safePartnerName = escapeHtml(partnerName)
+
+  await sendMail({
+    from: CONNECT_FROM,
+    to,
+    subject: 'Vous êtes invité à rejoindre STRYV Connect',
+    html: connectEmailTemplate(`
+      <p style="font-size:16px;color:#ffffff;margin:0 0 10px;font-weight:600;">Bonjour ${safePartnerName},</p>
+      <p style="font-size:15px;color:rgba(255,255,255,0.62);margin:0 0 22px;line-height:1.65;">Vous avez été ajouté à <strong style="color:#ffffff;">STRYV Connect</strong>, l’espace partenaire de STRYV lab.</p>
+      <p style="font-size:15px;color:rgba(255,255,255,0.62);margin:0 0 26px;line-height:1.65;">Vous pourrez y suivre vos prospects, organiser vos relances et consulter vos commissions. Créez votre mot de passe pour activer votre accès.</p>
+      <a href="${activationUrl}" style="display:block;background:#f2f2f2;border-radius:12px;color:#111315;text-align:center;text-decoration:none;font-weight:700;font-size:13px;padding:15px 20px;margin:0 0 22px;">Activer mon accès STRYV Connect</a>
+      <p style="font-size:12px;color:rgba(255,255,255,0.42);margin:0;line-height:1.65;">Par sécurité, vous confirmerez l’ouverture du lien avant de créer votre accès. Si vous n’attendiez pas cette invitation, vous pouvez ignorer cet e-mail.</p>
+    `),
+  })
+}
+
+// ─── 7b. Programme PDF envoyé au client ──────────────────────────────────────
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+function richMessageBlock(message?: string | null) {
+  const normalized = String(message ?? '').trim()
+  if (!normalized) return ''
+
+  const formatted = escapeHtml(normalized)
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p style="font-size:13px;color:${DS.white};margin:0 0 10px;line-height:1.7;">${paragraph.replace(/\n/g, '<br />')}</p>`)
+    .join('')
+
+  return `
+    <div style="background:${DS.surface};border:1px solid ${DS.border};border-radius:12px;padding:16px;margin:0 0 20px;">
+      <p style="margin:0 0 10px;font-size:11px;color:${DS.textVeryMuted};text-transform:uppercase;letter-spacing:0.12em;">Message du coach</p>
+      ${formatted}
+    </div>
+  `
+}
+
+export async function sendProgramPdfEmail(params: SendProgramPdfEmailParams) {
+  const {
+    to,
+    clientFirstName,
+    coachName,
+    programName,
+    customMessage,
+    pdfBuffer,
+    filename,
+    fromName,
+  } = params
+
+  const subject = coachName
+    ? `${coachName} vous a envoyé votre programme — ${programName}`
+    : `Votre programme PDF — ${programName}`
+
+  const intro = coachName
+    ? `Votre coach <strong style="color:${DS.white};">${coachName}</strong> vous a envoyé un programme au format PDF : <strong style="color:${DS.white};">${programName}</strong>.`
+    : `Votre programme <strong style="color:${DS.white};">${programName}</strong> est joint à cet email au format PDF.`
+
+  await sendMail({
+    from: fromName ? `${fromName} <${process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'}>` : FROM,
+    to,
+    subject,
+    html: emailTemplate({
+      senderLabel: coachName ?? undefined,
+      body: `
+        ${greeting(clientFirstName)}
+        ${bodyText(intro)}
+        ${richMessageBlock(customMessage)}
+        ${bodyText('Ouvrez la pièce jointe pour consulter votre programme. Vous pourrez ensuite l’enregistrer sur votre appareil si besoin.')}
+        ${hint('Si vous avez une question sur les consignes ou l’organisation des séances, répondez directement à cet email ou contactez votre coach.')}
+        ${coachSignature(coachName)}
+      `,
+    }),
+    attachments: [{
+      filename,
+      content: pdfBuffer,
+      contentType: 'application/pdf',
+    }],
+  })
+}
+
+export async function sendNutritionProtocolPdfEmail(params: SendNutritionProtocolPdfEmailParams) {
+  const {
+    to,
+    clientFirstName,
+    coachName,
+    protocolName,
+    customMessage,
+    pdfBuffer,
+    filename,
+    fromName,
+  } = params
+
+  const subject = coachName
+    ? `${coachName} vous a envoyé votre protocole nutritionnel — ${protocolName}`
+    : `Votre protocole nutritionnel PDF — ${protocolName}`
+
+  const intro = coachName
+    ? `Votre coach <strong style="color:${DS.white};">${coachName}</strong> vous a envoyé un protocole nutritionnel au format PDF : <strong style="color:${DS.white};">${protocolName}</strong>.`
+    : `Votre protocole nutritionnel <strong style="color:${DS.white};">${protocolName}</strong> est joint à cet email au format PDF.`
+
+  await sendMail({
+    from: fromName ? `${fromName} <${process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'}>` : FROM,
+    to,
+    subject,
+    html: emailTemplate({
+      senderLabel: coachName ?? undefined,
+      body: `
+        ${greeting(clientFirstName)}
+        ${bodyText(intro)}
+        ${richMessageBlock(customMessage)}
+        ${bodyText('Ouvrez la pièce jointe pour consulter votre protocole nutritionnel et le conserver sur votre appareil si besoin.')}
+        ${hint('Si vous avez une question sur la structure du protocole ou son application, répondez directement à cet email ou contactez votre coach.')}
+        ${coachSignature(coachName)}
+      `,
+    }),
+    attachments: [{
+      filename,
+      content: pdfBuffer,
+      contentType: 'application/pdf',
+    }],
   })
 }
 
@@ -459,8 +579,8 @@ export async function sendReactivationEmail(params: SendReactivationEmailParams)
   const { to, clientFirstName, coachName, loginUrl } = params
 
   const intro = coachName
-    ? `Votre coach <strong style="color:${DS.white};">${coachName}</strong> a restauré votre accès à STRYVR. Vous pouvez vous reconnecter avec votre email et votre mot de passe habituel.`
-    : `Votre accès à STRYVR a été restauré. Vous pouvez vous reconnecter avec votre email et votre mot de passe habituel.`
+    ? `Votre coach <strong style="color:${DS.white};">${coachName}</strong> a restauré votre accès à STRYVR. Votre espace client est de nouveau disponible.`
+    : `Votre accès à STRYVR a été restauré. Votre espace client est de nouveau disponible.`
 
   const subject = coachName
     ? `${coachName} a restauré votre accès STRYVR`
@@ -564,4 +684,3 @@ export async function sendCoachAlertEmail(params: SendCoachAlertEmailParams) {
     }),
   })
 }
-

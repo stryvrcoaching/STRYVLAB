@@ -11,7 +11,7 @@ function service() {
 }
 
 const patchSchema = z.object({
-  status: z.enum(['acknowledged', 'resolved']),
+  status: z.enum(['resolved']),
 })
 
 // PATCH /api/coach/inbox/[notificationId] — acknowledge ou resolve
@@ -40,7 +40,7 @@ export async function PATCH(
 
   const { error } = await db
     .from('coach_notifications')
-    .update({ status: body.data.status, updated_at: new Date().toISOString() })
+    .update({ status: body.data.status })
     .eq('id', params.notificationId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

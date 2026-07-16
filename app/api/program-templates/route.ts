@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { resolveStoredFrequency } from "@/lib/programs/frequency";
 
 function service() {
   return createServiceClient(
@@ -10,11 +11,11 @@ function service() {
 }
 
 const SELECT = `
-  id, name, description, goal, level, frequency, weeks, muscle_tags, notes, is_public, is_system, coach_id, equipment_archetype, created_at,
+  id, name, description, goal, level, frequency, weeks, muscle_tags, notes, is_public, is_system, coach_id, equipment_archetype, session_mode, volume_focus, created_at,
   coach_program_template_sessions (
     id, name, day_of_week, days_of_week, position, notes,
     coach_program_template_exercises (
-      id, name, sets, reps, rest_sec, rir, notes, position, image_url, movement_pattern, equipment_required, primary_muscles, secondary_muscles, group_id, is_compound, set_prescriptions, tempo
+      id, name, sets, reps, rest_sec, rir, notes, position, image_url, movement_pattern, equipment_required, primary_muscles, secondary_muscles, group_id, is_compound, is_unilateral, target_rir, set_prescriptions, superset_rest_mode, tempo, execution_type, target_hr_zone
     )
   )
 `;
@@ -75,6 +76,7 @@ export async function POST(req: NextRequest) {
     notes,
     sessions,
     session_mode,
+    volume_focus,
   } = body;
 
   if (!name)
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest) {
   const db = service();
 
   // Créer le template
-  const effectiveFrequency = sessions?.length ?? frequency;
+  const effectiveFrequency = resolveStoredFrequency(sessions ?? [], frequency ?? null);
 
   const { data: template, error: tErr } = await db
     .from("coach_program_templates")
@@ -99,6 +101,7 @@ export async function POST(req: NextRequest) {
       notes,
       equipment_archetype: body.equipment_archetype || null,
       session_mode: session_mode ?? "day",
+      volume_focus: volume_focus ?? {},
     })
     .select("id")
     .single();
@@ -152,8 +155,13 @@ export async function POST(req: NextRequest) {
           secondary_muscles: e.secondary_muscles ?? [],
           group_id: e.group_id ?? null,
           is_compound: e.is_compound ?? null,
+          is_unilateral: e.is_unilateral ?? false,
+          target_rir: e.target_rir ?? null,
           set_prescriptions: e.set_prescriptions ?? null,
+          superset_rest_mode: e.superset_rest_mode ?? 'after_round',
           tempo: e.tempo ?? null,
+          execution_type: e.execution_type ?? 'reps_rir',
+          target_hr_zone: e.target_hr_zone ?? null,
         })),
       );
     }

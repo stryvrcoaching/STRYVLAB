@@ -1,43 +1,29 @@
-export type FeedbackEntityType =
-  | "session"
-  | "exercise"
-  | "set"
-  | "checkin"
-  | "morpho"
-  | "bilan"
+export const FEEDBACK_WORKSPACES = ['client_pwa', 'platform_web'] as const
+export type FeedbackWorkspace = (typeof FEEDBACK_WORKSPACES)[number]
 
-export type FeedbackEmoji = "👍" | "💪" | "✅" | "🔥" | "❓"
-export type FeedbackAuthorType = "client" | "coach"
+export const FEEDBACK_CATEGORIES = ['bug', 'usability', 'suggestion'] as const
+export type FeedbackCategory = (typeof FEEDBACK_CATEGORIES)[number]
 
-export const FEEDBACK_EMOJIS: FeedbackEmoji[] = ["👍", "💪", "✅", "🔥", "❓"]
+export const FEEDBACK_PRIORITIES = ['low', 'medium', 'critical'] as const
+export type FeedbackPriority = (typeof FEEDBACK_PRIORITIES)[number]
 
-export interface FeedbackReaction {
+export const FEEDBACK_STATUSES = ['new', 'reviewed', 'planned', 'done', 'dismissed'] as const
+export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number]
+
+export const FEEDBACK_EMOJIS = ['👍', '🔥', '👏', '💪', '❤️'] as const
+export type FeedbackEmoji = (typeof FEEDBACK_EMOJIS)[number]
+
+export interface CoachFeedbackReaction {
   id: string
-  feedback_id: string
-  author_type: FeedbackAuthorType
-  author_id: string
   emoji: FeedbackEmoji
   reply_text: string | null
+  author_type: 'coach' | 'client'
   created_at: string
 }
 
 export interface CoachFeedback {
   id: string
-  coach_id: string
-  client_id: string
-  entity_type: FeedbackEntityType
-  entity_id: string
-  entity_label: string | null
   body: string
   created_at: string
-  reactions: FeedbackReaction[]
-}
-
-export const ENTITY_TYPE_LABEL: Record<FeedbackEntityType, string> = {
-  session: "🏋️ Séance",
-  exercise: "💪 Exercice",
-  set: "💪 Set",
-  checkin: "📊 Check-in",
-  morpho: "📷 Morpho",
-  bilan: "📋 Bilan",
+  reactions: CoachFeedbackReaction[]
 }

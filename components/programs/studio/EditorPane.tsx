@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, AlertCircle, ChevronDown, ChevronUp, Layers } from 'lucide-react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
 import ExerciseCard, { type ExerciseData } from './ExerciseCard'
@@ -11,6 +11,7 @@ import { isMorphoV2, type BiomechMovementPattern, type PatternVerdict } from '@/
 import { buildVerdictMap, computeCoherence } from '@/lib/morpho/exerciseCoherence'
 import { extractMorphoTraits, type MorphoTraits } from '@/lib/morpho/morphoTraits'
 import type { IntelligenceResult, IntelligenceAlert } from '@/lib/programs/intelligence'
+import { getSessionsPerWeek, getTrainingDaysPerWeek } from '@/lib/programs/frequency'
 
 const GOALS = [
   { value: 'hypertrophy', label: 'Hypertrophie' },
@@ -96,6 +97,9 @@ interface Props {
   makeExDragId: (si: number, ei: number) => string
   sessionDropId: (si: number) => string
   clientId?: string
+  selectedExercises: { si: number; ei: number }[]
+  onToggleSelectExercise: (si: number, ei: number) => void
+  onAddPatternClick: (si: number) => void
 }
 
 export default function EditorPane({
@@ -132,6 +136,9 @@ export default function EditorPane({
   makeExDragId,
   sessionDropId,
   clientId,
+  selectedExercises,
+  onToggleSelectExercise,
+  onAddPatternClick,
 }: Props) {
   type TrendEntry = { trend: 'progression' | 'stagnation' | 'overtraining' | null; suggestion: string | null }
   const [trendMap, setTrendMap] = useState<Record<string, TrendEntry>>({})
@@ -183,6 +190,9 @@ export default function EditorPane({
     sessions.flatMap(s => s.exercises.map(e => e.movement_pattern).filter((p): p is string => !!p))
   ))
 
+  const scheduledSessionCount = getSessionsPerWeek(sessions)
+  const trainingDays = getTrainingDaysPerWeek(sessions)
+
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[#121212]">
       {/* Sticky sub-header: template meta + save button */}
@@ -215,7 +225,7 @@ export default function EditorPane({
             <span className="w-9 h-7 bg-[#0a0a0a] rounded-lg border-[0.3px] border-white/[0.06] text-[11px] text-white/50 flex items-center justify-center font-mono">
               {meta.frequency}
             </span>
-            <span className="text-[10px] text-white/30 whitespace-nowrap">j/sem</span>
+            <span className="text-[10px] text-white/30 whitespace-nowrap">séances/sem</span>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <input
@@ -382,6 +392,9 @@ export default function EditorPane({
                       performanceTrend={trendMap[ex.name]?.trend ?? null}
                       performanceSuggestion={trendMap[ex.name]?.suggestion ?? null}
                       morphoCoherence={(verdictMap || morphoTraits) ? computeCoherence(ex, verdictMap, morphoTraits) : undefined}
+                      isSelected={selectedExercises.some(s => s.si === si && s.ei === ei)}
+                      onToggleSelect={() => onToggleSelectExercise(si, ei)}
+                      clientId={clientId}
                       onMoveUp={() => {
                         if (ei > 0) {
                           onMoveExercise(si, ei, si, ei - 1)
@@ -400,13 +413,22 @@ export default function EditorPane({
                     />
                   ))}
                 </SortableContext>
-                <button
-                  onClick={() => onAddExercise(si)}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-[0.3px] border-dashed border-white/[0.08] text-white/30 hover:text-white/60 hover:border-white/[0.15] transition-colors text-[11px]"
-                >
-                  <Plus size={12} />
-                  Ajouter un exercice
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => onAddExercise(si)}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-[0.3px] border-dashed border-white/[0.08] text-white/30 hover:text-white/60 hover:border-white/[0.15] transition-colors text-[11px]"
+                  >
+                    <Plus size={12} />
+                    Ajouter un exercice
+                  </button>
+                  <button
+                    onClick={() => onAddPatternClick(si)}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-[0.3px] border-dashed border-white/[0.08] text-[#1f8a65]/70 hover:text-[#1f8a65] hover:border-[#1f8a65]/40 transition-colors text-[11px]"
+                  >
+                    <Layers size={12} />
+                    Ajouter un pattern
+                  </button>
+                </div>
               </DroppableSession>
             )}
           </div>

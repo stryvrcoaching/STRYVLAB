@@ -1,0 +1,81 @@
+import type { OverlayMetricGroup } from '@/lib/coach/metricsOverlay/types'
+
+export const OVERLAY_GROUPS: OverlayMetricGroup[] = [
+  {
+    key: 'recomposition',
+    label: 'Recomposition',
+    description: 'Vue croisée de la composition corporelle pour repérer le duo perte de gras et maintien ou hausse du muscle.',
+    family: 'body',
+    metrics: ['weight_kg', 'fat_mass_kg', 'body_fat_pct', 'lean_mass_kg', 'muscle_mass_kg'],
+  },
+  {
+    key: 'ratio-corporel',
+    label: 'Ratio corporel',
+    description: 'Lecture relative des pourcentages corporels et des marqueurs de structure.',
+    family: 'body',
+    metrics: ['body_fat_pct', 'muscle_mass_pct', 'skeletal_muscle_pct', 'body_water_pct', 'waist_hip_ratio'],
+  },
+  {
+    key: 'mensuration-tronc',
+    label: 'Mensuration tronc',
+    description: 'Évolution des mensurations centrales.',
+    family: 'body',
+    metrics: ['waist_cm', 'hips_cm', 'chest_cm', 'neck_cm'],
+  },
+  {
+    key: 'mensuration-membres',
+    label: 'Mensuration membres',
+    description: 'Lecture des changements périphériques sur les membres.',
+    family: 'body',
+    metrics: ['arm_cm', 'thigh_cm', 'calf_cm'],
+  },
+  {
+    key: 'recuperation-bien-etre',
+    label: 'Récupération et bien-être',
+    description: 'Croise sommeil, énergie, stress et courbatures.',
+    family: 'recovery',
+    metrics: ['sleep_duration_h', 'energy_level', 'stress_level', 'muscle_soreness'],
+  },
+  {
+    key: 'nutrition-apport',
+    label: 'Nutrition apportée',
+    description: 'Courbes nutritionnelles réellement consommées.',
+    family: 'nutrition',
+    metrics: ['protein_consumed_g', 'carbs_consumed_g', 'fat_consumed_g', 'calories_consumed_kcal', 'hydration_consumed_ml'],
+  },
+  {
+    key: 'nutrition-prevue',
+    label: 'Nutrition prévue',
+    description: 'Objectifs nutritionnels issus du protocole partagé.',
+    family: 'nutrition',
+    metrics: ['protein_planned_g', 'carbs_planned_g', 'fat_planned_g', 'calories_planned_kcal', 'hydration_planned_ml'],
+  },
+  {
+    key: 'performance-charge',
+    label: 'Performance charge',
+    description: 'Lecture des marqueurs de charge et d’intensité.',
+    family: 'performance',
+    metrics: ['performance_volume', 'performance_avg_load', 'performance_avg_rir', 'performance_avg_rpe'],
+  },
+  {
+    key: 'performance-execution',
+    label: 'Performance exécution',
+    description: 'Suit la complétion et la difficulté ressentie.',
+    family: 'performance',
+    metrics: ['performance_completion_rate', 'performance_avg_rir', 'performance_avg_rpe'],
+  },
+  {
+    key: 'correlation-composition-nutrition',
+    label: 'Corrélation composition x nutrition',
+    description: 'Groupe prêt à l’emploi pour rapprocher composition corporelle et apports nutritionnels.',
+    family: 'correlation',
+    metrics: ['muscle_mass_kg', 'fat_mass_kg', 'protein_consumed_g', 'calories_consumed_kcal', 'hydration_consumed_ml'],
+  },
+  {
+    key: 'correlation-performance-recuperation',
+    label: 'Corrélation performance x récupération',
+    description: 'Groupe prêt à l’emploi pour repérer l’effet du sommeil, du stress et des courbatures sur la performance.',
+    family: 'correlation',
+    metrics: ['performance_volume', 'performance_completion_rate', 'sleep_duration_h', 'stress_level', 'muscle_soreness'],
+  },
+]

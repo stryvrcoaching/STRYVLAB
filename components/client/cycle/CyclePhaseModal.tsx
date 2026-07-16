@@ -1,9 +1,13 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
+import { createPortal } from 'react-dom'
+import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import type { CyclePhase } from '@/lib/cycle/cycleEngine'
-import { PHASE_CONTENT, type CycleContext } from '@/lib/client/cycle/phaseContent'
+import { getPhaseContent, type CycleContext } from '@/lib/client/cycle/phaseContent'
+import { useClientT } from '@/components/client/ClientI18nProvider'
+import useBodyScrollLock from '@/components/client/useBodyScrollLock'
 
 const PHASE_COLORS: Record<CyclePhase, string> = {
   follicular: '#22c55e',
@@ -29,15 +33,22 @@ export default function CyclePhaseModal({
   context,
   onClose,
 }: Props) {
-  const content = PHASE_CONTENT[phase][context]
+  const { lang, t } = useClientT()
+  useBodyScrollLock(open)
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  const content = getPhaseContent(lang, phase, context)
   const color = PHASE_COLORS[phase]
 
-  return (
+  if (!mounted) return null
+
+  return createPortal(
+    (
     <AnimatePresence>
       {open && (
         <>
           <motion.div
-            className="fixed inset-0 bg-black/60 z-[79]"
+            className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-[2px]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -45,8 +56,8 @@ export default function CyclePhaseModal({
           />
 
           <motion.div
-            className="fixed bottom-0 left-0 right-0 z-[80] bg-[#161616] rounded-t-2xl px-5 pt-4 pb-8 space-y-4"
-            style={{ maxHeight: '88vh' }}
+            className="client-native-bottom-sheet fixed bottom-0 left-0 right-0 z-[70] bg-[#0d0d0d] rounded-t-[28px] px-5 pt-4 space-y-4"
+            style={{ maxHeight: '88dvh', paddingBottom: 'var(--client-modal-bottom-padding)' }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
@@ -63,11 +74,14 @@ export default function CyclePhaseModal({
                   {content.subtitle}
                 </p>
                 <p className="text-[20px] font-bold text-white leading-tight">{content.title}</p>
-                <p className="text-[11px] text-white/40">J{cycleDay} sur {avgCycleLength}</p>
+                <p className="text-[11px] text-white/40">
+                  {t('cycle.day.short', { day: cycleDay })} {t('cycle.day.of')} {avgCycleLength}
+                </p>
               </div>
               <button
                 onClick={onClose}
                 className="w-7 h-7 rounded-full bg-white/[0.06] flex items-center justify-center shrink-0"
+                aria-label={t('ui.close')}
               >
                 <X size={13} className="text-white/50" />
               </button>
@@ -81,7 +95,7 @@ export default function CyclePhaseModal({
               }}
             >
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40 mb-0.5">
-                Impact {context === 'nutrition' ? 'nutritionnel' : 'entraînement'}
+                {t(context === 'nutrition' ? 'cycle.impact.nutrition' : 'cycle.impact.training')}
               </p>
               <p className="text-[11px] font-medium" style={{ color }}>{content.impact}</p>
             </div>
@@ -101,5 +115,7 @@ export default function CyclePhaseModal({
         </>
       )}
     </AnimatePresence>
+    ),
+    document.body,
   )
 }

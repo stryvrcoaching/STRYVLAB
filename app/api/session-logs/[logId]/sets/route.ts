@@ -14,7 +14,7 @@ function service() {
 type Params = { params: { logId: string } }
 
 const setLogSchema = z.object({
-  exercise_id: z.string().uuid(),
+  exercise_id: z.string().uuid().nullable().optional(),
   exercise_name: z.string().min(1),
   set_number: z.number().int().positive(),
   side: z.enum(['left', 'right', 'bilateral']).default('bilateral'),
@@ -74,14 +74,18 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const parsed = bodySchema.safeParse(raw)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues }, { status: 400 })
 
-  // Si set_logs est vide, c'est un ping de validation (draft check) — retourner ok directement
+  // Si set_logs est vide, c'est un ping de validation (draft check) — retourner ok directement avec les sets existants
   if (parsed.data.set_logs.length === 0) {
-    return NextResponse.json({ success: true })
+    const { data: dbSets } = await db
+      .from('client_set_logs')
+      .select('*')
+      .eq('session_log_id', params.logId)
+    return NextResponse.json({ success: true, set_logs: dbSets ?? [] })
   }
 
   const rows = parsed.data.set_logs.map(s => ({
     session_log_id: params.logId,
-    exercise_id: s.exercise_id,
+    exercise_id: s.exercise_id ?? null,
     exercise_name: s.exercise_name,
     set_number: s.set_number,
     side: s.side,

@@ -8,6 +8,7 @@ import {
 } from '@/lib/performance/analyzer'
 import { isLikelyCompoundExercise } from './clientProfile'
 import { computeOneRMTrends, type RawSetLogEntry } from '@/lib/training/oneRepMax'
+import { resolveCanonicalExerciseKey, resolveCanonicalExerciseName } from '@/lib/training/exerciseHistoryKey'
 
 export interface SessionSetRow {
   exercise_id: string
@@ -87,8 +88,8 @@ export function buildExercisePerformanceRows(input: {
     logged_at: session.completed_at,
     sets: session.sets.map(
       (set): SetLogEntry => ({
-        exercise_id: set.exercise_id || set.exercise_name,
-        exercise_name: set.exercise_name,
+        exercise_id: set.exercise_id || resolveCanonicalExerciseKey(set.exercise_name),
+        exercise_name: resolveCanonicalExerciseName(set.exercise_name),
         set_number: set.set_number,
         actual_reps: set.actual_reps,
         completed: set.completed,
@@ -115,11 +116,11 @@ export function buildExercisePerformanceRows(input: {
 
   for (const session of sortedSessions) {
     const exIds = Array.from(
-      new Set(session.sets.map((s) => s.exercise_id || s.exercise_name).filter(Boolean)),
+      new Set(session.sets.map((s) => s.exercise_id || resolveCanonicalExerciseKey(s.exercise_name)).filter(Boolean)),
     )
     for (const exId of exIds) {
-      const exSets = session.sets.filter((s) => (s.exercise_id || s.exercise_name) === exId)
-      const name = exSets[0]?.exercise_name ?? exId
+      const exSets = session.sets.filter((s) => (s.exercise_id || resolveCanonicalExerciseKey(s.exercise_name)) === exId)
+      const name = resolveCanonicalExerciseName(exSets[0]?.exercise_name ?? exId)
       if (!byExercise.has(exId)) {
         byExercise.set(exId, {
           name,

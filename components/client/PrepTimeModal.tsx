@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Timer, Vibrate, VibrateOff } from 'lucide-react'
+import { useClientT } from '@/components/client/ClientI18nProvider'
 
 interface PrepTimeModalProps {
   exerciseName: string
@@ -66,9 +67,18 @@ function isIOS(): boolean {
 }
 
 export default function PrepTimeModal({ exerciseName, onConfirm, onClose }: PrepTimeModalProps) {
+  const { t } = useClientT()
   const [seconds, setSeconds]   = useState<number>(() => getPrepTime(exerciseName))
   const [haptics, setHaptics]   = useState<boolean>(() => getHapticsEnabled())
+  const [isLandscape, setIsLandscape] = useState(false)
   const iosDevice = typeof window !== 'undefined' ? isIOS() : false
+
+  useEffect(() => {
+    const syncOrientation = () => setIsLandscape(window.innerWidth > window.innerHeight)
+    syncOrientation()
+    window.addEventListener('resize', syncOrientation)
+    return () => window.removeEventListener('resize', syncOrientation)
+  }, [])
 
   const dec = () => setSeconds(s => Math.max(3, s - 1))
   const inc = () => setSeconds(s => Math.min(30, s + 1))
@@ -91,7 +101,7 @@ export default function PrepTimeModal({ exerciseName, onConfirm, onClose }: Prep
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/70 z-[65] flex items-center justify-center p-6"
+        className="fixed inset-0 bg-black/70 z-[65] flex items-center justify-center p-4"
         onClick={onClose}
       >
         <motion.div
@@ -100,7 +110,7 @@ export default function PrepTimeModal({ exerciseName, onConfirm, onClose }: Prep
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 12 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="w-full max-w-xs bg-[#111111] rounded-2xl p-6"
+          className={`w-full bg-[#111111] rounded-2xl overflow-y-auto ${isLandscape ? 'max-w-2xl max-h-[calc(100dvh-24px)] p-5' : 'max-w-xs max-h-[calc(100dvh-32px)] p-6'}`}
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
@@ -111,10 +121,10 @@ export default function PrepTimeModal({ exerciseName, onConfirm, onClose }: Prep
               </div>
               <div>
                 <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">
-                  Préparation
+                  {t('common.preparation')}
                 </p>
                 <p className="text-[13px] font-bold text-white leading-tight">
-                  Temps de mise en place
+                  {t('prep.modal.title')}
                 </p>
               </div>
             </div>
@@ -128,18 +138,17 @@ export default function PrepTimeModal({ exerciseName, onConfirm, onClose }: Prep
 
           {/* Explanation */}
           <p className="text-[11px] text-white/45 leading-relaxed mb-5">
-            Combien de secondes vous faut-il pour vous positionner sur{' '}
-            <span className="text-white/70 font-medium">{exerciseName}</span> ?
-            Ce compte à rebours se lancera avant chaque set.
+            {t('prep.modal.question', { exercise: exerciseName })}{' '}
+            {t('prep.modal.desc')}
           </p>
 
           {/* How to calculate tip */}
           <div className="bg-[#111111] rounded-xl px-3 py-2.5 mb-5">
             <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/25 mb-1">
-              Comment estimer ?
+              {t('prep.modal.estimate')}
             </p>
             <p className="text-[10px] text-white/35 leading-relaxed">
-              Exercice simple (machine) → 3–5s · Mouvement complexe (barbell, câble) → 5–10s · Setup technique (réglages) → 10–15s
+              {t('prep.modal.estimate.desc')}
             </p>
           </div>
 
@@ -159,7 +168,7 @@ export default function PrepTimeModal({ exerciseName, onConfirm, onClose }: Prep
               >
                 {seconds}
               </span>
-              <p className="text-[10px] text-white/30 font-medium mt-0.5">secondes</p>
+              <p className="text-[10px] text-white/30 font-medium mt-0.5">{t('common.seconds')}</p>
             </div>
             <button
               onClick={inc}
@@ -175,7 +184,7 @@ export default function PrepTimeModal({ exerciseName, onConfirm, onClose }: Prep
             <div className="w-full flex items-center gap-2.5 px-4 h-11 rounded-xl mb-4 bg-[#111111]">
               <VibrateOff size={14} className="text-white/20 shrink-0" />
               <span className="text-[11px] text-white/25">
-                Vibrations non disponibles sur iOS
+                {t('prep.modal.hapticsUnavailable')}
               </span>
             </div>
           ) : (
@@ -191,7 +200,7 @@ export default function PrepTimeModal({ exerciseName, onConfirm, onClose }: Prep
                   : <VibrateOff size={14} className="text-white/25" />
                 }
                 <span className={`text-[11px] font-semibold ${haptics ? 'text-white/80' : 'text-white/30'}`}>
-                  Vibrations aux transitions
+                  {t('prep.modal.haptics')}
                 </span>
               </div>
               <div className={`w-8 h-4 rounded-full relative transition-colors ${haptics ? 'bg-white/[0.30]' : 'bg-white/[0.10]'}`}>
@@ -205,11 +214,11 @@ export default function PrepTimeModal({ exerciseName, onConfirm, onClose }: Prep
             onClick={handleConfirm}
             className="w-full h-12 rounded-xl font-bold text-[13px] uppercase tracking-[0.10em] transition-all active:scale-[0.98] bg-white text-[#0d0d0d]"
           >
-            Commencer
+            {t('common.start')}
           </button>
 
           <p className="text-center text-[9px] text-white/20 mt-3">
-            Mémorisé pour cet exercice · Modifiable au prochain set
+            {t('prep.modal.saved')}
           </p>
         </motion.div>
       </motion.div>

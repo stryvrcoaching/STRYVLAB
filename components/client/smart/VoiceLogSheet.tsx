@@ -10,19 +10,23 @@ import {
   Plus,
   RotateCcw,
   Keyboard,
+  Loader2,
 } from "lucide-react";
 import { useClientT } from "@/components/client/ClientI18nProvider";
+import useBodyScrollLock from "@/components/client/useBodyScrollLock";
 import {
   cleanTranscript,
   guessVoiceFoodCategory,
   type VoiceItem,
 } from "@/lib/nutrition/voice";
+import type { NutritionParseSnapshot } from "@/lib/nutrition/parse-feedback";
 import type {
   CategoryL1,
   EntryDraft,
   FoodItem,
   MealType,
 } from "@/lib/nutrition/food-items";
+import { sendClientMutation } from "@/lib/client/offline-mutations";
 
 type Layer =
   | "recording"
@@ -32,6 +36,32 @@ type Layer =
   | "review";
 type RecordMode = "idle" | "recording";
 type EntryInputMode = "voice" | "text";
+type VoicePurpose = "meal" | "note";
+type SpeechRecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+type SpeechRecognitionEventLike = {
+  resultIndex: number;
+  results: ArrayLike<{
+    isFinal: boolean;
+    0: { transcript: string };
+  }>;
+};
+
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognitionLike;
+    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+  }
+}
 
 const SUBCATEGORIES: Record<CategoryL1, string[]> = {
   proteins: [
@@ -91,15 +121,42 @@ function withBases(item: VoiceItem): DisplayItem {
   };
 }
 
+function toParseSnapshot(items: DisplayItem[], mealType: MealType): NutritionParseSnapshot {
+  return {
+    meal_type: mealType,
+    items: items
+      .filter((item) => item.name.trim().length > 0)
+      .map((item) => ({
+        name: item.name.trim(),
+        quantity_g: item.quantity_g,
+        food_item_id: item.food_item_id ?? null,
+        category_l1: item.category_l1 ?? null,
+        category_l2: item.category_l2 ?? null,
+      })),
+  };
+}
+
+function snapshotsDiffer(
+  initialSnapshot: NutritionParseSnapshot | null,
+  currentSnapshot: NutritionParseSnapshot,
+): boolean {
+  if (!initialSnapshot) return false;
+  return JSON.stringify(initialSnapshot) !== JSON.stringify(currentSnapshot);
+}
+
 interface VoiceLogSheetProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
   onTranscriptOnly?: (transcript: string) => void;
   onDraftReady?: (entries: EntryDraft[], mealType: MealType) => void;
+  onNoteSubmit?: (note: string) => void;
   mealId?: string;
   lang?: string;
   initialInputMode?: EntryInputMode;
+  initialText?: string;
+  purpose?: VoicePurpose;
+  onNoteDraftChange?: (note: string) => void;
 }
 
 const MAX_RECORD_SEC = 90;
@@ -110,17 +167,41 @@ const CONFIDENCE_STYLES: Record<string, string> = {
   low: "bg-white/[0.06] text-[#b0b0b0]",
 };
 
+function appendDictation(base: string, addition: string) {
+  const cleanBase = base.trim();
+  const cleanAddition = addition.trim();
+
+  if (!cleanAddition) {
+    return base;
+  }
+
+  if (!cleanBase) {
+    return cleanAddition;
+  }
+
+  const separator = /[.!?…]$/.test(cleanBase) ? " " : ". ";
+  return `${cleanBase}${separator}${cleanAddition}`;
+}
+
 export default function VoiceLogSheet({
   open,
   onClose,
   onSuccess,
   onTranscriptOnly,
   onDraftReady,
+  onNoteSubmit,
   mealId,
   lang = "fr",
   initialInputMode = "voice",
+  initialText = "",
+  purpose = "meal",
+  onNoteDraftChange,
 }: VoiceLogSheetProps) {
   const { t } = useClientT();
+  useBodyScrollLock(open);
+  const isNoteMode = purpose === "note";
+  const sheetTitle = isNoteMode ? t("voice.note.title") : t("voice.title");
+
   const CATEGORY_LABELS_T: Record<CategoryL1, string> = {
     proteins: t("food.cat.proteins"),
     carbs: t("food.cat.carbs"),
@@ -172,9 +253,18 @@ export default function VoiceLogSheet({
   const [items, setItems] = useState<DisplayItem[]>([]);
   const [qtyDrafts, setQtyDrafts] = useState<Record<number, string>>({});
   const [mealType, setMealType] = useState<MealType>("snack");
+  const [initialParseSnapshot, setInitialParseSnapshot] =
+    useState<NutritionParseSnapshot | null>(null);
   const [logging, setLogging] = useState(false);
   const [waveBars, setWaveBars] = useState<number[]>([6, 6, 6, 6, 6, 6, 6]);
   const [elapsedSec, setElapsedSec] = useState(0);
+
+  const closeNoteSheet = useCallback(() => {
+    if (isNoteMode) {
+      onNoteDraftChange?.(textInput.trim());
+    }
+    onClose();
+  }, [isNoteMode, onClose, onNoteDraftChange, textInput]);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -187,6 +277,8 @@ export default function VoiceLogSheet({
   const waveFrameRef = useRef<number | null>(null);
   const modeRef = useRef<RecordMode>("idle");
   const openRef = useRef(open);
+  const speechRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const dictationBaseRef = useRef("");
 
   openRef.current = open;
   function setModeSync(m: RecordMode) {
@@ -201,18 +293,20 @@ export default function VoiceLogSheet({
       setLayer("recording");
       setModeSync("idle");
       setInputMode(initialInputMode);
-      setTextInput("");
-      setEditableTranscript("");
+      setTextInput(initialText);
+      setEditableTranscript(initialText);
       setError(null);
       setItems([]);
+      setInitialParseSnapshot(null);
       setElapsedSec(0);
       setWaveBars([6, 6, 6, 6, 6, 6, 6]);
       chunksRef.current = [];
+      dictationBaseRef.current = initialText;
     } else {
       stopAll();
       setModeSync("idle");
     }
-  }, [open, initialInputMode]);
+  }, [open, initialInputMode, initialText]);
 
   useEffect(() => () => stopAll(), []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -220,16 +314,15 @@ export default function VoiceLogSheet({
     setQtyDrafts({});
   }, [items.length]);
 
-  useEffect(() => {
-    function onHide() {
-      if (modeRef.current === "recording") stopRecording();
-    }
-    document.addEventListener("visibilitychange", onHide);
-    return () => document.removeEventListener("visibilitychange", onHide);
-  }, []);
-
   // ── Stop everything ────────────────────────────────────────────────────────
   function stopAll() {
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.onend = null;
+        speechRecognitionRef.current.abort();
+      } catch {}
+      speechRecognitionRef.current = null;
+    }
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -300,7 +393,14 @@ export default function VoiceLogSheet({
         }
         const { transcript } = await res.json();
         if (!openRef.current) return;
-        if (onTranscriptOnly) {
+        if (isNoteMode) {
+          const next = appendDictation(dictationBaseRef.current, transcript);
+          setTextInput(next);
+          setEditableTranscript(next);
+          setError(null);
+          setModeSync("idle");
+          setLayer("recording");
+        } else if (onTranscriptOnly) {
           onTranscriptOnly(transcript);
         } else {
           setEditableTranscript(transcript);
@@ -312,13 +412,25 @@ export default function VoiceLogSheet({
         setModeSync("idle");
       }
     },
-    [t, onTranscriptOnly],
+    [isNoteMode, t, onTranscriptOnly],
   );
 
   // ── Parse transcript → GPT ─────────────────────────────────────────────────
   const parseTranscript = useCallback(
     async (raw: string) => {
       if (!openRef.current) return;
+      if (isNoteMode) {
+        const note = cleanTranscript(raw, lang);
+        if (note.length < 3) {
+          setError(t("voice.error.noteShort"));
+          return;
+        }
+        setError(null);
+        onNoteSubmit?.(note);
+        onTranscriptOnly?.(note);
+        onClose();
+        return;
+      }
       const clean = cleanTranscript(raw, lang);
       setLayer("processing");
       setError(null);
@@ -344,15 +456,18 @@ export default function VoiceLogSheet({
         }
         const data = await res.json();
         if (!openRef.current) return;
-        setItems((data.items ?? []).map(withBases));
-        setMealType(data.meal_type ?? "snack");
+        const parsedItems = (data.items ?? []).map(withBases);
+        const parsedMealType = data.meal_type ?? "snack";
+        setItems(parsedItems);
+        setMealType(parsedMealType);
+        setInitialParseSnapshot(toParseSnapshot(parsedItems, parsedMealType));
         setLayer("review");
       } catch {
         setError(t("voice.error_parse"));
         setLayer("transcript");
       }
     },
-    [lang, t],
+    [isNoteMode, lang, onClose, onNoteSubmit, onTranscriptOnly, t],
   );
 
   // ── Stop recording → transcribing layer ───────────────────────────────────
@@ -389,9 +504,19 @@ export default function VoiceLogSheet({
     setLayer("transcribing");
   }, []);
 
+  useEffect(() => {
+    function onHide() {
+      if (modeRef.current === "recording") stopRecording();
+    }
+    document.addEventListener("visibilitychange", onHide);
+    return () => document.removeEventListener("visibilitychange", onHide);
+  }, [stopRecording]);
+
   // ── Start recording ────────────────────────────────────────────────────────
   const startRecording = useCallback(async () => {
     if (modeRef.current === "recording") return;
+    const noteBaseText = textInput;
+    dictationBaseRef.current = noteBaseText;
     setModeSync("recording");
     setError(null);
     setElapsedSec(0);
@@ -402,7 +527,7 @@ export default function VoiceLogSheet({
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
       setModeSync("idle");
-      setError("Microphone inaccessible");
+      setError(t("voice.error.microphone"));
       return;
     }
 
@@ -457,7 +582,7 @@ export default function VoiceLogSheet({
       },
       (MAX_RECORD_SEC + 2) * 1000,
     );
-  }, [transcribeBlob, stopRecording]);
+  }, [stopRecording, textInput, transcribeBlob]);
 
   function handleToggle() {
     if (modeRef.current === "idle") {
@@ -549,6 +674,7 @@ export default function VoiceLogSheet({
       item_key:
         item.food_item_id ??
         `voice-${item.name}`.toLowerCase().replace(/\s+/g, "-"),
+      icon_key: null,
       kcal_per_100g: Math.round((item.kcal / quantity) * 100),
       protein_per_100g: parseFloat(
         ((item.protein_g / quantity) * 100).toFixed(1),
@@ -568,9 +694,7 @@ export default function VoiceLogSheet({
       (i) => i.is_new && !i.food_item_id && (!i.category_l1 || !i.category_l2),
     );
     if (uncategorizedNewItem) {
-      setError(
-        "Choisis une categorie et une sous-categorie pour chaque nouvel aliment avant de continuer.",
-      );
+      setError(t("voice.error.category"));
       return null;
     }
 
@@ -621,7 +745,7 @@ export default function VoiceLogSheet({
     return validItems.map((item) => ({
       food_item: toDraftFoodItem(item),
       quantity_g: item.quantity_g,
-      input_mode: "voice" as const,
+      input_mode: inputMode,
     }));
   }
 
@@ -635,7 +759,23 @@ export default function VoiceLogSheet({
       setLogging(false);
       return;
     }
+    const correctedSnapshot = toParseSnapshot(validItems, mealType);
     if (onDraftReady) {
+      if (snapshotsDiffer(initialParseSnapshot, correctedSnapshot)) {
+        try {
+          await fetch("/api/client/nutrition/parse-feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              source: inputMode,
+              transcript: editableTranscript.trim(),
+              meal_type: mealType,
+              parsed: initialParseSnapshot,
+              corrected: correctedSnapshot,
+            }),
+          });
+        } catch {}
+      }
       onDraftReady(draftEntries, mealType);
       setLogging(false);
       onClose();
@@ -646,7 +786,7 @@ export default function VoiceLogSheet({
       .map((i) => ({
         food_item_id: i.food_item_id!,
         quantity_g: i.quantity_g,
-        input_mode: "voice" as const,
+        input_mode: inputMode,
       }));
     if (entries.length === 0) {
       setLogging(false);
@@ -654,16 +794,35 @@ export default function VoiceLogSheet({
       return;
     }
     try {
-      const res = await fetch("/api/client/nutrition/meals", {
+      const result = await sendClientMutation({
+        kind: "meal",
+        url: "/api/client/nutrition/meals",
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           ...(mealId ? { meal_id: mealId } : {}),
           meal_type: mealType,
+          meal_source: inputMode === "text" ? "text" : "voice",
           entries,
-        }),
+        },
       });
-      if (!res.ok) throw new Error();
+      if (!result.queued && !result.response?.ok) throw new Error();
+      const loggedMeal = await result.response?.json();
+      if (snapshotsDiffer(initialParseSnapshot, correctedSnapshot)) {
+        try {
+          await fetch("/api/client/nutrition/parse-feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              meal_id: loggedMeal?.id ?? null,
+              source: inputMode,
+              transcript: editableTranscript.trim(),
+              meal_type: mealType,
+              parsed: initialParseSnapshot,
+              corrected: correctedSnapshot,
+            }),
+          });
+        } catch {}
+      }
       if (onSuccess) onSuccess();
       else onClose();
     } catch {
@@ -684,9 +843,10 @@ export default function VoiceLogSheet({
   const formatTime = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
   const timeWarning = isActive && elapsedSec >= 70;
+  const noteIsTranscribing = isNoteMode && layer === "transcribing";
 
   return (
-    <AnimatePresence>
+    <AnimatePresence initial={false}>
       {open && (
         <>
           {/* Overlay */}
@@ -695,7 +855,7 @@ export default function VoiceLogSheet({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={closeNoteSheet}
           />
 
           {/* Sheet */}
@@ -703,9 +863,10 @@ export default function VoiceLogSheet({
             className="fixed bottom-0 left-0 right-0 z-[70] rounded-t-2xl"
             style={{
               background: "#0d0d0d",
-              maxHeight: "88vh",
+              maxHeight: "var(--client-sheet-max-height)",
               display: "flex",
               flexDirection: "column",
+              paddingBottom: "16px",
             }}
             initial={{ y: "100%" }}
             animate={{
@@ -718,10 +879,10 @@ export default function VoiceLogSheet({
             <div className="relative flex items-center justify-between px-5 pt-5 pb-4 shrink-0">
               <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-white/[0.10]" />
               <p className="text-[15px] font-barlow-condensed font-bold uppercase tracking-[0.12em] text-white">
-                {t("voice.title")}
+                {sheetTitle}
               </p>
               <button
-                onClick={onClose}
+                onClick={closeNoteSheet}
                 className="h-8 w-8 flex items-center justify-center rounded-xl bg-white/[0.06] text-white/40 hover:text-white/70 transition-colors"
               >
                 <X size={14} />
@@ -730,8 +891,105 @@ export default function VoiceLogSheet({
 
             {/* Body */}
             <div className="flex-1 overflow-y-auto min-h-0 px-5 pb-8">
+              {isNoteMode ? (
+                <div className="flex flex-col gap-4 pt-1">
+                  <div>
+                    <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/40">
+                      {t("voice.note.prompt")}
+                    </p>
+                    <p className="mt-2 text-[13px] leading-6 text-white/62">
+                      {t("voice.note.desc")}
+                    </p>
+                  </div>
+
+                  <div className="relative rounded-[20px] bg-white/[0.05] p-3 ring-1 ring-white/[0.08]">
+                    {isActive || noteIsTranscribing ? (
+                      <div className="flex min-h-[150px] flex-col items-center justify-center gap-4 rounded-[16px] py-4">
+                        <div className="flex h-12 items-center justify-center gap-[4px]">
+                          {waveBars.map((h, i) => (
+                            <motion.div
+                              key={i}
+                              style={{
+                                width: 4,
+                                borderRadius: 99,
+                                backgroundColor: isActive ? "#f2f2f2" : "#3a3a3a",
+                              }}
+                              animate={{ height: isActive ? h : 8 }}
+                              transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                            />
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/44">
+                          {noteIsTranscribing ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              {t("voice.transcribing")}
+                            </>
+                          ) : (
+                            <>
+                              {t("voice.note.recording")}
+                              <span className="tabular-nums text-white/70">{formatTime(elapsedSec)}</span>
+                            </>
+                          )}
+                        </div>
+                        {isActive ? (
+                          <button
+                            onClick={handleToggle}
+                            className="flex h-12 w-12 items-center justify-center rounded-[16px] bg-white text-[#080808] transition active:scale-95"
+                            aria-label={t("voice.aria.stopNoteRecording")}
+                          >
+                            <span className="h-4 w-4 rounded-[3px] bg-[#080808]" />
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <>
+                        <textarea
+                          autoFocus
+                          value={textInput}
+                          onChange={(e) => {
+                            setTextInput(e.target.value)
+                            setEditableTranscript(e.target.value)
+                          }}
+                          rows={5}
+                          placeholder={t("voice.note.placeholder")}
+                          className="w-full min-w-0 rounded-[16px] bg-transparent pr-14 py-2 text-[15px] leading-6 text-white/90 outline-none resize-none placeholder:text-white/28"
+                        />
+                        <button
+                          onClick={handleToggle}
+                          className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-[14px] bg-[#1a1a1a] text-white/76 transition-all"
+                          aria-label={t("voice.aria.startNoteRecording")}
+                        >
+                          <Mic size={16} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {error ? <p className="text-[12px] text-red-400">{error}</p> : null}
+
+                  <div className="flex gap-3 pt-1">
+                    <button
+                      onClick={closeNoteSheet}
+                      className="h-12 flex-1 rounded-[16px] bg-white/[0.06] text-[11px] font-barlow-condensed font-bold uppercase tracking-[0.14em] text-white/68"
+                    >
+                      {t("voice.note.close")}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setError(null)
+                        void parseTranscript(textInput)
+                      }}
+                      disabled={textInput.trim().length < 3 || isActive || noteIsTranscribing}
+                      className="h-12 flex-[1.4] rounded-[16px] bg-white text-[12px] font-barlow-condensed font-bold uppercase tracking-[0.14em] text-[#080808] disabled:opacity-40"
+                    >
+                      {t("voice.note.add")}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               {/* ── LAYER: recording ── */}
-              {layer === "recording" && (
+              {!isNoteMode && layer === "recording" && (
                 <div
                   className="flex flex-col"
                   style={{ paddingTop: 4, paddingBottom: 16, gap: 0 }}
@@ -745,9 +1003,9 @@ export default function VoiceLogSheet({
                           ? "bg-white/[0.10] text-white"
                           : "text-white/30 hover:text-white/50"
                       }`}
-                    >
+                      >
                       <Mic size={12} />
-                      Voix
+                      {t("voice.mode.voice")}
                     </button>
                     <button
                       onClick={() => setInputMode("text")}
@@ -758,7 +1016,7 @@ export default function VoiceLogSheet({
                       }`}
                     >
                       <Keyboard size={12} />
-                      Texte
+                      {t("voice.mode.text")}
                     </button>
                   </div>
 
@@ -850,7 +1108,7 @@ export default function VoiceLogSheet({
                               color: isActive ? "#f2f2f2" : "#080808",
                             }}
                           >
-                            {isActive ? "ARRÊTER" : "ENREGISTRER"}
+                            {isActive ? t("voice.record.stop") : t("voice.record.start")}
                           </span>
                         </button>
                       </div>
@@ -865,8 +1123,8 @@ export default function VoiceLogSheet({
                         }}
                       >
                         {isActive
-                          ? "Appuyer pour arrêter"
-                          : "Appuyer pour enregistrer"}
+                          ? t("voice.record.tapStop")
+                          : t("voice.record.tapStart")}
                       </p>
                     </div>
                   )}
@@ -880,7 +1138,7 @@ export default function VoiceLogSheet({
                         onChange={(e) => setTextInput(e.target.value)}
                         rows={5}
                         placeholder={
-                          "Ex: 3 œufs brouillés, 100g de riz basmati, une cuillère d'huile d'olive, 200ml de lait…"
+                          t("voice.text.placeholder")
                         }
                         className="w-full min-w-0 rounded-xl px-4 py-3 text-white/90 leading-relaxed resize-none focus:outline-none"
                         style={{
@@ -902,7 +1160,7 @@ export default function VoiceLogSheet({
                         style={{ background: "#f2f2f2", color: "#080808" }}
                       >
                         <ChevronRight size={16} />
-                        Analyser
+                        {isNoteMode ? t("voice.action.apply") : t("voice.action.continue")}
                       </button>
                     </div>
                   )}
@@ -910,27 +1168,27 @@ export default function VoiceLogSheet({
               )}
 
               {/* ── LAYER: transcribing ── */}
-              {layer === "transcribing" && (
+              {!isNoteMode && layer === "transcribing" && (
                 <div className="flex flex-col items-center justify-center h-48 gap-5">
                   <div className="h-10 w-10 border-2 border-[#2e2e2e] border-t-[#f2f2f2] rounded-full animate-spin" />
                   <p className="text-[13px] text-white/50 font-barlow-condensed uppercase tracking-[0.14em]">
-                    Transcription…
+                    {t("voice.transcribing")}
                   </p>
                 </div>
               )}
 
               {/* ── LAYER: transcript — editable before analysis ── */}
-              {layer === "transcript" && (
+              {!isNoteMode && layer === "transcript" && (
                 <div className="flex flex-col gap-4" style={{ paddingTop: 4 }}>
                   <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/40">
-                    Vérifier avant d'analyser
+                    {t("voice.review.check")}
                   </p>
 
                   <textarea
                     value={editableTranscript}
                     onChange={(e) => setEditableTranscript(e.target.value)}
                     rows={5}
-                    placeholder="Dictée vide — retapez manuellement ou ré-enregistrez"
+                    placeholder={t("voice.transcript.placeholder")}
                     className="w-full min-w-0 rounded-xl px-4 py-3 text-white/90 leading-relaxed resize-none focus:outline-none"
                     style={{
                       background: "rgba(255,255,255,0.05)",
@@ -952,7 +1210,7 @@ export default function VoiceLogSheet({
                       }}
                     >
                       <RotateCcw size={13} />
-                      Ré-enregistrer
+                      {t("voice.rerecord")}
                     </button>
 
                     {/* Analyse */}
@@ -963,14 +1221,14 @@ export default function VoiceLogSheet({
                       style={{ background: "#f2f2f2", color: "#080808" }}
                     >
                       <ChevronRight size={16} />
-                      Analyser
+                      {isNoteMode ? t("voice.action.apply") : t("voice.action.continue")}
                     </button>
                   </div>
                 </div>
               )}
 
               {/* ── LAYER: processing ── */}
-              {layer === "processing" && (
+              {!isNoteMode && layer === "processing" && (
                 <div className="flex flex-col items-center justify-center h-48 gap-5">
                   <div className="h-10 w-10 border-2 border-[#2e2e2e] border-t-[#f2f2f2] rounded-full animate-spin" />
                   <p className="text-[13px] text-white/50 font-barlow-condensed uppercase tracking-[0.14em]">
@@ -980,7 +1238,7 @@ export default function VoiceLogSheet({
               )}
 
               {/* ── LAYER: review ── */}
-              {layer === "review" && (
+              {!isNoteMode && layer === "review" && (
                 <div className="flex flex-col gap-3">
                   <p className="text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/40 mt-1">
                     {t("voice.review_title")}
@@ -1089,7 +1347,7 @@ export default function VoiceLogSheet({
                         <div className="mt-3 grid grid-cols-2 gap-2">
                           <div className="space-y-1">
                             <p className="text-[10px] uppercase tracking-[0.12em] text-white/25 font-semibold">
-                              Categorie
+                              {t("log.custom.category")}
                             </p>
                             <select
                               value={item.category_l1 ?? ""}
@@ -1106,7 +1364,7 @@ export default function VoiceLogSheet({
                                 value=""
                                 className="bg-[#080808] text-white"
                               >
-                                Choisir
+                                {t("common.select")}
                               </option>
                               {(
                                 Object.entries(CATEGORY_LABELS_T) as [
@@ -1126,7 +1384,7 @@ export default function VoiceLogSheet({
                           </div>
                           <div className="space-y-1">
                             <p className="text-[10px] uppercase tracking-[0.12em] text-white/25 font-semibold">
-                              Sous-categorie
+                              {t("log.custom.subcategory")}
                             </p>
                             <select
                               value={item.category_l2 ?? ""}
@@ -1140,7 +1398,7 @@ export default function VoiceLogSheet({
                                 value=""
                                 className="bg-[#080808] text-white"
                               >
-                                Choisir
+                                {t("common.select")}
                               </option>
                               {(item.category_l1
                                 ? SUBCATEGORIES[item.category_l1]
@@ -1158,8 +1416,11 @@ export default function VoiceLogSheet({
                           </div>
                           <p className="col-span-2 text-[11px] text-white/40">
                             {item.category_l1 && item.category_l2
-                              ? `Classement: ${CATEGORY_LABELS_T[item.category_l1]} · ${SUBCATEGORY_LABELS_T[item.category_l2] ?? item.category_l2}`
-                              : "Ce nouvel aliment doit etre classe avant enregistrement."}
+                              ? t("voice.review.classification", {
+                                  category: CATEGORY_LABELS_T[item.category_l1],
+                                  subcategory: SUBCATEGORY_LABELS_T[item.category_l2] ?? item.category_l2,
+                                })
+                              : t("voice.review.classificationMissing")}
                           </p>
                         </div>
                       )}
@@ -1184,9 +1445,11 @@ export default function VoiceLogSheet({
                   )}
                   {uncategorizedCount > 0 && (
                     <p className="text-[11px] text-[#b0b0b0]">
-                      {uncategorizedCount} nouvel aliment
-                      {uncategorizedCount > 1 ? "s sont" : " est"} encore a
-                      classer.
+                      {(t("voice.review.uncategorizedCount", {
+                        n: uncategorizedCount,
+                      }) || "")
+                        .split("|")[uncategorizedCount > 1 ? 1 : 0]
+                        ?.replace("{n}", String(uncategorizedCount))}
                     </p>
                   )}
 
@@ -1222,7 +1485,7 @@ export default function VoiceLogSheet({
                       <>
                         <ChevronRight size={16} />
                         {onDraftReady
-                          ? "Ajouter au draft"
+                          ? t("voice.action.addToDraft")
                           : t("voice.log_meal")}
                       </>
                     )}

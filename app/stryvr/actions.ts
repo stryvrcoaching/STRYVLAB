@@ -25,7 +25,14 @@ export async function joinWaitlist(formData: FormData): Promise<WaitlistResult> 
 
   const { error } = await supabase
     .from('beta_waitlist')
-    .insert({ first_name: firstName, email, source: 'stryvr-landing' });
+    .insert({
+      first_name: firstName,
+      email,
+      source: 'stryvr-landing',
+      lead_kind: 'client_beta',
+      lead_status: 'new',
+      priority: 'medium',
+    });
 
   if (error) {
     // Unique constraint violation → déjà inscrit

@@ -79,6 +79,21 @@ export interface IntelligenceResult {
   sraHeatmap: SRAHeatmapWeek[]
   programStats: ProgramStats
   volumeByMuscle: Record<string, number>
+  volumeFocus: VolumeFocusResult[]
+}
+
+export type VolumeFocus = 'priority' | 'progression' | 'maintenance' | 'off'
+
+export interface VolumeFocusResult {
+  key: string
+  label: string
+  mode: VolumeFocus
+  volume: number
+  mev: number
+  mav: number
+  mrv: number
+  targetMin: number | null
+  targetMax: number | null
 }
 
 // Exercice tel que stocké dans le builder (coach_program_template_exercises)
@@ -117,6 +132,8 @@ export interface BuilderSession {
   day_of_week: number | null
   days_of_week?: number[]
   exercises: BuilderExercise[]
+  /** Index of the source session when this is a scheduled occurrence. */
+  sourceSessionIndex?: number
 }
 
 export interface TemplateMeta {
@@ -125,6 +142,10 @@ export interface TemplateMeta {
   weeks: number
   frequency: number
   equipment_archetype: string
+  /** Day mode analyses only scheduled occurrences; cycle mode analyses the active cycle. */
+  sessionMode?: 'day' | 'cycle'
+  /** Coach-defined intent per broad muscle group, persisted with the program. */
+  volumeFocus?: Partial<Record<string, VolumeFocus>>
 }
 
 export interface InjuryRestriction {

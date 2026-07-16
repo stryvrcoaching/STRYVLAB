@@ -133,4 +133,63 @@ describe('scoreVolumeCoverage', () => {
     const result = scoreVolumeCoverage(sessionWith([minimalSession]), META_HYPERTROPHY_INTERMEDIATE)
     expect(result.score).toBeLessThan(80)
   })
+
+  it('aggregates anatomical sub-groups into one broad objective', () => {
+    const chest = {
+      ...SQUAT,
+      primaryMuscle: 'pectoralis_major_upper',
+      primaryActivation: 1,
+      secondaryMusclesDetail: ['pectoralis_major'],
+      secondaryActivations: [0.5],
+      sets: 6,
+    }
+    const result = scoreVolumeCoverage(sessionWith([chest]), META_HYPERTROPHY_INTERMEDIATE)
+    const pectoraux = result.volumeFocus.find((group) => group.key === 'pectoraux')
+
+    expect(pectoraux?.volume).toBeCloseTo(9, 1)
+    expect(pectoraux?.mev).toBe(6)
+  })
+
+  it('uses the coach objective instead of requiring every group to reach MAV', () => {
+    const progression = scoreVolumeCoverage(
+      sessionWith([{ ...SQUAT, sets: 10 }]),
+      META_HYPERTROPHY_INTERMEDIATE,
+    )
+    const priority = scoreVolumeCoverage(
+      sessionWith([{ ...SQUAT, sets: 10 }]),
+      { ...META_HYPERTROPHY_INTERMEDIATE, volumeFocus: { quadriceps: 'priority' } },
+    )
+
+    expect(progression.alerts.some((alert) => alert.code === 'UNDER_MEV' && alert.title.includes('Quadriceps'))).toBe(false)
+    expect(priority.alerts.some((alert) => alert.code === 'PRIORITY_UNDER_TARGET')).toBe(true)
+  })
+
+  it('does not flag a non-objective muscle as under-MEV', () => {
+    const result = scoreVolumeCoverage(
+      sessionWith([{ ...SQUAT, sets: 1 }]),
+      { ...META_HYPERTROPHY_INTERMEDIATE, volumeFocus: { quadriceps: 'off', fessiers: 'off', ischio: 'off' } },
+    )
+
+    expect(result.alerts.some((alert) => alert.code === 'UNDER_MEV')).toBe(false)
+  })
+
+  it('keeps an explicitly prioritised muscle visible even with no direct volume', () => {
+    const result = scoreVolumeCoverage(
+      sessionWith([{ ...SQUAT, primaryMuscle: 'rectus_femoris', secondaryMusclesDetail: [], secondaryActivations: [] }]),
+      { ...META_HYPERTROPHY_INTERMEDIATE, volumeFocus: { pectoraux: 'priority' } },
+    )
+
+    expect(result.volumeFocus.find((group) => group.key === 'pectoraux')?.volume).toBe(0)
+    expect(result.alerts.some((alert) => alert.code === 'PRIORITY_UNDER_TARGET' && alert.title.includes('Pectoraux'))).toBe(true)
+  })
+
+  it('keeps a configured objective when every exercise is removed', () => {
+    const result = scoreVolumeCoverage(
+      [],
+      { ...META_HYPERTROPHY_INTERMEDIATE, volumeFocus: { pectoraux: 'priority' } },
+    )
+
+    expect(result.volumeFocus.find((group) => group.key === 'pectoraux')?.volume).toBe(0)
+    expect(result.alerts.some((alert) => alert.code === 'PRIORITY_UNDER_TARGET')).toBe(true)
+  })
 })
