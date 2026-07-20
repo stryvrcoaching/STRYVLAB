@@ -3,7 +3,7 @@ import { renderStryvEmail } from '@/lib/email/template'
 
 // ─── Transport ────────────────────────────────────────────────────────────────
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
 async function sendMail(options: {
   from: string
@@ -12,6 +12,10 @@ async function sendMail(options: {
   html: string
   attachments?: { filename: string; content: Buffer; contentType: string }[]
 }) {
+  if (!resend) {
+    throw new Error('RESEND_API_KEY is not configured')
+  }
+
   await resend.emails.send({
     from: options.from,
     to: options.to,

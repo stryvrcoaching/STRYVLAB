@@ -9,7 +9,7 @@ type CoachPlatformTrialEmailParams = {
   trialEndsAt: Date
 }
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://stryvlab.com'
 const FROM = `STRYV lab <${process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'}>`
 
@@ -42,7 +42,7 @@ export async function sendCoachPlatformTrialEmail({
   monthlyPrice,
   trialEndsAt,
 }: CoachPlatformTrialEmailParams) {
-  if (!process.env.RESEND_API_KEY) {
+  if (!resend) {
     throw new Error('RESEND_API_KEY is not configured')
   }
 
