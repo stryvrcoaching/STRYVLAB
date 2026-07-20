@@ -24,6 +24,7 @@ CREATE TRIGGER coach_whatsapp_agents_updated_at
 
 ALTER TABLE public.coach_whatsapp_agents ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "coach_whatsapp_agents_own" ON public.coach_whatsapp_agents;
 CREATE POLICY "coach_whatsapp_agents_own"
   ON public.coach_whatsapp_agents
   FOR ALL
