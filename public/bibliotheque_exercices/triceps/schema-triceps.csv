@@ -17,7 +17,6 @@ TRI-015,Extension-triceps-incline-poulie-basse,elbow_extension,sagittal,isolatio
 TRI-016,Extension-triceps-machine-technogym,elbow_extension,sagittal,isolation,false,triceps_brachii,0.9,anconeus,0.1,elbow,1,1,2,1,1,machine_isolation
 TRI-017,Extension-triceps-poulie-haute,elbow_extension,sagittal,isolation,false,triceps_brachii,0.85,anconeus,0.15,elbow,2,1,2,2,2,cable_pushdown
 TRI-018,Extension-triceps-poulie-haute-corde,elbow_extension,sagittal,isolation,false,triceps_brachii,0.85,anconeus,0.15,elbow,2,1,2,3,3,rope_pushdown
-TRI-036,Extension-triceps-corde-poulie-haute-banc-incline,elbow_extension,sagittal,isolation,false,triceps_brachii,0.8,flechisseurs_avant_bras|deltoide_anterieur,0.1|0.1,core,1,1,3,2,3,cable_control
 TRI-019,Extension-triceps-verticale-elastique,elbow_extension,sagittal,isolation,false,triceps_brachii,0.8,anconeus,0.2,elbow,2,1,2,4,4,elastic_resistance
 TRI-020,Extension-verticale-assis-barre,elbow_extension,sagittal,isolation,false,triceps_brachii,0.85,anconeus,0.15,elbow,3,1,3,2,2,seated_barbell
 TRI-021,Extension-verticale-triceps-poulie-basse,elbow_extension,sagittal,isolation,false,triceps_brachii,0.85,anconeus,0.15,elbow,2,1,2,2,2,cable_vertical
@@ -35,7 +34,3 @@ TRI-032,Kickback-alterne-assis,elbow_extension,sagittal,isolation,true,triceps_b
 TRI-033,Kickback-debout-avec-halteres,elbow_extension,sagittal,isolation,true,triceps_brachii,0.85,anconeus,0.15,elbow,3,1,2,5,5,standing_unilateral
 TRI-034,Pompe-musculation,horizontal_push,sagittal,compound,false,pectoralis_major,0.65,triceps_brachii|anterior_deltoid,0.2|0.15,core,5,1,6,7,7,bodyweight_push
 TRI-035,Tate-press,elbow_extension,sagittal,isolation,false,triceps_brachii,0.8,pectoralis_major|anconeus,0.1|0.1,elbow,4,1,5,5,5,lying_rotation
-TRI-037,Soulevé de coudes - pompe inversée,spine_extension,sagittal,isolation,false,upper_back,0.6,core,0.2,core,2,1,1,2,3,bodyweight_basic
-TRI-038,Tirage incliné câblé,vertical_push,sagittal,compound,false,lats,0.8,core|biceps_brachii,0.1|0.2,core,2,1,2,3,4,cable_constant
-TRI-039,Extension allongée avec tirage au câble (avec attache en corde),scapular_retraction,sagittal,compound,false,lats,0.7,pectoralis_major|triceps_brachii,0.2|0.1,core,1,1,2,3,4,cable_constant
-TRI-040,Extension des bras avec barre en poulie (bras droits),vertical_push,sagittal,isolation,false,lats,0.7,core,0.15,core,2,1,2,2,4,cable_constant

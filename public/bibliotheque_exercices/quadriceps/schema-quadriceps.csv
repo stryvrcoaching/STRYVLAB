@@ -69,27 +69,3 @@ QUAD-067,Thruster-kettlebell,full_body_push,frontal,compound,false,quadriceps,0.
 QUAD-068,Thruster-landmine,full_body_push,sagittal,compound,false,quadriceps,0.55,gluteus_maximus|shoulders,0.25|0.2,core,6,5,4,5,6,angled_push
 QUAD-069,Zercher-deadlift,hip_hinge,sagittal,compound,false,hamstrings,0.55,gluteus_maximus|core,0.25|0.2,core,8,4,3,6,6,front_loaded_hinge
 QUAD-070,Zercher-squat,squat,sagittal,compound,false,quadriceps,0.6,gluteus_maximus|core,0.25|0.15,core,7,6,3,6,6,front_loaded_squat
-QUAD-071,Fente avancée à la Smith,hip_hinge,sagittal,compound,false,glutes,0.8,hamstrings|quads,0.25|0.2,core,2,2,1,4,3,machine_stability
-QUAD-072,Torsion allongé genoux fléchis (homme),core_rotation,transverse,isolation,true,glutes,0.65,obliques|core,0.25|0.2,core,2,1,1,5,4,bodyweight_basic
-QUAD-073,Squat saut drop poids de corps,squat_jump,sagittal,compound,false,glutes,0.85,quads|hamstrings,0.2|0.2,core,2,3,1,6,7,bodyweight_basic
-QUAD-074,Squat en courbette,squat,sagittal,compound,false,glutes,0.75,quadriceps,0.3,core,2,3,1,4,5,bodyweight_basic
-QUAD-075,Battements de jambes,core_anti_extension,sagittal,isolation,false,glutes,0.6,rectus_abdominis,0.2,core,2,1,1,3,5,bodyweight_basic
-QUAD-076,Fente avant (homme),unilateral_lunge,sagittal,compound,true,glutes,0.75,quadriceps|hamstrings,0.2|0.1,core,2,3,1,4,4,bodyweight_basic
-QUAD-077,Squat avant avec kettlebell,squat,sagittal,compound,false,glutes,0.8,quadriceps|core,0.2|0.3,core|shoulders,3,3,1,3,4,free_weight_complex
-QUAD-078,Squat goblet avec kettlebell,squat,sagittal,compound,false,glutes,0.8,quadriceps|core,0.25|0.3,core|shoulders,2,2,1,3,4,free_weight_complex
-QUAD-079,Lunge avec passage de kettlebell,unilateral_lunge,sagittal,compound,false,glutes,0.75,hamstrings|core,0.2|0.25,core|shoulders,2,3,2,5,6,bodyweight_basic
-QUAD-080,Squat pistol avec kettlebell,unilateral_squat,sagittal,compound,true,glutes,0.8,quadriceps|core,0.2|0.1,core,3,3,1,5,7,bodyweight_basic
-QUAD-081,Lever turc avec kettlebell (style squat),core_anti_extension,sagittal,compound,true,glutes,0.8,core|hamstrings,0.2|0.1,core|shoulders,3,2,3,6,6,free_weight_complex
-QUAD-082,squat saut,squat_jump,sagittal,compound,false,glutes,0.8,quadriceps|hamstrings,0.25|0.2,core,2,3,1,6,5,bodyweight_basic
-QUAD-083,squat saut v. 2,squat_jump,sagittal,compound,false,glutes,0.75,quadriceps|hamstrings,0.2|0.15,core,2,3,1,5,4,bodyweight_basic
-QUAD-084,tirage des jambes assis,core_flexion,sagittal,compound,false,hamstrings,0.7,rectus_abdominis,0.2,core,2,2,1,4,4,bodyweight_basic
-QUAD-085,Fente avec saut,core_anti_extension,sagittal,compound,false,glutes,0.85,quads|hamstrings|core,0.25|0.2|0.3,core,2,3,1,6,7,bodyweight_basic
-QUAD-086,Marche assise (mur),core_anti_extension,sagittal,compound,true,glutes,0.8,quads|core,0.2|0.15,core,1,2,1,4,5,bodyweight_basic
-QUAD-087,Squat sur une jambe,squat,sagittal,compound,true,glutes,0.8,quadriceps,0.3,core,2,3,1,5,6,bodyweight_basic
-QUAD-088,Pompes avec coup de pied latéral,horizontal_push,sagittal,compound,true,glutes,0.7,pectoralis_major,0.25,core,2,1,3,6,7,bodyweight_basic
-QUAD-089,Pompe pike vers cobra,core_flexion,sagittal,compound,false,glutes,0.7,core|triceps_brachii|pectoralis_major,0.25|0.2|0.3,core,2,1,3,4,5,bodyweight_basic
-QUAD-090,Squat potty avec support,squat,sagittal,compound,false,glutes,0.6,rectus_abdominis|hamstrings,0.15|0.1,core,2,3,1,3,4,bodyweight_basic
-QUAD-091,squat avec haltères sur banc,squat,sagittal,compound,false,glutes,0.8,quadriceps,0.3,core,2,3,1,4,5,free_weight_complex
-QUAD-092,Fente avant contralatérale avec haltères,unilateral_lunge,sagittal,compound,true,glutes,0.7,hamstrings,0.15,core,2,2,1,5,5,free_weight_complex
-QUAD-093,Fente avec haltères,mobility_stability,sagittal,compound,true,glutes,0.8,quads|hamstrings,0.2|0.15,core,2,3,1,6,5,bodyweight_basic
-QUAD-094,Fente avec curl biceps,complex_rotation,sagittal,compound,true,biceps_brachii,0.75,glutes|quads,0.25|0.2,core,2,4,2,5,6,bodyweight_basic

@@ -41,29 +41,3 @@ HAM-039,Squat-goblet-kettlebell,squat,sagittal,compound,false,quadriceps,0.55,ha
 HAM-040,Squat-pistol,unilateral_squat,sagittal,compound,true,quadriceps,0.5,hamstrings|gluteus_maximus,0.3|0.2,core,7,5,2,9,9,high_unilateral
 HAM-041,Squat-sumo-avec-haltere,squat,sagittal,compound,false,gluteus_maximus,0.55,adductors|hamstrings,0.25|0.2,core,5,5,2,5,5,wide_stance
 HAM-042,Zercher-deadlift,hip_hinge,sagittal,compound,false,hamstrings,0.55,gluteus_maximus|core,0.25|0.2,core,8,4,3,6,6,front_loaded_hinge
-HAM-043,Étirement des quadriceps en position quadrupède,mobility_stability,sagittal,isolation,true,ischio-jambiers,0.5,,,core,1,2,1,2,2,bodyweight_basic
-HAM-044,Toucher les orteils circulaires bras écartés (hommes),hip_hinge,frontal,compound,true,glutes,0.65,hamstrings,0.2,core,2,2,1,4,5,bodyweight_basic
-HAM-045,Saut en arrière,horizontal_push,sagittal,compound,false,ischio-jambiers,0.6,,,core,2,3,1,4,4,bodyweight_basic
-HAM-046,Toucher des orteils de base (homme),core_flexion,sagittal,isolation,false,glutes,0.6,hamstrings,0.2|0.2,core,2,2,1,4,3,bodyweight_basic
-HAM-047,Extension des hanches sur banc,hip_extension,sagittal,compound,false,glutes,0.85,hamstrings,0.15|0.1,core,2,2,1,3,4,bodyweight_basic
-HAM-048,Posture du papillon,core_stability,frontal,isolation,false,adductors,0.5,none,,core,1,1,1,2,3,bodyweight_basic
-HAM-049,Étirement des mollets avec les mains contre un mur,plantar_flexion,sagittal,isolation,true,gastrocnemius,0.6,soleus,0.2,core,1,1,1,1,2,bodyweight_basic
-HAM-050,Étirement des mollets avec les mains contre un mur,plantar_flexion,sagittal,isolation,true,gastrocnemius,0.6,soleus,0.2,core,1,1,1,1,2,bodyweight_basic
-HAM-051,Étirement du quadriceps sur chaise,mobility_stability,sagittal,isolation,true,quadriceps,0.5,none,,core,1,2,1,1,2,bodyweight_basic
-HAM-052,Étirement des genoux en cercles,mobility_stability,sagittal,isolation,false,ischio-jambiers,0.4,none,,core,1,2,1,2,4,bodyweight_basic
-HAM-053,Élévation des mollets à l'arrière,plantar_flexion,sagittal,isolation,false,gastrocnemius,0.7,soleus,0.2,core,1,2,1,2,2,bodyweight_basic
-HAM-054,Pont fessier en marche,core_anti_extension,sagittal,compound,true,glutes,0.7,hamstrings|core,0.2|0.1,core,2,1,1,4,5,bodyweight_basic
-HAM-055,Pont fessier sur banc (homme),core_anti_extension,sagittal,compound,false,glutes,0.75,hamstrings|core,0.2|0.1,core,2,1,1,3,4,bodyweight_basic
-HAM-056,Toucher de orteils circulaires avec les mains jointes (homme),mobility_stability,sagittal,isolation,false,glutes,0.5,hamstrings,0.15,core,2,1,1,3,3,bodyweight_basic
-HAM-057,Toucher de orteils circulaires avec les mains croisées (homme),mobility_stability,sagittal,isolation,false,glutes,0.5,hamstrings,0.15,core,2,1,1,3,3,bodyweight_basic
-HAM-058,Portez vos genoux à la poitrine,core_stability,sagittal,compound,false,glutes,0.6,core,0.2,core,2,2,1,3,3,bodyweight_basic
-HAM-059,Étirement en croix de fer,mobility_stability,transverse,isolation,false,glutes,0.4,none,,core,1,1,1,2,2,bodyweight_basic
-HAM-060,Pont gluteal bas sur le sol,hip_extension,sagittal,compound,false,glutes,0.8,core,0.2,core,1,1,1,2,2,bodyweight_basic
-HAM-061,Étirement des quadriceps en position allongée (côté),mobility_stability,sagittal,isolation,true,ischio-jambiers,0.1,,,,1,1,1,1,1,bodyweight_basic
-HAM-062,Marche monstre,hip_abduction,frontal,compound,false,glutes,0.8,,,core,1,2,1,4,5,bodyweight_basic
-HAM-063,Élévation de mollet sur une jambe,plantar_flexion,sagittal,isolation,true,gastrocnemius,0.7,,,none,1,1,1,3,2,bodyweight_basic
-HAM-064,Inclinaison pelvienne en pont,core_flexion,sagittal,compound,false,glutes,0.6,,,core,2,1,1,4,5,bodyweight_basic
-HAM-065,Clean avec haltères,hip_hinge,sagittal,compound,false,glutes,0.75,hamstrings,0.1|0.15,core,3,1,3,5,6,free_weight_complex
-HAM-066,Soulevé de terre avec haltères,hip_hinge,sagittal,compound,false,gluteus_maximus,0.85,hamstrings,0.25|0.15,core,3,2,1,4,5,free_weight_complex
-HAM-067,Soulevé de terre avec câble,hip_hinge,sagittal,compound,false,glutes,0.8,hamstrings|core,0.15|0.2,core,2,2,1,4,3,cable_constant
-HAM-068,Tirage à la machine (avec corde),hip_hinge,sagittal,compound,false,glutes,0.75,hamstrings,0.2,core,2,2,1,5,3,cable_constant
