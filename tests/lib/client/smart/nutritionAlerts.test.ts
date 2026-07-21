@@ -37,6 +37,26 @@ describe('computeNutritionAlerts', () => {
     expect(r.find(a => a.code === 'carbs_limit')?.severity).toBe('critical')
   })
 
+  it('warns when a macro target is nearly consumed in the afternoon', () => {
+    const input: NutritionInput = {
+      ...baseInput,
+      currentHour: 15,
+      consumed: { kcal: 1600, protein_g: 120, carbs_g: 252, fat_g: 45, water_ml: 1500 },
+    }
+    const r = computeNutritionAlerts(input)
+    expect(r.find(a => a.code === 'macro_target_alert')?.body).toContain('glucides')
+  })
+
+  it('flags an exceptionally low energy intake late in the day', () => {
+    const input: NutritionInput = {
+      ...baseInput,
+      currentHour: 19,
+      consumed: { kcal: 800, protein_g: 70, carbs_g: 80, fat_g: 25, water_ml: 1500 },
+    }
+    const r = computeNutritionAlerts(input)
+    expect(r.find(a => a.code === 'daily_energy_deficit')?.severity).toBe('warning')
+  })
+
   it('triggers hydration_low warning if water < 50% after 14h', () => {
     const input: NutritionInput = {
       ...baseInput,

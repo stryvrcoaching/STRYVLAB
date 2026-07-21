@@ -129,7 +129,7 @@ export function SalesCommissions() {
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <CreditCard size={18} className="text-[#c6b48b]" />
+              <CreditCard size={18} className="text-[#1f8a65]" />
               <h2 className="text-[14px] font-semibold text-white">Versement automatique par Stripe Connect</h2>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-white/50">
@@ -149,7 +149,7 @@ export function SalesCommissions() {
               <button
                 disabled={connectingStripe}
                 onClick={connectStripe}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#c6b48b]/10 border border-[#c6b48b]/30 px-4 text-[10px] font-bold uppercase tracking-[0.1em] text-[#c6b48b] hover:bg-[#c6b48b]/20 transition disabled:opacity-50"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#1f8a65]/10 border border-[#1f8a65]/30 px-4 text-[10px] font-bold uppercase tracking-[0.1em] text-[#1f8a65] hover:bg-[#1f8a65]/20 transition disabled:opacity-50"
               >
                 {connectingStripe ? <Loader2 size={13} className="animate-spin" /> : <AlertTriangle size={13} />}
                 Finaliser Stripe

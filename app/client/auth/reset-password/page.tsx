@@ -144,7 +144,7 @@ export default function ClientResetPasswordPage() {
   const { t } = useClientT();
   return (
     <main
-      className="flex min-h-dvh items-center justify-center bg-[#0d0d0d] p-6"
+      className="flex min-h-dvh items-center justify-center bg-[#121212] p-6"
       style={{
         paddingTop: "max(24px, env(safe-area-inset-top))",
         paddingBottom: "max(24px, env(safe-area-inset-bottom))",

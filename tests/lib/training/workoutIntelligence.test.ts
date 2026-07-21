@@ -73,6 +73,51 @@ describe('workout intelligence', () => {
     expect(result?.recommendation.reps).toBe(10)
   })
 
+  it('recomputes the next recommendation when a completed set is corrected', () => {
+    const recommendationFromMistake = recommendFollowingWorkoutSet({
+      completedSet: makeSet({
+        set_number: 1,
+        actual_reps: '5',
+        actual_weight_kg: '10',
+        completed: true,
+        rir_actual: '1',
+      }),
+      sets: [
+        makeSet({ set_number: 1, actual_reps: '5', actual_weight_kg: '10', completed: true, rir_actual: '1' }),
+        makeSet({ set_number: 2, planned_reps: '12' }),
+      ],
+      exercises: [{ id: 'exercise-1', name: 'Bench press', rep_min: 8, rep_max: 12, target_rir: 1 }],
+      historyIndex: {},
+      goal: 'hypertrophy',
+      level: 'intermediate',
+      manuallyEdited: new Set(),
+      resolveTargetRir: (exercise) => exercise.target_rir ?? null,
+    })
+    const recommendationFromCorrection = recommendFollowingWorkoutSet({
+      completedSet: makeSet({
+        set_number: 1,
+        actual_reps: '5',
+        actual_weight_kg: '70',
+        completed: true,
+        rir_actual: '1',
+      }),
+      sets: [
+        makeSet({ set_number: 1, actual_reps: '5', actual_weight_kg: '70', completed: true, rir_actual: '1' }),
+        makeSet({ set_number: 2, planned_reps: '12' }),
+      ],
+      exercises: [{ id: 'exercise-1', name: 'Bench press', rep_min: 8, rep_max: 12, target_rir: 1 }],
+      historyIndex: {},
+      goal: 'hypertrophy',
+      level: 'intermediate',
+      manuallyEdited: new Set(),
+      resolveTargetRir: (exercise) => exercise.target_rir ?? null,
+    })
+
+    expect(recommendationFromMistake?.nextKey).toBe('exercise-1_set2_bilateral')
+    expect(recommendationFromCorrection?.nextKey).toBe('exercise-1_set2_bilateral')
+    expect(recommendationFromCorrection?.recommendation.weight_kg).not.toBe(recommendationFromMistake?.recommendation.weight_kg)
+  })
+
   it('does not overwrite a manually edited next set', () => {
     const result = recommendFollowingWorkoutSet({
       completedSet: makeSet({
@@ -91,6 +136,30 @@ describe('workout intelligence', () => {
       goal: 'hypertrophy',
       level: 'intermediate',
       manuallyEdited: new Set(['exercise-1_set2_bilateral']),
+      resolveTargetRir: (exercise) => exercise.target_rir ?? null,
+    })
+
+    expect(result).toBeNull()
+  })
+
+  it('does not overwrite an already completed next set', () => {
+    const result = recommendFollowingWorkoutSet({
+      completedSet: makeSet({
+        set_number: 1,
+        actual_reps: '5',
+        actual_weight_kg: '70',
+        completed: true,
+        rir_actual: '1',
+      }),
+      sets: [
+        makeSet({ set_number: 1, actual_reps: '5', actual_weight_kg: '70', completed: true, rir_actual: '1' }),
+        makeSet({ set_number: 2, actual_reps: '10', actual_weight_kg: '60', completed: true, rir_actual: '1' }),
+      ],
+      exercises: [{ id: 'exercise-1', name: 'Bench press', rep_min: 8, rep_max: 12, target_rir: 1 }],
+      historyIndex: {},
+      goal: 'hypertrophy',
+      level: 'intermediate',
+      manuallyEdited: new Set(),
       resolveTargetRir: (exercise) => exercise.target_rir ?? null,
     })
 

@@ -41,7 +41,9 @@ const NAV_ITEMS = [
     icon: Briefcase,
     href: "/coach/comptabilite",
     match: (p: string) =>
-      p.startsWith("/coach/comptabilite") || p.startsWith("/coach/formules"),
+      p.startsWith("/coach/comptabilite") ||
+      p.startsWith("/coach/formules") ||
+      p.startsWith("/coach/ma-page"),
   },
   {
     id: "compte",

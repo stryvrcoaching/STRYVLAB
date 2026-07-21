@@ -58,12 +58,12 @@ export const explorerSections: ExplorerSection[] = [
     id: "pilotage",
     label: "Pilotage",
     eyebrow: "Pilotage du coaching",
-    title: "Le tableau de bord du coaching sportif.",
+    title: "Le point d’entrée du coaching sportif.",
     description:
-      "Le point d’entrée de STRYVLAB relie le portefeuille coachés, les priorités et les échanges pour que le coach ne reconstruise pas le contexte à chaque action.",
+      "STRYV lab relie portefeuille, priorités et échanges pour que le coach ne reconstruise pas le contexte à chaque action.",
     preview: {
       src: "/landing-demo/dashboard.png",
-      alt: "Vue d’ensemble du tableau de bord STRYVLAB pour coach",
+      alt: "Vue d’ensemble du tableau de bord STRYV lab pour coach",
       label: "Vue d’ensemble coach",
       mobileSrc: "/landing-demo/dashboard-focus-mobile.png",
       mobileAlt: "Vue resserrée du tableau de bord coach sur mobile",
@@ -73,7 +73,7 @@ export const explorerSections: ExplorerSection[] = [
         id: "clients",
         label: "Coachés",
         description:
-          "Le portefeuille et les dossiers individuels : objectif, historique, programmes et éléments récents.",
+          "Portefeuille et dossiers individuels : objectif, historique, programmes et éléments récents.",
         connection:
           "Chaque espace du système revient vers le dossier du coaché.",
         icon: UsersRound,
@@ -82,7 +82,7 @@ export const explorerSections: ExplorerSection[] = [
         id: "priorites",
         label: "Priorités",
         description:
-          "Les situations à traiter sont regroupées pour aider le coach à voir où porter son attention.",
+          "Les situations à traiter sont regroupées pour voir où porter l’attention aujourd’hui.",
         connection:
           "Un signal peut devenir une action plutôt qu’une notification isolée.",
         icon: Target,
@@ -91,7 +91,7 @@ export const explorerSections: ExplorerSection[] = [
         id: "inbox",
         label: "Inbox",
         description:
-          "Les échanges et éléments qui demandent une réponse restent rapprochés du bon accompagnement.",
+          "Les échanges qui demandent une réponse restent rattachés au bon accompagnement.",
         connection:
           "La conversation conserve la personne et le contexte concernés.",
         icon: MessageSquareText,
@@ -100,7 +100,7 @@ export const explorerSections: ExplorerSection[] = [
         id: "bilans",
         label: "Bilans",
         description:
-          "Créer des modèles de bilan, configurer les questions et réutiliser un cadre adapté à chaque suivi.",
+          "Créer des modèles, configurer les questions et réutiliser un cadre adapté à chaque phase de suivi.",
         connection:
           "Chaque réponse rejoint le dossier, la phase de travail et la décision suivante.",
         icon: ClipboardList,
@@ -111,16 +111,16 @@ export const explorerSections: ExplorerSection[] = [
         description:
           "Le cadre d’accès et de suivi d’un coaché reste visible à côté de l’accompagnement.",
         connection:
-          "Le portefeuille actif, l’accès et le suivi opérationnel restent cohérents.",
+          "Portefeuille actif, accès et suivi opérationnel restent cohérents.",
         icon: WalletCards,
       },
       {
         id: "documentation",
         label: "Méthode",
         description:
-          "La documentation et les modèles permettent de capitaliser une méthode sans rendre chaque suivi identique.",
+          "Capitaliser une méthode réutilisable sans rendre chaque suivi identique.",
         connection:
-          "Une base de travail réutilisable, puis adaptée à chaque coaché.",
+          "Une base de travail solide, puis adaptée à chaque coaché.",
         icon: NotebookTabs,
       },
     ],
@@ -129,9 +129,9 @@ export const explorerSections: ExplorerSection[] = [
     id: "workout",
     label: "Workout",
     eyebrow: "Workout Studio · Smart Workout",
-    title: "Construire des programmes d’entraînement reliés au suivi.",
+    title: "Prescrire avec précision, ajuster sur le terrain.",
     description:
-      "Workout Studio rassemble la programmation. Smart Workout en relit le volume, la répartition, les alertes et ce qui a été réellement exécuté par le coaché.",
+      "Workout Studio structure la programmation. Smart Workout relit volume, répartition, alertes et ce que le coaché a réellement exécuté.",
     preview: {
       src: "/landing-demo/workout-studio-builder-desktop.png",
       alt: "Interface réelle de Workout Studio avec programmation des séances",
@@ -199,9 +199,9 @@ export const explorerSections: ExplorerSection[] = [
     id: "nutrition",
     label: "Nutrition",
     eyebrow: "Smart Nutrition · Nutrition Studio",
-    title: "Une nutrition personnalisée qui s’ajuste avec le contexte.",
+    title: "Calculer à partir du réel. Prescrire quelque chose de tenable.",
     description:
-      "Smart Nutrition relie les choix du coach au quotidien du coaché : plans alimentaires, repas, alternatives, suivi et ajustements restent dans le même raisonnement.",
+      "Plans, repas, alternatives et suivi restent dans le même raisonnement : le coach ajuste le protocole sans perdre le lien avec le quotidien du coaché.",
     preview: {
       src: "/landing-demo/nutrition-studio-builder-desktop.png",
       alt: "Interface réelle de Nutrition Studio avec protocole et repas",
@@ -270,12 +270,12 @@ export const explorerSections: ExplorerSection[] = [
     id: "metrics",
     label: "Metrics",
     eyebrow: "Data Metrics",
-    title: "Relier les données de suivi à la décision du coach.",
+    title: "Voir ce qui mérite une décision, pas seulement ce qui s’est passé.",
     description:
-      "Les données corporelles, les retours de suivi, la nutrition et la performance se lisent dans un même espace pour préparer la prochaine décision du coach.",
+      "Corps, retours de suivi, nutrition et performance se lisent ensemble pour préparer la prochaine action du coach.",
     preview: {
       src: "/landing-demo/client-metrics-desktop.png",
-      alt: "Interface réelle de métriques client dans STRYVLAB",
+      alt: "Interface réelle de métriques client dans STRYV lab",
       label: "Data Metrics",
       mobileSrc: "/landing-v2/intelligence/performance-focus-mobile.png",
       mobileAlt: "Vue resserrée des données de performance sur mobile",
@@ -345,7 +345,7 @@ export const explorerSections: ExplorerSection[] = [
       "Morpho Pro donne au coach un espace séparé pour documenter, comparer et relire des éléments visuels avec prudence.",
     preview: {
       src: "/landing-demo/morphopro-desktop.png",
-      alt: "Interface réelle de Morpho Pro dans STRYVLAB",
+      alt: "Interface réelle de Morpho Pro dans STRYV lab",
       label: "Morpho Pro",
       mobileSrc: "/landing-demo/morphopro-focus-mobile.png",
       mobileAlt: "Vue resserrée de Morpho Pro sur mobile",
@@ -416,7 +416,7 @@ export const explorerSections: ExplorerSection[] = [
       "Les tâches, rendez-vous, paiements et priorités opérationnelles restent liés aux coachés et à leur contexte de suivi.",
     preview: {
       src: "/landing-demo/business.png",
-      alt: "Interface réelle Business de STRYVLAB avec portefeuille et organisation",
+      alt: "Interface réelle Business de STRYV lab avec portefeuille et organisation",
       label: "Organisation & Business",
       mobileSrc: "/landing-demo/business-focus-mobile.png",
       mobileAlt: "Vue resserrée de l’espace Business sur mobile",
@@ -477,9 +477,9 @@ export const explorerSections: ExplorerSection[] = [
     id: "stryvr",
     label: "STRYVR",
     eyebrow: "Application client STRYVR",
-    title: "L’application client qui donne vie au protocole.",
+    title: "Le coaching sort du rendez-vous et entre dans la journée.",
     description:
-      "STRYVR transforme les prescriptions du coach en actions quotidiennes claires, puis renvoie les données et retours utiles au bon endroit dans STRYVLAB.",
+      "STRYVR transforme les prescriptions en actions quotidiennes claires, puis renvoie séances, repas et check-ins au bon endroit dans STRYV lab.",
     preview: {
       src: "/landing-v2/hero/client-context.png",
       alt: "Expérience client STRYVR connectée au contexte de coaching",
@@ -526,7 +526,7 @@ export const explorerSections: ExplorerSection[] = [
         id: "progression",
         label: "Progression",
         description:
-          "Consulter les repères que le coach a choisi de rendre visibles dans l’accompagnement.",
+          "Consulter les repères que le coach a choisi de rendre visibles.",
         connection:
           "Le coaché comprend davantage la continuité de son parcours.",
         icon: BarChart3,
@@ -535,7 +535,7 @@ export const explorerSections: ExplorerSection[] = [
         id: "trophees",
         label: "Trophées",
         description:
-          "Voir points, séries de régularité et récompenses définies dans son environnement de coaching.",
+          "Points, séries de régularité et récompenses définies dans l’environnement de coaching.",
         connection: "L’engagement reste encadré par les règles du coach.",
         icon: Trophy,
       },
@@ -634,10 +634,10 @@ export type LandingExplorerView = {
 
 export const landingDockItems: LandingDockItem[] = [
   { id: "accueil", label: "Accueil", viewId: "accueil" },
-  { id: "athletes", label: "Athlètes", viewId: "athletes-profil" },
+  { id: "athletes", label: "Coachés", viewId: "athletes-profil" },
   { id: "studio", label: "Studio", viewId: "studio-workout" },
   { id: "business", label: "Business", viewId: "business" },
-  { id: "compte", label: "Mon compte", viewId: "compte" },
+  { id: "compte", label: "Compte", viewId: "compte" },
 ];
 
 export const landingAthleteTabs: LandingAthleteTab[] = [
@@ -660,21 +660,21 @@ export const landingExplorerViews: LandingExplorerView[] = [
     sectionId: "pilotage",
     defaultModuleId: "priorites",
     eyebrow: "Accueil",
-    title: "Le tableau de bord de votre coaching sportif.",
+    title: "Savoir où porter l’attention aujourd’hui.",
     description:
-      "Portefeuille coachés, priorités et échanges : le contexte reste disponible avant chaque décision.",
+      "Portefeuille, priorités et échanges : le contexte de chaque coaché reste disponible avant la prochaine action.",
   },
   {
     id: "athletes-profil",
     sectionId: "pilotage",
     defaultModuleId: "clients",
-    eyebrow: "Athlètes · Profil",
-    title: "Le dossier complet de chaque coaché.",
+    eyebrow: "Coachés · Profil",
+    title: "Un dossier complet, pas un fichier éparpillé.",
     description:
-      "Objectif, historique, programmes d’entraînement, bilans et éléments récents restent réunis.",
+      "Objectif, historique, programmes, bilans et éléments récents restent réunis pour ne plus reconstruire le profil à chaque message.",
     preview: {
       src: "/landing-demo/client-profile-desktop.png",
-      alt: "Interface réelle du profil coaché dans STRYVLAB",
+      alt: "Interface réelle du profil coaché dans STRYV lab",
       label: "Profil coaché",
     },
   },
@@ -682,13 +682,13 @@ export const landingExplorerViews: LandingExplorerView[] = [
     id: "athletes-suivi",
     sectionId: "metrics",
     defaultModuleId: "corps",
-    eyebrow: "Athlètes · Suivi",
-    title: "Le suivi client, relié à la décision du coach.",
+    eyebrow: "Coachés · Suivi",
+    title: "Lire le suivi pour décider, pas seulement pour archiver.",
     description:
-      "Les données, retours et repères utiles sont rapprochés pour préparer l’ajustement suivant.",
+      "Données, retours et repères sont rapprochés pour préparer l’ajustement suivant avec le bon niveau de contexte.",
     preview: {
       src: "/landing-demo/client-metrics-desktop.png",
-      alt: "Interface réelle de suivi des métriques dans STRYVLAB",
+      alt: "Interface réelle de suivi des métriques dans STRYV lab",
       label: "Suivi coaché",
     },
   },
@@ -696,13 +696,13 @@ export const landingExplorerViews: LandingExplorerView[] = [
     id: "athletes-protocoles",
     sectionId: "nutrition",
     defaultModuleId: "protocoles",
-    eyebrow: "Athlètes · Protocoles",
-    title: "Prescrire, relire, ajuster les protocoles.",
+    eyebrow: "Coachés · Protocoles",
+    title: "Prescrire, relire, ajuster — dans le même fil.",
     description:
-      "Nutrition Studio connecte le plan du coach, ce qui est vécu dans STRYVR et la prochaine décision.",
+      "Nutrition Studio relie le plan du coach, ce qui est vécu dans STRYVR et la décision d’ajustement.",
     preview: {
       src: "/landing-demo/nutrition-studio-builder-desktop.png",
-      alt: "Interface réelle de Nutrition Studio dans STRYVLAB",
+      alt: "Interface réelle de Nutrition Studio dans STRYV lab",
       label: "Nutrition Studio",
     },
   },
@@ -710,13 +710,13 @@ export const landingExplorerViews: LandingExplorerView[] = [
     id: "studio-workout",
     sectionId: "workout",
     defaultModuleId: "programmes",
-    eyebrow: "Studio",
-    title: "Construire les programmes d’entraînement.",
+    eyebrow: "Studio · Workout",
+    title: "Construire des programmes reliés au terrain.",
     description:
-      "Programmes, progression et relecture de cohérence dans l’espace de construction du coach.",
+      "Séances, progression et relecture de cohérence : la prescription reste lisible pour le coaché et utile pour l’ajustement.",
     preview: {
       src: "/landing-demo/workout-studio-builder-desktop.png",
-      alt: "Interface réelle de Workout Studio dans STRYVLAB",
+      alt: "Interface réelle de Workout Studio dans STRYV lab",
       label: "Workout Studio",
     },
   },
@@ -724,13 +724,13 @@ export const landingExplorerViews: LandingExplorerView[] = [
     id: "studio-nutrition",
     sectionId: "nutrition",
     defaultModuleId: "protocoles",
-    eyebrow: "Studio · Smart Nutrition",
+    eyebrow: "Studio · Nutrition",
     title: "Ajuster la nutrition sans reconstruire le plan.",
     description:
-      "Protocoles, journées, portions et données de suivi restent reliés dans Nutrition Studio.",
+      "Protocoles, journées, portions et données de suivi restent liés : une décision se propage sans tout refaire à la main.",
     preview: {
       src: "/landing-demo/nutrition-studio-builder-desktop.png",
-      alt: "Interface réelle de Nutrition Studio dans STRYVLAB",
+      alt: "Interface réelle de Nutrition Studio dans STRYV lab",
       label: "Nutrition Studio",
       mobileSrc: "/landing-v2/studios/nutrition-focus-mobile.png",
       mobileAlt: "Vue resserrée de Nutrition Studio sur mobile",
@@ -741,12 +741,12 @@ export const landingExplorerViews: LandingExplorerView[] = [
     sectionId: "metrics",
     defaultModuleId: "overlays",
     eyebrow: "Studio · Data Metrics",
-    title: "Lire plusieurs signaux dans la même période.",
+    title: "Croiser les signaux sur la même période.",
     description:
-      "Les données de suivi, de nutrition, de récupération et de performance éclairent la prochaine action.",
+      "Corps, nutrition, récupération et performance éclairent ce qui mérite une décision — pas seulement ce qui s’est passé.",
     preview: {
       src: "/landing-demo/client-metrics-desktop.png",
-      alt: "Interface réelle de Data Metrics dans STRYVLAB",
+      alt: "Interface réelle de Data Metrics dans STRYV lab",
       label: "Data Metrics",
       mobileSrc: "/landing-v2/intelligence/performance-focus-mobile.png",
       mobileAlt: "Vue resserrée des données de performance sur mobile",
@@ -759,10 +759,10 @@ export const landingExplorerViews: LandingExplorerView[] = [
     eyebrow: "Studio · Morpho Pro",
     title: "Documenter l’observation visuelle dans le temps.",
     description:
-      "Les repères visuels restent rattachés au dossier et aux choix de programmation du coach.",
+      "Photos, comparaisons et annotations restent rattachées au dossier et aux choix de programmation.",
     preview: {
       src: "/landing-demo/morphopro-desktop.png",
-      alt: "Interface réelle de Morpho Pro dans STRYVLAB",
+      alt: "Interface réelle de Morpho Pro dans STRYV lab",
       label: "Morpho Pro",
       mobileSrc: "/landing-demo/morphopro-focus-mobile.png",
       mobileAlt: "Vue resserrée de Morpho Pro sur mobile",
@@ -773,9 +773,9 @@ export const landingExplorerViews: LandingExplorerView[] = [
     sectionId: "stryvr",
     defaultModuleId: "today",
     eyebrow: "Studio · STRYVR",
-    title: "Donner au coaché un parcours clair au quotidien.",
+    title: "Le protocole devient le quotidien du coaché.",
     description:
-      "STRYVR rend le protocole actionnable, puis ramène les retours utiles dans l’espace coach.",
+      "STRYVR rend l’exécution claire, puis ramène séances, repas et check-ins au bon endroit dans STRYV lab.",
     preview: {
       src: "/landing-v2/hero/client-context.png",
       alt: "Aperçu de l’expérience client STRYVR",
@@ -789,12 +789,12 @@ export const landingExplorerViews: LandingExplorerView[] = [
     sectionId: "business",
     defaultModuleId: "portfolio",
     eyebrow: "Business",
-    title: "Faire avancer l’activité de coaching sans séparer le suivi.",
+    title: "Faire tourner l’activité sans quitter le suivi.",
     description:
-      "Les rendez-vous, tâches et éléments opérationnels restent liés aux bonnes personnes.",
+      "Rendez-vous, tâches, paiements et alertes restent liés aux coachés concernés — l’opérationnel au service du coaching.",
     preview: {
       src: "/landing-demo/business.png",
-      alt: "Interface réelle Business de STRYVLAB",
+      alt: "Interface réelle Business de STRYV lab",
       label: "Business",
     },
   },
@@ -803,28 +803,28 @@ export const landingExplorerViews: LandingExplorerView[] = [
     sectionId: "account",
     defaultModuleId: "profil-coach",
     eyebrow: "Mon compte",
-    title: "Votre environnement, vos réglages.",
+    title: "Votre environnement, sous votre contrôle.",
     description:
-      "Les préférences et repères de travail qui structurent votre espace coach.",
+      "Préférences, notifications et cadre de travail qui structurent votre espace coach.",
   },
 ];
 
 export const landingModulePreviews: Partial<Record<string, ExplorerPreview>> = {
   "pilotage-clients": {
     src: "/landing-demo/clients.png",
-    alt: "Liste réelle des coachés dans STRYVLAB",
+    alt: "Liste réelle des coachés dans STRYV lab",
     label: "Athlètes · Coachés",
   },
   "pilotage-priorites": {
     src: "/landing-demo/dashboard.png",
-    alt: "Tableau de bord réel STRYVLAB avec les priorités coach",
+    alt: "Tableau de bord réel STRYV lab avec les priorités coach",
     label: "Accueil · Priorités",
     mobileSrc: "/landing-demo/dashboard-focus-mobile.png",
     mobileAlt: "Vue resserrée des priorités du coach sur mobile",
   },
   "pilotage-bilans": {
     src: "/landing-demo/client-profile-desktop.png",
-    alt: "Profil coaché réel STRYVLAB avec les informations de suivi",
+    alt: "Profil coaché réel STRYV lab avec les informations de suivi",
     label: "Athlètes · Bilans",
   },
   "workout-programmes": {
@@ -855,7 +855,7 @@ export const landingModulePreviews: Partial<Record<string, ExplorerPreview>> = {
   },
   "workout-performance": {
     src: "/landing-demo/client-performances-desktop.png",
-    alt: "Interface réelle de performances coaché dans STRYVLAB",
+    alt: "Interface réelle de performances coaché dans STRYV lab",
     label: "Suivi · Performance",
   },
   "nutrition-protocoles": {
@@ -879,85 +879,85 @@ export const landingModulePreviews: Partial<Record<string, ExplorerPreview>> = {
   },
   "nutrition-reality": {
     src: "/landing-demo/client-nutrition-data-desktop.png",
-    alt: "Données nutritionnelles réelles d’un coaché dans STRYVLAB",
+    alt: "Données nutritionnelles réelles d’un coaché dans STRYV lab",
     label: "Suivi · Réalité nutritionnelle",
   },
   "metrics-synthese": {
     src: "/landing-demo/client-performances-desktop.png",
-    alt: "Interface réelle de performances coaché dans STRYVLAB",
+    alt: "Interface réelle de performances coaché dans STRYV lab",
     label: "Data Metrics · Synthèse",
   },
   "morpho-galerie": {
     src: "/landing-demo/morphopro-desktop.png",
-    alt: "Interface réelle Morpho Pro dans STRYVLAB",
+    alt: "Interface réelle Morpho Pro dans STRYV lab",
     label: "Morpho Pro · Galerie",
     mobileSrc: "/landing-demo/morphopro-focus-mobile.png",
     mobileAlt: "Vue resserrée de Morpho Pro sur mobile",
   },
   "morpho-comparaison": {
     src: "/landing-demo/morphopro-desktop.png",
-    alt: "Interface réelle Morpho Pro dans STRYVLAB",
+    alt: "Interface réelle Morpho Pro dans STRYV lab",
     label: "Morpho Pro · Comparer",
     mobileSrc: "/landing-demo/morphopro-focus-mobile.png",
     mobileAlt: "Vue resserrée de Morpho Pro sur mobile",
   },
   "morpho-annotations": {
     src: "/landing-demo/morphopro-desktop.png",
-    alt: "Interface réelle Morpho Pro dans STRYVLAB",
+    alt: "Interface réelle Morpho Pro dans STRYV lab",
     label: "Morpho Pro · Annotations",
     mobileSrc: "/landing-demo/morphopro-focus-mobile.png",
     mobileAlt: "Vue resserrée de Morpho Pro sur mobile",
   },
   "morpho-analysis": {
     src: "/landing-demo/morphopro-desktop.png",
-    alt: "Interface réelle Morpho Pro dans STRYVLAB",
+    alt: "Interface réelle Morpho Pro dans STRYV lab",
     label: "Morpho Pro · Analyse assistée",
     mobileSrc: "/landing-demo/morphopro-focus-mobile.png",
     mobileAlt: "Vue resserrée de Morpho Pro sur mobile",
   },
   "morpho-evolution": {
     src: "/landing-demo/morphopro-desktop.png",
-    alt: "Interface réelle Morpho Pro dans STRYVLAB",
+    alt: "Interface réelle Morpho Pro dans STRYV lab",
     label: "Morpho Pro · Évolution",
     mobileSrc: "/landing-demo/morphopro-focus-mobile.png",
     mobileAlt: "Vue resserrée de Morpho Pro sur mobile",
   },
   "morpho-coherence": {
     src: "/landing-demo/morphopro-desktop.png",
-    alt: "Interface réelle Morpho Pro dans STRYVLAB",
+    alt: "Interface réelle Morpho Pro dans STRYV lab",
     label: "Morpho Pro · Cohérence",
     mobileSrc: "/landing-demo/morphopro-focus-mobile.png",
     mobileAlt: "Vue resserrée de Morpho Pro sur mobile",
   },
   "business-portfolio": {
     src: "/landing-demo/business.png",
-    alt: "Interface réelle Business de STRYVLAB",
+    alt: "Interface réelle Business de STRYV lab",
     label: "Business · Portefeuille",
     mobileSrc: "/landing-demo/business-focus-mobile.png",
     mobileAlt: "Vue resserrée du portefeuille Business sur mobile",
   },
   "business-agenda": {
     src: "/landing-demo/dashboard.png",
-    alt: "Tableau de bord réel STRYVLAB avec les événements du jour",
+    alt: "Tableau de bord réel STRYV lab avec les événements du jour",
     label: "Accueil · Agenda",
     mobileSrc: "/landing-demo/dashboard-focus-mobile.png",
     mobileAlt: "Vue resserrée des événements du jour sur mobile",
   },
   "business-kanban": {
     src: "/landing-demo/dashboard.png",
-    alt: "Tableau de bord réel STRYVLAB avec les tâches en cours",
+    alt: "Tableau de bord réel STRYV lab avec les tâches en cours",
     label: "Accueil · Kanban",
     mobileSrc: "/landing-demo/dashboard-focus-mobile.png",
     mobileAlt: "Vue resserrée des tâches en cours sur mobile",
   },
   "business-paiements": {
     src: "/landing-demo/comptabilite.png",
-    alt: "Interface réelle de comptabilité STRYVLAB",
+    alt: "Interface réelle de comptabilité STRYV lab",
     label: "Business · Paiements",
   },
   "business-alertes": {
     src: "/landing-demo/dashboard.png",
-    alt: "Tableau de bord réel STRYVLAB avec les alertes actives",
+    alt: "Tableau de bord réel STRYV lab avec les alertes actives",
     label: "Accueil · Alertes",
     mobileSrc: "/landing-demo/dashboard-focus-mobile.png",
     mobileAlt: "Vue resserrée des alertes actives sur mobile",

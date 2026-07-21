@@ -43,7 +43,7 @@ export default function OfflinePage() {
   }
 
   return (
-    <div className="min-h-dvh bg-[#0d0d0d] flex flex-col items-center justify-center px-6 text-center overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <div className="min-h-dvh bg-[#121212] flex flex-col items-center justify-center px-6 text-center overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="mb-8">
         <div className="w-16 h-16 rounded-2xl bg-white/[0.06] flex items-center justify-center mx-auto mb-6">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/30">

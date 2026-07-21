@@ -6,17 +6,32 @@ const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
   disable: process.env.NODE_ENV === "development",
+  // Keep the PWA install light: exclude marketing / coach-desktop / library assets
+  // from precache. Client runtime cache still fills what is actually navigated.
+  exclude: [
+    /landing-demo\//,
+    /landing-v2\//,
+    /bibliotheque_exercices\//,
+    // Heavy media: runtime CacheFirst after first use, never block SW install
+    /videos\/hero\.mp4$/,
+    /videos\/client-dashboard-bg/,
+    /images\/trophies\//,
+    /images\/videoframe_/,
+    /\.map$/,
+  ],
 });
 
 const PRODUCTION_URL = "https://stryvlab.com";
 const isDev = process.env.NODE_ENV === "development";
+// Dev-only allowance so impeccable live mode can load.
+const __impeccableLiveDev = isDev ? " http://localhost:8400" : "";
 
 const defaultCsp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'" + (isDev ? " 'unsafe-eval'" : ""),
+  `script-src 'self' 'unsafe-inline'${__impeccableLiveDev}` + (isDev ? " 'unsafe-eval'" : ""),
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} https://*.supabase.co`,
-  `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} https://*.supabase.co wss://*.supabase.co`,
+  `connect-src 'self'${__impeccableLiveDev} ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} https://*.supabase.co wss://*.supabase.co`,
   "frame-src 'self' blob:",
   "child-src 'self' blob:",
   "font-src 'self' data:",

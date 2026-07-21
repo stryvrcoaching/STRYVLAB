@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { AlertTriangle, Bug, Lightbulb, MessageSquareText, Send, X } from 'lucide-react'
+import { useClientT } from '@/components/client/ClientI18nProvider'
 
 type Workspace = 'client_pwa' | 'platform_web'
 type FeedbackCategory = 'bug' | 'usability' | 'suggestion'
@@ -67,6 +68,7 @@ function shouldHide(pathname: string | null) {
 }
 
 export default function AppFeedbackWidget() {
+  const { t } = useClientT()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const workspace = resolveWorkspace(pathname)
@@ -214,14 +216,14 @@ export default function AppFeedbackWidget() {
           onClick={() => setOpen(true)}
           className={
             isClientPwa
-              ? 'fixed right-0 top-[54%] z-[70] flex h-12 items-center gap-2 rounded-l-2xl border border-r-0 border-white/10 bg-[#161616]/96 pl-3 pr-3 text-white shadow-[0_12px_28px_rgba(0,0,0,0.34)] backdrop-blur-md transition hover:bg-[#1c1c1c]'
-              : 'fixed bottom-6 right-6 z-[70] inline-flex h-11 items-center gap-2 rounded-full border border-white/10 bg-[#161616]/96 px-4 text-[12px] font-medium text-white shadow-[0_12px_28px_rgba(0,0,0,0.32)] backdrop-blur-md transition hover:border-white/20 hover:bg-[#1d1d1d]'
+              ? 'fixed right-0 top-[54%] z-[50] flex h-12 items-center gap-2 rounded-l-2xl border border-r-0 border-white/10 bg-[#161616]/96 pl-3 pr-3 text-white shadow-[0_12px_28px_rgba(0,0,0,0.34)] backdrop-blur-md transition hover:bg-[#1c1c1c]'
+              : 'fixed bottom-6 right-6 z-[50] inline-flex h-11 items-center gap-2 rounded-full border border-white/10 bg-[#161616]/96 px-4 text-[12px] font-medium text-white shadow-[0_12px_28px_rgba(0,0,0,0.32)] backdrop-blur-md transition hover:border-white/20 hover:bg-[#1d1d1d]'
           }
           style={isClientPwa ? { transform: 'translateY(-50%)' } : undefined}
         >
           <MessageSquareText size={isClientPwa ? 16 : 15} />
           <span className={isClientPwa ? 'text-[11px] font-semibold tracking-[0.02em]' : 'text-[12px] font-medium'}>
-            {isClientPwa ? 'Retour' : 'Donner un retour'}
+            {isClientPwa ? t('feedback.trigger') : 'Donner un retour'}
           </span>
         </button>
       )}

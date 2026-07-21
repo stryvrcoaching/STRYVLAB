@@ -263,10 +263,19 @@ export default function ProfilLoading() {
                 </div>
               </div>
               <InsightHeroSkeleton />
+              <div className="mt-4 flex gap-2 justify-center">
+                {[52, 48, 56, 48, 48].map((w, i) => (
+                  <div
+                    key={i}
+                    className="bg-white/[0.04] animate-pulse rounded-lg flex flex-col items-center justify-center gap-1"
+                    style={{ width: `${w}px`, height: '48px' }}
+                  >
+                    <Pulse className="h-3.5 w-6 rounded" />
+                    <Pulse className="h-1.5 w-5 rounded" />
+                  </div>
+                ))}
+              </div>
               <div className="mt-4">
-                <SectionAccordionSkeleton />
-                <SectionAccordionSkeleton />
-                <SectionAccordionSkeleton />
                 <SectionAccordionSkeleton />
               </div>
             </div>

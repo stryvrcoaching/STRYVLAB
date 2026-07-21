@@ -688,3 +688,41 @@ export async function sendCoachAlertEmail(params: SendCoachAlertEmailParams) {
     }),
   })
 }
+
+// ─── 11. Demande de paiement Stripe ───────────────────────────────────────────
+
+export interface SendPaymentRequestEmailParams {
+  to: string
+  clientFirstName: string
+  coachName: string | null
+  formulaName: string
+  amount: number
+  paymentUrl: string
+}
+
+export async function sendPaymentRequestEmail(params: SendPaymentRequestEmailParams) {
+  const { to, clientFirstName, coachName, formulaName, amount, paymentUrl } = params
+
+  const rows = [
+    { label: 'Formule', value: formulaName },
+    { label: 'Montant', value: `${amount.toFixed(2)} €`, accent: true },
+  ]
+
+  await sendMail({
+    from: FROM,
+    to,
+    subject: `Demande de paiement — ${formulaName} — ${amount.toFixed(2)} €`,
+    html: emailTemplate({
+      senderLabel: coachName ?? undefined,
+      body: `
+        ${greeting(clientFirstName)}
+        ${bodyText(`Votre coach <strong style="color:${DS.white};">${coachName ?? 'votre coach'}</strong> vous invite à régler votre formule de suivi <strong style="color:${DS.white};">${formulaName}</strong>.`)}
+        ${infoTable(rows)}
+        ${ctaButton(paymentUrl, 'Procéder au paiement')}
+        ${hint('Ce lien de paiement sécurisé est fourni par Stripe.')}
+        ${directLink(paymentUrl)}
+        ${coachSignature(coachName)}
+      `,
+    }),
+  })
+}

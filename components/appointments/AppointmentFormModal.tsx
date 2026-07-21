@@ -90,6 +90,7 @@ export default function AppointmentFormModal({
     return end.toISOString()
   }
 
+  // Corrigé pour renvoyer une date ISO correcte
   function buildStartsAt(): string {
     return new Date(startDatetime).toISOString()
   }
@@ -159,7 +160,7 @@ export default function AppointmentFormModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-white/8">
           <div className="flex items-center gap-3">
-            <Calendar className="text-[#c6b48b]" size={18} />
+            <Calendar className="text-[#1f8a65]" size={18} />
             <h2 className="text-white font-semibold text-base">Planifier un rendez-vous</h2>
           </div>
           <button
@@ -180,7 +181,7 @@ export default function AppointmentFormModal({
                 value={selectedClientId}
                 onChange={(e) => setSelectedClientId(e.target.value)}
                 required
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#c6b48b]/50"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#1f8a65]/50"
               >
                 <option value="">Sélectionner un client...</option>
                 {allClients.map((c) => (
@@ -210,7 +211,7 @@ export default function AppointmentFormModal({
               onChange={(e) => setTitle(e.target.value)}
               maxLength={200}
               placeholder="Point de suivi"
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#c6b48b]/50"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#1f8a65]/50"
             />
           </div>
 
@@ -225,7 +226,7 @@ export default function AppointmentFormModal({
                 value={startDatetime}
                 onChange={(e) => setStartDatetime(e.target.value)}
                 required
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#c6b48b]/50 [color-scheme:dark]"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#1f8a65]/50 [color-scheme:dark]"
               />
             </div>
             <div className="space-y-1.5">
@@ -233,7 +234,7 @@ export default function AppointmentFormModal({
               <select
                 value={durationMin}
                 onChange={(e) => setDurationMin(Number(e.target.value))}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#c6b48b]/50"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#1f8a65]/50"
               >
                 {DURATION_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -253,7 +254,7 @@ export default function AppointmentFormModal({
                   onClick={() => setMeetingKind(value)}
                   className={`flex flex-col items-center gap-1.5 px-2 py-3 rounded-lg border text-xs font-medium transition-all
                     ${meetingKind === value
-                      ? 'border-[#c6b48b]/60 bg-[#c6b48b]/10 text-[#c6b48b]'
+                      ? 'border-[#1f8a65]/60 bg-[#1f8a65]/10 text-[#1f8a65]'
                       : 'border-white/10 bg-white/5 text-white/50 hover:text-white/80 hover:border-white/20'}`}
                 >
                   <Icon size={16} />
@@ -274,7 +275,7 @@ export default function AppointmentFormModal({
               onChange={(e) => { setMeetingUrl(e.target.value); setUrlError(null) }}
               placeholder="https://meet.google.com/..."
               className={`w-full bg-white/5 border rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-white/30 focus:outline-none
-                ${urlError ? 'border-red-500/50 focus:border-red-500' : 'border-white/10 focus:border-[#c6b48b]/50'}`}
+                ${urlError ? 'border-red-500/50 focus:border-red-500' : 'border-white/10 focus:border-[#1f8a65]/50'}`}
             />
             {urlError && <p className="text-red-400 text-xs">{urlError}</p>}
           </div>
@@ -290,7 +291,7 @@ export default function AppointmentFormModal({
               maxLength={2000}
               rows={3}
               placeholder="Objectif de l'appel, consignes, documents à préparer..."
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#c6b48b]/50 resize-none"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#1f8a65]/50 resize-none"
             />
           </div>
 
@@ -301,10 +302,10 @@ export default function AppointmentFormModal({
                 type="button"
                 onClick={() => setConfirmationRequired(!confirmationRequired)}
                 className={`w-5 h-5 rounded flex items-center justify-center border transition-all
-                  ${confirmationRequired ? 'bg-[#c6b48b] border-[#c6b48b]' : 'border-white/20 bg-white/5'}`}
+                  ${confirmationRequired ? 'bg-[#1f8a65] border-[#1f8a65]' : 'border-white/20 bg-white/5'}`}
                 aria-pressed={confirmationRequired}
               >
-                {confirmationRequired && <CheckSquare size={12} className="text-black" />}
+                {confirmationRequired && <CheckSquare size={12} className="text-white" />}
               </button>
               <span className="text-sm text-white/70 group-hover:text-white/90 transition-colors">
                 Demander une confirmation au client
@@ -316,10 +317,10 @@ export default function AppointmentFormModal({
                 type="button"
                 onClick={() => setCreateKanbanTask(!createKanbanTask)}
                 className={`w-5 h-5 rounded flex items-center justify-center border transition-all
-                  ${createKanbanTask ? 'bg-[#c6b48b] border-[#c6b48b]' : 'border-white/20 bg-white/5'}`}
+                  ${createKanbanTask ? 'bg-[#1f8a65] border-[#1f8a65]' : 'border-white/20 bg-white/5'}`}
                 aria-pressed={createKanbanTask}
               >
-                {createKanbanTask && <CheckSquare size={12} className="text-black" />}
+                {createKanbanTask && <CheckSquare size={12} className="text-white" />}
               </button>
               <span className="text-sm text-white/70 group-hover:text-white/90 transition-colors">
                 Créer une tâche de préparation dans le Kanban
@@ -347,7 +348,7 @@ export default function AppointmentFormModal({
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 px-4 py-2.5 rounded-lg bg-[#c6b48b] text-[#0d0d0d] text-sm font-semibold hover:bg-[#d4c09e] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2.5 rounded-lg bg-[#1f8a65] text-white text-sm font-semibold hover:bg-[#217356] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {submitting ? <Loader2 size={14} className="animate-spin" /> : <Calendar size={14} />}
               Planifier

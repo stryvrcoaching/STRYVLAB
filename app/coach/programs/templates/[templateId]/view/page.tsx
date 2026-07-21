@@ -297,13 +297,13 @@ export default async function ViewProgramTemplatePage({
               </div>
 
               {s.notes && (
-                <div className="px-5 py-2 bg-[#0a0a0a] border-b border-white/10">
+                <div className="px-5 py-2 bg-[#0a0a0a] border-b border-white/[0.06]">
                   <p className="text-xs text-white/70 italic">{s.notes}</p>
                 </div>
               )}
 
               {/* Exercises */}
-              <div className="divide-y divide-white/30">
+              <div className="divide-y divide-white/[0.06]">
                 {s.coach_program_template_exercises.map(
                   (e: any, ei: number) => (
                     <div

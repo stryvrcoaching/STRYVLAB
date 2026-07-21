@@ -29,6 +29,20 @@ interface SessionLog {
   completed_at: string | null;
   duration_min: number | null;
   notes: string | null;
+  exercise_notes?: Record<string, string> | null;
+  client_session_exercise_comments?: {
+    id: string;
+    exercise_name: string;
+    body: string;
+    created_at: string;
+  }[];
+  training_session_checkins?: {
+    phase: "pre" | "post";
+    readiness: number | null;
+    exertion: number | null;
+    discomfort_level: number;
+    discomfort_area: string | null;
+  }[];
   session_kind?: "planned" | "flex" | null;
   flex_session_id?: string | null;
   relation_to_planned_workout?: "replace" | "bonus" | "unknown" | null;
@@ -46,9 +60,17 @@ interface SessionLog {
 
 interface Props {
   clientId: string;
+  focusedSessionId?: string | null;
   focusedSessionDate?: string | null;
   focusVersion?: number;
   onSessionsChanged?: () => void;
+}
+
+interface PersonalExerciseNote {
+  exercise_key: string;
+  exercise_name: string;
+  body: string;
+  updated_at: string;
 }
 
 const STATUS_LABELS: Record<SessionStatusFilter, string> = {
@@ -65,6 +87,7 @@ function resolveFlexLabel(log: SessionLog) {
 
 export default function SessionHistory({
   clientId,
+  focusedSessionId,
   focusedSessionDate,
   focusVersion = 0,
   onSessionsChanged,
@@ -81,6 +104,7 @@ export default function SessionHistory({
     label: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [personalNotes, setPersonalNotes] = useState<PersonalExerciseNote[]>([]);
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
@@ -103,6 +127,23 @@ export default function SessionHistory({
   useEffect(() => {
     loadLogs();
   }, [loadLogs]);
+
+  useEffect(() => {
+    fetch(`/api/coach/clients/${clientId}/exercise-notes`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => setPersonalNotes(data?.notes ?? []))
+      .catch(() => setPersonalNotes([]));
+  }, [clientId]);
+
+  useEffect(() => {
+    if (!focusedSessionId || logs.length === 0) return;
+    if (!logs.some((log) => log.id === focusedSessionId)) return;
+    setStatusFilter("all");
+    setExpanded(focusedSessionId);
+    window.setTimeout(() => {
+      document.getElementById(`session-log-${focusedSessionId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+  }, [focusedSessionId, logs]);
 
   useEffect(() => {
     if (!focusedSessionDate || logs.length === 0) return;
@@ -310,6 +351,20 @@ export default function SessionHistory({
         )}
       </div>
 
+      {personalNotes.length > 0 && (
+        <div className="mb-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/35">Notes personnelles par exercice</p>
+          <div className="mt-3 space-y-3">
+            {personalNotes.map((note) => (
+              <div key={note.exercise_key} className="border-l border-white/[0.12] pl-3">
+                <p className="text-xs font-semibold text-white/80">{note.exercise_name}</p>
+                <p className="mt-1 text-xs leading-relaxed text-white/50">{note.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {filteredLogs.length === 0 ? (
         <div className="bg-[#181818] border-subtle rounded-xl p-10 text-center">
           <Dumbbell size={36} className="text-white/45 mx-auto mb-3 opacity-30" />
@@ -500,6 +555,30 @@ export default function SessionHistory({
                         {log.notes}
                       </p>
                     )}
+                    {log.training_session_checkins?.length ? (
+                      <div className="flex flex-wrap gap-2 border-t border-white/[0.06] pt-3">
+                        {log.training_session_checkins.map((checkin) => (
+                          <span key={checkin.phase} className="rounded-lg bg-white/[0.04] px-2.5 py-1.5 text-[11px] text-white/60">
+                            {checkin.phase === "pre" ? `Préparation ${checkin.readiness}/10` : `Effort ${checkin.exertion}/10`}
+                            {checkin.discomfort_level > 0 ? ` · gêne${checkin.discomfort_area ? ` : ${checkin.discomfort_area}` : ""}` : ""}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {(log.client_session_exercise_comments?.length || Object.keys(log.exercise_notes ?? {}).length) ? (
+                      <div className="space-y-2 border-t border-white/[0.06] pt-3">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">Commentaires du client</p>
+                        {log.client_session_exercise_comments?.map((comment) => (
+                          <div key={comment.id} className="border-l border-white/[0.12] pl-3">
+                            <p className="text-xs font-semibold text-white/75">{comment.exercise_name}</p>
+                            <p className="mt-1 text-xs leading-relaxed text-white/50">{comment.body}</p>
+                          </div>
+                        ))}
+                        {Object.entries(log.exercise_notes ?? {}).map(([exerciseId, note]) => (
+                          <p key={exerciseId} className="border-l border-white/[0.12] pl-3 text-xs leading-relaxed text-white/50">{note}</p>
+                        ))}
+                      </div>
+                    ) : null}
                     {log.session_kind === "flex" && (
                       <div className="border-t border-white/[0.06] pt-3 flex items-center justify-between gap-3">
                         <p className="text-[11px] text-white/30">

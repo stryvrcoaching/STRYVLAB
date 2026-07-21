@@ -2,13 +2,29 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, ClipboardList, Sparkles, MessageSquare, Clock, TrendingUp } from "lucide-react";
+import {
+  ClipboardList,
+  Sparkles,
+  MessageSquare,
+  Clock,
+  TrendingUp,
+  CreditCard,
+} from "lucide-react";
 import { emitClientInboxUpdated } from "@/lib/client/inboxEvents";
 import { sendClientMutation } from "@/lib/client/offline-mutations";
+import { DashboardSignalCard } from "@/components/client/smart/DashboardSignalCard";
 
 export type Notification = {
   id: string;
-  type: "coach_note" | "coach_message" | "bilan_pending" | "program_assigned" | "program_updated" | "system_reminder" | "tdee_updated" | "coach_feedback";
+  type:
+    | "coach_note"
+    | "coach_message"
+    | "bilan_pending"
+    | "program_assigned"
+    | "program_updated"
+    | "system_reminder"
+    | "tdee_updated"
+    | "coach_feedback";
   title: string;
   body: string | null;
   payload: Record<string, unknown> | null;
@@ -27,6 +43,22 @@ const TYPE_ICON: Record<Notification["type"], React.ElementType> = {
   coach_feedback: MessageSquare,
 };
 
+function toneFor(n: Notification) {
+  if (n.payload?.event === "payment_reminder") return "warning" as const;
+  if (n.type === "bilan_pending") return "attention" as const;
+  if (
+    n.type === "coach_message" ||
+    n.type === "coach_note" ||
+    n.type === "coach_feedback"
+  ) {
+    return "info" as const;
+  }
+  if (n.type === "system_reminder" || n.type === "tdee_updated") {
+    return "warning" as const;
+  }
+  return "success" as const;
+}
+
 export default function NotificationsBar({
   initial,
 }: {
@@ -40,17 +72,29 @@ export default function NotificationsBar({
   const dismiss = async (id: string) => {
     setItems((prev) => prev.filter((n) => n.id !== id));
     emitClientInboxUpdated();
-    const result = await sendClientMutation({ kind: "notification", url: `/api/client/notifications/${id}`, method: "PATCH" });
+    const result = await sendClientMutation({
+      kind: "notification",
+      url: `/api/client/notifications/${id}`,
+      method: "PATCH",
+    });
     if (!result.queued && !result.response?.ok) emitClientInboxUpdated();
   };
 
   const handleClick = (n: Notification) => {
     if (!n.read_at) {
-      setItems((prev) => prev.map((item) => (
-        item.id === n.id ? { ...item, read_at: new Date().toISOString() } : item
-      )));
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === n.id
+            ? { ...item, read_at: new Date().toISOString() }
+            : item,
+        ),
+      );
       emitClientInboxUpdated();
-      void sendClientMutation({ kind: "notification", url: `/api/client/notifications/${n.id}`, method: "PATCH" }).then((result) => {
+      void sendClientMutation({
+        kind: "notification",
+        url: `/api/client/notifications/${n.id}`,
+        method: "PATCH",
+      }).then((result) => {
         if (!result.queued && !result.response?.ok) emitClientInboxUpdated();
       });
     }
@@ -59,7 +103,47 @@ export default function NotificationsBar({
         ? n.payload.action_url
         : null;
     if (actionUrl) {
-      router.push(actionUrl);
+      const isExternal =
+        actionUrl.startsWith("http://") || actionUrl.startsWith("https://");
+      const isStripe =
+        isExternal &&
+        (actionUrl.includes("checkout.stripe.com") ||
+          actionUrl.includes("stripe.com/c/pay"));
+
+      // Never open raw Stripe Checkout inside the PWA from a notification card.
+      if (isStripe || n.payload?.event === "payment_reminder") {
+        const params = new URLSearchParams();
+        if (typeof n.payload?.payment_id === "string") {
+          params.set("payment_id", n.payload.payment_id);
+        }
+        if (typeof n.payload?.subscription_id === "string") {
+          params.set("subscription_id", n.payload.subscription_id);
+        }
+        if (typeof n.payload?.formula_id === "string") {
+          params.set("formula_id", n.payload.formula_id);
+        }
+        const qs = params.toString();
+        router.push(qs ? `/client/paiement?${qs}` : "/client/paiement");
+        return;
+      }
+
+      if (isExternal) {
+        window.open(actionUrl, "_blank", "noopener,noreferrer");
+      } else {
+        router.push(actionUrl);
+      }
+      return;
+    }
+    if (n.payload?.event === "payment_reminder") {
+      const params = new URLSearchParams();
+      if (typeof n.payload?.payment_id === "string") {
+        params.set("payment_id", n.payload.payment_id);
+      }
+      router.push(
+        params.toString()
+          ? `/client/paiement?${params.toString()}`
+          : "/client/paiement",
+      );
       return;
     }
     if (n.type === "bilan_pending" && n.payload?.assessment_submission_id) {
@@ -75,63 +159,54 @@ export default function NotificationsBar({
     } else if (n.type === "tdee_updated") {
       router.push("/client/nutrition");
     } else if (n.type === "coach_feedback") {
-      const payload = n.payload as any
+      const payload = n.payload as Record<string, unknown>;
       if (!payload?.entity_type || !payload?.entity_id) {
-        router.push("/client")
-        return
+        router.push("/client");
+        return;
       }
       switch (payload.entity_type) {
-        case 'session':
-          router.push(`/client/programme/recap/${payload.entity_id}`)
-          break
-        case 'bilan':
-          router.push(`/client/bilans/${payload.entity_id}`)
-          break
-        case 'checkin':
-          router.push('/client/checkin')
-          break
-        case 'morpho':
-          router.push('/client/metrics')
-          break
+        case "session":
+          router.push(`/client/programme/recap/${payload.entity_id}`);
+          break;
+        case "bilan":
+          router.push(`/client/bilans/${payload.entity_id}`);
+          break;
+        case "checkin":
+          router.push("/client/checkin");
+          break;
+        case "morpho":
+          router.push("/client/metrics");
+          break;
         default:
-          router.push('/client')
+          router.push("/client");
       }
     } else {
-      void sendClientMutation({ kind: "notification", url: "/api/client/notifications", method: "PATCH" });
+      void sendClientMutation({
+        kind: "notification",
+        url: "/api/client/notifications",
+        method: "PATCH",
+      });
     }
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {items.map((n) => {
-        const Icon = TYPE_ICON[n.type] ?? ClipboardList;
+        const isPayment = n.payload?.event === "payment_reminder";
+        const Icon = isPayment
+          ? CreditCard
+          : (TYPE_ICON[n.type] ?? ClipboardList);
         return (
-          <div
+          <DashboardSignalCard
+            body={n.body}
+            icon={Icon}
             key={n.id}
-            className="flex items-start gap-3 bg-[#111111] rounded-2xl p-3 active:scale-[0.99] transition-transform cursor-pointer"
+            label="Ouvrir"
             onClick={() => handleClick(n)}
-          >
-            <div className="w-9 h-9 rounded-lg bg-[#f2f2f2]/10 flex items-center justify-center shrink-0">
-              <Icon size={18} className="text-[#f2f2f2]" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[12px] font-semibold text-white">{n.title}</p>
-              {n.body && (
-                <p className="text-[11px] text-white/50 mt-1 leading-relaxed">
-                  {n.body}
-                </p>
-              )}
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                dismiss(n.id);
-              }}
-              className="w-7 h-7 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0"
-            >
-              <X size={14} className="text-white/40" />
-            </button>
-          </div>
+            onDismiss={() => void dismiss(n.id)}
+            title={n.title}
+            tone={toneFor(n)}
+          />
         );
       })}
     </div>

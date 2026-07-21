@@ -322,7 +322,7 @@ export default function MesocycleGeneratorModal({
             ) : (
               <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {preview.weeks.map((week) => (
-                  <article key={week.position} className={`rounded-xl border p-3 ${week.weekType === 'deload' ? 'border-[#86aeb8]/25 bg-[#86aeb8]/[0.06]' : 'border-white/[0.07] bg-white/[0.02]'}`}>
+                  <article key={week.position} className={`rounded-xl border p-3 ${week.weekType === 'deload' ? 'border-blue-500/25 bg-blue-500/5' : 'border-white/[0.07] bg-white/[0.02]'}`}>
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-[11px] font-semibold text-white/75">{week.label}</p>
                       <span className="text-[8px] font-bold uppercase tracking-[0.12em] text-white/30">{weekTypeLabels[week.weekType]}</span>

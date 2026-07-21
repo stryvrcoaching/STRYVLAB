@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function LegalNoticePage() {
   return (
-    <main className="min-h-screen bg-[#0d0d0d] text-white">
+    <main className="min-h-screen bg-[#121212] text-white">
       <header className="border-b border-white/10 px-5 py-5 sm:px-8">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <Link href="/" className="font-unbounded text-sm tracking-[-0.04em]">STRYV lab</Link>
@@ -17,7 +17,7 @@ export default function LegalNoticePage() {
       </header>
 
       <div className="mx-auto max-w-5xl px-5 py-16 sm:px-8 sm:py-24">
-        <p className="font-barlow-condensed text-xs uppercase tracking-[0.2em] text-[#c6b48b]">Éditeur & exploitation</p>
+        <p className="font-barlow-condensed text-xs uppercase tracking-[0.2em] text-[#1f8a65]">Éditeur & exploitation</p>
         <h1 className="mt-5 font-barlow text-5xl font-semibold uppercase leading-[0.9] tracking-[-0.045em] sm:text-7xl">Mentions légales</h1>
         <p className="mt-7 text-base leading-7 text-white/60">Dernière mise à jour technique : 15 juillet 2026.</p>
 
@@ -31,8 +31,8 @@ export default function LegalNoticePage() {
               <p><strong className="text-white/85">BCE :</strong> 0745.797.168</p>
               <p><strong className="text-white/85">TVA :</strong> BE0745797168</p>
               <p><strong className="text-white/85">Publication :</strong> Boukelmoune Kévin</p>
-              <p><strong className="text-white/85">E-mail :</strong> <a className="text-[#c6b48b]" href="mailto:contact@stryvlab.com">contact@stryvlab.com</a></p>
-              <p><strong className="text-white/85">Téléphone :</strong> <a className="text-[#c6b48b]" href="tel:+32472238612">+32 472 23 86 12</a></p>
+              <p><strong className="text-white/85">E-mail :</strong> <a className="text-[#1f8a65]" href="mailto:contact@stryvlab.com">contact@stryvlab.com</a></p>
+              <p><strong className="text-white/85">Téléphone :</strong> <a className="text-[#1f8a65]" href="tel:+32472238612">+32 472 23 86 12</a></p>
               <p><strong className="text-white/85">Adresse :</strong> Boulevard Président Kennedy 69, 7000 Mons, Belgique</p>
             </div>
           </section>

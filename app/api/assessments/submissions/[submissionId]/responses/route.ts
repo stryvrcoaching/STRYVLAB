@@ -4,6 +4,10 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { BulkResponsePayload } from '@/types/assessment'
 import { inngest } from '@/lib/inngest/client'
 import { syncProfileFromResponses } from '@/lib/assessments/sync-profile'
+import {
+  publicAssessmentPayloadSchema,
+  validatePublicAssessmentResponses,
+} from '@/lib/assessments/public-response-security'
 
 function serviceClient() {
   return createServiceClient(
@@ -15,22 +19,28 @@ function serviceClient() {
 // POST /api/assessments/submissions/[submissionId]/responses — bulk upsert (mode coach)
 export async function POST(
   req: NextRequest,
-  { params }: { params: { submissionId: string } }
+  { params }: { params: Promise<{ submissionId: string }> }
 ) {
+  const { submissionId } = await params
   const supabase = createServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
-  const body: BulkResponsePayload = await req.json()
+  const rawBody: BulkResponsePayload = await req.json()
+  const parsedBody = publicAssessmentPayloadSchema.safeParse(rawBody)
+  if (!parsedBody.success) {
+    return NextResponse.json({ error: 'Réponses invalides' }, { status: 400 })
+  }
+  const body = parsedBody.data
   const db = serviceClient()
 
   // Vérifier ownership
   const { data: submission } = await db
     .from('assessment_submissions')
-    .select('id, client_id, coach_id, status, bilan_date')
-    .eq('id', params.submissionId)
+    .select('id, client_id, coach_id, status, bilan_date, template_snapshot')
+    .eq('id', submissionId)
     .eq('coach_id', user.id)
     .single()
 
@@ -42,9 +52,20 @@ export async function POST(
     return NextResponse.json({ error: 'Aucune réponse fournie' }, { status: 400 })
   }
 
+  const responseValidation = validatePublicAssessmentResponses({
+    payload: body,
+    snapshot: submission.template_snapshot as any,
+    coachId: submission.coach_id,
+    clientId: submission.client_id,
+    submissionId: submission.id,
+  })
+  if (!responseValidation.ok) {
+    return NextResponse.json({ error: responseValidation.error }, { status: 400 })
+  }
+
   // Upsert des réponses
   const rows = body.responses.map(r => ({
-    submission_id: params.submissionId,
+    submission_id: submissionId,
     block_id:      r.block_id,
     field_key:     r.field_key,
     value_text:    r.value_text   ?? null,
@@ -67,16 +88,16 @@ export async function POST(
     await db
       .from('assessment_submissions')
       .update({ status: 'completed', submitted_at: new Date().toISOString() })
-      .eq('id', params.submissionId)
+      .eq('id', submissionId)
 
     // Sync profile fields (gender, dob, training_goal, fitness_level, injuries)
     const bilanDate = submission.bilan_date ?? new Date().toISOString().slice(0, 10)
-    await syncProfileFromResponses(db, submission.client_id, user.id, body.responses as any, bilanDate)
+    await syncProfileFromResponses(db, submission.client_id, user.id, body.responses as any, bilanDate, submissionId)
 
     await db.from('client_notifications').insert({
       coach_id:      user.id,
       client_id:     submission.client_id,
-      submission_id: params.submissionId,
+      submission_id: submissionId,
       type:          'assessment_completed',
       message:       `Bilan rempli par le coach.`,
     })
@@ -87,7 +108,7 @@ export async function POST(
       .select('id')
       .eq('client_id', submission.client_id)
       .eq('action_type', 'bilan')
-      .eq('reference_id', params.submissionId)
+      .eq('reference_id', submissionId)
       .maybeSingle()
 
     if (!existingBilanPoints) {
@@ -95,7 +116,7 @@ export async function POST(
         client_id: submission.client_id,
         action_type: 'bilan',
         points: 20,
-        reference_id: params.submissionId,
+        reference_id: submissionId,
       })
 
       await inngest.send({
@@ -111,7 +132,7 @@ export async function POST(
       event_type: 'assessment',
       event_date: eventDate,
       event_time: new Date().toTimeString().slice(0, 5),
-      source_id: params.submissionId,
+      source_id: submissionId,
       title: 'Bilan complété',
       summary: null,
       data: null,

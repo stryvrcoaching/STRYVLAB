@@ -39,7 +39,6 @@ function isCaffeineType(type?: DrinkType | null): boolean {
   return type === 'espresso' || type === 'coffee' || type === 'lungo' || type === 'tea'
 }
 
-
 const WATER_SHEET_EXCLUDED_TYPES = new Set(['espresso', 'coffee', 'lungo', 'tea'])
 
 function isPureWaterLog(log: WaterLog): boolean {
@@ -106,8 +105,6 @@ export default function QuickWaterModal({
     let cancelled = false
     setLoading(true)
 
-    // Hydratation = tous les volumes hydratants du jour.
-    // Ça aligne le total du sheet avec la page nutrition.
     const params = new URLSearchParams({ kind: 'water' })
     if (date) params.set('date', date)
 
@@ -115,7 +112,7 @@ export default function QuickWaterModal({
       .then(res => res.ok ? res.json() : null)
       .then(json => {
         if (cancelled) return
-        const rows = ((json?.data ?? json?.logs ?? []) as WaterLog[])
+        const rows = (json?.data ?? json?.logs ?? []) as WaterLog[]
         setLogs(rows.filter(isPureWaterLog))
       })
       .catch(() => {
@@ -202,7 +199,7 @@ export default function QuickWaterModal({
       <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-[2px]" onClick={onClose} />
 
       <div
-        className="client-native-bottom-sheet fixed left-0 right-0 bottom-0 z-[70] rounded-t-[28px] bg-[#0d0d0d] shadow-2xl"
+        className="client-native-bottom-sheet fixed left-0 right-0 bottom-0 z-[70] rounded-t-[28px] bg-[#121212] shadow-2xl"
         style={{
           maxHeight: '88dvh',
           display: 'flex',

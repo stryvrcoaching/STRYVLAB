@@ -18,7 +18,7 @@ export default function CheckinSavingOverlay({ open }: { open: boolean }) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: reducedMotion ? 0.01 : 0.16 }}
-          className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#0d0d0d]/94 px-8 text-center backdrop-blur-sm"
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#121212]/94 px-8 text-center backdrop-blur-sm"
         >
           <motion.div
             animate={reducedMotion ? undefined : { scale: [0.96, 1.04, 0.96] }}

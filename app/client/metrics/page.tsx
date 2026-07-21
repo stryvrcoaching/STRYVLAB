@@ -21,27 +21,9 @@ export default async function MetricsRoute() {
     user.id,
     user.email,
     db,
-    'id, first_name, last_name, email, profile_photo_url'
+    'id'
   )
   if (!cc) return null
 
-  const firstName = (cc as any).first_name ?? ""
-  const lastName  = (cc as any).last_name  ?? ""
-  const initials  = `${firstName?.[0] ?? ""}${lastName?.[0] ?? ""}`.toUpperCase() || "?"
-
-  const { data: streakRow } = await db
-    .from('client_streaks')
-    .select('current_streak')
-    .eq('client_id', cc.id)
-    .maybeSingle()
-
-  return (
-    <MetricsClientPage
-      clientName={`${firstName} ${lastName}`.trim()}
-      clientEmail={(cc as any).email ?? user.email ?? ""}
-      avatarInitials={initials}
-      avatarUrl={(cc as any).profile_photo_url ?? null}
-      streak={(streakRow as any)?.current_streak ?? 0}
-    />
-  )
+  return <MetricsClientPage />
 }

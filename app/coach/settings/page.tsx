@@ -36,6 +36,8 @@ import {
   DEFAULT_COACH_INBOX_PREFERENCES,
   type CoachInboxPreferenceKey,
 } from "@/lib/notifications/coach-inbox-preferences";
+import { PhoneCountryField } from "@/components/ui/PhoneCountryField";
+import WhatsappAgentSettings from "@/components/coach/settings/WhatsappAgentSettings";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -424,6 +426,34 @@ export default function SettingsPage() {
     load();
   }, [load]);
 
+  // Deep link: /coach/settings?section=plan|profile|notifications|rewards|client-payments
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const section = params.get("section") as SettingsSectionId | null;
+    const valid: SettingsSectionId[] = [
+      "profile",
+      "availabilities",
+      "billing",
+      "client-payments",
+      "plan",
+      "notifications",
+      "ai",
+      "rewards",
+      "account",
+    ];
+    if (section && valid.includes(section)) {
+      setOpenSection(section);
+      // Scroll after paint
+      requestAnimationFrame(() => {
+        document.getElementById(section)?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
+    }
+  }, []);
+
   function renderSaveFeedback(scope: SettingsSaveScope) {
     if (!saveFeedback || saveFeedback.scope !== scope) return null;
 
@@ -802,15 +832,14 @@ export default function SettingsPage() {
                 placeholder="contact@moncoaching.fr"
               />
             </div>
-            <div>
-              <label className={labelCls}>Téléphone</label>
-              <input
-                className={inputCls}
-                value={profile.phone ?? ""}
-                onChange={(e) => set("phone", e.target.value || null)}
-                placeholder="+33 6 00 00 00 00"
-              />
-            </div>
+            <PhoneCountryField
+              variant="coach"
+              label="Téléphone"
+              value={profile.phone}
+              defaultCountryIso="BE"
+              placeholder="470 12 34 56"
+              onChange={(e164) => set("phone", e164)}
+            />
           </div>
           <div className="mt-5 flex flex-col items-end gap-2 border-t border-white/[0.05] pt-4">
             <button
@@ -1166,7 +1195,10 @@ export default function SettingsPage() {
                   Rappels paiement
                 </p>
                 <p className="text-[11px] text-white/40 mt-0.5">
-                  Envoie un email au client avant chaque échéance
+                  E-mail + app client avant l’échéance (J-N), le jour J, et en
+                  retard si jamais relancé. Les échéances partent des
+                  abonnements actifs (génération auto quotidienne + bouton
+                  Comptabilité).
                 </p>
               </div>
               <Toggle
@@ -1333,6 +1365,8 @@ export default function SettingsPage() {
                     onChange={(v) => set('ai_notif_email', v)}
                   />
                 </div>
+
+                <WhatsappAgentSettings />
               </>
             )}
 
@@ -1366,11 +1400,12 @@ export default function SettingsPage() {
         {/* ════════════════════════════════════════════════════════════
             SECTION 5 — RÉCOMPENSES
         ════════════════════════════════════════════════════════════ */}
+        {/* Rewards require client app (Pro+) — section still visible with plan context in child */}
         <Section
           id="rewards"
           icon={Gift}
           title="Boutique de Récompenses"
-          description="Gérez les cadeaux et leurs coûts pour vos clients"
+          description="Gérez les cadeaux et leurs coûts pour vos clients (app STRYVR · Pro+)"
           open={openSection === "rewards"}
           onToggle={() => toggleSection("rewards")}
         >

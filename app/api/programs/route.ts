@@ -260,7 +260,7 @@ export async function GET(req: NextRequest) {
           id, name, sets, reps, rest_sec, rir, notes, position, image_url,
           movement_pattern, equipment_required, primary_muscles, secondary_muscles,
           group_id, is_compound, is_unilateral, target_rir, target_hr_zone, execution_type,
-          weight_increment_kg, tempo, set_prescriptions, superset_rest_mode,
+          weight_increment_kg, current_weight_kg, tempo, set_prescriptions, superset_rest_mode,
           plane, mechanic, unilateral, primary_muscle, primary_activation,
           secondary_muscles_detail, secondary_activations, stabilizers,
           joint_stress_spine, joint_stress_knee, joint_stress_shoulder,

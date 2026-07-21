@@ -8,6 +8,9 @@ import { NavDock } from "@/components/layout/NavDock";
 import GlobalOrganizerButton from "@/components/layout/GlobalOrganizerButton";
 import NotificationBell from "@/components/layout/NotificationBell";
 import ClientPulseDashboard from "@/components/layout/ClientPulseDashboard";
+import ActivationContinueBar from "@/components/dashboard/ActivationContinueBar";
+import CoachLearningContinueBar from "@/components/dashboard/CoachLearningContinueBar";
+import CoachPlanBadge from "@/components/coach/CoachPlanBadge";
 import { createClient } from "@/utils/supabase/client";
 
 // ─── FULLSCREEN PAGE CONTEXT ──────────────────────────────────────────────────
@@ -43,6 +46,7 @@ function TopBar({ firstName }: { firstName: string | null }) {
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {right}
+        <CoachPlanBadge />
         <ClientPulseDashboard />
         <GlobalOrganizerButton />
         <NotificationBell />
@@ -113,6 +117,8 @@ function ShellInner({ children }: { children: ReactNode }) {
         {/* pt = top-4(16) + h-14(56) + gap-4(16) = 88px | pb = bottom-6(24) + rowB h-14(56) + rowA h-9(36) + gap-1.5(6) + gap(16) = 138px */}
         <PageContent hideDock={hideDock}>{children}</PageContent>
         {!fullscreen && !hideDock && <NavDock />}
+        {!fullscreen && <ActivationContinueBar />}
+        {!fullscreen && <CoachLearningContinueBar />}
       </div>
     </FullscreenPageContext.Provider>
   );

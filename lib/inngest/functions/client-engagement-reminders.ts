@@ -1,4 +1,3 @@
-import { inngest } from '@/lib/inngest/client'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClientAppNotification } from '@/lib/notifications/create-client-app-notification'
 import type {
@@ -54,7 +53,7 @@ async function createAndPush(
   if (await alreadySent(db, client.id, event, date)) return false
 
   try {
-    await createClientAppNotification(db, {
+    const result = await createClientAppNotification(db, {
       clientId: client.id,
       coachId: client.coach_id ?? null,
       type: 'system_reminder',
@@ -65,16 +64,16 @@ async function createAndPush(
       pushKind: kind,
       pushTag: `stryv-${event}-${date}`,
     })
+    return result.created && result.pushed
   } catch {
     return false
   }
-  return true
 }
 
-export const clientEngagementRemindersFunction = inngest.createFunction(
-  { id: 'client-engagement-reminders', retries: 1, triggers: [{ cron: '*/5 * * * *' }] },
-  async ({ step }) => step.run('send-client-engagement-reminders', async () => {
-    const db = service()
+export async function runClientEngagementReminders(
+  db: ReturnType<typeof service>,
+  now = new Date(),
+) {
     const { data: clients } = await db
       .from('coach_clients')
       .select('id, coach_id, timezone')
@@ -84,7 +83,7 @@ export const clientEngagementRemindersFunction = inngest.createFunction(
     const { data: preferenceRows } = clientIds.length > 0
       ? await db
         .from('client_preferences')
-        .select('client_id, training_reminder_times, hydration_reminder_first_time, hydration_reminder_count, meal_reminder_breakfast_time, meal_reminder_lunch_time, protein_reminder_time')
+        .select('client_id, notif_session_reminder, notif_hydration_reminder, notif_meal_reminder, notif_protein_reminder, training_reminder_times, hydration_reminder_first_time, hydration_reminder_count, meal_reminder_breakfast_time, meal_reminder_lunch_time, protein_reminder_time')
         .in('client_id', clientIds)
       : { data: [] }
     const preferencesByClient = new Map(
@@ -92,7 +91,6 @@ export const clientEngagementRemindersFunction = inngest.createFunction(
     )
 
     let sent = 0
-    const now = new Date()
 
     for (const client of clients ?? []) {
       const timezone = String(client.timezone ?? '').trim() || 'Europe/Paris'
@@ -100,7 +98,10 @@ export const clientEngagementRemindersFunction = inngest.createFunction(
       const date = computePhysiologicalDateInTimezone(now, timezone)
       const weekday = getLocalWeekday(now, timezone)
       const preferences = preferencesByClient.get(client.id) as Record<string, unknown> | undefined
-      const trainingTimes = normalizeTrainingReminderTimes(preferences?.training_reminder_times)
+      const isEnabled = (key: string) => preferences?.[key] !== false
+      const trainingTimes = isEnabled('notif_session_reminder')
+        ? normalizeTrainingReminderTimes(preferences?.training_reminder_times)
+        : []
       const dueTrainingIndex = trainingTimes.findIndex((time) => isReminderDue(local, time))
 
       if (dueTrainingIndex >= 0) {
@@ -145,10 +146,12 @@ export const clientEngagementRemindersFunction = inngest.createFunction(
         )) sent++
       }
 
-      const hydrationTimes = buildHydrationReminderTimes(
-        preferences?.hydration_reminder_first_time,
-        preferences?.hydration_reminder_count,
-      )
+      const hydrationTimes = isEnabled('notif_hydration_reminder')
+        ? buildHydrationReminderTimes(
+            preferences?.hydration_reminder_first_time,
+            preferences?.hydration_reminder_count,
+          )
+        : []
       const dueHydrationTime = hydrationTimes.find((time) => isReminderDue(local, time))
       if (dueHydrationTime && await createAndPush(
           db,
@@ -172,9 +175,9 @@ export const clientEngagementRemindersFunction = inngest.createFunction(
         preferences?.protein_reminder_time,
         REMINDER_DEFAULTS.proteinTime,
       )
-      const breakfastDue = isReminderDue(local, breakfastTime)
-      const lunchDue = isReminderDue(local, lunchTime)
-      const proteinDue = isReminderDue(local, proteinTime)
+      const breakfastDue = isEnabled('notif_meal_reminder') && isReminderDue(local, breakfastTime)
+      const lunchDue = isEnabled('notif_meal_reminder') && isReminderDue(local, lunchTime)
+      const proteinDue = isEnabled('notif_protein_reminder') && isReminderDue(local, proteinTime)
 
       if (breakfastDue || lunchDue || proteinDue) {
         const { data: meals } = await db
@@ -242,5 +245,4 @@ export const clientEngagementRemindersFunction = inngest.createFunction(
     }
 
     return { sent }
-  }),
-)
+}

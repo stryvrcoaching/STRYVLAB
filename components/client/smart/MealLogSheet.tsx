@@ -186,8 +186,6 @@ export default function MealLogSheet({
               date={resolvedDate}
               consumed={headerConsumed}
               target={headerTarget}
-              gender={balanceContext?.profile?.gender}
-              bodyWeightKg={balanceContext?.profile?.weightKg}
               action={{
                 icon: ScanLine,
                 label: t("nutrition.photo.quickScan"),

@@ -203,6 +203,9 @@ export function useNutritionStudio(
     null,
   );
   const [clientLoading, setClientLoading] = useState(true);
+  const [foodProfileStatus, setFoodProfileStatus] = useState<
+    "loading" | "unknown" | "none" | "declared"
+  >("loading");
   const [protocolName, setProtocolName] = useState(
     existingProtocol?.name ?? "Nouveau protocole",
   );
@@ -371,6 +374,31 @@ export function useNutritionStudio(
     const stored = readLocalStorage(dataModeStorageKey);
     setDataMode(stored === "realtime" ? "realtime" : "bilan");
   }, [dataModeStorageKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadFoodProfile = async () => {
+      try {
+        const response = await fetch(`/api/clients/${clientId}/food-profile`, {
+          cache: "no-store",
+        });
+        const payload = response.ok ? await response.json() : null;
+        if (!cancelled) setFoodProfileStatus(payload?.status ?? "unknown");
+      } catch {
+        if (!cancelled) setFoodProfileStatus("unknown");
+      }
+    };
+    const onUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ clientId?: string }>).detail;
+      if (!detail?.clientId || detail.clientId === clientId) void loadFoodProfile();
+    };
+    void loadFoodProfile();
+    window.addEventListener("stryv:food-profile-updated", onUpdated);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("stryv:food-profile-updated", onUpdated);
+    };
+  }, [clientId]);
 
   // ── Fetch client data ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -892,6 +920,13 @@ export function useNutritionStudio(
       return issues;
     }
 
+    if (foodProfileStatus === "unknown" || foodProfileStatus === "loading") {
+      issues.push({
+        severity: "blocking",
+        message: "Le statut allergique doit être confirmé avant le partage.",
+      });
+    }
+
     if (coherenceScore.score < 55) {
       issues.push({
         severity: "blocking",
@@ -954,7 +989,7 @@ export function useNutritionStudio(
     }
 
     return issues;
-  }, [clientData, macroResult, coherenceScore.score, days, dataMode, dataSource]);
+  }, [clientData, macroResult, coherenceScore.score, days, dataMode, dataSource, foodProfileStatus]);
 
   const canShare = !shareIssues.some((issue) => issue.severity === "blocking");
   const phaseProtocolPreview = useMemo<PhaseProtocolPreview | null>(() => {
@@ -1120,7 +1155,13 @@ export function useNutritionStudio(
       });
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || "Le partage du protocole a échoué.");
+        let message = "Le partage du protocole a échoué.";
+        try {
+          message = JSON.parse(errorText)?.error ?? message;
+        } catch {
+          if (errorText) message = errorText;
+        }
+        throw new Error(message);
       }
     } finally {
       setSharing(false);

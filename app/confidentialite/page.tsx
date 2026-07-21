@@ -154,7 +154,7 @@ const sections = [
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-[#0d0d0d] text-white">
+    <main className="min-h-screen bg-[#121212] text-white">
       <header className="border-b border-white/10 px-5 py-5 sm:px-8">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <Link href="/" className="font-unbounded text-sm tracking-[-0.04em]">STRYV lab</Link>
@@ -165,7 +165,7 @@ export default function PrivacyPage() {
       </header>
 
       <div className="mx-auto max-w-5xl px-5 py-16 sm:px-8 sm:py-24">
-        <p className="font-barlow-condensed text-xs uppercase tracking-[0.2em] text-[#c6b48b]">
+        <p className="font-barlow-condensed text-xs uppercase tracking-[0.2em] text-[#1f8a65]">
           Données & transparence
         </p>
         <h1 className="mt-5 max-w-4xl font-barlow text-5xl font-semibold uppercase leading-[0.9] tracking-[-0.045em] sm:text-7xl">
@@ -175,7 +175,7 @@ export default function PrivacyPage() {
           Cette notice distingue le site public, le compte coach et les données traitées pour le compte
           des coachs. Dernière mise à jour technique : 15 juillet 2026.
         </p>
-        <div className="mt-7 rounded-2xl border border-[#c6b48b]/25 bg-[#c6b48b]/[0.06] p-5 text-sm leading-6 text-white/70">
+        <div className="mt-7 rounded-2xl border border-[#1f8a65]/25 bg-[#1f8a65]/[0.06] p-5 text-sm leading-6 text-white/70">
           Version de transparence préparatoire. La qualification contractuelle des rôles, la condition
           applicable aux données de santé, les durées légales et les transferts doivent recevoir une
           validation juridique finale avant le lancement commercial.
@@ -185,7 +185,7 @@ export default function PrivacyPage() {
           {sections.map((section) => (
             <section key={section.title} className="rounded-3xl border border-white/10 bg-white/[0.025] p-6 sm:p-8">
               <h2 className="font-barlow text-2xl font-semibold tracking-[-0.025em]">{section.title}</h2>
-              <div className="mt-4 space-y-4 text-[15px] leading-7 text-white/62 [&_a]:text-[#c6b48b] [&_a]:underline [&_a]:underline-offset-4 [&_strong]:font-semibold [&_strong]:text-white/85 [&_ul]:space-y-2 [&_ul]:pl-5 [&_li]:list-disc">
+              <div className="mt-4 space-y-4 text-[15px] leading-7 text-white/62 [&_a]:text-[#1f8a65] [&_a]:underline [&_a]:underline-offset-4 [&_strong]:font-semibold [&_strong]:text-white/85 [&_ul]:space-y-2 [&_ul]:pl-5 [&_li]:list-disc">
                 {section.content}
               </div>
             </section>

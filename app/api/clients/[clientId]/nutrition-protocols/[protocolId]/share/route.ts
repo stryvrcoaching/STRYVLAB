@@ -4,6 +4,10 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { ensureProtocolSharedAnnotation } from '@/lib/nutrition/protocolAnnotations'
 import { activateNutritionProtocolAssignment, closeNutritionProtocolAssignment } from '@/lib/assignments/clientAssignments'
 import { createClientAppNotification } from '@/lib/notifications/create-client-app-notification'
+import {
+  loadProtocolDaysForFoodValidation,
+  validateProtocolFoodCompatibility,
+} from '@/lib/nutrition/protocol-food-validation'
 
 function serviceClient() {
   return createServiceClient(
@@ -38,6 +42,24 @@ export async function POST(
     .eq('client_id', clientId)
     .single()
   if (!protocol) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const foodValidation = await validateProtocolFoodCompatibility({
+    db,
+    clientId,
+    days: await loadProtocolDaysForFoodValidation(db, protocolId),
+  })
+  if (foodValidation.issues.length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          foodValidation.issues[0].status === 'profile_unknown'
+            ? 'Le statut allergique doit être confirmé avant le partage.'
+            : 'Le protocole contient un aliment bloqué ou dont la compatibilité doit être vérifiée.',
+        food_compatibility_issues: foodValidation.issues,
+      },
+      { status: 409 },
+    )
+  }
 
   const { data: currentlyShared } = await db
     .from('nutrition_protocols')

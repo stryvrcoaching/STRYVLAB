@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, type ChangeEvent, type DragEvent } from "r
 import { Loader2, Plus, Edit2, Trash2, X, Check, HelpCircle, Upload, Image as ImageIcon, Clock3, Zap } from "lucide-react";
 import useTimedActionFeedback from "@/components/ui/useTimedActionFeedback";
 import ActionFeedbackBadge from "@/components/ui/ActionFeedbackBadge";
+import { useCoachEntitlements } from "@/components/coach/useCoachEntitlements";
+import PlanUpgradeCard from "@/components/coach/PlanUpgradeCard";
 
 type Reward = {
   id: string;
@@ -50,6 +52,7 @@ const SHOP_STEPS = [
 ];
 
 export default function CoachRewardsSection() {
+  const { entitlements, loading: entitlementsLoading } = useCoachEntitlements();
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,12 +125,28 @@ export default function CoachRewardsSection() {
   }
 
   useEffect(() => {
+    if (!entitlements?.clientAppEnabled) {
+      setLoading(false);
+      return;
+    }
     fetchRewards();
     fetchRedemptions();
     fetch('/api/coach/rewards/settings').then((res) => res.ok ? res.json() : null).then((data) => {
       if (data?.settings?.pace) setPace(data.settings.pace);
     }).catch(() => undefined);
-  }, []);
+  }, [entitlements?.clientAppEnabled]);
+
+  if (!entitlementsLoading && entitlements && !entitlements.clientAppEnabled) {
+    return (
+      <PlanUpgradeCard
+        title="Boutique de récompenses"
+        reason={
+          entitlements.clientAppBlockedReason ??
+          "Les récompenses se consomment dans l’app client STRYVR (plan Pro+)."
+        }
+      />
+    );
+  }
 
   async function updatePace(nextPace: 'fast' | 'balanced' | 'demanding') {
     if (nextPace === pace || savingPace) return;

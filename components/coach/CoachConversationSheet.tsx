@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 import { Loader2, Paperclip, Send, X } from "lucide-react";
 import { useRef } from "react";
 import type { ChatAttachment } from "@/lib/chat/attachments";
+import MessageScroller from "@/components/ui/MessageScroller";
+import { Message, MessageContent, MessageFooter } from "@/components/ui/message";
 
 type CoachThreadMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  message_type?: string;
   from_coach_human?: boolean;
   metadata?: { attachment?: ChatAttachment } | null;
   created_at: string;
@@ -18,6 +21,8 @@ type CoachNotification = {
   clientId: string;
   clientName: string;
   messageExcerpt: string | null;
+  /** Prefill composer (e.g. cockpit direction draft) */
+  draftContent?: string | null;
 };
 
 function formatMessageTime(value: string): string {
@@ -61,18 +66,37 @@ export default function CoachConversationSheet({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const [attachmentSending, setAttachmentSending] = useState(false);
+  const [composerFocused, setComposerFocused] = useState(false);
+  const [participantAvatars, setParticipantAvatars] = useState<{ clientAvatarUrl: string | null; coachAvatarUrl: string | null }>({ clientAvatarUrl: null, coachAvatarUrl: null });
+
+  useEffect(() => {
+    const composer = composerRef.current;
+    if (!composer) return;
+    composer.style.height = "auto";
+    composer.style.height = `${Math.min(composer.scrollHeight, 144)}px`;
+  }, [content]);
 
   useEffect(() => {
     if (!notification) return;
     setLoading(true);
     setError("");
+    if (notification.draftContent) {
+      setContent(notification.draftContent);
+    }
     const load = () => fetch(`/api/coach/clients/${notification.clientId}/reply`)
       .then(async (response) => {
         const data = await response.json().catch(() => null);
         if (!response.ok) throw new Error(data?.error ?? "Conversation indisponible.");
         const loaded = Array.isArray(data?.messages) ? data.messages : [];
-        setMessages(loaded.filter((message: CoachThreadMessage) => message.role === "user" || message.from_coach_human));
+        setParticipantAvatars({
+          clientAvatarUrl: data?.participants?.clientAvatarUrl ?? null,
+          coachAvatarUrl: data?.participants?.coachAvatarUrl ?? null,
+        });
+        setMessages(loaded.filter((message: CoachThreadMessage) =>
+          (message.role === "user" || message.from_coach_human) && message.message_type !== "checkin_summary"
+        ));
       })
       .catch((caught) => {
         setError(caught instanceof Error ? caught.message : "Conversation indisponible.");
@@ -134,6 +158,9 @@ export default function CoachConversationSheet({
 
   if (!notification) return null;
 
+  const latestClientMessageId = [...messages].reverse().find((message) => message.role === "user" && !message.from_coach_human)?.id;
+  const transcriptKey = `${messages.map((message) => message.id).join(",")}:${loading ? "loading" : "ready"}`;
+
   return (
     <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <section
@@ -153,7 +180,7 @@ export default function CoachConversationSheet({
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto space-y-3 px-5 py-4">
+        <MessageScroller contentKey={transcriptKey} anchorId={latestClientMessageId} className="space-y-3 px-5 py-4">
           {loading ? (
             <div className="flex h-full items-center justify-center text-white/40"><Loader2 size={18} className="animate-spin" /></div>
           ) : messages.length === 0 ? (
@@ -163,11 +190,17 @@ export default function CoachConversationSheet({
             const previous = visibleMessages[index - 1];
             const showDay = !previous || formatMessageDay(previous.created_at) !== formatMessageDay(message.created_at);
             return (
-              <div key={message.id}>
+              <div key={message.id} data-message-scroller-id={message.id}>
                 {showDay && <div className="my-3 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-white/25">{formatMessageDay(message.created_at)}</div>}
-                <div className={`flex ${isCoach ? "justify-end" : "justify-start"}`}>
-                  <div className="max-w-[82%]">
-                    <div className={`rounded-2xl border px-4 py-3 text-sm leading-relaxed shadow-[0_4px_18px_rgba(0,0,0,0.16)] ${isCoach ? "rounded-br-md border-[#1f8a65]/45 bg-[#17231e] text-white" : "rounded-bl-md border-white/[0.07] bg-[#151817] text-[#e1e5e3]"}`}>{message.content}</div>
+                <Message align={isCoach ? "end" : "start"}>
+                  <div aria-hidden="true" className="flex h-7 w-7 shrink-0 self-end items-center justify-center overflow-hidden rounded-full bg-[#1c1c1c] text-[10px] font-semibold text-white/65">
+                    {(isCoach ? participantAvatars.coachAvatarUrl : participantAvatars.clientAvatarUrl) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={(isCoach ? participantAvatars.coachAvatarUrl : participantAvatars.clientAvatarUrl)!} alt="" className="h-full w-full object-cover" />
+                    ) : (isCoach ? "C" : notification.clientName.trim().charAt(0).toUpperCase())}
+                  </div>
+                  <MessageContent className="max-w-[82%] gap-1.5">
+                    <div className={`rounded-xl px-3.5 py-2.5 text-sm leading-5 ${isCoach ? "rounded-br-sm bg-[#222222] text-white" : "rounded-bl-sm bg-[#181818] text-[#e0e0e0]"}`}>{message.content}</div>
                     {message.metadata?.attachment?.url && (
                       <a href={message.metadata.attachment.url} target="_blank" rel="noreferrer" className="mt-2 block overflow-hidden rounded-2xl border border-white/[0.08] bg-black/20">
                         {message.metadata.attachment.type.startsWith("image/") ? (
@@ -176,21 +209,24 @@ export default function CoachConversationSheet({
                         ) : <span className="flex max-w-[240px] items-center gap-2 px-3 py-2 text-[11px] text-white/75">📎 {message.metadata.attachment.name}</span>}
                       </a>
                     )}
-                    <p className={`mt-1 px-1 text-[9px] font-medium text-white/25 ${isCoach ? "text-right" : "text-left"}`}>{formatMessageTime(message.created_at)}</p>
-                  </div>
-                </div>
+                    <MessageFooter className={`px-1 text-[9px] text-white/25 ${isCoach ? "justify-end" : "justify-start"}`}>{formatMessageTime(message.created_at)}</MessageFooter>
+                  </MessageContent>
+                </Message>
               </div>
             );
           })}
-        </div>
+        </MessageScroller>
 
         {error && <p className="shrink-0 bg-red-500/10 px-5 py-2 text-xs text-red-200">{error}</p>}
-        <div className="flex shrink-0 items-end gap-2 border-t border-white/[0.06] bg-[#0d0d0d] px-4 py-3">
+        <div className="flex shrink-0 items-end gap-2 bg-[#0d0d0d] px-4 py-3">
           <input ref={attachmentInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,text/plain" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void sendAttachment(file); event.currentTarget.value = ""; }} />
           <button type="button" aria-label="Joindre un fichier" onClick={() => attachmentInputRef.current?.click()} disabled={attachmentSending || sending} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/55 disabled:opacity-40"><Paperclip size={16} /></button>
           <textarea
             value={content}
+            ref={composerRef}
             onChange={(event) => setContent(event.target.value)}
+            onFocus={() => setComposerFocused(true)}
+            onBlur={() => setComposerFocused(false)}
             onKeyDown={(event) => {
               if ((event.metaKey || event.ctrlKey) && event.key === "Enter") void send();
             }}
@@ -198,9 +234,10 @@ export default function CoachConversationSheet({
             maxLength={2000}
             placeholder="Écrire une réponse…"
             disabled={sending || attachmentSending}
-            className="min-h-10 flex-1 resize-none rounded-xl border border-white/[0.08] bg-[#181818] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/25 focus:border-[#1f8a65]/60 disabled:opacity-50"
+            className={`min-h-11 flex-1 resize-none rounded-xl px-3 py-3 text-sm leading-5 text-white outline-none placeholder:text-white/35 transition-colors disabled:opacity-50 ${composerFocused ? "bg-[#222222]" : "bg-[#181818]"}`}
+            style={{ maxHeight: "144px", overflowY: "auto" }}
           />
-          <button type="button" onClick={() => void send()} disabled={sending || !content.trim()} aria-label="Envoyer" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1f8a65] text-white disabled:opacity-40">
+          <button type="button" onClick={() => void send()} disabled={sending || !content.trim()} aria-label="Envoyer" className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors disabled:opacity-50 ${content.trim() ? "bg-[#1f8a65] text-white" : "bg-[#222222] text-white/35"}`}>
             {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
           </button>
         </div>

@@ -176,10 +176,10 @@ function htmlReport(summary: BenchmarkSummary, results: BenchmarkRunResult[]) {
   return `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Benchmark scan nutritionnel</title><style>
-body{font-family:Inter,system-ui,sans-serif;background:#0d0d0d;color:#f5f5f5;margin:0;padding:32px}main{max-width:1280px;margin:auto}
+body{font-family:Inter,system-ui,sans-serif;background:#121212;color:#f5f5f5;margin:0;padding:32px}main{max-width:1280px;margin:auto}
 h1,h2{margin:0 0 16px}.meta{color:#aaa}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:24px 0}
-.card{background:#171717;border:1px solid #333;border-radius:12px;padding:18px}.value{font-size:28px;font-weight:700;color:#c6b48b}.label{font-size:13px;color:#aaa;margin-top:6px}
-section{margin-top:36px;overflow:auto}table{border-collapse:collapse;width:100%;background:#141414}th,td{padding:10px 12px;border-bottom:1px solid #2b2b2b;text-align:left;white-space:nowrap}th{color:#c6b48b}.error{color:#ff9d9d;white-space:normal}
+.card{background:#171717;border:1px solid #333;border-radius:12px;padding:18px}.value{font-size:28px;font-weight:700;color:#1f8a65}.label{font-size:13px;color:#aaa;margin-top:6px}
+section{margin-top:36px;overflow:auto}table{border-collapse:collapse;width:100%;background:#141414}th,td{padding:10px 12px;border-bottom:1px solid #2b2b2b;text-align:left;white-space:nowrap}th{color:#1f8a65}.error{color:#ff9d9d;white-space:normal}
 </style></head><body><main><h1>Benchmark scan nutritionnel</h1><p class="meta">Généré le ${escapeHtml(summary.generated_at)}. Le score est un indicateur interne de régression, pas une validation clinique.</p>
 <div class="cards"><div class="card"><div class="value">${summary.average_score}</div><div class="label">Score moyen / 100</div></div><div class="card"><div class="value">${percentage(summary.technical_success_rate)}</div><div class="label">Succès technique</div></div><div class="card"><div class="value">${percentage(summary.ready_to_log_rate)}</div><div class="label">Résultats prêts à logger</div></div><div class="card"><div class="value">${summary.average_run_score_stddev ?? "—"}</div><div class="label">Variabilité moyenne</div></div><div class="card"><div class="value">${summary.p95_latency_ms} ms</div><div class="label">Latence p95</div></div></div>
 <section><h2>Par scénario</h2><table><thead><tr><th>Scénario</th><th>Exécutions</th><th>Succès</th><th>Score moyen</th><th>Latence moyenne</th></tr></thead><tbody>${groupRows(summary.by_scenario)}</tbody></table></section>

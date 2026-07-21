@@ -1,234 +1,89 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { stripe, BILLING_TO_STRIPE } from "@/lib/stripe/client";
+import { NextRequest, NextResponse } from "next/server"
+import { createClient as createServerClient } from "@/utils/supabase/server"
+import { createClient as createServiceClient } from "@supabase/supabase-js"
 import {
-  getCoachConnectAccount,
-  syncCoachConnectAccount,
-} from "@/lib/stripe/connect";
+  CheckoutError,
+  createCoachingCheckoutSession,
+} from "@/lib/stripe/create-coaching-checkout"
 
 function db() {
   return createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
+  )
 }
 
 /**
  * POST /api/stripe/coaching/checkout
  *
- * Crée une Stripe Checkout Session pour facturer un client coach.
- *
- * Body: { client_id, subscription_id, formula_id }
- *   - client_id       : coach_clients.id
- *   - subscription_id : client_subscriptions.id (déjà créé manuellement ou à créer)
- *   - formula_id      : coach_formulas.id (pour récupérer prix + cycle)
- *
- * Flow:
- *  1. Récupère formula + client
- *  2. Crée/récupère Stripe Product + Price pour la formule
- *  3. Crée/récupère Stripe Customer pour le client
- *  4. Crée Stripe Checkout Session (subscription ou payment selon billing_cycle)
- *  5. Stocke stripe_checkout_session_id sur client_subscriptions
- *  6. Retourne { url } pour redirection
+ * Coach-side: create a Stripe Checkout Session for a client payment / formula.
+ * Prefer sending clients to /client/paiement (fresh session) rather than a
+ * pre-baked Checkout URL that expires.
  */
 export async function POST(req: NextRequest) {
-  const supabase = createServerClient();
+  const supabase = createServerClient()
   const {
     data: { user },
     error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user)
-    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-
-  const body = await req.json();
-  const { client_id, subscription_id, formula_id } = body;
-
-  if (!client_id || !formula_id) {
-    return NextResponse.json(
-      { error: "client_id et formula_id requis" },
-      { status: 400 },
-    );
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.json({ error: "Non authentifié" }, { status: 401 })
   }
 
-  const service = db();
+  const body = await req.json().catch(() => ({}))
+  const {
+    client_id,
+    subscription_id,
+    formula_id,
+    payment_id,
+    source,
+  } = body as {
+    client_id?: string
+    subscription_id?: string
+    formula_id?: string
+    payment_id?: string
+    source?: string
+  }
 
-  // STRYV lab is a SaaS platform: the coach is the merchant of record and
-  // Checkout must run on the coach's own connected Stripe account.
-  let connectedAccountId: string;
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+  const isClientSource = source === "client" || !!payment_id
+
+  const successUrl = isClientSource
+    ? `${baseUrl}/client/paiement?stripe=success${payment_id ? `&payment_id=${payment_id}` : ""}`
+    : formula_id
+      ? `${baseUrl}/coach/clients/${client_id}?tab=formules&stripe=success`
+      : `${baseUrl}/coach/comptabilite?stripe=success`
+
+  const cancelUrl = isClientSource
+    ? `${baseUrl}/client/paiement?stripe=cancelled${payment_id ? `&payment_id=${payment_id}` : ""}`
+    : formula_id
+      ? `${baseUrl}/coach/clients/${client_id}?tab=formules&stripe=cancelled`
+      : `${baseUrl}/coach/comptabilite?stripe=cancelled`
+
   try {
-    const connectAccount = await getCoachConnectAccount(user.id);
-    if (!connectAccount.accountId) {
-      return NextResponse.json(
-        { error: "Connectez d’abord votre compte Stripe pour encaisser vos clients." },
-        { status: 409 },
-      );
-    }
+    const result = await createCoachingCheckoutSession({
+      db: db(),
+      coachUserId: user.id,
+      clientId: client_id ?? "",
+      formulaId: formula_id,
+      subscriptionId: subscription_id,
+      paymentId: payment_id,
+      successUrl,
+      cancelUrl,
+    })
 
-    const status = await syncCoachConnectAccount(user.id, connectAccount.accountId);
-    if (!status.chargesEnabled) {
-      return NextResponse.json(
-        { error: "Votre compte Stripe doit être finalisé avant d’encaisser un client." },
-        { status: 409 },
-      );
-    }
-
-    connectedAccountId = connectAccount.accountId;
+    return NextResponse.json({
+      url: result.url,
+      session_id: result.sessionId,
+    })
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Impossible de vérifier votre compte Stripe.";
-    return NextResponse.json({ error: message }, { status: 503 });
-  }
-
-  // 1. Récupère formula + vérification ownership
-  const { data: formula, error: fErr } = await service
-    .from("coach_formulas")
-    .select("*")
-    .eq("id", formula_id)
-    .eq("coach_id", user.id)
-    .single();
-
-  if (fErr || !formula)
-    return NextResponse.json({ error: "Formule introuvable" }, { status: 404 });
-
-  // 2. Récupère client
-  const { data: client, error: cErr } = await service
-    .from("coach_clients")
-    .select("id, first_name, last_name, email, stripe_customer_id, stripe_connected_account_id")
-    .eq("id", client_id)
-    .eq("coach_id", user.id)
-    .single();
-
-  if (cErr || !client)
-    return NextResponse.json({ error: "Client introuvable" }, { status: 404 });
-  if (!client.email)
-    return NextResponse.json(
-      { error: "Ce client n'a pas d'email — requis pour Stripe" },
-      { status: 422 },
-    );
-
-  // 3. Crée/récupère Stripe Product + Price pour la formule
-  let stripeProductId = formula.stripe_connected_account_id === connectedAccountId
-    ? formula.stripe_product_id
-    : null;
-  let stripePriceId = formula.stripe_connected_account_id === connectedAccountId
-    ? formula.stripe_price_id
-    : null;
-
-  if (!stripeProductId || !stripePriceId) {
-    // Créer le Product Stripe
-    const product = await stripe.products.create({
-      name: formula.name,
-      description: formula.description ?? undefined,
-      metadata: {
-        formula_id: formula.id,
-        coach_id: user.id,
-      },
-    }, { stripeAccount: connectedAccountId });
-    stripeProductId = product.id;
-
-    // Créer le Price Stripe
-    const isOneTime = formula.billing_cycle === "one_time";
-    const priceAmount = Math.round(formula.price_eur * 100); // centimes
-
-    const priceParams: Parameters<typeof stripe.prices.create>[0] = {
-      product: stripeProductId,
-      currency: "eur",
-      unit_amount: priceAmount,
-      metadata: { formula_id: formula.id },
-    };
-
-    if (!isOneTime) {
-      const recurring = BILLING_TO_STRIPE[formula.billing_cycle];
-      if (recurring) {
-        priceParams.recurring = recurring;
-      }
+    if (error instanceof CheckoutError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
     }
-
-    const price = await stripe.prices.create(priceParams, { stripeAccount: connectedAccountId });
-    stripePriceId = price.id;
-
-    // Persiste sur la formule
-    await service
-      .from("coach_formulas")
-      .update({
-        stripe_product_id: stripeProductId,
-        stripe_price_id: stripePriceId,
-        stripe_connected_account_id: connectedAccountId,
-      })
-      .eq("id", formula.id);
+    console.error("[coaching/checkout]", error)
+    return NextResponse.json(
+      { error: "Impossible de créer la session de paiement" },
+      { status: 500 },
+    )
   }
-
-  // 4. Crée/récupère Stripe Customer pour le client
-  let stripeCustomerId = client.stripe_connected_account_id === connectedAccountId
-    ? client.stripe_customer_id
-    : null;
-
-  if (!stripeCustomerId) {
-    const customer = await stripe.customers.create({
-      email: client.email,
-      name: `${client.first_name} ${client.last_name}`,
-      metadata: {
-        client_id: client.id,
-        coach_id: user.id,
-      },
-    }, { stripeAccount: connectedAccountId });
-    stripeCustomerId = customer.id;
-
-    await service
-      .from("coach_clients")
-      .update({
-        stripe_customer_id: stripeCustomerId,
-        stripe_connected_account_id: connectedAccountId,
-      })
-      .eq("id", client.id);
-  }
-
-  // 5. Crée Stripe Checkout Session
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  const isOneTime = formula.billing_cycle === "one_time";
-
-  const sessionParams: Parameters<typeof stripe.checkout.sessions.create>[0] = {
-    line_items: [{ price: stripePriceId!, quantity: 1 }],
-    mode: isOneTime ? "payment" : "subscription",
-    customer: stripeCustomerId,
-    success_url: `${baseUrl}/coach/clients/${client_id}?tab=formules&stripe=success`,
-    cancel_url: `${baseUrl}/coach/clients/${client_id}?tab=formules&stripe=cancelled`,
-    metadata: {
-      client_id: client_id,
-      formula_id: formula_id,
-      subscription_id: subscription_id ?? "",
-      coach_id: user.id,
-      type: "coaching",
-    },
-    // Affiche le nom du coach dans Stripe Checkout
-    custom_text: {
-      submit: { message: `Vous serez facturé par votre coach.` },
-    },
-  };
-
-  // Pour les abonnements avec durée limitée, on laisse Stripe gérer
-  if (!isOneTime && formula.duration_months) {
-    (sessionParams as Record<string, unknown>).subscription_data = {
-      metadata: {
-        client_id: client_id,
-        formula_id: formula_id,
-        coach_id: user.id,
-      },
-    };
-  }
-
-  const session = await stripe.checkout.sessions.create(sessionParams, {
-    stripeAccount: connectedAccountId,
-  });
-
-  // 6. Stocke l'ID de session sur l'abonnement si fourni
-  if (subscription_id) {
-    await service
-      .from("client_subscriptions")
-      .update({ stripe_checkout_session_id: session.id })
-      .eq("id", subscription_id)
-      .eq("coach_id", user.id);
-  }
-
-  return NextResponse.json({ url: session.url, session_id: session.id });
 }

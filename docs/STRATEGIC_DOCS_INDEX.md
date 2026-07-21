@@ -60,6 +60,23 @@
 
 ---
 
+### 4. **COCKPIT_PRODUCT_CHARTER.md**
+**Purpose**: Canonical product charter for the coach client Cockpit (decision seat)
+
+**Read when**:
+- Changing `ClientPulseDashboard` or cockpit directions
+- Adding a gauge, signal, or recommendation
+- Reviewing PRs that touch live client decision UX
+
+**Key sections**:
+- Vision (reality vs plan → next action)
+- Place in the ecosystem (Profil / Cockpit / Studios)
+- Non-negotiable principles
+- Direction priority rules (recovery before deficit, adherence before retarget)
+- Do / Don’t, UI order, PR checklist
+
+---
+
 ## 📊 EXECUTIVE-LEVEL
 
 ### 4. **EXECUTIVE_SUMMARY_STRYVR_2026.md**

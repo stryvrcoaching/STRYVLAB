@@ -15,8 +15,9 @@ function service() {
 // GET /api/clients/[clientId]/ai-settings
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { clientId: string } }
+  { params }: { params: Promise<{ clientId: string }> }
 ) {
+  const { clientId } = await params
   const supabase = createServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
@@ -27,7 +28,7 @@ export async function GET(
   const { data: clientRow } = await db
     .from('coach_clients')
     .select('id')
-    .eq('id', params.clientId)
+    .eq('id', clientId)
     .eq('coach_id', user.id)
     .maybeSingle()
 
@@ -41,9 +42,9 @@ export async function GET(
 
   const { data: settings } = await db
     .from('coach_ai_settings_per_client')
-    .select('ai_llm_enabled, ai_tone, monthly_quota, ai_morning_routine_enabled, ai_evening_routine_enabled, coaching_freedom, ai_chat_lang')
+    .select('ai_llm_enabled, ai_tone, monthly_quota, ai_morning_routine_enabled, ai_evening_routine_enabled, coaching_freedom, ai_chat_lang, nutrition_generation_enabled, nutrition_publication_mode, nutrition_allow_phase_adjustment')
     .eq('coach_id', user.id)
-    .eq('client_id', params.clientId)
+    .eq('client_id', clientId)
     .maybeSingle()
 
   // Defaults si pas encore de ligne
@@ -57,6 +58,9 @@ export async function GET(
       ai_evening_routine_enabled: false,
       coaching_freedom:     'none',
       ai_chat_lang:         null,
+      nutrition_generation_enabled: false,
+      nutrition_publication_mode: 'coach_review',
+      nutrition_allow_phase_adjustment: false,
     }
   })
 }
@@ -69,13 +73,17 @@ const putSchema = z.object({
   ai_evening_routine_enabled: z.boolean().optional(),
   coaching_freedom: z.enum(['none', 'safe', 'extended']).optional(),
   ai_chat_lang: z.enum(['fr', 'es', 'en']).nullable().optional(),
+  nutrition_generation_enabled: z.boolean().optional(),
+  nutrition_publication_mode: z.enum(['coach_review', 'coach_auto']).optional(),
+  nutrition_allow_phase_adjustment: z.boolean().optional(),
 })
 
 // PUT /api/clients/[clientId]/ai-settings
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { clientId: string } }
+  { params }: { params: Promise<{ clientId: string }> }
 ) {
+  const { clientId } = await params
   const supabase = createServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
@@ -89,7 +97,7 @@ export async function PUT(
   const { data: clientRow } = await db
     .from('coach_clients')
     .select('id')
-    .eq('id', params.clientId)
+    .eq('id', clientId)
     .eq('coach_id', user.id)
     .maybeSingle()
 
@@ -98,7 +106,7 @@ export async function PUT(
   const { data, error } = await db
     .from('coach_ai_settings_per_client')
     .upsert(
-      { coach_id: user.id, client_id: params.clientId, ...body.data },
+      { coach_id: user.id, client_id: clientId, ...body.data },
       { onConflict: 'coach_id,client_id' }
     )
     .select()

@@ -3,6 +3,8 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { resolveClientFromUser } from '@/lib/client/resolve-client'
 import { indexExerciseHistoryEntry } from '@/lib/training/exerciseHistoryKey'
+import { loadExerciseNameResolver } from '@/lib/i18n/exerciseDisplayName'
+import type { ClientLang } from '@/lib/i18n/clientTranslations'
 import SessionLogger from './SessionLogger'
 
 export default async function SessionLogPage({
@@ -37,6 +39,14 @@ export default async function SessionLogPage({
     redirect(fallbackHref)
   }
   const clientGender = (client as { gender?: string | null }).gender ?? null
+  const { data: preferences } = await service
+    .from('client_preferences')
+    .select('language')
+    .eq('client_id', client.id)
+    .maybeSingle()
+  const rawLang = preferences?.language
+  const lang: ClientLang = rawLang === 'es' || rawLang === 'en' || rawLang === 'fr' ? rawLang : 'fr'
+  const resolveExerciseName = await loadExerciseNameResolver(service, lang)
 
   const { data: session, error: sessionError } = await service
     .from('program_sessions')
@@ -99,6 +109,8 @@ export default async function SessionLogPage({
     .sort((a: any, b: any) => a.position - b.position)
     .map((ex: any) => ({
       ...ex,
+      sourceName: ex.name,
+      name: resolveExerciseName(ex.name, ex.catalog_exercise_id ?? ex.catalog_id ?? null),
       progressive_overload_enabled: progressionEnabled,
       // Détection unilatéral : flag DB OU nom contient un mot-clé unilatéral
       // NOTE: préférer cocher is_unilateral dans le builder coach — la regex est un filet de sécurité
@@ -177,7 +189,7 @@ export default async function SessionLogPage({
             set_number: s.set_number,
             completed_at: session.completed_at ?? null,
           }
-          indexExerciseHistoryEntry(lastPerformance, s.exercise_name, entry)
+          indexExerciseHistoryEntry(lastPerformance, resolveExerciseName(s.exercise_name), entry)
         }
       }
     }
@@ -186,7 +198,7 @@ export default async function SessionLogPage({
   // Add clientAlternatives to each exercise
   const exercisesWithAlternatives = exercises.map((ex: any) => ({
     ...ex,
-    clientAlternatives: alternativesMap[ex.name] ?? [],
+    clientAlternatives: (alternativesMap[ex.sourceName] ?? []).map((name) => resolveExerciseName(name)),
   }))
 
   // Fetch poids client (dernière valeur depuis assessment_submissions)

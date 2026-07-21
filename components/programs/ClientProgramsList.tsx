@@ -55,6 +55,7 @@ interface Program {
   muscle_tags?: string[] | null;
   equipment_archetype?: string | null;
   session_mode?: string | null;
+  volume_focus?: Record<string, "priority" | "progression" | "maintenance" | "off">;
   program_sessions?: any[];
   analytics?: ProgramAnalytics;
 }

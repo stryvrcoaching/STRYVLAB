@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { sendPaymentReminderEmail } from '@/lib/email/mailer'
+import { createClientAppNotification } from '@/lib/notifications/create-client-app-notification'
 import { z } from 'zod'
 
 function serviceClient() {
@@ -72,6 +73,31 @@ export async function POST(
     paymentMethod: payment.payment_method,
     fromName: coachName,
   })
+
+  // Mirror in the client app with a working payment destination
+  try {
+    await createClientAppNotification(db, {
+      clientId: payment.client_id,
+      coachId: user.id,
+      type: 'system_reminder',
+      copyKey: 'payment.reminder',
+      copyParams: {
+        amount: Number(payment.amount_eur),
+        dueDate: payment.payment_date,
+        formulaName,
+      },
+      payload: {
+        event: 'payment_reminder',
+        payment_id: payment.id,
+        priority: 'important',
+      },
+      actionUrl: `/client/paiement?payment_id=${encodeURIComponent(payment.id)}`,
+      pushKind: 'essential',
+      pushTag: `payment-reminder-${payment.id}`,
+    })
+  } catch (notifErr) {
+    console.error('[payments/remind] in-app notification failed:', notifErr)
+  }
 
   await db
     .from('subscription_payments')

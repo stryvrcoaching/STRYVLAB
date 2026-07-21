@@ -8,6 +8,7 @@ export type AssessmentModule =
   | 'measurements'
   | 'photos'
   | 'nutrition'
+  | 'food_preferences'
   | 'training'
   | 'cardio'
   | 'wellness'
@@ -28,6 +29,7 @@ export type InputType =
   | 'date'
   | 'photo_upload'
   | 'meal_journal'
+  | 'food_preferences'
 
 export type MealType =
   | 'Petit déjeuner'
@@ -91,6 +93,7 @@ export interface FieldConfig {
   placeholder?: string
   helper?: string           // texte d'aide affiché sous le champ
   show_if?: FieldCondition  // condition d'affichage dynamique (runtime)
+  stage?: 'activation' | 'personalization' | 'advanced'
 }
 
 export interface BlockConfig {
@@ -113,6 +116,10 @@ export interface AssessmentTemplate {
   template_type: TemplateType
   blocks: BlockConfig[]
   is_default: boolean
+  origin?: 'coach' | 'stryv_system'
+  system_key?: string | null
+  system_version?: number | null
+  source_template_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -160,7 +167,14 @@ export interface ClientNotification {
 // Formulaire state
 // ------------------------------------------------------------------
 
-export type ResponseMap = Record<string, Record<string, string | number | string[] | boolean>>
+export type AssessmentResponseValue =
+  | string
+  | number
+  | string[]
+  | boolean
+  | Record<string, unknown>
+
+export type ResponseMap = Record<string, Record<string, AssessmentResponseValue>>
 
 // ------------------------------------------------------------------
 // Vues enrichies (joins)

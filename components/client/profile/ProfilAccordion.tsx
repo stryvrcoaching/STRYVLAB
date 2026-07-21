@@ -224,13 +224,6 @@ export default function ProfilAccordion({
         onToggle={toggle}
       >
         <NotificationsPanel preferences={notifPrefs} />
-        <Link
-          href="/client/checkin/schedule"
-          className="mt-3 flex items-center justify-between bg-white/[0.03] rounded-xl px-3 py-2.5 hover:bg-white/[0.05] transition-colors"
-        >
-          <p className="text-[12px] text-white/60">{t('profil.configReminders')}</p>
-          <p className="text-[10px] text-white/30">→</p>
-        </Link>
       </AccordionSection>
 
       {/* ── Section 7 : Préférences ── */}

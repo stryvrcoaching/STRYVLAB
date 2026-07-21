@@ -73,7 +73,7 @@ describe('computePhaseOptimization', () => {
     expect(result.confidence).toBeLessThanOrEqual(1)
     expect(result.engineMetadata.engineVersion).toBe('v1')
     expect(result.analysisState).toBe('insufficient_data')
-    expect(result.analysisStateReason).toContain('aucun check-in coach')
+    expect(result.analysisStateReason).toContain('aucun check-in')
     expect(result.analysisStateReason).toContain('aucune séance loggée')
     expect(result.analysisStateReason).toContain('aucun bilan corporel')
   })

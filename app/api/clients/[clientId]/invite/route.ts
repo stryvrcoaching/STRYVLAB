@@ -3,7 +3,7 @@ import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { sendInvitationEmail, sendReactivationEmail, sendAccessLinkEmail } from '@/lib/email/mailer'
 import { getCoachPlan } from '@/lib/billing/getCoachPlan'
-import { hasCapability } from '@/lib/billing/plans'
+import { isClientAppEnabledForPlanState } from '@/lib/billing/assertClientAppEnabled'
 import { assertCoachClientCapacity, ClientLimitReachedError } from '@/lib/billing/clientLimits'
 import { hasValidMinorAuthorization } from '@/lib/privacy/minor-authorization'
 
@@ -51,9 +51,15 @@ export async function POST(req: NextRequest, { params }: Params) {
   const db = service()
   const planState = await getCoachPlan(db, user.id)
 
-  if (!hasCapability(planState.plan, 'client_app_access')) {
+  // Plan Pro/Studio + abonnement trial/active requis (pas seulement le label plan)
+  if (!isClientAppEnabledForPlanState(planState)) {
     return NextResponse.json(
-      { error: 'L’accès client STRYVR est disponible à partir du plan Pro.' },
+      {
+        error:
+          planState.plan === 'solo'
+            ? 'L’accès client STRYVR est disponible à partir du plan Pro.'
+            : 'Réactivez votre abonnement Pro pour inviter des clients dans STRYVR.',
+      },
       { status: 403 },
     )
   }

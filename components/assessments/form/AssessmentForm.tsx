@@ -3,10 +3,11 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, CheckCircle2, Loader2 } from "lucide-react";
-import { BlockConfig, ResponseMap } from "@/types/assessment";
+import { BlockConfig, ResponseMap, type AssessmentResponseValue } from "@/types/assessment";
 import { evaluateCondition } from "@/lib/assessments/condition";
 import MetricField from "./MetricField";
 import PointsEarnedOverlay from "@/components/client/PointsEarnedOverlay";
+import { isAdultBirthDate } from "@/lib/assessments/eligibility";
 
 interface Props {
   submissionId: string;
@@ -156,7 +157,7 @@ export default function AssessmentForm({
   function setValue(
     blockId: string,
     fieldKey: string,
-    value: string | number | string[] | boolean,
+    value: AssessmentResponseValue,
   ) {
     setResponses((prev) => {
       const withValue = {
@@ -202,6 +203,8 @@ export default function AssessmentForm({
             } catch {
               row.value_text = val as string;
             }
+          } else if (field.input_type === "food_preferences") {
+            row.value_json = val;
           } else {
             row.value_text = val;
           }
@@ -251,6 +254,10 @@ export default function AssessmentForm({
           setError(
             `Champ requis manquant : "${field.label}" dans ${blk.label}`,
           );
+          return;
+        }
+        if (field.key === "birth_date" && !isAdultBirthDate(val)) {
+          setError("Cette plateforme est réservée aux personnes majeures.");
           return;
         }
       }
@@ -373,6 +380,7 @@ export default function AssessmentForm({
         {/* Navigation */}
         <div className="flex justify-between mt-6">
           <button
+            type="button"
             onClick={() => setCurrentBlock((v) => Math.max(0, v - 1))}
             disabled={currentBlock === 0}
             className="flex items-center gap-2 text-[12px] font-medium text-white/60 hover:text-white disabled:opacity-30 transition-colors"
@@ -383,6 +391,7 @@ export default function AssessmentForm({
 
           {isLast ? (
             <button
+              type="button"
               onClick={handleSubmit}
               disabled={submitting}
               className="flex items-center gap-2 bg-[#f2f2f2] text-[#080808] text-[12px] font-bold uppercase tracking-[0.12em] px-6 py-2.5 rounded-xl hover:bg-white transition-colors disabled:opacity-50 active:scale-[0.99]"
@@ -396,6 +405,7 @@ export default function AssessmentForm({
             </button>
           ) : (
             <button
+              type="button"
               onClick={() =>
                 setCurrentBlock((v) => Math.min(blocks.length - 1, v + 1))
               }

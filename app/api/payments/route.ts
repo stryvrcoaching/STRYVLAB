@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { sendPaymentReceiptEmail } from "@/lib/email/mailer";
 import { z } from "zod";
 import { coachOwnsClient } from "@/lib/security/client-resource-access";
+import { resolvePaymentDueDate } from "@/lib/payments/due-date";
 
 function serviceClient() {
   return createServiceClient(
@@ -112,6 +113,15 @@ export async function POST(req: NextRequest) {
     if (!subscription) return NextResponse.json({ error: "Abonnement introuvable" }, { status: 404 });
   }
 
+  const resolvedStatus = status ?? "paid";
+  const resolvedPaymentDate =
+    payment_date ?? new Date().toISOString().split("T")[0];
+  const resolvedDueDate = resolvePaymentDueDate({
+    status: resolvedStatus,
+    due_date: due_date ?? null,
+    payment_date: resolvedPaymentDate,
+  });
+
   const { data, error } = await db
     .from("subscription_payments")
     .insert({
@@ -119,10 +129,10 @@ export async function POST(req: NextRequest) {
       client_id,
       subscription_id: subscription_id ?? null,
       amount_eur: Number(amount_eur),
-      status: status ?? "paid",
+      status: resolvedStatus,
       payment_method: payment_method ?? "manual",
-      payment_date: payment_date ?? new Date().toISOString().split("T")[0],
-      due_date: due_date ?? null,
+      payment_date: resolvedPaymentDate,
+      due_date: resolvedDueDate,
       description: description ?? null,
       reference: reference ?? null,
     })
@@ -133,7 +143,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Envoyer reçu email au client si paiement confirmé et client a un email
-  const resolvedStatus = status ?? "paid";
   if (resolvedStatus === "paid") {
     try {
       const { data: client } = await db
@@ -163,47 +172,49 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Notification coach explicite (nom client, montant, formule/description)
-  try {
-    const { data: client } = await db
-      .from("coach_clients")
-      .select("first_name, last_name")
-      .eq("id", client_id)
-      .eq("coach_id", user.id)
-      .single();
+  // Coach notif only for confirmed payments (not pending Stripe requests)
+  if (resolvedStatus === "paid") {
+    try {
+      const { data: client } = await db
+        .from("coach_clients")
+        .select("first_name, last_name")
+        .eq("id", client_id)
+        .eq("coach_id", user.id)
+        .single();
 
-    const formulaName = body.formula_name ?? description ?? "Coaching";
-    const clientName = client
-      ? `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim()
-      : "Le client";
-    const amountLabel = new Intl.NumberFormat("fr-FR", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(Number(amount_eur));
-    const notifMessage = `${clientName} a effectué un paiement de ${amountLabel} € pour "${formulaName}".`;
+      const formulaName = body.formula_name ?? description ?? "Coaching";
+      const clientName = client
+        ? `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim()
+        : "Le client";
+      const amountLabel = new Intl.NumberFormat("fr-FR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(Number(amount_eur));
+      const notifMessage = `${clientName} a effectué un paiement de ${amountLabel} € pour "${formulaName}".`;
 
-    await db.from("coach_notifications").insert({
-      coach_id: user.id,
-      client_id,
-      category: "admin",
-      subcategory: "payment_received",
-      priority: 3,
-      status: "pending",
-      email_sent: false,
-      title: "Paiement reçu",
-      body: notifMessage,
-      payload: {
-        payment_id: data.id,
-        amount_eur: Number(amount_eur),
-        formula_name: formulaName,
-        action_url: `/coach/paiements/${data.id}`,
-      },
-    });
-  } catch (notifError) {
-    console.error(
-      "Notification paiement coach échouée (non-bloquant):",
-      notifError,
-    );
+      await db.from("coach_notifications").insert({
+        coach_id: user.id,
+        client_id,
+        category: "admin",
+        subcategory: "payment_received",
+        priority: 3,
+        status: "pending",
+        email_sent: false,
+        title: "Paiement reçu",
+        body: notifMessage,
+        payload: {
+          payment_id: data.id,
+          amount_eur: Number(amount_eur),
+          formula_name: formulaName,
+          action_url: `/coach/comptabilite?payment=${data.id}`,
+        },
+      });
+    } catch (notifError) {
+      console.error(
+        "Notification paiement coach échouée (non-bloquant):",
+        notifError,
+      );
+    }
   }
 
   return NextResponse.json({ payment: data }, { status: 201 });

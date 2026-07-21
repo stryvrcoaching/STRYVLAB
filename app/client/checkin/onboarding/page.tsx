@@ -76,7 +76,7 @@ export default function CheckinOnboardingPage() {
   }
 
   return (
-    <main className="min-h-dvh bg-[#0d0d0d] px-6 py-10 overflow-x-hidden" style={{ paddingTop: 'max(2.5rem, env(safe-area-inset-top))', paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
+    <main className="min-h-dvh bg-[#121212] px-6 py-10 overflow-x-hidden" style={{ paddingTop: 'max(2.5rem, env(safe-area-inset-top))', paddingBottom: 'max(2.5rem, env(safe-area-inset-bottom))' }}>
       <section className="max-w-sm mx-auto bg-white/[0.02] rounded-xl p-5">
         <div className="flex gap-1.5 mb-5">
           {Array.from({ length: totalSteps }, (_, i) => i).map((i) => (

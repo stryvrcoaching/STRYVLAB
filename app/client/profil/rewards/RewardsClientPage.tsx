@@ -145,21 +145,7 @@ export default function RewardsClientPage({
   }
 
   return (
-    <div className="relative min-h-full overflow-hidden text-white">
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <video
-          className="h-full w-full object-cover"
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="metadata"
-          poster="/images/lclient-dashboard-bg.jpg"
-        >
-          <source src="/videos/client-dashboard-bg.mp4" type="video/mp4" />
-        </video>
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,6,7,0.56),rgba(6,6,7,0.88))]" />
-      </div>
+    <div className="relative min-h-full overflow-hidden bg-[#121212] text-white">
       <RewardsFixedHeader
         headerRef={heroRef}
         trophies={levelTrophies}
@@ -633,7 +619,7 @@ function PointsInfoSheet({ onClose }: { onClose: () => void }) {
         exit={reduceMotion ? { opacity: 0 } : { y: '100%' }}
         transition={{ type: 'spring', stiffness: 320, damping: 32 }}
         onClick={(event) => event.stopPropagation()}
-        className="client-native-bottom-sheet fixed inset-x-0 bottom-0 z-[121] mx-auto flex max-h-[88dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-[28px] bg-[#0d0d0d] shadow-[0_-18px_60px_rgba(0,0,0,0.45)]"
+        className="client-native-bottom-sheet fixed inset-x-0 bottom-0 z-[121] mx-auto flex max-h-[88dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-[28px] bg-[#121212] shadow-[0_-18px_60px_rgba(0,0,0,0.45)]"
         style={{ paddingBottom: 'var(--client-modal-bottom-padding)' }}
       >
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-white/[0.10]" />

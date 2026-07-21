@@ -1,56 +1,87 @@
-'use client'
+"use client";
 
-import HeaderIconLink from '@/components/layout/HeaderIconLink'
-import { ChevronLeft } from 'lucide-react'
-import { useClientT } from '@/components/client/ClientI18nProvider'
+import type { ReactNode } from "react";
+import HeaderIconLink from "@/components/layout/HeaderIconLink";
+import { ChevronLeft } from "lucide-react";
+import { useClientT } from "@/components/client/ClientI18nProvider";
+import { cn } from "@/app/lib/utils";
 
-interface Props {
-  left?: React.ReactNode
-  section?: string
-  title?: string
-  backHref?: string
-  right?: React.ReactNode
-  hideCoachButton?: boolean
+export interface ClientTopBarProps {
+  /**
+   * Title mode — single human-readable title (sentence case).
+   * Prefer this over stacking a section eyebrow.
+   */
+  title?: string;
+  /** Optional back control (title mode). */
+  backHref?: string;
+  /**
+   * Tabs / custom left cluster. When set, replaces the title block
+   * (Programme, Nutrition segmented controls).
+   */
+  left?: ReactNode;
+  /** Trailing actions (avatar, gear, cycle arc, counts…). */
+  right?: ReactNode;
+  className?: string;
+  /**
+   * @deprecated No longer rendered. Pass a single `title` instead.
+   */
+  section?: string;
 }
 
-export default function ClientTopBar({ left, section, title, backHref, right }: Props) {
-  const { t } = useClientT()
+/**
+ * Fixed client chrome header.
+ * - Same surface as pages (`--client-page-bg` / near-black gray).
+ * - Height + safe-area tokenized via `--client-top-bar-*`.
+ * - Two layouts: title (+ optional back) or custom `left` (tabs).
+ */
+export default function ClientTopBar({
+  left,
+  title,
+  backHref,
+  right,
+  className,
+}: ClientTopBarProps) {
+  const { t } = useClientT();
+
   return (
     <header
-      className="fixed inset-x-0 top-0 z-40 bg-[var(--client-chrome-bg)] shadow-[0_10px_28px_rgba(0,0,0,0.26)]"
-      style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      className={cn(
+        // No border under status bar — one continuous chrome band with the system status area
+        "fixed inset-x-0 top-0 z-40 bg-[var(--client-chrome-bg,#0a0a0a)]",
+        className,
+      )}
+      style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
     >
-      <div className="mx-auto flex min-h-[64px] w-full max-w-[520px] items-center justify-between gap-3 px-4 py-3">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div
+        className="mx-auto flex w-full max-w-[520px] items-center justify-between gap-2 px-3"
+        style={{ height: "var(--client-top-bar-height)" }}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           {left ?? (
             <>
-              {backHref && (
+              {backHref ? (
                 <HeaderIconLink
                   href={backHref}
                   icon={<ChevronLeft size={16} />}
-                  label={t('common.back')}
-                  className="shrink-0 rounded-xl border-white/[0.05] bg-white/[0.05] text-white/62 hover:bg-white/[0.08] hover:text-white"
+                  label={t("common.back")}
+                  className="h-9 w-9 shrink-0 rounded-xl border-white/[0.06] bg-white/[0.04] text-white/70 hover:bg-white/[0.08] hover:text-white"
                 />
-              )}
-              <div className="min-w-0">
-                {section && (
-                  <p className="mb-0.5 text-[9px] font-barlow-condensed font-bold uppercase leading-none tracking-[0.22em] text-white/34">
-                    {section}
-                  </p>
-                )}
-                {title && (
-                  <p className="truncate text-[15px] font-barlow-condensed font-bold uppercase leading-tight tracking-[0.12em] text-[#e0e0e0]">
-                    {title}
-                  </p>
-                )}
-              </div>
+              ) : null}
+              {title ? (
+                <h1 className="min-w-0 truncate text-[17px] font-semibold leading-tight tracking-[-0.02em] text-white">
+                  {title}
+                </h1>
+              ) : null}
             </>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {right && <>{right}</>}
-        </div>
+
+        {right ? (
+          <div className="flex max-w-[46%] shrink-0 items-center justify-end gap-2">
+            {right}
+          </div>
+        ) : null}
       </div>
     </header>
-  )
+  );
 }

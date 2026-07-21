@@ -6,7 +6,9 @@ import {
 } from '@/lib/notifications/client-push-copy'
 import {
   sendClientPush,
+  clientPushPreferenceForKind,
   type ClientPushKind,
+  type ClientPushPreferenceKey,
 } from '@/lib/notifications/send-client-push'
 
 interface NotificationPayload {
@@ -59,7 +61,7 @@ function resolvePushKind(
     return 'session'
   }
 
-  return 'system'
+  return type === 'payment_received' ? 'essential' : 'system'
 }
 
 function resolveActionUrl(
@@ -94,6 +96,19 @@ export async function insertClientNotification(
   db: SupabaseClient,
   payload: NotificationPayload,
 ) {
+  const pushKind = resolvePushKind(payload.type)
+  const preference = clientPushPreferenceForKind[pushKind]
+  if (preference) {
+    const { data: preferences } = await db
+      .from('client_preferences')
+      .select(preference)
+      .eq('client_id', payload.clientId)
+      .maybeSingle()
+    if ((preferences as Partial<Record<ClientPushPreferenceKey, boolean>> | null)?.[preference] === false) {
+      return { created: false, pushed: false }
+    }
+  }
+
   const { data: clientRow } = await db
     .from('coach_clients')
     .select('user_id')
@@ -119,10 +134,10 @@ export async function insertClientNotification(
     lang,
   )
 
-  await sendClientPush(
+  const pushed = await sendClientPush(
     db,
     payload.clientId,
-    resolvePushKind(payload.type),
+    pushKind,
     {
       title: copy.title,
       body: copy.body,
@@ -130,4 +145,6 @@ export async function insertClientNotification(
       tag: `stryv-${payload.type}`,
     },
   )
+
+  return { created: true, pushed }
 }

@@ -3,6 +3,7 @@ import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { CreateTemplatePayload } from '@/types/assessment'
 import { SYSTEM_ASSESSMENT_TEMPLATE_NAMES } from '@/lib/assessments/templateSnapshot'
+import { ensureRecommendedAssessmentTemplate } from '@/lib/assessments/recommended-template'
 
 function serviceClient() {
   return createServiceClient(
@@ -19,7 +20,14 @@ export async function GET() {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
-  const { data, error } = await serviceClient()
+  const db = serviceClient()
+  try {
+    await ensureRecommendedAssessmentTemplate(db, user.id)
+  } catch (error) {
+    console.error('Recommended assessment provisioning failed:', error)
+  }
+
+  const { data, error } = await db
     .from('assessment_templates')
     .select('*')
     .eq('coach_id', user.id)

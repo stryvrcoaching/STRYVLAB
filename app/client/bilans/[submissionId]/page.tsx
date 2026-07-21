@@ -80,15 +80,14 @@ export default async function BilanDetailPage({
   );
 
   return (
-    <div className="min-h-dvh bg-[#0d0d0d] font-barlow overflow-x-hidden">
+    <div className="min-h-dvh bg-[#121212] font-barlow overflow-x-hidden">
       <ClientTopBar
-        section={ct(lang, "nav.bilans")}
         title={templateName}
         backHref="/client/bilans"
         right={statusBadge}
       />
 
-      <main className="max-w-lg mx-auto flex flex-col gap-3 px-4 pb-5 pt-[104px]">
+      <main className="client-page-top mx-auto flex max-w-lg flex-col gap-3 px-4 pb-5">
 
         {/* Date */}
         <p className="text-[11px] text-white/30 px-1">{date}</p>

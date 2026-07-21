@@ -71,21 +71,47 @@ function hasMeaningfulTransformationData(data: TransformationScoreResult): boole
   return Object.values(data.dimensions).some((dimension) => dimension.dataPoints > 0)
 }
 
-function transformationBadgeExplanation(data: TransformationScoreResult): string {
+/**
+ * Texte sous le badge de lecture rapide.
+ * Uniquement si données manquantes ou alerte réelle — pas d’invention d’un « levier »
+ * quand le score est simplement moyen sans alerte active.
+ */
+function transformationBadgeExplanation(data: TransformationScoreResult): string | null {
   if (!hasMeaningfulTransformationData(data)) {
     return data.analysisStateReason ?? 'Aucun check-in, séance ou bilan corporel sur cette fenêtre.'
   }
   if (data.alerts[0]?.message) return data.alerts[0].message
-  const weakestDimension = Object.entries(data.dimensions)
-    .filter(([, dimension]) => dimension.dataPoints > 0)
-    .sort(([, left], [, right]) => left.score - right.score)[0]
+  return null
+}
 
-  if (data.score < 75 && weakestDimension) {
-    const [dimensionKey, dimension] = weakestDimension
-    return `${DIM_FULL[dimensionKey]} est le premier levier à vérifier (${dimension.score}/100).`
+/** Qualité de lecture — même intention que dataQuality de l’optimisation de phase. */
+function transformationDataQuality(data: TransformationScoreResult): {
+  label: string
+  color: string
+} {
+  if (!hasMeaningfulTransformationData(data)) {
+    return {
+      label: 'Données insuffisantes',
+      color: 'rgba(245,158,11,0.75)',
+    }
   }
-
-  return 'Aucune alerte active — poursuivre le plan et contrôler la tendance à la prochaine lecture.'
+  const withData = Object.values(data.dimensions).filter((d) => d.dataPoints > 0).length
+  if (withData >= 4 && !data.insufficientData) {
+    return {
+      label: 'Données complètes',
+      color: 'rgba(31,138,101,0.85)',
+    }
+  }
+  if (withData >= 3 && !data.insufficientData) {
+    return {
+      label: 'Données solides',
+      color: 'rgba(255,255,255,0.45)',
+    }
+  }
+  return {
+    label: 'Données partielles',
+    color: 'rgba(245,158,11,0.75)',
+  }
 }
 
 // ── Dimension pills ────────────────────────────────────────────────────────────
@@ -298,12 +324,27 @@ export default function TransformationScoreWidget({ clientId }: Props) {
       .finally(() => setLoading(false))
   }, [clientId, win])
 
+  const quality = data ? transformationDataQuality(data) : null
+
   return (
     <div className="bg-white/[0.02] border-[0.3px] border-white/[0.06] rounded-2xl px-6 py-5">
       <div className="flex items-center justify-between mb-6">
-        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">
-          Score de transformation
-        </p>
+        <div>
+          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">
+            Score de transformation
+          </p>
+          {quality && (
+            <div className="mt-1.5 flex items-center gap-1.5">
+              <div
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: quality.color }}
+              />
+              <span className="text-[10px]" style={{ color: quality.color }}>
+                {quality.label}
+              </span>
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <CoachDocLinkButton
             href="/coach/documentation/transformation-score"
@@ -371,9 +412,11 @@ export default function TransformationScoreWidget({ clientId }: Props) {
               >
                 {tone.label}
               </span>
-              <p className="mt-1 text-[10px] leading-snug text-white/38">
-                {badgeReason}
-              </p>
+              {badgeReason ? (
+                <p className="mt-1 text-[10px] leading-snug text-white/38">
+                  {badgeReason}
+                </p>
+              ) : null}
             </div>
           </div>
 

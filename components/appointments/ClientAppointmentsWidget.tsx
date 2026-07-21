@@ -1,14 +1,23 @@
 'use client'
 
 /**
- * components/appointments/ClientAppointmentsWidget.tsx
- *
- * Widget pour la fiche client côté coach.
- * Affiche la liste des rendez-vous de ce client et permet d'en planifier/gérer.
+ * Client appointments block — coach client profile.
+ * Aligned with profil page Card / SectionLabel DA (flat dark, no rainbow badges).
  */
 
-import { useEffect, useState } from 'react'
-import { Calendar, Video, Phone, MapPin, Clock, Plus, Trash2, CheckCircle, AlertTriangle } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  Calendar,
+  Video,
+  Phone,
+  MapPin,
+  Clock,
+  Plus,
+  Trash2,
+  CheckCircle,
+  AlertTriangle,
+  Loader2,
+} from 'lucide-react'
 import {
   appointmentStatusLabel,
   appointmentDurationMinutes,
@@ -17,14 +26,14 @@ import {
 } from '@/lib/appointments/types'
 import AppointmentFormModal from './AppointmentFormModal'
 
-const STATUS_CLASSES: Record<AppointmentStatus, string> = {
-  scheduled: 'bg-blue-500/15 text-blue-400',
-  awaiting_confirmation: 'bg-amber-500/15 text-amber-400',
-  confirmed: 'bg-emerald-500/15 text-emerald-400',
-  reschedule_requested: 'bg-orange-500/15 text-orange-400',
-  cancelled: 'bg-red-500/15 text-red-400',
-  completed: 'bg-white/10 text-white/40',
-  no_show: 'bg-red-500/10 text-red-300/70',
+const STATUS_DOT: Record<AppointmentStatus, string> = {
+  scheduled: 'bg-[#7aa7ff]',
+  awaiting_confirmation: 'bg-amber-400',
+  confirmed: 'bg-[#1f8a65]',
+  reschedule_requested: 'bg-orange-400',
+  cancelled: 'bg-red-400/80',
+  completed: 'bg-white/25',
+  no_show: 'bg-red-400/60',
 }
 
 const KIND_ICONS = {
@@ -50,18 +59,18 @@ export default function ClientAppointmentsWidget({
   const [showModal, setShowModal] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
-  const fetchAppointments = () => {
+  const fetchAppointments = useCallback(() => {
     setLoading(true)
     fetch(`/api/coach/appointments?clientId=${clientId}`)
       .then((r) => r.json())
       .then((data) => setAppointments(Array.isArray(data) ? data : []))
       .catch(() => setAppointments([]))
       .finally(() => setLoading(false))
-  }
+  }, [clientId])
 
   useEffect(() => {
     fetchAppointments()
-  }, [clientId])
+  }, [fetchAppointments])
 
   async function handleAction(apptId: string, action: 'cancel' | 'complete' | 'no_show') {
     setActionLoading(apptId)
@@ -71,9 +80,7 @@ export default function ClientAppointmentsWidget({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
       })
-      if (res.ok) {
-        fetchAppointments()
-      }
+      if (res.ok) fetchAppointments()
     } catch (err) {
       console.error(err)
     } finally {
@@ -81,119 +88,101 @@ export default function ClientAppointmentsWidget({
     }
   }
 
+  const upcoming = appointments.filter(
+    (a) => !['cancelled', 'completed', 'no_show'].includes(a.status),
+  )
+  const past = appointments.filter((a) =>
+    ['cancelled', 'completed', 'no_show'].includes(a.status),
+  )
+
   return (
-    <div className="rounded-2xl bg-white/[0.02] border-[0.3px] border-white/[0.06] p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/30 leading-none mb-0.5">Rendez-vous</p>
-          <h3 className="text-[12px] font-bold text-white leading-none">Appels & One-to-One</h3>
-        </div>
+    <div className="rounded-2xl border-[0.3px] border-white/[0.06] bg-white/[0.02] p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/40">
+          Rendez-vous
+        </p>
         <button
+          type="button"
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 text-xs text-[#c6b48b] hover:text-[#d4c09e] transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[#1f8a65] px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-[#217356]"
         >
-          <Plus size={14} />
-          Planifier un appel
+          <Plus size={12} />
+          Planifier
         </button>
       </div>
 
+      <p className="mb-4 text-[12px] leading-relaxed text-white/45">
+        Appels et one-to-one avec ce client. Le client peut confirmer, reporter ou
+        annuler depuis STRYVR.
+      </p>
+
       {loading && (
-        <div className="space-y-2 py-4">
+        <div className="space-y-2">
           {[0, 1].map((i) => (
-            <div key={i} className="h-16 rounded-xl bg-white/4 animate-pulse" />
+            <div
+              key={i}
+              className="h-[64px] animate-pulse rounded-xl border-[0.3px] border-white/[0.04] bg-[#0a0a0a]"
+            />
           ))}
         </div>
       )}
 
       {!loading && appointments.length === 0 && (
-        <div className="text-center py-8 border border-dashed border-white/8 rounded-xl">
-          <Calendar className="text-white/10 mx-auto mb-2" size={24} />
-          <p className="text-xs text-white/40">Aucun rendez-vous enregistré pour ce client.</p>
+        <div className="flex flex-col items-center rounded-xl border border-dashed border-white/[0.08] bg-[#0a0a0a]/50 px-4 py-8 text-center">
+          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl border-[0.3px] border-white/[0.06] bg-white/[0.03]">
+            <Calendar size={18} className="text-white/25" />
+          </div>
+          <p className="text-[13px] font-semibold text-white/70">Aucun rendez-vous</p>
+          <p className="mt-1 max-w-[260px] text-[11px] leading-relaxed text-white/35">
+            Planifie un appel pour qu’il apparaisse ici et dans l’app client.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="mt-4 text-[11px] font-bold text-[#1f8a65] transition-colors hover:text-[#7fe2bf]"
+          >
+            Planifier un appel →
+          </button>
         </div>
       )}
 
       {!loading && appointments.length > 0 && (
-        <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
-          {appointments.map((appt) => {
-            const Icon = KIND_ICONS[appt.meeting_kind] ?? Clock
-            const start = new Date(appt.starts_at)
-            const durationMin = appointmentDurationMinutes(appt)
-            const dateLabel = new Intl.DateTimeFormat('fr-FR', {
-              day: 'numeric',
-              month: 'short',
-              hour: '2-digit',
-              minute: '2-digit',
-            }).format(start)
+        <div className="max-h-[320px] space-y-4 overflow-y-auto pr-0.5">
+          {upcoming.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/25">
+                À venir · {upcoming.length}
+              </p>
+              {upcoming.map((appt) => (
+                <AppointmentRow
+                  key={appt.id}
+                  appt={appt}
+                  actionLoading={actionLoading}
+                  onAction={handleAction}
+                />
+              ))}
+            </div>
+          )}
 
-            const isTerminal = ['cancelled', 'completed', 'no_show'].includes(appt.status)
-
-            return (
-              <div
-                key={appt.id}
-                className="flex items-center justify-between gap-3 bg-white/4 border border-white/6 rounded-xl p-3.5"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
-                    <Icon size={14} className="text-[#c6b48b]" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-xs font-semibold text-white truncate">{appt.title}</p>
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold ${STATUS_CLASSES[appt.status]}`}>
-                        {appointmentStatusLabel(appt.status)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] text-white/40">
-                      <span>{dateLabel}</span>
-                      {durationMin > 0 && (
-                        <>
-                          <span>·</span>
-                          <span>{durationMin} min</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions rapides */}
-                {!isTerminal && (
-                  <div className="flex items-center gap-1 shrink-0">
-                    {appt.status === 'reschedule_requested' && appt.reschedule_reason && (
-                      <div className="group relative mr-2">
-                        <AlertTriangle size={14} className="text-orange-400 cursor-help" />
-                        <div className="absolute right-0 bottom-6 hidden group-hover:block bg-[#222] border border-white/10 text-white text-[10px] rounded-lg p-2.5 w-48 shadow-xl z-20">
-                          <p className="font-bold mb-1">Motif du report :</p>
-                          <p className="italic text-white/80">« {appt.reschedule_reason} »</p>
-                        </div>
-                      </div>
-                    )}
-
-                    <button
-                      onClick={() => handleAction(appt.id, 'complete')}
-                      disabled={actionLoading !== null}
-                      title="Marquer comme réalisé"
-                      className="p-1.5 text-white/40 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-all"
-                    >
-                      <CheckCircle size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleAction(appt.id, 'cancel')}
-                      disabled={actionLoading !== null}
-                      title="Annuler le rendez-vous"
-                      className="p-1.5 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            )
-          })}
+          {past.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/25">
+                Historique · {past.length}
+              </p>
+              {past.map((appt) => (
+                <AppointmentRow
+                  key={appt.id}
+                  appt={appt}
+                  actionLoading={actionLoading}
+                  onAction={handleAction}
+                  muted
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Modal */}
       <AppointmentFormModal
         open={showModal}
         onClose={() => setShowModal(false)}
@@ -204,6 +193,89 @@ export default function ClientAppointmentsWidget({
         }}
         onSuccess={fetchAppointments}
       />
+    </div>
+  )
+}
+
+function AppointmentRow({
+  appt,
+  actionLoading,
+  onAction,
+  muted = false,
+}: {
+  appt: CoachingAppointment
+  actionLoading: string | null
+  onAction: (id: string, action: 'cancel' | 'complete' | 'no_show') => void
+  muted?: boolean
+}) {
+  const Icon = KIND_ICONS[appt.meeting_kind] ?? Clock
+  const start = new Date(appt.starts_at)
+  const durationMin = appointmentDurationMinutes(appt)
+  const dateLabel = new Intl.DateTimeFormat('fr-FR', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(start)
+  const isTerminal = ['cancelled', 'completed', 'no_show'].includes(appt.status)
+  const busy = actionLoading === appt.id
+
+  return (
+    <div
+      className={`rounded-xl border-[0.3px] border-white/[0.06] bg-[#0a0a0a] p-3.5 transition-opacity ${
+        muted ? 'opacity-55' : ''
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-[0.3px] border-white/[0.06] bg-white/[0.03]">
+            <Icon size={14} className="text-[#1f8a65]" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="truncate text-[13px] font-semibold text-white">{appt.title}</p>
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.03] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white/50">
+                <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[appt.status]}`} />
+                {appointmentStatusLabel(appt.status)}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-white/40">
+              {dateLabel}
+              {durationMin > 0 ? ` · ${durationMin} min` : ''}
+            </p>
+            {appt.status === 'reschedule_requested' && appt.reschedule_reason && (
+              <p className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-snug text-amber-400/80">
+                <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                <span>Report demandé : « {appt.reschedule_reason} »</span>
+              </p>
+            )}
+          </div>
+        </div>
+
+        {!isTerminal && (
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onAction(appt.id, 'complete')}
+              disabled={busy}
+              title="Marquer comme réalisé"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border-[0.3px] border-white/[0.06] bg-white/[0.03] text-white/40 transition-colors hover:border-[#1f8a65]/30 hover:text-[#5dba87] disabled:opacity-40"
+            >
+              {busy ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={13} />}
+            </button>
+            <button
+              type="button"
+              onClick={() => onAction(appt.id, 'cancel')}
+              disabled={busy}
+              title="Annuler le rendez-vous"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border-[0.3px] border-white/[0.06] bg-white/[0.03] text-white/40 transition-colors hover:border-red-500/25 hover:text-red-400 disabled:opacity-40"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -40,15 +40,21 @@ Ce fichier définit le cadre de conception, de rédaction et d’implémentation
 
 ## Système de couleurs et tokens
 
-- **Fond landing :** `#0d0d0d`.
-- **Surfaces :** noirs et gris très sombres, avec blancs translucides pour les séparations et regroupements.
-- **Accent principal :** or/beige `#c6b48b`, réservé aux repères, points d’attention et indications de progression.
-- **Accent secondaire :** bleu-gris `#86aeb8`, utilisé avec parcimonie pour distinguer un état ou une étape.
-- **Accent clair :** `#dbe4df`, pour une emphase ponctuelle.
-- **Texte :** blanc pour le niveau primaire ; opacités réduites pour les niveaux secondaire et tertiaire.
-- Pour l'interface produit, respecter les tokens existants de `tailwind.config.ts` et `app/globals.css`. Pour la landing, respecter en priorité la palette définie dans ce document.
-- Ne pas introduire une palette arc-en-ciel, des gradients arbitraires ou des couleurs d’interface non nécessaires.
-- Vérifier le contraste des textes, des liens, des bordures et des états de focus.
+> [!IMPORTANT]
+> **Charte Graphique Unique (Flat Dark) :**
+> L'ensemble du projet (Landing commerciale, Espace Coach, PWA client STRYVR, et pages publiques `/p/*`) utilise la charte **Flat Dark** historique :
+> - **Fond principal :** `#121212` (Flat Dark)
+> - **Surfaces :** `#181818` (avec opacités `bg-white/[0.02]`)
+> - **Accent principal :** Vert émeraude `#1f8a65` (dérivé de `app/globals.css` et `tailwind.config.ts`)
+> - **Champs de saisie / Inputs :** `#0a0a0a`
+> - **Bordures ultra-fines :** `border-[0.3px] border-white/[0.06]`
+> - **Texte :** blanc pour le niveau primaire ; opacités réduites pour les niveaux secondaire et tertiaire (100, 90, 60, 45, 40, 20).
+>
+> **AUCUN AUTRE THÈME DE COULEUR N'EST AUTORISÉ.** Les couleurs d'accent marketing passées (telles que le beige/doré `#c6b48b` ou le bleu-gris `#86aeb8`) sont formellement bannies du projet et de sa documentation.
+>
+> - Respecter impérativement les tokens de style du projet.
+> - Ne pas introduire de palettes arc-en-ciel, de dégradés agressifs ou de bordures épaisses.
+> - Vérifier le contraste des textes, des liens, des bordures et des états de focus.
 
 ## Espacement
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react"
-import { Check, ChevronDown, ChevronRight, Copy, GripVertical, Lock, Plus, Search, SlidersHorizontal, Sparkles, Trash2, Unlock } from "lucide-react"
+import { Check, ChevronDown, ChevronRight, ChevronUp, Copy, GripVertical, Loader2, Lock, Plus, Redo2, Search, SlidersHorizontal, Sparkles, Trash2, Undo2, Unlock, X, Zap } from "lucide-react"
 import { FoodIcon } from "@/components/nutrition/FoodIcon"
 import CoachSmoothingStudioPanel from "@/components/nutrition/studio/CoachSmoothingStudioPanel"
 import { CATEGORY_LABELS, SUBCATEGORY_LABELS, type CategoryL1 } from "@/lib/nutrition/food-items"
@@ -19,6 +19,7 @@ import {
 } from "@/lib/nutrition/protocol-builder"
 import { adjustPlanMealsForCycle } from "@/lib/nutrition/cycle-meal-plan-adjustment"
 import type { CycleSyncAdjustment } from "@/lib/nutrition/engine/cycleSync"
+import FoodProfileEditor from "@/components/nutrition/studio/FoodProfileEditor"
 
 type BuilderLayoutCase = "case_1" | "case_2" | "case_3" | "case_4"
 
@@ -62,6 +63,15 @@ type CustomFoodDraft = {
   fat_per_100g: string
   fiber_per_100g: string
 }
+
+type AiGenerationScope =
+  | { kind: "day" }
+  | { kind: "meal"; mealId: NutritionPlanMeal["id"]; mealTitle: string }
+
+type AiGenerationHistory = Record<string, {
+  past: NutritionPlanMeal[][]
+  future: NutritionPlanMeal[][]
+}>
 
 const CATEGORY_FILTERS: Array<{ id: FoodCategoryFilter; label: string }> = [
   { id: "all", label: "Tous les aliments" },
@@ -152,6 +162,18 @@ function targetForDay(day: DayDraft | undefined) {
     protein: Number(day?.protein_g) || 0,
     carbs: Number(day?.carbs_g) || 0,
     fat: Number(day?.fat_g) || 0,
+  }
+}
+
+function targetForMeal(meal: NutritionPlanMeal | undefined, dayTarget: ReturnType<typeof targetForDay>, mealCount: number) {
+  const current = meal ? mealTotals(meal) : null
+  const hasCurrentMeal = Boolean(current && current.calories >= 100)
+  const divisor = Math.max(mealCount, 1)
+  return {
+    calories: Math.max(100, Math.round(hasCurrentMeal ? current!.calories : dayTarget.calories / divisor)),
+    protein: Math.max(1, Math.round(hasCurrentMeal ? current!.protein : dayTarget.protein / divisor)),
+    carbs: Math.max(0, Math.round(hasCurrentMeal ? current!.carbs : dayTarget.carbs / divisor)),
+    fat: Math.max(0, Math.round(hasCurrentMeal ? current!.fat : dayTarget.fat / divisor)),
   }
 }
 
@@ -348,6 +370,12 @@ export default function NutritionProtocolBuilder({
   const [sort, setSort] = useState<FoodSort>("name")
   const [openMenu, setOpenMenu] = useState<BuilderMenu>(null)
   const [foods, setFoods] = useState<NutritionPlanFood[]>([])
+  const [foodProfileRevision, setFoodProfileRevision] = useState(0)
+  const [aiGenerating, setAiGenerating] = useState(false)
+  const [pendingAiGeneration, setPendingAiGeneration] = useState<AiGenerationScope | null>(null)
+  const [aiGenerationHistory, setAiGenerationHistory] = useState<AiGenerationHistory>({})
+  const [aiGenerationMessage, setAiGenerationMessage] = useState("")
+  const [showAvoidedFoods, setShowAvoidedFoods] = useState(false)
   const [loadingFoods, setLoadingFoods] = useState(false)
   const [draggedFood, setDraggedFood] = useState<NutritionPlanFood | null>(null)
   const [showCustomFoodForm, setShowCustomFoodForm] = useState(false)
@@ -554,6 +582,7 @@ export default function NutritionProtocolBuilder({
       if (subcategory) params.set("subcategory", subcategory)
       params.set("sort", sort)
       if (sort === "frequent") params.set("frequent", "true")
+      if (showAvoidedFoods) params.set("include_hidden", "true")
 
       try {
         const res = await fetch(`/api/clients/${clientId}/food-items?${params.toString()}`, {
@@ -574,7 +603,7 @@ export default function NutritionProtocolBuilder({
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [category, clientId, query, sort, subcategory])
+  }, [category, clientId, foodProfileRevision, query, showAvoidedFoods, sort, subcategory])
 
   const persistPlanForDay = useCallback((dayKey: string, meals: NutritionPlanMeal[]) => {
     const dayIndex = days.findIndex((day, index) => (day.localId ?? `day-${index}`) === dayKey)
@@ -593,6 +622,123 @@ export default function NutritionProtocolBuilder({
       }
     })
   }, [persistPlanForDay])
+
+  const commitAiGeneratedMeals = useCallback((nextMeals: NutritionPlanMeal[]) => {
+    setAiGenerationHistory((history) => {
+      const current = history[activeDayKey] ?? { past: [], future: [] }
+      return {
+        ...history,
+        [activeDayKey]: {
+          past: [...current.past, activeMeals].slice(-12),
+          future: [],
+        },
+      }
+    })
+    updateMealsForDay(activeDayKey, () => nextMeals)
+  }, [activeDayKey, activeMeals, updateMealsForDay])
+
+  const generateWithAi = useCallback(async (scope: AiGenerationScope) => {
+    if (!activeDay || target.calories < 1000 || target.protein < 40 || target.carbs < 20 || target.fat < 20) {
+      setAiGenerationMessage("Complète d’abord les objectifs calories et macros de cette journée.")
+      return
+    }
+    const targetMeal = scope.kind === "meal"
+      ? activeMeals.find((meal) => meal.id === scope.mealId)
+      : undefined
+    const generationTarget = scope.kind === "meal"
+      ? targetForMeal(targetMeal, target, activeMeals.length)
+      : target
+    setAiGenerating(true)
+    setAiGenerationMessage("")
+    try {
+      const response = await fetch(`/api/clients/${clientId}/nutrition-ai/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          protocol_id: protocolId ?? null,
+          day_name: scope.kind === "meal"
+            ? `${activeDay.name || "Journée nutritionnelle"} · ${scope.mealTitle}`
+            : activeDay.name || "Journée nutritionnelle",
+          target_meal_title: scope.kind === "meal" ? scope.mealTitle : undefined,
+          day_role: activeDay.role ?? "neutral",
+          calories: generationTarget.calories,
+          protein_g: generationTarget.protein,
+          carbs_g: generationTarget.carbs,
+          fat_g: generationTarget.fat,
+          hydration_ml: Number(activeDay.hydration_ml) > 0 ? Number(activeDay.hydration_ml) : null,
+          meal_count: scope.kind === "meal" ? 1 : activeMeals.length,
+        }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !Array.isArray(payload?.meal_plan) || (scope.kind === "meal" && !payload.meal_plan[0])) {
+        throw new Error(payload?.error ?? "La génération a échoué.")
+      }
+      const nextMeals = scope.kind === "meal"
+        ? activeMeals.map((meal) => (
+            meal.id === scope.mealId
+              ? { ...payload.meal_plan[0], id: meal.id, title: meal.title }
+              : meal
+          ))
+        : payload.meal_plan
+      commitAiGeneratedMeals(nextMeals)
+      setAiGenerationMessage(
+        payload.confidence === "high"
+          ? scope.kind === "meal"
+            ? "Repas régénéré. Vérifie puis enregistre le protocole."
+            : "Brouillon généré. Vérifie puis enregistre le protocole."
+          : "Brouillon généré avec vérification coach renforcée.",
+      )
+    } catch (error) {
+      setAiGenerationMessage(error instanceof Error ? error.message : "La génération a échoué.")
+    } finally {
+      setAiGenerating(false)
+    }
+  }, [activeDay, activeMeals, clientId, commitAiGeneratedMeals, protocolId, target])
+
+  const requestAiGeneration = useCallback((scope: AiGenerationScope) => {
+    if (!activeDay || target.calories < 1000 || target.protein < 40 || target.carbs < 20 || target.fat < 20) {
+      setAiGenerationMessage("Complète d’abord les objectifs calories et macros de cette journée.")
+      return
+    }
+    const hasExistingMeals = scope.kind === "day"
+      ? activeMeals.some((meal) => meal.items.length > 0)
+      : activeMeals.some((meal) => meal.id === scope.mealId && meal.items.length > 0)
+    if (hasExistingMeals) {
+      setPendingAiGeneration(scope)
+      return
+    }
+    void generateWithAi(scope)
+  }, [activeDay, activeMeals, generateWithAi, target])
+
+  const undoAiGeneration = useCallback(() => {
+    const history = aiGenerationHistory[activeDayKey]
+    const previous = history?.past.at(-1)
+    if (!history || !previous) return
+    setAiGenerationHistory((all) => ({
+      ...all,
+      [activeDayKey]: {
+        past: history.past.slice(0, -1),
+        future: [activeMeals, ...history.future].slice(0, 12),
+      },
+    }))
+    updateMealsForDay(activeDayKey, () => previous)
+    setAiGenerationMessage("Dernière génération annulée.")
+  }, [activeDayKey, activeMeals, aiGenerationHistory, updateMealsForDay])
+
+  const redoAiGeneration = useCallback(() => {
+    const history = aiGenerationHistory[activeDayKey]
+    const next = history?.future[0]
+    if (!history || !next) return
+    setAiGenerationHistory((all) => ({
+      ...all,
+      [activeDayKey]: {
+        past: [...history.past, activeMeals].slice(-12),
+        future: history.future.slice(1),
+      },
+    }))
+    updateMealsForDay(activeDayKey, () => next)
+    setAiGenerationMessage("Génération rétablie.")
+  }, [activeDayKey, activeMeals, aiGenerationHistory, updateMealsForDay])
 
   const addMeal = useCallback(() => {
     updateMealsForDay(activeDayKey, (meals) => {
@@ -616,6 +762,18 @@ export default function NutritionProtocolBuilder({
 
   const removeMeal = useCallback((mealId: NutritionPlanMeal["id"]) => {
     updateMealsForDay(activeDayKey, (meals) => meals.filter((meal) => meal.id !== mealId))
+  }, [activeDayKey, updateMealsForDay])
+
+  const moveMeal = useCallback((mealId: NutritionPlanMeal["id"], direction: "up" | "down") => {
+    updateMealsForDay(activeDayKey, (meals) => {
+      const currentIndex = meals.findIndex((meal) => meal.id === mealId)
+      const nextIndex = currentIndex + (direction === "up" ? -1 : 1)
+      if (currentIndex < 0 || nextIndex < 0 || nextIndex >= meals.length) return meals
+      const nextMeals = [...meals]
+      const [movedMeal] = nextMeals.splice(currentIndex, 1)
+      nextMeals.splice(nextIndex, 0, movedMeal)
+      return nextMeals
+    })
   }, [activeDayKey, updateMealsForDay])
 
   const addFoodToMeal = useCallback((mealId: NutritionPlanMeal["id"], food: NutritionPlanFood) => {
@@ -786,7 +944,8 @@ export default function NutritionProtocolBuilder({
   }, [activeDayKey, updateMealsForDay])
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+    <>
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div ref={builderGridRef} className="flex min-h-0 flex-1 overflow-hidden">
         <section
           className="flex min-h-0 flex-col"
@@ -815,6 +974,21 @@ export default function NutritionProtocolBuilder({
               />
             </div>
             </div>
+            <FoodProfileEditor
+              clientId={clientId}
+              onSaved={() => setFoodProfileRevision((value) => value + 1)}
+            />
+            <button
+              type="button"
+              onClick={() => setShowAvoidedFoods((value) => !value)}
+              className={`mb-2 ml-4 rounded-lg px-2.5 py-1.5 text-[9px] font-semibold transition-colors ${
+                showAvoidedFoods
+                  ? "bg-white/[0.09] text-white"
+                  : "bg-white/[0.04] text-white/45 hover:text-white"
+              }`}
+            >
+              {showAvoidedFoods ? "Masquer les aliments évités" : "Afficher les aliments évités"}
+            </button>
           {showCustomFoodForm && (
             <div className="mb-2 rounded-xl border-[0.3px] border-[#1f8a65]/25 bg-[#1f8a65]/[0.06] p-2">
               <input
@@ -993,6 +1167,18 @@ export default function NutritionProtocolBuilder({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[10px] font-medium text-white/75">{food.name_fr}</p>
                   <p className="text-[9px] text-white/35">{Math.round(food.kcal_per_100g)} kcal · P {food.protein_per_100g} · G {food.carbs_per_100g} · L {food.fat_per_100g}</p>
+                  {food.compatibility?.status === "priority" && (
+                    <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-[#1f8a65]">À conserver</p>
+                  )}
+                  {food.compatibility?.status === "liked" && (
+                    <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-[#1f8a65]">Apprécié</p>
+                  )}
+                  {food.compatibility?.status === "hidden" && (
+                    <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-white/30">Non apprécié</p>
+                  )}
+                  {food.compatibility?.status === "needs_review" && (
+                    <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-white/60">À vérifier</p>
+                  )}
                 </div>
               </button>
             ))}
@@ -1027,6 +1213,37 @@ export default function NutritionProtocolBuilder({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  onClick={() => requestAiGeneration({ kind: "day" })}
+                  disabled={aiGenerating}
+                  title="Générer ou régénérer toute la journée avec l’IA"
+                  aria-label="Générer ou régénérer toute la journée avec l’IA"
+                  className="flex h-7 items-center gap-1.5 rounded-lg border border-[#1f8a65]/30 bg-[#1f8a65]/12 px-2.5 text-[9px] font-bold text-[#b8efd9] transition-colors hover:bg-[#1f8a65]/20 disabled:opacity-45"
+                >
+                  {aiGenerating ? <Loader2 size={11} className="animate-spin" /> : <Zap size={11} className="fill-[#1f8a65] text-[#1f8a65]" />}
+                  {aiGenerating ? "Génération" : "Générer"}
+                </button>
+                <button
+                  type="button"
+                  onClick={undoAiGeneration}
+                  disabled={!aiGenerationHistory[activeDayKey]?.past.length || aiGenerating}
+                  title="Annuler la dernière génération IA"
+                  aria-label="Annuler la dernière génération IA"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04] text-white/55 transition-colors hover:bg-white/[0.07] hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  <Undo2 size={11} />
+                </button>
+                <button
+                  type="button"
+                  onClick={redoAiGeneration}
+                  disabled={!aiGenerationHistory[activeDayKey]?.future.length || aiGenerating}
+                  title="Rétablir la génération annulée"
+                  aria-label="Rétablir la génération annulée"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04] text-white/55 transition-colors hover:bg-white/[0.07] hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  <Redo2 size={11} />
+                </button>
+                <button
+                  type="button"
                   onClick={() => setShowPortionProtections((value) => !value)}
                   aria-expanded={showPortionProtections}
                   className={`flex h-7 items-center gap-1.5 rounded-lg border px-2 text-[9px] font-semibold transition-colors ${
@@ -1043,21 +1260,18 @@ export default function NutritionProtocolBuilder({
                   onClick={() => onStartMealPlanDuplication?.(activeDayIndex)}
                   disabled={!activeMeals.some((meal) => meal.items.length > 0)}
                   title={activeMeals.some((meal) => meal.items.length > 0) ? "Dupliquer ce plan sur d’autres journées" : "Ajoute d’abord au moins un aliment au plan"}
-                  className="flex h-7 items-center gap-1.5 rounded-lg border border-[#86aeb8]/25 bg-[#86aeb8]/10 px-2 text-[9px] font-semibold text-[#c6dce2] transition-colors hover:bg-[#86aeb8]/20 disabled:cursor-not-allowed disabled:opacity-35"
+                  className="flex h-7 items-center gap-1.5 rounded-lg border border-[#1f8a65]/25 bg-[#1f8a65]/10 px-2 text-[9px] font-semibold text-[#7fe2bf] transition-colors hover:bg-[#1f8a65]/20 disabled:cursor-not-allowed disabled:opacity-35"
                 >
                   <Copy size={11} />
                   Dupliquer
                 </button>
-                <button
-                  type="button"
-                  onClick={addMeal}
-                  className="flex h-7 items-center gap-1.5 rounded-lg bg-white px-2 text-[9px] font-bold uppercase tracking-[0.1em] text-black transition-opacity hover:opacity-90"
-                >
-                  <Plus size={11} />
-                  Repas
-                </button>
               </div>
             </div>
+          {aiGenerationMessage && (
+            <p className="mb-2 rounded-lg border-[0.3px] border-white/[0.07] bg-white/[0.03] px-2.5 py-2 text-[9px] leading-relaxed text-white/60">
+              {aiGenerationMessage}
+            </p>
+          )}
           {showPortionProtections && (
             <p className="mb-2 rounded-lg border border-[#1f8a65]/20 bg-[#1f8a65]/[0.06] px-2.5 py-2 text-[9px] leading-relaxed text-[#7fe2bf]/80">
               À utiliser seulement si le coach veut fixer une portion, la limiter ou lui donner une priorité. Sinon, le système ajuste automatiquement les aliments concernés.
@@ -1127,6 +1341,38 @@ export default function NutritionProtocolBuilder({
                       <span className="text-[#6ee7a8]">{Math.round(totals.protein)} P</span>
                       <span className="text-[#f7d154]">{Math.round(totals.carbs)} G</span>
                       <span className="text-[#ff8a5b]">{Math.round(totals.fat)} L</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => requestAiGeneration({ kind: "meal", mealId: meal.id, mealTitle: meal.title || `Repas ${mealIndex + 1}` })}
+                      disabled={aiGenerating}
+                      title={`Régénérer uniquement ${meal.title || `ce repas`} avec l’IA`}
+                      aria-label={`Régénérer uniquement ${meal.title || `ce repas`} avec l’IA`}
+                      className="flex h-6 w-6 items-center justify-center rounded-md text-[#7fe2bf]/70 transition-colors hover:bg-[#1f8a65]/12 hover:text-[#7fe2bf] disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      <Zap size={11} className="fill-current" />
+                    </button>
+                    <div className="flex overflow-hidden rounded-md border-[0.3px] border-white/[0.06]">
+                      <button
+                        type="button"
+                        onClick={() => moveMeal(meal.id, "up")}
+                        disabled={mealIndex === 0}
+                        title="Monter ce repas"
+                        aria-label={`Monter ${meal.title || `le repas ${mealIndex + 1}`}`}
+                        className="flex h-6 w-6 items-center justify-center text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-25"
+                      >
+                        <ChevronUp size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveMeal(meal.id, "down")}
+                        disabled={mealIndex === activeMeals.length - 1}
+                        title="Descendre ce repas"
+                        aria-label={`Descendre ${meal.title || `le repas ${mealIndex + 1}`}`}
+                        className="flex h-6 w-6 items-center justify-center border-l-[0.3px] border-white/[0.06] text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-25"
+                      >
+                        <ChevronDown size={12} />
+                      </button>
                     </div>
                     {mealIndex >= 4 && (
                       <button
@@ -1280,10 +1526,80 @@ export default function NutritionProtocolBuilder({
               </div>
               )
             })}
+            <button
+              type="button"
+              onClick={addMeal}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-[0.3px] border-dashed border-white/[0.12] bg-white/[0.015] text-[10px] font-semibold text-white/50 transition-colors hover:border-[#1f8a65]/35 hover:bg-[#1f8a65]/[0.05] hover:text-[#b8efd9]"
+            >
+              <Plus size={13} />
+              Ajouter un repas
+            </button>
           </div>
           </div>
         </section>
       </div>
-    </div>
+      </div>
+
+      {pendingAiGeneration && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/72 p-4 backdrop-blur-[2px]"
+          role="presentation"
+          onMouseDown={() => setPendingAiGeneration(null)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="nutrition-ai-replace-title"
+            className="w-full max-w-md overflow-hidden rounded-2xl border-[0.3px] border-white/[0.1] bg-[#181818] shadow-2xl shadow-black/40"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="flex items-start justify-between gap-4 border-b-[0.3px] border-white/[0.06] px-5 py-4">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#7fe2bf]">Nutrition Studio · IA</p>
+                <h2 id="nutrition-ai-replace-title" className="mt-1.5 text-[16px] font-semibold text-white">
+                  {pendingAiGeneration.kind === "meal" ? "Régénérer ce repas ?" : "Remplacer ce brouillon ?"}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPendingAiGeneration(null)}
+                aria-label="Fermer"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white"
+              >
+                <X size={15} />
+              </button>
+            </header>
+            <div className="px-5 py-4">
+              <p className="text-[12px] leading-relaxed text-white/65">
+                {pendingAiGeneration.kind === "meal"
+                  ? `Seul « ${pendingAiGeneration.mealTitle} » sera remplacé. Les autres repas restent inchangés et tu pourras annuler cette génération juste après.`
+                  : "Les repas actuels de cette journée seront remplacés par un nouveau brouillon. Le protocole n’est pas publié, restera à vérifier par le coach, et tu pourras revenir en arrière juste après."}
+              </p>
+            </div>
+            <footer className="flex items-center justify-end gap-2 border-t-[0.3px] border-white/[0.06] px-5 py-4">
+              <button
+                type="button"
+                onClick={() => setPendingAiGeneration(null)}
+                className="h-9 rounded-lg px-3 text-[10px] font-semibold text-white/55 transition-colors hover:bg-white/[0.05] hover:text-white"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const scope = pendingAiGeneration
+                  setPendingAiGeneration(null)
+                  void generateWithAi(scope)
+                }}
+                className="flex h-9 items-center gap-1.5 rounded-lg bg-[#1f8a65] px-3.5 text-[10px] font-bold text-white transition-colors hover:bg-[#217356]"
+              >
+                <Zap size={12} className="fill-current" />
+                {pendingAiGeneration.kind === "meal" ? "Régénérer le repas" : "Générer le brouillon"}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+    </>
   )
 }

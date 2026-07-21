@@ -862,7 +862,7 @@ export default function VoiceLogSheet({
           <motion.div
             className="fixed bottom-0 left-0 right-0 z-[70] rounded-t-2xl"
             style={{
-              background: "#0d0d0d",
+              background: "#121212",
               maxHeight: "var(--client-sheet-max-height)",
               display: "flex",
               flexDirection: "column",
@@ -902,7 +902,7 @@ export default function VoiceLogSheet({
                     </p>
                   </div>
 
-                  <div className="relative rounded-[20px] bg-white/[0.05] p-3 ring-1 ring-white/[0.08]">
+                  <div className="relative rounded-[20px] bg-white/[0.06] p-3">
                     {isActive || noteIsTranscribing ? (
                       <div className="flex min-h-[150px] flex-col items-center justify-center gap-4 rounded-[16px] py-4">
                         <div className="flex h-12 items-center justify-center gap-[4px]">
@@ -957,7 +957,7 @@ export default function VoiceLogSheet({
                         />
                         <button
                           onClick={handleToggle}
-                          className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-[14px] bg-[#1a1a1a] text-white/76 transition-all"
+                          className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-[14px] bg-[#1a1a1a] text-white/76 transition-[background-color,color,transform] active:scale-[0.96]"
                           aria-label={t("voice.aria.startNoteRecording")}
                         >
                           <Mic size={16} />
@@ -998,7 +998,7 @@ export default function VoiceLogSheet({
                   <div className="flex gap-1 bg-white/[0.04] rounded-xl p-1 mb-5">
                     <button
                       onClick={() => setInputMode("voice")}
-                      className={`flex-1 h-8 flex items-center justify-center gap-1.5 rounded-xl text-[11px] font-barlow-condensed font-bold uppercase tracking-[0.1em] transition-all ${
+                      className={`flex-1 h-8 flex items-center justify-center gap-1.5 rounded-xl text-[11px] font-barlow-condensed font-bold uppercase tracking-[0.1em] transition-[background-color,color] ${
                         inputMode === "voice"
                           ? "bg-white/[0.10] text-white"
                           : "text-white/30 hover:text-white/50"
@@ -1009,7 +1009,7 @@ export default function VoiceLogSheet({
                     </button>
                     <button
                       onClick={() => setInputMode("text")}
-                      className={`flex-1 h-8 flex items-center justify-center gap-1.5 rounded-xl text-[11px] font-barlow-condensed font-bold uppercase tracking-[0.1em] transition-all ${
+                      className={`flex-1 h-8 flex items-center justify-center gap-1.5 rounded-xl text-[11px] font-barlow-condensed font-bold uppercase tracking-[0.1em] transition-[background-color,color] ${
                         inputMode === "text"
                           ? "bg-white/[0.10] text-white"
                           : "text-white/30 hover:text-white/50"
@@ -1156,7 +1156,7 @@ export default function VoiceLogSheet({
                           parseTranscript(textInput);
                         }}
                         disabled={textInput.trim().length < 3}
-                        className="w-full h-12 flex items-center justify-center gap-2 rounded-xl font-barlow-condensed font-bold uppercase tracking-[0.14em] text-[12px] transition-all active:scale-[0.98] disabled:opacity-40"
+                        className="flex h-12 w-full items-center justify-center gap-2 rounded-xl font-barlow-condensed font-bold uppercase tracking-[0.14em] text-[12px] transition-transform active:scale-[0.96] disabled:opacity-40"
                         style={{ background: "#f2f2f2", color: "#080808" }}
                       >
                         <ChevronRight size={16} />
@@ -1203,7 +1203,7 @@ export default function VoiceLogSheet({
                     {/* Re-record */}
                     <button
                       onClick={handleReRecord}
-                      className="h-12 flex-1 flex items-center justify-center gap-2 rounded-xl font-barlow-condensed font-bold uppercase tracking-[0.08em] text-[11px] transition-all active:scale-[0.98] whitespace-nowrap"
+                      className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl font-barlow-condensed font-bold uppercase tracking-[0.08em] text-[11px] transition-transform active:scale-[0.96] whitespace-nowrap"
                       style={{
                         background: "rgba(255,255,255,0.06)",
                         color: "rgba(255,255,255,0.5)",
@@ -1217,7 +1217,7 @@ export default function VoiceLogSheet({
                     <button
                       onClick={() => parseTranscript(editableTranscript)}
                       disabled={editableTranscript.trim().length < 3}
-                      className="h-12 flex-[1.4] flex items-center justify-center gap-2 rounded-xl font-barlow-condensed font-bold uppercase tracking-[0.14em] text-[12px] transition-all active:scale-[0.98] disabled:opacity-40"
+                      className="flex h-12 flex-[1.4] items-center justify-center gap-2 rounded-xl font-barlow-condensed font-bold uppercase tracking-[0.14em] text-[12px] transition-transform active:scale-[0.96] disabled:opacity-40"
                       style={{ background: "#f2f2f2", color: "#080808" }}
                     >
                       <ChevronRight size={16} />
@@ -1476,7 +1476,7 @@ export default function VoiceLogSheet({
                       items.filter((i) => i.name.trim()).length === 0 ||
                       uncategorizedCount > 0
                     }
-                    className="w-full h-12 rounded-xl font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[13px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-40"
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-xl font-barlow-condensed font-bold uppercase tracking-[0.18em] text-[13px] transition-transform active:scale-[0.96] disabled:opacity-40"
                     style={{ background: "#f2f2f2", color: "#080808" }}
                   >
                     {logging ? (

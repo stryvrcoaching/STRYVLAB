@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServiceDb, requireAuthedUser, resolveClientForUser } from '@/lib/training/flexTraining/server'
-import { fetchFlexWorkoutSession } from '@/lib/training/flexTraining/queries'
+import { fetchFlexWorkoutSession, localizeFlexExercises } from '@/lib/training/flexTraining/queries'
 import { summarizeFlexWorkoutSession } from '@/lib/training/flexTraining/summary'
+import { loadExerciseNameResolver } from '@/lib/i18n/exerciseDisplayName'
+import type { ClientLang } from '@/lib/i18n/clientTranslations'
 import type { FlexWorkoutType } from '@/lib/training/flexTraining/types'
 
 type Params = { params: { sessionId: string } }
@@ -38,9 +40,17 @@ export async function GET(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Séance introuvable' }, { status: 404 })
   }
 
+  const { data: preferences } = await db
+    .from('client_preferences')
+    .select('language')
+    .eq('client_id', client.id)
+    .maybeSingle()
+  const lang: ClientLang = preferences?.language === 'es' || preferences?.language === 'en' ? preferences.language : 'fr'
+  const localizedExercises = localizeFlexExercises(exercises, await loadExerciseNameResolver(db, lang))
+
   return NextResponse.json({
     session,
-    exercises,
+    exercises: localizedExercises,
     summary: summarizeFlexWorkoutSession(session, exercises),
   })
 }

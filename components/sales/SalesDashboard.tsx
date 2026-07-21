@@ -76,7 +76,7 @@ export function SalesDashboard() {
       </section>
 
       <section className="rounded-[24px] border border-white/[0.07] bg-white/[0.025] p-5 sm:p-6">
-        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#c6b48b]">Affiliation</p>
+        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#1f8a65]">Affiliation</p>
         <h2 className="mt-1 text-lg font-semibold text-white">Votre lien de recommandation</h2>
         <p className="mt-2 text-xs leading-relaxed text-white/55">
           Partagez ce lien avec des entraîneurs et des clubs. Tout coach s'inscrivant via ce lien sera automatiquement attribué à votre portefeuille.
@@ -85,13 +85,13 @@ export function SalesDashboard() {
           <input
             readOnly
             value={referralLink}
-            className="h-11 min-w-0 flex-1 rounded-xl border border-white/[0.10] bg-black/20 px-3 text-xs text-white outline-none focus:border-[#c6b48b]"
+            className="h-11 min-w-0 flex-1 rounded-xl border border-white/[0.10] bg-black/20 px-3 text-xs text-white outline-none focus:border-[#1f8a65]"
             onClick={(e) => (e.target as HTMLInputElement).select()}
           />
           <button
             onClick={copyToClipboard}
             type="button"
-            className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#c6b48b]/10 px-5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#c6b48b] hover:bg-[#c6b48b]/20 transition"
+            className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#1f8a65]/10 px-5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#1f8a65] hover:bg-[#1f8a65]/20 transition"
           >
             {copied ? 'Copié !' : 'Copier le lien'}
           </button>

@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import type { ElementType } from "react";
 import { Brain, ChevronDown, Loader2, Moon, Sunrise } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCoachEntitlements } from "@/components/coach/useCoachEntitlements";
+import PlanUpgradeCard from "@/components/coach/PlanUpgradeCard";
 
 type CoachingFreedom = "none" | "safe" | "extended";
 
@@ -15,6 +17,9 @@ type AiSettings = {
   ai_evening_routine_enabled: boolean;
   coaching_freedom: CoachingFreedom;
   ai_chat_lang: 'fr' | 'es' | 'en' | null;
+  nutrition_generation_enabled: boolean;
+  nutrition_publication_mode: 'coach_review' | 'coach_auto';
+  nutrition_allow_phase_adjustment: boolean;
 };
 
 const FREEDOM_OPTIONS: { value: CoachingFreedom; label: string; hint: string }[] = [
@@ -24,6 +29,7 @@ const FREEDOM_OPTIONS: { value: CoachingFreedom; label: string; hint: string }[]
 ];
 
 export default function AiCoachSettingsWidget({ clientId }: { clientId: string }) {
+  const { entitlements, loading: entitlementsLoading } = useCoachEntitlements();
   const [settings, setSettings] = useState<AiSettings | null>(null);
   const [globalAiEnabled, setGlobalAiEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -31,7 +37,14 @@ export default function AiCoachSettingsWidget({ clientId }: { clientId: string }
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
+  const appEnabled = entitlements?.clientAppEnabled === true;
+
   useEffect(() => {
+    if (entitlementsLoading) return;
+    if (!appEnabled) {
+      setLoading(false);
+      return;
+    }
     fetch(`/api/clients/${clientId}/ai-settings`)
       .then((res) => res.json())
       .then((data) => {
@@ -43,7 +56,7 @@ export default function AiCoachSettingsWidget({ clientId }: { clientId: string }
         setError("Erreur réseau");
         setLoading(false);
       });
-  }, [clientId]);
+  }, [clientId, appEnabled, entitlementsLoading]);
 
   async function updateSettings(updates: Partial<AiSettings>) {
     if (!settings) return;
@@ -111,7 +124,19 @@ export default function AiCoachSettingsWidget({ clientId }: { clientId: string }
     );
   }
 
-  if (loading) {
+  if (!entitlementsLoading && !appEnabled) {
+    return (
+      <PlanUpgradeCard
+        title="IA coach (routines client)"
+        reason={
+          entitlements?.clientAppBlockedReason ??
+          "Les routines IA matinée/soirée s’exécutent dans l’app client STRYVR (plan Pro+)."
+        }
+      />
+    );
+  }
+
+  if (loading || entitlementsLoading) {
     return (
       <div className="bg-white/[0.02] border-[0.3px] border-white/[0.06] rounded-2xl p-4 space-y-4">
         <Skeleton className="h-4 w-24" />
@@ -279,6 +304,76 @@ export default function AiCoachSettingsWidget({ clientId }: { clientId: string }
               onToggle={() => updateSettings({ ai_evening_routine_enabled: !settings.ai_evening_routine_enabled })}
               Icon={Moon}
             />
+          </div>
+
+          <div className="space-y-3 pt-3 border-t border-white/[0.05]">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/40">
+                Nutrition IA
+              </p>
+              <p className="mt-1 text-[10px] leading-relaxed text-white/35">
+                Génère des brouillons dans Nutrition Studio en respectant allergies, cadres et préférences.
+              </p>
+            </div>
+            <ToggleRow
+              title="Activer la génération nutritionnelle"
+              description="Autorise la génération manuelle et prépare les ajustements automatiques futurs."
+              enabled={settings.nutrition_generation_enabled ?? false}
+              onToggle={() => updateSettings({
+                nutrition_generation_enabled: !settings.nutrition_generation_enabled,
+              })}
+              Icon={Brain}
+            />
+            {settings.nutrition_generation_enabled && (
+              <>
+                <div>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/40">
+                    Publication
+                  </p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {([
+                      {
+                        value: 'coach_review',
+                        label: 'Validation coach',
+                        hint: 'Toujours relire avant publication',
+                      },
+                      {
+                        value: 'coach_auto',
+                        label: 'Automatique',
+                        hint: 'Publication future si tous les contrôles passent',
+                      },
+                    ] as const).map((option) => {
+                      const active = settings.nutrition_publication_mode === option.value
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => updateSettings({ nutrition_publication_mode: option.value })}
+                          className={`rounded-xl border-[0.3px] px-2.5 py-2 text-left ${
+                            active
+                              ? 'border-[#1f8a65]/40 bg-[#1f8a65]/[0.08]'
+                              : 'border-white/[0.06] bg-[#0a0a0a]'
+                          }`}
+                        >
+                          <p className={`text-[11px] font-semibold ${active ? 'text-[#1f8a65]' : 'text-white/70'}`}>
+                            {option.label}
+                          </p>
+                          <p className="mt-0.5 text-[9px] leading-snug text-white/35">{option.hint}</p>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <ToggleRow
+                  title="Autoriser les changements de phase"
+                  description="Désactivé par défaut. Les générations manuelles ne changent jamais la phase silencieusement."
+                  enabled={settings.nutrition_allow_phase_adjustment ?? false}
+                  onToggle={() => updateSettings({
+                    nutrition_allow_phase_adjustment: !settings.nutrition_allow_phase_adjustment,
+                  })}
+                />
+              </>
+            )}
           </div>
         </div>
       )}

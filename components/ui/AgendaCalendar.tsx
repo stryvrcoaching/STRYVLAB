@@ -50,13 +50,31 @@ const PRIORITY_CONFIG = {
 } as const;
 
 const TEMPLATE_TYPES = [
-  { value: "", label: "Aucun type" },
+  { value: "", label: "Aucun type particulier" },
   { value: "seance", label: "Séance d'entraînement" },
   { value: "bilan", label: "Bilan client" },
   { value: "appel", label: "Appel de suivi" },
   { value: "rendez-vous", label: "Planifier un rendez-vous" },
   { value: "autre", label: "Autre" },
 ] as const;
+
+const DURATION_OPTIONS = [
+  { label: '15 min', value: 15 },
+  { label: '30 min', value: 30 },
+  { label: '45 min', value: 45 },
+  { label: '1h', value: 60 },
+  { label: '1h 30', value: 90 },
+  { label: '2h', value: 120 },
+] as const;
+
+const computeEndTime = (startTime: string, durationMinutes: number): string => {
+  if (!startTime) return "";
+  const [h, m] = startTime.split(':').map(Number);
+  const totalMin = h * 60 + m + durationMinutes;
+  const endH = String(Math.floor(totalMin / 60) % 24).padStart(2, '0');
+  const endM = String(totalMin % 60).padStart(2, '0');
+  return `${endH}:${endM}`;
+};
 
 type MeetingKindLocal = 'video' | 'phone' | 'in_person';
 const MEETING_KINDS: { value: MeetingKindLocal; label: string; icon: React.ElementType }[] = [
@@ -162,7 +180,6 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
   const [newTitle, setNewTitle] = useState("");
   const [newDate, setNewDate] = useState(todayKey);
   const [newTime, setNewTime] = useState("");
-  const [newTimeEnd, setNewTimeEnd] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newPriority, setNewPriority] = useState<"high" | "medium" | "low">("medium");
   const [newTemplateType, setNewTemplateType] = useState("");
@@ -178,6 +195,8 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
   const [loadingColumns, setLoadingColumns] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [newDuration, setNewDuration] = useState<number>(60);
+  const [editDuration, setEditDuration] = useState<number>(60);
   // Assignation — creation modal
   const [newClientId, setNewClientId] = useState("");
   const [newProgramTemplateId, setNewProgramTemplateId] = useState("");
@@ -194,7 +213,6 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
   const [editTitle, setEditTitle] = useState("");
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
-  const [editTimeEnd, setEditTimeEnd] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editPriority, setEditPriority] = useState<"high" | "medium" | "low">("medium");
   const [editTemplateType, setEditTemplateType] = useState("");
@@ -264,6 +282,19 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
     setEditDate(ev.event_date);
     setEditTime(ev.event_time ?? "");
     setEditTimeEnd(ev.event_time_end ?? "");
+
+    // Calcul de la durée
+    let duration = 60;
+    if (ev.event_time && ev.event_time_end) {
+      const [sh, sm] = ev.event_time.split(':').map(Number);
+      const [eh, em] = ev.event_time_end.split(':').map(Number);
+      const startMin = sh * 60 + sm;
+      let endMin = eh * 60 + em;
+      if (endMin < startMin) endMin += 24 * 60;
+      duration = endMin - startMin;
+    }
+    setEditDuration(duration);
+
     setEditDesc(ev.description ?? "");
     setEditPriority(ev.priority);
     setEditTemplateType(ev.template_type ?? "");
@@ -283,17 +314,18 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
     if (!editEvent || !editTitle.trim() || !editDate) return;
     setEditSaving(true);
     try {
+      const calculatedEnd = editTime ? computeEndTime(editTime, editDuration) : null;
       const payload: Record<string, unknown> = {
         title:       editTitle.trim(),
         event_date:  editDate,
         event_time:  editTime || null,
+        event_time_end: calculatedEnd,
         description: editDesc.trim() || null,
         priority:    editPriority,
         client_id:   editClientId || null,
         notify_minutes_before: null,
         alert_at: editAlertEnabled ? `${editAlertDate}T${editAlertTime || '08:00'}:00` : null,
       };
-      if (editTimeEnd !== undefined)      payload.event_time_end        = editTimeEnd || null;
       if (editTemplateType !== undefined) payload.template_type         = editTemplateType || null;
 
       const res = await fetch(`/api/organisation/events?id=${editEvent.id}`, {
@@ -316,7 +348,7 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
     setNewTitle("");
     setNewDate(todayKey);
     setNewTime("");
-    setNewTimeEnd("");
+    setNewDuration(60);
     setNewDesc("");
     setNewPriority("medium");
     setNewTemplateType("");
@@ -363,7 +395,7 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
               return {
                 id: a.id,
                 coach_id: a.coach_id,
-                title: `📞 ${a.title}`,
+                title: `📞 ${a.title.startsWith('📞') ? a.title.slice(1).trim() : a.title}`,
                 event_date,
                 event_time,
                 event_time_end,
@@ -412,8 +444,14 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
       .then((r) => r.json())
       .then((data: ColumnOption[]) => {
         setKanbanColumns(Array.isArray(data) ? data : []);
-        if (Array.isArray(data) && data.length > 0) setSelectedColumnId(data[0].id);
-        else setSelectedColumnId("");
+        if (Array.isArray(data) && data.length > 0) {
+          setSelectedColumnId((prev) => {
+            const isValid = data.some((col) => col.id === prev);
+            return isValid ? prev : data[0].id;
+          });
+        } else {
+          setSelectedColumnId("");
+        }
       })
       .catch(() => { setKanbanColumns([]); setSelectedColumnId(""); })
       .finally(() => setLoadingColumns(false));
@@ -498,15 +536,8 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
       setSaving(true);
       try {
         // Construire starts_at / ends_at
-        const durationMin = newTimeEnd && newTime
-          ? (() => {
-              const [sh, sm] = newTime.split(':').map(Number);
-              const [eh, em] = newTimeEnd.split(':').map(Number);
-              return (eh * 60 + em) - (sh * 60 + sm);
-            })()
-          : 60;
         const startsAt = new Date(`${newDate}T${newTime}:00`).toISOString();
-        const endsAt = new Date(new Date(`${newDate}T${newTime}:00`).getTime() + Math.max(durationMin, 15) * 60_000).toISOString();
+        const endsAt = new Date(new Date(`${newDate}T${newTime}:00`).getTime() + newDuration * 60_000).toISOString();
 
         const res = await fetch('/api/coach/appointments', {
           method: 'POST',
@@ -559,11 +590,12 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
     // Événement standard
     setSaving(true);
     try {
+      const calculatedEnd = newTime ? computeEndTime(newTime, newDuration) : null;
       const payload: Record<string, unknown> = {
         title:                 newTitle.trim(),
         event_date:            newDate,
         event_time:            newTime || null,
-        event_time_end:        newTimeEnd || null,
+        event_time_end:        calculatedEnd,
         description:           newDesc.trim() || null,
         priority:              newPriority,
         template_type:         newTemplateType || null,
@@ -815,17 +847,17 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
                         (grouped[key] ?? []).map((ev) => (
                           <div
                             key={ev.id}
-                            className={`group flex items-center justify-between gap-1 rounded-lg px-2 py-1.5 transition-colors ${
+                            className={`group flex items-start justify-between gap-1 rounded-lg px-2 py-1.5 transition-colors ${
                               ev.is_completed
                                 ? "bg-white/[0.015] hover:bg-white/[0.03]"
                                 : "bg-white/[0.03] hover:bg-white/[0.05]"
                             }`}
                           >
-                            <span className={`text-[11px] truncate ${ev.is_completed ? "line-through text-white/30" : "text-white/70"}`}>
+                            <span className={`text-[11px] break-words whitespace-normal flex-1 leading-normal ${ev.is_completed ? "line-through text-white/30" : "text-white/70"}`}>
                               {ev.title}
                             </span>
                             {ev.linked_column_title && (
-                              <Kanban size={9} className="text-[#1f8a65]/50 flex-shrink-0" />
+                              <Kanban size={9} className="text-[#1f8a65]/50 flex-shrink-0 mt-0.5" />
                             )}
                             <button
                               type="button"
@@ -833,7 +865,7 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
                                 event.stopPropagation();
                                 void handleDelete(ev.id);
                               }}
-                              className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-white/25 hover:text-red-400 transition-all"
+                              className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-white/25 hover:text-red-400 transition-all mt-0.5"
                             >
                               <X size={11} />
                             </button>
@@ -998,13 +1030,47 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1f8a65]/20">
                 <Calendar size={15} className="text-[#1f8a65]" />
               </div>
-              <h3 className="font-bold text-white text-[15px]">Nouvel événement</h3>
+              <h3 className="font-bold text-white text-[15px]">
+                {newTemplateType === 'rendez-vous' ? 'Planifier un rendez-vous' : 'Nouvel événement / Rappel'}
+              </h3>
             </div>
             <form onSubmit={handleAdd} className="space-y-3">
+              {/* Type de planification (Onglets) */}
+              <div className="flex gap-1 p-1 rounded-xl bg-[#0a0a0a] border border-white/[0.04] mb-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewTemplateType("");
+                    if (newTitle === "Point de suivi") setNewTitle("");
+                  }}
+                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+                    newTemplateType !== 'rendez-vous'
+                      ? "bg-[#1f8a65]/15 text-[#1f8a65] border-[0.3px] border-[#1f8a65]/35"
+                      : "text-white/40 hover:text-white/70 hover:bg-white/[0.02]"
+                  }`}
+                >
+                  📅 Événement / Rappel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewTemplateType("rendez-vous");
+                    if (!newTitle.trim()) setNewTitle("Point de suivi");
+                  }}
+                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+                    newTemplateType === 'rendez-vous'
+                      ? "bg-[#1f8a65]/15 text-[#1f8a65] border-[0.3px] border-[#1f8a65]/35"
+                      : "text-white/40 hover:text-white/70 hover:bg-white/[0.02]"
+                  }`}
+                >
+                  🤝 Rendez-vous Client
+                </button>
+              </div>
+
               <input
                 autoFocus
                 className="w-full rounded-xl bg-[#0a0a0a] px-4 py-2.5 text-[14px] font-medium text-white placeholder:text-white/20 outline-none h-[44px]"
-                placeholder="Titre de l'événement"
+                placeholder={newTemplateType === 'rendez-vous' ? "Objet du rendez-vous" : "Titre de l'événement"}
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
               />
@@ -1016,14 +1082,17 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
               />
 
               {/* Date */}
-              <input
-                type="date"
-                className="w-full rounded-xl bg-[#0a0a0a] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-              />
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-1">Date</p>
+                <input
+                  type="date"
+                  className="w-full rounded-xl bg-[#0a0a0a] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                />
+              </div>
 
-              {/* Time range */}
+              {/* Heure de début + Durée */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-1">Début</p>
@@ -1035,37 +1104,48 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
                   />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-1">Fin</p>
-                  <input
-                    type="time"
+                  <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-1">Durée</p>
+                  <select
                     className="w-full rounded-xl bg-[#0a0a0a] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
-                    value={newTimeEnd}
-                    onChange={(e) => setNewTimeEnd(e.target.value)}
-                  />
+                    value={newDuration}
+                    onChange={(e) => setNewDuration(Number(e.target.value))}
+                  >
+                    {DURATION_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              {/* Priority */}
-              <select
-                className="w-full rounded-xl bg-[#0a0a0a] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
-                value={newPriority}
-                onChange={(e) => setNewPriority(e.target.value as "high" | "medium" | "low")}
-              >
-                <option value="high">Priorité haute</option>
-                <option value="medium">Priorité moyenne</option>
-                <option value="low">Priorité basse</option>
-              </select>
+              {/* Priorité */}
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-1">Priorité</p>
+                <select
+                  className="w-full rounded-xl bg-[#0a0a0a] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
+                  value={newPriority}
+                  onChange={(e) => setNewPriority(e.target.value as "high" | "medium" | "low")}
+                >
+                  <option value="high">Priorité haute</option>
+                  <option value="medium">Priorité moyenne</option>
+                  <option value="low">Priorité basse</option>
+                </select>
+              </div>
 
-              {/* Template type */}
-              <select
-                className="w-full rounded-xl bg-[#0a0a0a] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
-                value={newTemplateType}
-                onChange={(e) => setNewTemplateType(e.target.value)}
-              >
-                {TEMPLATE_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
+              {/* Type d'événement - visible uniquement si ce n'est pas un rendez-vous (le rendez-vous est déjà un type en soi) */}
+              {newTemplateType !== 'rendez-vous' && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-1">Type d'événement</p>
+                  <select
+                    className="w-full rounded-xl bg-[#0a0a0a] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
+                    value={newTemplateType}
+                    onChange={(e) => setNewTemplateType(e.target.value)}
+                  >
+                    {TEMPLATE_TYPES.filter(t => t.value !== 'rendez-vous').map((t) => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="rounded-xl bg-[#0a0a0a] p-3 space-y-3">
                 <button
@@ -1435,13 +1515,16 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
                   />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-1">Fin</p>
-                  <input
-                    type="time"
+                  <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wider px-1">Durée</p>
+                  <select
                     className="w-full rounded-xl bg-[#0a0a0a] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
-                    value={editTimeEnd}
-                    onChange={(e) => setEditTimeEnd(e.target.value)}
-                  />
+                    value={editDuration}
+                    onChange={(e) => setEditDuration(Number(e.target.value))}
+                  >
+                    {DURATION_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <select
@@ -1453,15 +1536,17 @@ const AgendaCalendar: React.FC<AgendaCalendarProps> = ({
                 <option value="medium">Priorité moyenne</option>
                 <option value="low">Priorité basse</option>
               </select>
-              <select
-                className="w-full rounded-xl bg-[#0a0a0a] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
-                value={editTemplateType}
-                onChange={(e) => setEditTemplateType(e.target.value)}
-              >
-                {TEMPLATE_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
+              {editTemplateType !== 'rendez-vous' && (
+                <select
+                  className="w-full rounded-xl bg-[#0a0a0a] px-3 py-2.5 text-[13px] text-white outline-none h-[44px]"
+                  value={editTemplateType}
+                  onChange={(e) => setEditTemplateType(e.target.value)}
+                >
+                  {TEMPLATE_TYPES.filter(t => t.value !== 'rendez-vous').map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              )}
               <div className="rounded-xl bg-[#0a0a0a] p-3 space-y-3">
                 <button
                   type="button"

@@ -17,7 +17,7 @@ export default async function ContinueClientAccessPage({ searchParams }: Props) 
   if (!actionUrl) redirect('/client/login?error=link_expired')
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-[#0d0d0d] p-6 text-white">
+    <main className="flex min-h-dvh items-center justify-center bg-[#121212] p-6 text-white">
       <section className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-white/[0.02] p-7 text-center">
         <Image
           src="/logo/logo-stryvr-silver.png"

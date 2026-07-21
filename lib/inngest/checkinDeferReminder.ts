@@ -58,10 +58,11 @@ export async function runDeferReminders(
 
   const clientIds = Array.from(new Set(candidates.map((m) => m.client_id)))
 
-  const [{ data: schedules }, { data: checkins }, { data: configs }] = await Promise.all([
+  const [{ data: schedules }, { data: checkins }, { data: configs }, { data: preferences }] = await Promise.all([
     db.from('daily_checkin_schedules').select('client_id, moment, scheduled_time, timezone').in('client_id', clientIds),
     db.from('client_daily_checkins').select('client_id, date, flow_type').in('client_id', clientIds),
     db.from('daily_checkin_configs').select('client_id, is_active, days_of_week').in('client_id', clientIds),
+    db.from('client_preferences').select('client_id, notif_checkin_reminder').in('client_id', clientIds),
   ])
 
   const tzByClient = new Map((schedules ?? []).map((s) => [s.client_id as string, (s.timezone as string) || 'Europe/Paris']))
@@ -72,6 +73,12 @@ export async function runDeferReminders(
     schedulesByClient.set(schedule.client_id as string, clientSchedules)
   }
   const configByClient = new Map((configs ?? []).map((config) => [config.client_id as string, config]))
+  const checkinEnabledByClient = new Map(
+    (preferences ?? []).map((preference) => [
+      preference.client_id as string,
+      preference.notif_checkin_reminder !== false,
+    ]),
+  )
   const doneSet = new Set(
     (checkins ?? []).map((c) => `${c.client_id}:${c.date}:${c.flow_type}`),
   )
@@ -80,6 +87,16 @@ export async function runDeferReminders(
   let push = 0
 
   for (const msg of candidates) {
+    if (checkinEnabledByClient.get(msg.client_id) === false) {
+      // The client explicitly disabled check-in reminders. Mark this deferred
+      // message handled so the cron does not revisit it on every execution.
+      await db
+        .from('chat_messages')
+        .update({ metadata: { ...(msg.metadata ?? {}), defer_reminded: true } })
+        .eq('id', msg.id)
+      continue
+    }
+
     const flow = FLOW_OF[msg.message_type]
     const tz = tzByClient.get(msg.client_id) ?? 'Europe/Paris'
 

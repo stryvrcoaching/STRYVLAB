@@ -11,6 +11,7 @@ import FeedbackThread from '@/components/client/smart/FeedbackThread'
 import { fetchFlexWorkoutSession } from '@/lib/training/flexTraining/queries'
 import { summarizeFlexWorkoutSession } from '@/lib/training/flexTraining/summary'
 import { resolveCatalogExerciseName } from '@/lib/training/flexTraining/catalog'
+import { loadExerciseNameResolver } from '@/lib/i18n/exerciseDisplayName'
 import { computeRobustAverageRestSec } from '@/lib/training/restMetrics'
 
 function resolveRecapTitle(type: string, relation: string | null, lang: ClientLang) {
@@ -39,6 +40,7 @@ export default async function FlexWorkoutRecapPage({ params }: { params: { sessi
   const prefsRes = await service.from('client_preferences').select('language').eq('client_id', client.id).maybeSingle()
   const rawLang = (prefsRes as { data?: { language?: string | null } } | null)?.data?.language
   const lang: ClientLang = ['fr', 'en', 'es'].includes(rawLang ?? '') ? rawLang as ClientLang : 'fr'
+  const resolveExerciseName = await loadExerciseNameResolver(service, lang)
 
   const { session, exercises } = await fetchFlexWorkoutSession(service, params.sessionId)
   if (!session || session.client_id !== client.id) notFound()
@@ -47,7 +49,10 @@ export default async function FlexWorkoutRecapPage({ params }: { params: { sessi
   const allSets = exercises.flatMap((exercise) =>
     exercise.sets.map((set) => ({
       ...set,
-      exercise_name: exercise.custom_exercise_name ?? resolveCatalogExerciseName(exercise.exercise_id) ?? 'Exercice',
+      exercise_name: exercise.custom_exercise_name
+        ?? (resolveCatalogExerciseName(exercise.exercise_id)
+          ? resolveExerciseName(resolveCatalogExerciseName(exercise.exercise_id)!, exercise.exercise_id)
+          : 'Exercice'),
       muscle_groups: exercise.muscle_groups ?? [],
     })),
   )
@@ -67,7 +72,10 @@ export default async function FlexWorkoutRecapPage({ params }: { params: { sessi
   const groupedExercises = Object.values(exerciseMap)
 
   const muscleInputs = exercises.map((exercise) => ({
-    name: exercise.custom_exercise_name ?? resolveCatalogExerciseName(exercise.exercise_id) ?? 'Exercice',
+    name: exercise.custom_exercise_name
+      ?? (resolveCatalogExerciseName(exercise.exercise_id)
+        ? resolveExerciseName(resolveCatalogExerciseName(exercise.exercise_id)!, exercise.exercise_id)
+        : 'Exercice'),
     sets: exercise.sets.filter((set) => set.completed).length,
     primary_muscles: exercise.muscle_groups ?? [],
     secondary_muscles: [],
@@ -95,9 +103,9 @@ export default async function FlexWorkoutRecapPage({ params }: { params: { sessi
   }
 
   return (
-    <div className="min-h-dvh bg-[#0d0d0d] font-barlow pb-10 overflow-x-hidden">
+    <div className="min-h-dvh bg-[#121212] font-barlow pb-10 overflow-x-hidden">
       <header
-        className="sticky top-0 z-40 bg-[#0d0d0d]"
+        className="sticky top-0 z-40 bg-[#121212]"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="flex items-center gap-3 px-4 py-3">
@@ -198,7 +206,10 @@ export default async function FlexWorkoutRecapPage({ params }: { params: { sessi
               {exercises.filter((exercise) => exercise.notes?.trim()).map((exercise) => (
                 <div key={exercise.id} className="bg-white/[0.02] rounded-xl px-3 py-2.5">
                   <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/30 mb-1">
-                    {exercise.custom_exercise_name ?? resolveCatalogExerciseName(exercise.exercise_id) ?? 'Exercice'}
+                    {exercise.custom_exercise_name
+                      ?? (resolveCatalogExerciseName(exercise.exercise_id)
+                        ? resolveExerciseName(resolveCatalogExerciseName(exercise.exercise_id)!, exercise.exercise_id)
+                        : 'Exercice')}
                   </p>
                   <p className="text-[12px] text-white/60 leading-relaxed">{exercise.notes}</p>
                 </div>

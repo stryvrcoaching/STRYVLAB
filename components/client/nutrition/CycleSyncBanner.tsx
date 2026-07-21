@@ -85,7 +85,7 @@ export default function CycleSyncBanner({ phase, adjustment, cycleDay }: Props) 
 
       {/* First note */}
       <p className="text-[11px] text-white/40 leading-relaxed">
-        {adjustment.notes[0]}
+        {t(`cycle.note.${phase}`)}
       </p>
     </div>
   )

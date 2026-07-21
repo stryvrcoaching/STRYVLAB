@@ -52,15 +52,13 @@ export default function BilanPage() {
           const val =
             r.value_number !== undefined && r.value_number !== null
               ? r.value_number
-              : Array.isArray(r.value_json)
-                ? (r.value_json as string[])
-                : typeof r.value_json === "boolean"
-                  ? r.value_json
+              : r.value_json !== undefined && r.value_json !== null
+                ? (r.value_json as ResponseMap[string][string])
                   : r.storage_path && r.storage_path.length > 0
                     ? r.storage_path
                     : r.value_text;
           if (val !== null && val !== undefined) {
-            map[r.block_id][r.field_key] = val as string | number | string[] | boolean;
+            map[r.block_id][r.field_key] = val;
           }
         }
         return map;

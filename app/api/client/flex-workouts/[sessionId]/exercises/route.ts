@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { requireAuthedUser, resolveClientForUser, createServiceDb } from '@/lib/training/flexTraining/server'
 import { fetchFlexWorkoutSession } from '@/lib/training/flexTraining/queries'
 import { resolveCatalogExerciseMeta, resolveCatalogExerciseMuscles, resolveCatalogExerciseName } from '@/lib/training/flexTraining/catalog'
+import { loadExerciseNameResolver } from '@/lib/i18n/exerciseDisplayName'
+import type { ClientLang } from '@/lib/i18n/clientTranslations'
 
 type Params = { params: { sessionId: string } }
 
@@ -54,7 +56,9 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const nextOrder = parsed.data.order_index ?? (((existingExercises ?? [])[0]?.order_index ?? -1) + 1)
   const exerciseId = parsed.data.exercise_id ?? null
-  const customExerciseName = parsed.data.custom_exercise_name?.trim() || resolveCatalogExerciseName(exerciseId) || null
+  // A catalogue exercise is identified by exercise_id. Persisting its French
+  // catalogue label as a custom name would bypass language resolution later.
+  const customExerciseName = exerciseId ? null : parsed.data.custom_exercise_name?.trim() || null
   const catalogMeta = resolveCatalogExerciseMeta(exerciseId)
 
   const fullPayload = {
@@ -101,5 +105,15 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: insertError?.message ?? 'Impossible d’ajouter l’exercice' }, { status: 500 })
   }
 
-  return NextResponse.json({ exercise: created }, { status: 201 })
+  const { data: preferences } = await db
+    .from('client_preferences')
+    .select('language')
+    .eq('client_id', client.id)
+    .maybeSingle()
+  const lang: ClientLang = preferences?.language === 'es' || preferences?.language === 'en' ? preferences.language : 'fr'
+  const catalogName = resolveCatalogExerciseName(exerciseId)
+  const display_name = customExerciseName
+    ?? (catalogName ? (await loadExerciseNameResolver(db, lang))(catalogName, exerciseId) : 'Exercice')
+
+  return NextResponse.json({ exercise: { ...created, display_name } }, { status: 201 })
 }

@@ -70,7 +70,7 @@ export default function ChatTodayStrip({ data, onCheckinClick, onWaterClick, onR
 
   if (!data || !data.checkin) {
     return (
-      <div data-tour-id="daily-strip" className={`shrink-0 h-[44px] flex items-center px-3 gap-2 ${className ?? "bg-[#0d0d0d]"}`}>
+      <div data-tour-id="daily-strip" className={`shrink-0 h-[44px] flex items-center px-3 gap-2 ${className ?? "bg-[#121212]"}`}>
         {[80, 120, 100].map(w => (
           <div key={w} className={`h-[26px] rounded-xl animate-pulse ${surfaceClassName ?? "bg-[#111111]"}`} style={{ width: w }} />
         ))}
@@ -98,7 +98,7 @@ export default function ChatTodayStrip({ data, onCheckinClick, onWaterClick, onR
 
   return (
     <>
-      <div data-tour-id="daily-strip" className={`shrink-0 ${className ?? "bg-[#0d0d0d]"}`}>
+      <div data-tour-id="daily-strip" className={`shrink-0 ${className ?? "bg-[#121212]"}`}>
         <div className="flex items-center gap-2 px-3 py-2 overflow-x-auto no-scrollbar">
 
           {/* Check-in */}
@@ -153,7 +153,8 @@ export default function ChatTodayStrip({ data, onCheckinClick, onWaterClick, onR
             <span className="text-[11px] font-barlow text-[#5a5a5a] whitespace-nowrap">
               / {data.calories.target}
             </span>
-            <div className="w-10 h-1 bg-[#1a1a1a] rounded-full overflow-hidden">
+            {/* Track distinct from pill surface so fill is readable */}
+            <div className="h-1.5 w-10 overflow-hidden rounded-full bg-white/[0.14] ring-1 ring-inset ring-white/[0.06]">
               <div
                 className="h-full rounded-full transition-all"
                 style={{ width: `${calBarWidth}%`, backgroundColor: calColor }}
@@ -174,7 +175,7 @@ export default function ChatTodayStrip({ data, onCheckinClick, onWaterClick, onR
             <span className="text-[11px] font-barlow text-[#5a5a5a] whitespace-nowrap">
               / {(data.water.target / 1000).toFixed(1)}L
             </span>
-            <div className="w-8 h-1 bg-[#1a1a1a] rounded-full overflow-hidden">
+            <div className="h-1.5 w-8 overflow-hidden rounded-full bg-white/[0.14] ring-1 ring-inset ring-white/[0.06]">
               <div
                 className="h-full rounded-full transition-all"
                 style={{ width: `${waterBarWidth}%`, backgroundColor: waterColor }}

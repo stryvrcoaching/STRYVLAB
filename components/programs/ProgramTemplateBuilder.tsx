@@ -41,6 +41,7 @@ import {
   useProgramIntelligence,
   useLabOverrides,
   type IntelligenceProfile,
+  type VolumeFocus,
 } from "@/lib/programs/intelligence";
 import {
   getCatalogEntryByName,
@@ -206,6 +207,7 @@ interface Exercise {
   rest_sec: number | null;
   rir: number | null;
   weight_increment_kg: number | null;
+  current_weight_kg: number | null;
   notes: string;
   image_url: string | null;
   movement_pattern: string | null;
@@ -269,6 +271,7 @@ function emptyExercise(goal = "hypertrophy"): Exercise {
     rest_sec: getDefaultRestSec(goal),
     rir: 2,
     weight_increment_kg: null,
+    current_weight_kg: null,
     notes: "",
     image_url: null,
     movement_pattern: null,
@@ -314,6 +317,19 @@ function emptySession(goal = "hypertrophy"): Session {
   };
 }
 
+function duplicateSession(session: Session): Session {
+  return {
+    ...structuredClone(session),
+    dbId: undefined,
+    name: session.name.trim() ? `${session.name} (copie)` : "Séance (copie)",
+    exercises: session.exercises.map((exercise) => ({
+      ...structuredClone(exercise),
+      dbId: undefined,
+    })),
+    open: true,
+  };
+}
+
 function derivePrimaryMusclesFromStoredExercise(exercise: any): string[] {
   const catalog = getCatalogEntryByName(exercise.name);
   const precisePrimary =
@@ -354,6 +370,7 @@ function mapStoredSessions(rawSessions: any[] | null | undefined, goal: string):
             rest_sec: exercise.rest_sec ?? getDefaultRestSec(goal),
             rir: exercise.rir,
             weight_increment_kg: exercise.weight_increment_kg ?? null,
+            current_weight_kg: exercise.current_weight_kg ?? null,
             notes: exercise.notes ?? "",
             image_url: exercise.image_url ?? catalog?.gifUrl ?? null,
             movement_pattern:
@@ -420,6 +437,7 @@ function buildStoredSessionsPayload(sessions: Session[], goal: string) {
           ? exercise.rir
           : (exercise.target_rir ?? exercise.rir),
       weight_increment_kg: exercise.weight_increment_kg ?? null,
+      current_weight_kg: exercise.current_weight_kg ?? null,
       target_rir: exercise.target_rir ?? null,
       target_hr_zone: exercise.target_hr_zone ?? null,
       notes: exercise.notes,
@@ -517,8 +535,10 @@ export default function ProgramTemplateBuilder({
           equipment_archetype: "",
           session_mode: "day",
           volume_focus: {},
-        },
+      },
   );
+  const volumeFocusRef = useRef(meta.volume_focus);
+  const volumeFocusSaveChainRef = useRef<Promise<void>>(Promise.resolve());
 
   const [sessions, setSessions] = useState<Session[]>(() =>
     mapStoredSessions(
@@ -632,21 +652,72 @@ export default function ProgramTemplateBuilder({
   ) {
     if (fromSi === toSi && fromEi === toEi) return;
     setSessions((prev) => {
+      const sourceSession = prev[fromSi];
+      const targetSession = prev[toSi];
+      const sourceExercise = sourceSession?.exercises[fromEi];
+      if (!sourceSession || !targetSession || !sourceExercise) return prev;
+
+      const sourceIndices = sourceExercise.group_id
+        ? sourceSession.exercises.reduce<number[]>((indices, exercise, index) => {
+            if (exercise.group_id === sourceExercise.group_id) indices.push(index);
+            return indices;
+          }, [])
+        : [fromEi];
+
+      if (fromSi === toSi && sourceIndices.includes(toEi)) return prev;
+
+      const movedExercises = sourceIndices.map(
+        (index) => sourceSession.exercises[index],
+      );
       const next = prev.map((s) => ({ ...s, exercises: [...s.exercises] }));
-      const [moved] = next[fromSi].exercises.splice(fromEi, 1);
-      next[toSi].exercises.splice(toEi, 0, moved);
+
+      next[fromSi].exercises = next[fromSi].exercises.filter(
+        (_, index) => !sourceIndices.includes(index),
+      );
+
+      let insertionIndex = Math.max(
+        0,
+        Math.min(toEi, targetSession.exercises.length),
+      );
+      if (toEi < targetSession.exercises.length) {
+        const targetExercise = targetSession.exercises[toEi];
+        if (targetExercise?.group_id) {
+          const targetGroupIndices = targetSession.exercises.reduce<number[]>(
+            (indices, exercise, index) => {
+              if (exercise.group_id === targetExercise.group_id)
+                indices.push(index);
+              return indices;
+            },
+            [],
+          );
+          const movingDown =
+            fromSi === toSi &&
+            toEi > sourceIndices[sourceIndices.length - 1];
+          insertionIndex = movingDown
+            ? targetGroupIndices[targetGroupIndices.length - 1] + 1
+            : targetGroupIndices[0];
+        } else if (
+          fromSi === toSi &&
+          toEi > sourceIndices[sourceIndices.length - 1]
+        ) {
+          insertionIndex = toEi + 1;
+        }
+      }
+
+      if (fromSi === toSi) {
+        insertionIndex -= sourceIndices.filter(
+          (index) => index < insertionIndex,
+        ).length;
+      }
+
+      insertionIndex = Math.max(
+        0,
+        Math.min(insertionIndex, next[toSi].exercises.length),
+      );
+      next[toSi].exercises.splice(insertionIndex, 0, ...movedExercises);
+      pendingMovedExerciseRef.current = movedExercises[0] ?? null;
       return next;
     });
-    // Scroll to destination after state update
-    setTimeout(() => {
-      const key = `${toSi}-${toEi}`;
-      const el = exerciseRefs.current[key];
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        setHighlightKey(key);
-        setTimeout(() => setHighlightKey(null), 1200);
-      }
-    }, 50);
   }
 
   const [saving, setSaving] = useState(false);
@@ -675,6 +746,8 @@ export default function ProgramTemplateBuilder({
   const [morphoDate, setMorphoDate] = useState<string | undefined>(undefined);
   const [highlightKey, setHighlightKey] = useState<string | null>(null);
   const exerciseRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const pendingMovedExerciseRef = useRef<Exercise | null>(null);
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
     overrides: labOverrides,
     setOverride: onOverrideChange,
@@ -684,6 +757,35 @@ export default function ProgramTemplateBuilder({
   useEffect(() => {
     goalRef.current = meta.goal;
   }, [meta.goal]);
+
+  useEffect(() => {
+    const movedExercise = pendingMovedExerciseRef.current;
+    if (!movedExercise) return;
+
+    for (let si = 0; si < orderedSessions.length; si += 1) {
+      const ei = orderedSessions[si].exercises.indexOf(movedExercise);
+      if (ei < 0) continue;
+
+      pendingMovedExerciseRef.current = null;
+      const key = `${si}-${ei}`;
+      const element = exerciseRefs.current[key];
+      element?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightKey(key);
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = setTimeout(
+        () => setHighlightKey(null),
+        1200,
+      );
+      break;
+    }
+  }, [orderedSessions]);
+
+  useEffect(
+    () => () => {
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+    },
+    [],
+  );
 
   const loadWeekContent = useCallback(
     async (weekId: string) => {
@@ -1244,6 +1346,17 @@ export default function ProgramTemplateBuilder({
     setSessions((prev) => prev.filter((_, i) => i !== si));
   }
 
+  function copySession(si: number) {
+    setSessions((prev) => {
+      const source = prev[si];
+      if (!source) return prev;
+
+      const next = [...prev];
+      next.splice(si + 1, 0, duplicateSession(source));
+      return next;
+    });
+  }
+
   function exerciseRefSetter(key: string) {
     return (el: HTMLDivElement | null) => {
       exerciseRefs.current[key] = el;
@@ -1331,6 +1444,43 @@ export default function ProgramTemplateBuilder({
         }),
       })),
     )
+  }
+
+  function handleVolumeFocusChange(group: string, focus: VolumeFocus) {
+    const nextVolumeFocus = {
+      ...volumeFocusRef.current,
+      [group]: focus,
+    };
+    volumeFocusRef.current = nextVolumeFocus;
+    setMeta((current) => ({
+      ...current,
+      volume_focus: nextVolumeFocus,
+    }));
+
+    if (!isProgram || !programId) return;
+
+    volumeFocusSaveChainRef.current = volumeFocusSaveChainRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        const response = await fetch(`/api/programs/${programId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ volume_focus: nextVolumeFocus }),
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(
+            data?.error ?? "Impossible d’enregistrer les objectifs Smart Fit",
+          );
+        }
+      })
+      .catch((cause) => {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "Impossible d’enregistrer les objectifs Smart Fit",
+        );
+      });
   }
 
   const handleSave = useCallback(async () => {
@@ -1733,6 +1883,7 @@ export default function ProgramTemplateBuilder({
                 removeExercise(rawSessionIndex(si), ei)
               }
               onAddExercise={(si) => addExercise(rawSessionIndex(si))}
+              onDuplicateSession={(si) => copySession(rawSessionIndex(si))}
               onRemoveSession={(si) => removeSession(rawSessionIndex(si))}
               onAddSession={() =>
                 setSessions((prev) => [...prev, emptySession(meta.goal)])
@@ -1825,12 +1976,7 @@ export default function ProgramTemplateBuilder({
               )}
               onOverrideChange={onOverrideChange}
               onOverrideReset={onOverrideReset}
-              onVolumeFocusChange={(group, focus) =>
-                setMeta((current) => ({
-                  ...current,
-                  volume_focus: { ...current.volume_focus, [group]: focus },
-                }))
-              }
+              onVolumeFocusChange={handleVolumeFocusChange}
               clientId={clientId}
               anchorExerciseNames={Array.from(
                 new Set(

@@ -1,8 +1,8 @@
 // components/programs/studio/EditorPane.tsx
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Plus, AlertCircle, ChevronDown, ChevronUp, Layers } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import { Plus, AlertCircle, CalendarDays, Check, ChevronDown, ChevronUp, Clock3, Copy, Layers, Repeat2, Weight } from 'lucide-react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
 import ExerciseCard, { type ExerciseData } from './ExerciseCard'
@@ -12,6 +12,8 @@ import { buildVerdictMap, computeCoherence } from '@/lib/morpho/exerciseCoherenc
 import { extractMorphoTraits, type MorphoTraits } from '@/lib/morpho/morphoTraits'
 import type { IntelligenceResult, IntelligenceAlert } from '@/lib/programs/intelligence'
 import { getSessionsPerWeek, getTrainingDaysPerWeek } from '@/lib/programs/frequency'
+import { estimateSessionDurationMin } from '@/lib/training/sessionDuration'
+import { parseRepsRange } from '@/lib/progression/double-progression'
 
 const GOALS = [
   { value: 'hypertrophy', label: 'Hypertrophie' },
@@ -31,6 +33,7 @@ const LEVELS = [
 ]
 
 const DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+const DAYS_FULL = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 
 const EQUIPMENT_ARCHETYPES = [
   { value: '', label: '— Non spécifié —' },
@@ -41,6 +44,166 @@ const EQUIPMENT_ARCHETYPES = [
   { value: 'functional_box', label: 'Box / Fonctionnel' },
   { value: 'commercial_gym', label: 'Salle de sport' },
 ]
+
+function resolveEstimatedReps(value: string | null | undefined): number {
+  const parsed = parseRepsRange(value ?? '')
+  if (parsed) return Math.round((parsed.rep_min + parsed.rep_max) / 2)
+  const numericValue = Number.parseFloat(String(value ?? '').replace(',', '.'))
+  return Number.isFinite(numericValue) && numericValue > 0 ? Math.round(numericValue) : 0
+}
+
+function formatEstimatedVolume(volumeKg: number): string {
+  if (volumeKg >= 1000) {
+    return `${(volumeKg / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} t`
+  }
+  return `${Math.round(volumeKg).toLocaleString('fr-FR')} kg`
+}
+
+function summarizeSession(exercises: ExerciseData[], goal: string) {
+  let totalSets = 0
+  let totalReps = 0
+  let estimatedVolumeKg = 0
+  let loadedSets = 0
+  let strengthSets = 0
+
+  exercises.forEach(exercise => {
+    const setCount = Math.max(0, Math.floor(Number(exercise.sets ?? 0)))
+    totalSets += setCount
+    if (exercise.execution_type && exercise.execution_type !== 'reps_rir') return
+
+    strengthSets += setCount
+    const weightKg = Number(exercise.current_weight_kg ?? 0)
+    for (let setIndex = 0; setIndex < setCount; setIndex += 1) {
+      const reps = resolveEstimatedReps(
+        exercise.set_prescriptions?.[setIndex]?.reps ?? exercise.reps,
+      )
+      totalReps += reps
+      if (weightKg > 0 && reps > 0) {
+        estimatedVolumeKg += weightKg * reps
+        loadedSets += 1
+      }
+    }
+  })
+
+  return {
+    durationMin: exercises.length > 0 ? estimateSessionDurationMin(exercises, goal) : 0,
+    totalSets,
+    totalReps,
+    estimatedVolumeKg,
+    partialVolume: estimatedVolumeKg > 0 && loadedSets < strengthSets,
+  }
+}
+
+function HeaderMetric({ icon, value, label, title }: {
+  icon: ReactNode
+  value: string
+  label: string
+  title?: string
+}) {
+  return (
+    <span
+      className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-white/[0.035] px-2 text-[9px] text-white/40"
+      title={title}
+      aria-label={`${label} : ${value}`}
+    >
+      <span className="text-[#1f8a65]">{icon}</span>
+      <span className="font-mono font-semibold tabular-nums text-white/75">{value}</span>
+    </span>
+  )
+}
+
+function SessionDayPicker({ selectedDays, onChange }: {
+  selectedDays: number[]
+  onChange: (days: number[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handlePointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open])
+
+  const sortedDays = [...selectedDays].sort((a, b) => a - b)
+  const buttonLabel = sortedDays.length === 0
+    ? 'Jours'
+    : sortedDays.length === 1
+      ? DAYS[sortedDays[0] - 1]
+      : `${DAYS[sortedDays[0] - 1]} +${sortedDays.length - 1}`
+
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen(current => !current)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={[
+          'inline-flex h-7 min-w-[68px] items-center justify-center gap-1.5 rounded-md border-[0.3px] px-2 text-[9px] font-semibold transition-colors',
+          sortedDays.length > 0
+            ? 'border-[#1f8a65]/25 bg-[#1f8a65]/10 text-[#1f8a65]'
+            : 'border-white/[0.06] bg-white/[0.03] text-white/40 hover:text-white/65',
+        ].join(' ')}
+      >
+        <CalendarDays size={11} aria-hidden="true" />
+        {buttonLabel}
+        <ChevronDown size={9} className={open ? 'rotate-180' : ''} aria-hidden="true" />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          aria-label="Jours de la séance"
+          className="absolute right-0 top-full z-50 mt-2 w-44 rounded-xl border-[0.3px] border-white/[0.08] bg-[#181818] p-1.5 shadow-[0_18px_50px_rgba(0,0,0,0.45)]"
+        >
+          {DAYS_FULL.map((day, index) => {
+            const dayNumber = index + 1
+            const active = sortedDays.includes(dayNumber)
+            return (
+              <button
+                key={day}
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={active}
+                onClick={() => onChange(
+                  active
+                    ? sortedDays.filter(value => value !== dayNumber)
+                    : [...sortedDays, dayNumber].sort((a, b) => a - b),
+                )}
+                className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-[10px] text-white/55 hover:bg-white/[0.04] hover:text-white/80"
+              >
+                {day}
+                <span className={active ? 'text-[#1f8a65]' : 'text-white/15'}>
+                  <Check size={12} aria-hidden="true" />
+                </span>
+              </button>
+            )
+          })}
+          {sortedDays.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onChange([])}
+              className="mt-1 w-full border-t-[0.3px] border-white/[0.06] px-2.5 pt-2 text-left text-[9px] text-white/30 hover:text-white/55"
+            >
+              Effacer la sélection
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export interface TemplateMeta {
   name: string
@@ -82,6 +245,7 @@ interface Props {
   onUpdateExercise: (si: number, ei: number, patch: Partial<ExerciseData>) => void
   onRemoveExercise: (si: number, ei: number) => void
   onAddExercise: (si: number) => void
+  onDuplicateSession: (si: number) => void
   onRemoveSession: (si: number) => void
   onAddSession: () => void
   onImageUpload: (si: number, ei: number, file: File) => void
@@ -121,6 +285,7 @@ export default function EditorPane({
   onUpdateExercise,
   onRemoveExercise,
   onAddExercise,
+  onDuplicateSession,
   onRemoveSession,
   onAddSession,
   onImageUpload,
@@ -274,13 +439,24 @@ export default function EditorPane({
 
       {/* Sessions + exercises scroll area */}
       <div className="flex-1 overflow-y-auto overscroll-contain px-6 pt-4 pb-40 space-y-4">
-        {sessions.map((session, si) => (
-          <div
-            key={si}
-            className="rounded-xl border-[0.3px] border-white/[0.06] bg-white/[0.01] overflow-hidden"
-          >
+        {sessions.map((session, si) => {
+          const summary = summarizeSession(session.exercises, meta.goal)
+          const volumeValue = summary.estimatedVolumeKg > 0
+            ? `${summary.partialVolume ? '≥' : '~'}${formatEstimatedVolume(summary.estimatedVolumeKg)}`
+            : '—'
+
+          return (
+            <div
+              key={si}
+              className="rounded-xl border-[0.3px] border-white/[0.06] bg-white/[0.01]"
+            >
             {/* Session header */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b-[0.3px] border-white/[0.06]">
+            <div
+              className={[
+                'flex flex-wrap items-center gap-2 rounded-t-[11px] border-b-[0.3px] border-white/[0.06] bg-[#181818] px-3 py-2.5',
+                session.open ? 'sticky top-0 z-20 shadow-[0_10px_24px_rgba(0,0,0,0.28)]' : '',
+              ].join(' ')}
+            >
               <button
                 onClick={() => onUpdateSession(si, { open: !session.open })}
                 className="p-0.5 text-white/30 hover:text-white/60 transition-colors"
@@ -313,36 +489,50 @@ export default function EditorPane({
                 value={session.name}
                 onChange={e => onUpdateSession(si, { name: e.target.value })}
                 placeholder={`Séance ${si + 1}`}
-                className="flex-1 bg-transparent text-[13px] font-semibold text-white placeholder:text-white/30 outline-none"
+                className="min-w-[120px] flex-1 bg-transparent text-[13px] font-semibold text-white placeholder:text-white/30 outline-none"
               />
-              {/* Day of week pills — multi-select (day mode only) */}
-              {sessionMode === 'day' && (
+
+              {session.open && (
                 <div className="flex items-center gap-1">
-                  {DAYS.map((d, idx) => {
-                    const dow = idx + 1
-                    const active = (session.days_of_week ?? []).includes(dow)
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          const current = session.days_of_week ?? []
-                          const next = active
-                            ? current.filter(x => x !== dow)
-                            : [...current, dow].sort((a, b) => a - b)
-                          onUpdateSession(si, { days_of_week: next, day_of_week: next[0] ?? null })
-                        }}
-                        className={[
-                          'w-7 h-7 rounded-md text-[9px] font-medium transition-colors',
-                          active
-                            ? 'bg-[#1f8a65]/20 text-[#1f8a65]'
-                            : 'text-white/25 hover:text-white/50 hover:bg-white/[0.04]',
-                        ].join(' ')}
-                      >
-                        {d}
-                      </button>
-                    )
-                  })}
+                  <HeaderMetric
+                    icon={<Clock3 size={10} />}
+                    value={summary.durationMin > 0 ? `~${summary.durationMin} min` : '—'}
+                    label="durée"
+                    title="Durée estimée avec tempo, repos et transitions"
+                  />
+                  <HeaderMetric
+                    icon={<Layers size={10} />}
+                    value={`${summary.totalSets} sér.`}
+                    label="séries"
+                  />
+                  <HeaderMetric
+                    icon={<Repeat2 size={10} />}
+                    value={`${summary.totalReps} reps`}
+                    label="reps"
+                    title="Répétitions estimées à partir du milieu de chaque plage"
+                  />
+                  <HeaderMetric
+                    icon={<Weight size={10} />}
+                    value={volumeValue}
+                    label="volume"
+                    title={
+                      summary.partialVolume
+                        ? 'Tonnage partiel : certaines charges courantes ne sont pas encore disponibles'
+                        : 'Tonnage estimé : charge courante × répétitions prévues'
+                    }
+                  />
                 </div>
+              )}
+
+              {/* Compact multi-select (day mode only) */}
+              {sessionMode === 'day' && (
+                <SessionDayPicker
+                  selectedDays={session.days_of_week ?? []}
+                  onChange={days => onUpdateSession(si, {
+                    days_of_week: days,
+                    day_of_week: days[0] ?? null,
+                  })}
+                />
               )}
               {/* Cycle badge */}
               {sessionMode === 'cycle' && (
@@ -351,8 +541,20 @@ export default function EditorPane({
                 </span>
               )}
               <button
+                type="button"
+                onClick={() => onDuplicateSession(si)}
+                className="p-1.5 rounded-lg text-white/25 hover:text-[#1f8a65] hover:bg-[#1f8a65]/10 transition-colors"
+                aria-label={`Dupliquer ${session.name || `la séance ${si + 1}`}`}
+                title="Dupliquer la séance"
+              >
+                <Copy size={12} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
                 onClick={() => onRemoveSession(si)}
                 className="p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors text-[11px]"
+                aria-label={`Supprimer ${session.name || `la séance ${si + 1}`}`}
+                title="Supprimer la séance"
               >
                 ×
               </button>
@@ -365,53 +567,91 @@ export default function EditorPane({
                   items={session.exercises.map((_, ei) => makeExDragId(si, ei))}
                   strategy={verticalListSortingStrategy}
                 >
-                  {session.exercises.map((ex, ei) => (
-                    <ExerciseCard
-                      key={ei}
-                      dragId={makeExDragId(si, ei)}
-                      exercise={ex}
-                      si={si}
-                      ei={ei}
-                      isHighlighted={highlightKey === `${si}-${ei}`}
-                      isUploading={uploadingKey === `${si}-${ei}`}
-                      alerts={alertsFor(si, ei)}
-                      templateId={templateId}
-                      supersetGroupColor={ex.group_id ? supersetGroupColors[ex.group_id] : undefined}
-                      groupSize={ex.group_id ? session.exercises.filter(e => e.group_id === ex.group_id).length : undefined}
-                      nextInSameGroup={!!(ex.group_id && session.exercises[ei + 1]?.group_id === ex.group_id)}
-                      onUpdate={patch => onUpdateExercise(si, ei, patch)}
-                      onRemove={() => onRemoveExercise(si, ei)}
-                      onImageUpload={file => onImageUpload(si, ei, file)}
-                      onPickExercise={() => onPickExercise(si, ei)}
-                      onPickExerciseForAlternative={addFn => onPickExerciseForAlternative(si, ei, addFn)}
-                      onOpenAlternatives={() => onOpenAlternatives(si, ei)}
-                      onToggleSuperset={() => onToggleSuperset(si, ei)}
-                      exerciseRef={exerciseRefSetter(`${si}-${ei}`)}
-                      isFirst={si === 0 && ei === 0}
-                      isLast={si === sessions.length - 1 && ei === session.exercises.length - 1}
-                      performanceTrend={trendMap[ex.name]?.trend ?? null}
-                      performanceSuggestion={trendMap[ex.name]?.suggestion ?? null}
-                      morphoCoherence={(verdictMap || morphoTraits) ? computeCoherence(ex, verdictMap, morphoTraits) : undefined}
-                      isSelected={selectedExercises.some(s => s.si === si && s.ei === ei)}
-                      onToggleSelect={() => onToggleSelectExercise(si, ei)}
-                      clientId={clientId}
-                      onMoveUp={() => {
-                        if (ei > 0) {
-                          onMoveExercise(si, ei, si, ei - 1)
-                        } else if (si > 0) {
-                          const prevSessionExCount = sessions[si - 1].exercises.length
-                          onMoveExercise(si, ei, si - 1, prevSessionExCount)
-                        }
-                      }}
-                      onMoveDown={() => {
-                        if (ei < session.exercises.length - 1) {
-                          onMoveExercise(si, ei, si, ei + 1)
-                        } else if (si < sessions.length - 1) {
-                          onMoveExercise(si, ei, si + 1, 0)
-                        }
-                      }}
-                    />
-                  ))}
+                  {session.exercises.map((ex, ei) => {
+                    const groupIndices = ex.group_id
+                      ? session.exercises.reduce<number[]>((indices, exercise, index) => {
+                          if (exercise.group_id === ex.group_id) indices.push(index)
+                          return indices
+                        }, [])
+                      : [ei]
+                    const blockStart = groupIndices[0]
+                    const blockEnd = groupIndices[groupIndices.length - 1]
+                    const previousInSameGroup = !!(
+                      ex.group_id && session.exercises[ei - 1]?.group_id === ex.group_id
+                    )
+                    const nextInSameGroup = !!(
+                      ex.group_id && session.exercises[ei + 1]?.group_id === ex.group_id
+                    )
+
+                    return (
+                      <ExerciseCard
+                        key={ei}
+                        dragId={makeExDragId(si, ei)}
+                        exercise={ex}
+                        si={si}
+                        ei={ei}
+                        isHighlighted={highlightKey === `${si}-${ei}`}
+                        isUploading={uploadingKey === `${si}-${ei}`}
+                        alerts={alertsFor(si, ei)}
+                        templateId={templateId}
+                        supersetGroupColor={ex.group_id ? supersetGroupColors[ex.group_id] : undefined}
+                        groupSize={groupIndices.length}
+                        previousInSameGroup={previousInSameGroup}
+                        nextInSameGroup={nextInSameGroup}
+                        onUpdate={patch => onUpdateExercise(si, ei, patch)}
+                        onRemove={() => onRemoveExercise(si, ei)}
+                        onImageUpload={file => onImageUpload(si, ei, file)}
+                        onPickExercise={() => onPickExercise(si, ei)}
+                        onPickExerciseForAlternative={addFn => onPickExerciseForAlternative(si, ei, addFn)}
+                        onOpenAlternatives={() => onOpenAlternatives(si, ei)}
+                        onToggleSuperset={() => onToggleSuperset(si, ei)}
+                        exerciseRef={exerciseRefSetter(`${si}-${ei}`)}
+                        isFirst={si === 0 && blockStart === 0}
+                        isLast={si === sessions.length - 1 && blockEnd === session.exercises.length - 1}
+                        performanceTrend={trendMap[ex.name]?.trend ?? null}
+                        performanceSuggestion={trendMap[ex.name]?.suggestion ?? null}
+                        morphoCoherence={(verdictMap || morphoTraits) ? computeCoherence(ex, verdictMap, morphoTraits) : undefined}
+                        isSelected={selectedExercises.some(s => s.si === si && s.ei === ei)}
+                        onToggleSelect={() => onToggleSelectExercise(si, ei)}
+                        clientId={clientId}
+                        onMoveUp={() => {
+                          if (blockStart > 0) {
+                            const previousExercise = session.exercises[blockStart - 1]
+                            const previousBlockStart = previousExercise.group_id
+                              ? session.exercises.findIndex(
+                                  item => item.group_id === previousExercise.group_id,
+                                )
+                              : blockStart - 1
+                            onMoveExercise(si, ei, si, previousBlockStart)
+                          } else if (si > 0) {
+                            onMoveExercise(
+                              si,
+                              ei,
+                              si - 1,
+                              sessions[si - 1].exercises.length,
+                            )
+                          }
+                        }}
+                        onMoveDown={() => {
+                          if (blockEnd < session.exercises.length - 1) {
+                            const nextExercise = session.exercises[blockEnd + 1]
+                            const nextBlockEnd = nextExercise.group_id
+                              ? session.exercises.reduce(
+                                  (lastIndex, item, index) =>
+                                    item.group_id === nextExercise.group_id
+                                      ? index
+                                      : lastIndex,
+                                  blockEnd + 1,
+                                )
+                              : blockEnd + 1
+                            onMoveExercise(si, ei, si, nextBlockEnd)
+                          } else if (si < sessions.length - 1) {
+                            onMoveExercise(si, ei, si + 1, 0)
+                          }
+                        }}
+                      />
+                    )
+                  })}
                 </SortableContext>
                 <div className="flex gap-2">
                   <button
@@ -431,8 +671,9 @@ export default function EditorPane({
                 </div>
               </DroppableSession>
             )}
-          </div>
-        ))}
+            </div>
+          )
+        })}
 
         {/* Add session */}
         <button

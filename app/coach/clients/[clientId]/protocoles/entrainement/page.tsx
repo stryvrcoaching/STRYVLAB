@@ -32,6 +32,7 @@ interface Program {
   muscle_tags?: string[];
   equipment_archetype?: string;
   session_mode?: string;
+  volume_focus?: Record<string, "priority" | "progression" | "maintenance" | "off">;
   program_sessions?: any[];
 }
 

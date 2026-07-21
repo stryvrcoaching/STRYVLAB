@@ -135,18 +135,17 @@ export default async function ClientProfilPage() {
   ).toLocaleDateString(dateLocale, { month: "long", year: "numeric" });
 
   return (
-    <div className="min-h-dvh bg-[#0d0d0d] font-barlow overflow-x-hidden">
+    <div className="min-h-dvh bg-[#121212] font-barlow overflow-x-hidden">
       <ClientTopBar
-        section={ct(lang, "profil.section")}
         title={ct(lang, "profil.title")}
         right={
-          <div className="w-8 h-8 rounded-full bg-[#222222] flex items-center justify-center shrink-0 overflow-hidden">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#222222]">
             {client?.profile_photo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={client.profile_photo_url}
                 alt={fullName}
-                className="w-full h-full object-cover"
+                className="h-full w-full object-cover"
               />
             ) : (
               <span className="text-[11px] font-bold text-[#f2f2f2]">
@@ -157,7 +156,7 @@ export default async function ClientProfilPage() {
         }
       />
 
-      <main className="max-w-lg mx-auto px-4 pt-[104px] pb-24">
+      <main className="client-page-top mx-auto max-w-lg px-4 pb-24">
         <ProfilAccordion
           clientId={client?.id ?? ""}
           profilePhotoUrl={client?.profile_photo_url ?? null}

@@ -202,7 +202,7 @@ function OnboardingFlow() {
   // ─── Exchanging ───────────────────────────────────────────────────────────
   if (step === 'exchanging') {
     return (
-      <div className="min-h-dvh bg-[#0d0d0d] flex items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="min-h-dvh bg-[#121212] flex items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="text-center">
           <Loader2 size={32} className="animate-spin text-[#f2f2f2] mx-auto mb-4" />
           <p className="text-base font-semibold text-white mb-1">{t('onboarding.verifying')}</p>
@@ -215,7 +215,7 @@ function OnboardingFlow() {
   // ─── Error ─────────────────────────────────────────────────────────────────
   if (step === 'error') {
     return (
-      <div className="min-h-dvh bg-[#0d0d0d] flex items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="min-h-dvh bg-[#121212] flex items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="bg-white/[0.02] rounded-xl p-8 max-w-sm w-full text-center">
           <XCircle size={44} className="text-red-400 mx-auto mb-4" />
           <h2 className="text-base font-bold text-white mb-2">{t('onboarding.error.title')}</h2>
@@ -246,7 +246,7 @@ function OnboardingFlow() {
     }
 
     return (
-      <div className="min-h-dvh bg-[#0d0d0d] flex flex-col items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="min-h-dvh bg-[#121212] flex flex-col items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="mb-12 flex flex-col items-center gap-3">
           <Image src="/logo/logo-stryvr-silver.png" alt="STRYVR" width={48} height={48} className="w-12 h-12 object-contain" />
         </div>
@@ -270,7 +270,7 @@ function OnboardingFlow() {
                 </div>
                 {selectedLang === lang.code && (
                   <div className="w-5 h-5 rounded-full bg-[#f2f2f2] flex items-center justify-center">
-                    <div className="w-2 h-2 rounded-full bg-[#0d0d0d]" />
+                    <div className="w-2 h-2 rounded-full bg-[#121212]" />
                   </div>
                 )}
               </button>
@@ -284,7 +284,7 @@ function OnboardingFlow() {
   // ─── Password ──────────────────────────────────────────────────────────────
   if (step === 'password') {
     return (
-      <div className="min-h-dvh bg-[#0d0d0d] flex flex-col items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="min-h-dvh bg-[#121212] flex flex-col items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="mb-8 flex flex-col items-center gap-3">
           <Image src="/logo/logo-stryvr-silver.png" alt="STRYVR" width={48} height={48} className="w-12 h-12 object-contain" />
         </div>
@@ -381,7 +381,7 @@ function OnboardingFlow() {
     }
 
     return (
-      <div className="min-h-dvh bg-[#0d0d0d] flex flex-col overflow-x-hidden">
+      <div className="min-h-dvh bg-[#121212] flex flex-col overflow-x-hidden">
         {/* Logo */}
         <div className="flex items-center justify-center pt-12 pb-6">
           <Image src="/logo/logo-stryvr-silver.png" alt="STRYVR" width={32} height={32} className="w-8 h-8 object-contain" />
@@ -468,7 +468,7 @@ export default function OnboardingPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-dvh bg-[#0d0d0d] flex items-center justify-center overflow-x-hidden">
+        <div className="min-h-dvh bg-[#121212] flex items-center justify-center overflow-x-hidden">
           <Loader2 size={32} className="animate-spin text-[#f2f2f2]" />
         </div>
       }

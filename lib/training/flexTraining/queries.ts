@@ -7,6 +7,7 @@ import type {
 } from './types'
 import { resolveFlexExerciseDisplayName, summarizeFlexWorkoutSession } from './summary'
 import { resolveCatalogExerciseName } from './catalog'
+import type { ExerciseNameResolver } from '@/lib/i18n/exerciseDisplayName'
 
 const FLEX_SESSION_SELECT = `
   id, client_id, coach_id, type, relation_to_planned_workout,
@@ -82,6 +83,21 @@ function normalizeExerciseRow(
         return a.side.localeCompare(b.side)
       }),
   }
+}
+
+/** Adds a display-only label; persisted custom exercise names are never machine-translated. */
+export function localizeFlexExercises(
+  exercises: Array<FlexWorkoutExerciseRow & { sets: FlexWorkoutSetRow[] }>,
+  resolveName: ExerciseNameResolver,
+) {
+  return exercises.map((exercise) => {
+    const catalogName = resolveCatalogExerciseName(exercise.exercise_id)
+    return {
+      ...exercise,
+      display_name: exercise.custom_exercise_name?.trim()
+        || (catalogName ? resolveName(catalogName, exercise.exercise_id) : 'Exercice'),
+    }
+  })
 }
 
 export async function fetchFlexWorkoutSession(

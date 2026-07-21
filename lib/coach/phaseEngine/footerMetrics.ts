@@ -250,6 +250,11 @@ export function buildPhaseFooterMetricCards(
           unit: '%',
           zone: perfZone,
           zoneLabel: defaultZoneLabel(perfZone, locale),
+          // Distinct from transformation-score performance pillar (composite sets/RIR/stagnation).
+          subtitle:
+            locale === 'en'
+              ? 'Load trend (phase engine)'
+              : 'Tendance de charge (moteur de phase)',
         }
       : emptyCard(),
     rhr: rhrCard,

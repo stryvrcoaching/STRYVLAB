@@ -39,7 +39,8 @@ export default function OrgSummary({
   const openAgendaRef = useRef<(() => void) | undefined>(onOpenAgenda)
   openAgendaRef.current = onOpenAgenda
 
-  const todayKey = new Date().toISOString().slice(0, 10)
+  const localToday = new Date()
+  const todayKey = `${localToday.getFullYear()}-${String(localToday.getMonth() + 1).padStart(2, '0')}-${String(localToday.getDate()).padStart(2, '0')}`
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -82,14 +83,26 @@ export default function OrgSummary({
   const upcoming = events
     .filter(e => {
       if (e.is_completed) return false
+
+      // 1. Rappel/Alerte configuré(e) dans les 24h
       const triggerAt = e.alert_at
         ? new Date(e.alert_at)
         : e.notify_minutes_before != null && e.event_time
           ? new Date(new Date(`${e.event_date}T${e.event_time}`).getTime() - e.notify_minutes_before * 60000)
           : null
-      if (!triggerAt || Number.isNaN(triggerAt.getTime())) return false
-      const diffMin = (triggerAt.getTime() - now.getTime()) / 60000
-      return diffMin >= 0 && diffMin <= 1440
+      const triggerDiffMin = triggerAt && !Number.isNaN(triggerAt.getTime())
+        ? (triggerAt.getTime() - now.getTime()) / 60000
+        : null
+      const hasTriggerIn24h = triggerDiffMin !== null && triggerDiffMin >= 0 && triggerDiffMin <= 1440
+
+      // 2. Début de l'événement physique dans les 24h (même sans rappel activé)
+      const eventStart = new Date(e.event_time ? `${e.event_date}T${e.event_time}` : `${e.event_date}T00:00:00`)
+      const startDiffMin = !Number.isNaN(eventStart.getTime())
+        ? (eventStart.getTime() - now.getTime()) / 60000
+        : null
+      const isHappeningIn24h = startDiffMin !== null && startDiffMin >= 0 && startDiffMin <= 1440
+
+      return hasTriggerIn24h || isHappeningIn24h
     })
     .sort((a, b) => {
       const aKey = a.alert_at ?? `${a.event_date}T${a.event_time ?? '09:00'}`

@@ -27,7 +27,7 @@ export async function GET(
   const db = service()
   const { data: clientRow } = await db
     .from('coach_clients')
-    .select('id')
+    .select('id, profile_photo_url')
     .eq('id', params.clientId)
     .eq('coach_id', user.id)
     .maybeSingle()
@@ -39,6 +39,7 @@ export async function GET(
     .select('id, role, content, message_type, from_coach_human, metadata, created_at')
     .eq('client_id', params.clientId)
     .is('archived_at', null)
+    .neq('message_type', 'checkin_summary')
     .order('created_at', { ascending: true })
     .limit(50)
 
@@ -48,7 +49,19 @@ export async function GET(
     if (!attachment?.path) return message
     return { ...message, metadata: { ...(message.metadata ?? {}), attachment: await signChatAttachment(db, attachment) } }
   }))
-  return NextResponse.json({ messages: signedMessages })
+  const { data: coachProfile } = await db
+    .from('coach_profiles')
+    .select('logo_url')
+    .eq('coach_id', user.id)
+    .maybeSingle()
+
+  return NextResponse.json({
+    messages: signedMessages,
+    participants: {
+      clientAvatarUrl: (clientRow as { profile_photo_url?: string | null }).profile_photo_url ?? null,
+      coachAvatarUrl: (coachProfile as { logo_url?: string | null } | null)?.logo_url ?? null,
+    },
+  })
 }
 
 // POST /api/coach/clients/[clientId]/reply

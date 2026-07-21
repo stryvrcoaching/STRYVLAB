@@ -21,7 +21,13 @@ import {
 import { useSetTopBar } from "@/components/layout/useSetTopBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import AssessmentForm from "@/components/assessments/form/AssessmentForm";
-import { BlockConfig, AssessmentResponse, SubmissionStatus } from "@/types/assessment";
+import {
+  BlockConfig,
+  AssessmentResponse,
+  SubmissionStatus,
+  type AssessmentResponseValue,
+  type ResponseMap,
+} from "@/types/assessment";
 import HeaderIconButton from "@/components/layout/HeaderIconButton";
 import { extractTemplateBlocks } from "@/lib/assessments/templateSnapshot";
 
@@ -46,19 +52,17 @@ interface SubmissionDetail {
   responses: AssessmentResponse[];
 }
 
-type ResponseMap = Record<string, Record<string, string | number | string[] | boolean>>;
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function buildResponseMap(responses: AssessmentResponse[]): ResponseMap {
   const map: ResponseMap = {};
   for (const r of responses) {
     if (!map[r.block_id]) map[r.block_id] = {};
-    const val: string | number | string[] | boolean | null =
+    const val: AssessmentResponseValue | null =
       r.value_number !== undefined && r.value_number !== null
         ? r.value_number
         : r.value_json !== undefined && r.value_json !== null
-          ? (r.value_json as string[] | boolean)
+          ? (r.value_json as Record<string, unknown> | string[] | boolean)
           : r.storage_path && r.storage_path.length > 0
             ? r.storage_path
             : r.value_text ?? null;
@@ -69,13 +73,20 @@ function buildResponseMap(responses: AssessmentResponse[]): ResponseMap {
   return map;
 }
 
-function formatValue(val: string | number | string[] | boolean | null | undefined, inputType: string): string {
+function formatValue(val: AssessmentResponseValue | null | undefined, inputType: string): string {
   if (val === undefined || val === null || val === "") return "—";
   if (Array.isArray(val)) return val.join(", ");
   if (typeof val === "boolean") return val ? "Oui" : "Non";
   if (val === "true") return "Oui";
   if (val === "false") return "Non";
   if (inputType === "photo_upload") return "__photo__";
+  if (inputType === "food_preferences" && typeof val === "object") {
+    const profile = val as Record<string, unknown>;
+    const allergies = Array.isArray(profile.allergies) ? profile.allergies.length : 0;
+    const preferences = Array.isArray(profile.preferences) ? profile.preferences.length : 0;
+    return `${allergies} allergie(s) · ${preferences} préférence(s)`;
+  }
+  if (typeof val === "object") return "Donnée structurée";
   return String(val);
 }
 

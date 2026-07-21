@@ -11,13 +11,14 @@ interface ExerciseContextMenuProps {
   onSwap: () => void
   onRest: () => void
   onNote: () => void
+  onComment: () => void
   onTempo: () => void
   onDelete: () => void
   onClose: () => void
 }
 
 export default function ExerciseContextMenu({
-  open, hasTempo, onSwap, onRest, onNote, onTempo, onDelete, onClose,
+  open, hasTempo, onSwap, onRest, onNote, onComment, onTempo, onDelete, onClose,
 }: ExerciseContextMenuProps) {
   const { t } = useClientT()
   useBodyScrollLock(open)
@@ -54,7 +55,8 @@ export default function ExerciseContextMenu({
             <div className="pt-4 divide-y divide-white/[0.05]">
               {item(<RefreshCw size={16} />, t('ui.change.exercise'), onSwap)}
               {item(<Clock size={16} />, 'Temps de repos', onRest)}
-              {item(<MessageSquare size={16} />, t('ui.add.note'), onNote)}
+              {item(<MessageSquare size={16} />, 'Ma note personnelle', onNote)}
+              {item(<MessageSquare size={16} />, 'Commentaire au coach', onComment)}
               {hasTempo && item(<Play size={16} />, 'Tempo guide', onTempo)}
               <div className="pt-1">
                 {item(<Trash2 size={16} />, t('ui.delete.exercise'), onDelete, true)}

@@ -49,7 +49,7 @@ const sections = [
 
 export default function BusinessTermsPage() {
   return (
-    <main className="min-h-screen bg-[#0d0d0d] text-white">
+    <main className="min-h-screen bg-[#121212] text-white">
       <header className="border-b border-white/10 px-5 py-5 sm:px-8">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <Link href="/" className="font-unbounded text-sm tracking-[-0.04em]">STRYV lab</Link>
@@ -58,7 +58,7 @@ export default function BusinessTermsPage() {
       </header>
 
       <div className="mx-auto max-w-5xl px-5 py-16 sm:px-8 sm:py-24">
-        <p className="font-barlow-condensed text-xs uppercase tracking-[0.2em] text-[#c6b48b]">Abonnements professionnels</p>
+        <p className="font-barlow-condensed text-xs uppercase tracking-[0.2em] text-[#1f8a65]">Abonnements professionnels</p>
         <h1 className="mt-5 max-w-4xl font-barlow text-5xl font-semibold uppercase leading-[0.9] tracking-[-0.045em] sm:text-7xl">Conditions B2B</h1>
         <p className="mt-7 max-w-3xl text-base leading-7 text-white/60">
           Conditions préparatoires alignées sur les offres et parcours Stripe présents dans le produit au
@@ -69,7 +69,7 @@ export default function BusinessTermsPage() {
         <section className="mt-12 grid gap-4 lg:grid-cols-3">
           {plans.map(([name, price, capacity, description]) => (
             <article key={name} className="rounded-3xl border border-white/10 bg-white/[0.025] p-6">
-              <p className="font-barlow-condensed text-[10px] uppercase tracking-[0.16em] text-[#c6b48b]">Plan</p>
+              <p className="font-barlow-condensed text-[10px] uppercase tracking-[0.16em] text-[#1f8a65]">Plan</p>
               <h2 className="mt-3 font-barlow text-3xl font-semibold">{name}</h2>
               <p className="mt-2 text-lg font-semibold text-white/85">{price}</p>
               <p className="mt-1 text-xs uppercase tracking-[0.1em] text-white/35">{capacity}</p>
@@ -87,7 +87,7 @@ export default function BusinessTermsPage() {
           ))}
         </div>
 
-        <div className="mt-8 rounded-2xl border border-[#c6b48b]/25 bg-[#c6b48b]/[0.06] p-5 text-sm leading-6 text-white/70">
+        <div className="mt-8 rounded-2xl border border-[#1f8a65]/25 bg-[#1f8a65]/[0.06] p-5 text-sm leading-6 text-white/70">
           Le contrat final doit inclure le DPA, la version acceptée, l’horodatage de l’acceptation et la
           preuve des informations présentées avant la souscription.
         </div>

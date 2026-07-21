@@ -36,6 +36,7 @@ export default function CoachMessageSheet({
   const [mounted, setMounted] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [attachmentSending, setAttachmentSending] = useState(false);
+  const [composerFocused, setComposerFocused] = useState(false);
 
   useBodyScrollLock(Boolean(notification));
 
@@ -70,7 +71,9 @@ export default function CoachMessageSheet({
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(data?.error ?? t("common.error"));
       const loaded = Array.isArray(data?.messages) ? data.messages : [];
-      const humanThread = loaded.filter((message: ChatMessage) => message.role === "user" || message.from_coach_human);
+      const humanThread = loaded.filter((message: ChatMessage) =>
+        (message.role === "user" || message.from_coach_human) && message.message_type !== "checkin_summary"
+      );
       setMessages(humanThread.length > 0 ? humanThread : fallbackMessage ? [fallbackMessage] : []);
       const unseenCoachMessageIds = loaded
         .filter((message: ChatMessage) => message.role === "assistant" && message.from_coach_human && !message.seen_at)
@@ -163,7 +166,7 @@ export default function CoachMessageSheet({
         role="dialog"
         aria-modal="true"
         aria-label={t("feedback.coachDialog")}
-        className="client-native-bottom-sheet fixed left-0 right-0 bottom-0 z-[70] mx-auto flex max-h-[88dvh] min-h-[420px] w-full max-w-xl flex-col overflow-hidden rounded-t-[28px] bg-[#0d0d0d] pb-[var(--client-modal-bottom-padding)] shadow-2xl"
+        className="client-native-bottom-sheet fixed left-0 right-0 bottom-0 z-[70] mx-auto flex max-h-[88dvh] min-h-[420px] w-full max-w-xl flex-col overflow-hidden rounded-t-[28px] bg-[#121212] pb-[var(--client-modal-bottom-padding)] shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-white/[0.10]" />
@@ -192,11 +195,11 @@ export default function CoachMessageSheet({
         )}
 
         {error && <p className="shrink-0 bg-red-500/10 px-4 py-2 text-xs text-red-200">{error}</p>}
-        <div className="shrink-0 border-t border-white/[0.06] bg-[#0d0d0d] px-4 py-3">
+        <div className="shrink-0 bg-[#121212] px-4 py-3">
           <input ref={attachmentInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,text/plain" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void sendAttachment(file); event.currentTarget.value = ""; }} />
-          <div className="flex items-end gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-1.5 shadow-inner shadow-black/20">
+          <div className={`flex items-end gap-2 rounded-[12px] p-1.5 transition-colors ${composerFocused ? "bg-[#222222]" : "bg-[#181818]"}`}>
             <button type="button" aria-label={t("feedback.attachFile")} onClick={() => attachmentInputRef.current?.click()} disabled={attachmentSending || sending} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/55 transition-colors active:bg-white/[0.1] disabled:opacity-40"><Paperclip size={16} /></button>
-            <div className="min-w-0 flex-1"><ChatInputBar compact onSend={sendMessage} disabled={loading || sending || attachmentSending} /></div>
+            <div className="min-w-0 flex-1"><ChatInputBar compact onSend={sendMessage} disabled={loading || sending || attachmentSending} onFocusChange={setComposerFocused} /></div>
           </div>
         </div>
       </section>

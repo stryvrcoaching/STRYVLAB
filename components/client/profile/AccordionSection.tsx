@@ -51,7 +51,7 @@ export default function AccordionSection({ id, title, icon, badge, isOpen, onTog
             style={{ overflow: 'hidden' }}
           >
             <div className="px-4 pb-4">
-              <div className="border-t border-white/[0.06] pt-4">
+              <div className="pt-2">
                 {children}
               </div>
             </div>

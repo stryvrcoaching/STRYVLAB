@@ -13,6 +13,10 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useClientT } from "@/components/client/ClientI18nProvider";
+import {
+  DASHBOARD_SIGNAL_COLORS,
+  DashboardSectionIcon,
+} from "@/components/client/DashboardSectionIcon";
 
 type HistoryPoint = {
   date: string;
@@ -74,7 +78,7 @@ export default function WeightTrackerWidget() {
 
   if (isLoading) {
     return (
-      <SurfaceCard className="bg-[#09090a] border border-white/[0.04] p-6 flex flex-col items-center justify-center min-h-[220px] shadow-sm">
+      <SurfaceCard className="flex min-h-[220px] flex-col items-center justify-center !bg-white/[0.02] p-6">
         <div className="animate-spin rounded-full h-6 w-6 border-2 border-t-transparent border-white/20" />
       </SurfaceCard>
     );
@@ -85,29 +89,28 @@ export default function WeightTrackerWidget() {
   }
 
   return (
-    <SurfaceCard className="bg-[#09090a] border border-white/[0.04] p-5 flex flex-col gap-3 shadow-sm">
-      {/* Header and Metrics */}
+    <SurfaceCard className="flex flex-col !bg-white/[0.02] p-5">
+      {/* Header row: icon + title + period */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-white/[0.03]">
-            <Scale size={14} style={{ color: "#5dba87" }} />
-          </div>
-          <div>
-            <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
-              {t("metrics.weightTracker.title")}
-            </h3>
-          </div>
+          <DashboardSectionIcon color={DASHBOARD_SIGNAL_COLORS.success}>
+            <Scale size={15} />
+          </DashboardSectionIcon>
+          <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
+            {t("metrics.weightTracker.title")}
+          </h3>
         </div>
 
         {/* Time filters */}
-        <div className="flex items-center bg-black/30 rounded-lg p-0.5 border border-white/5">
+        <div className="flex items-center rounded-lg bg-black/30 p-0.5">
           {(["7d", "30d", "all"] as const).map((r) => (
             <button
               key={r}
+              type="button"
               onClick={() => setTimeRange(r)}
-              className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${
+              className={`rounded-md px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider transition-all ${
                 timeRange === r
-                  ? "bg-white/10 text-white border border-white/5"
+                  ? "bg-white/10 text-white"
                   : "text-white/40 hover:text-white/70"
               }`}
             >
@@ -117,16 +120,17 @@ export default function WeightTrackerWidget() {
         </div>
       </div>
 
-      {/* KPI Cards Row */}
+      {/* KPI row — only extra space under the full header line */}
       {stats && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="mt-4 grid grid-cols-2 gap-3">
           {/* Weight KPI */}
           <button
+            type="button"
             onClick={() => setActiveTab("weight")}
-            className={`p-3 rounded-xl border text-left transition-all duration-300 ${
+            className={`rounded-xl p-3 text-left transition-all duration-300 border-[0.3px] ${
               activeTab === "weight"
-                ? "bg-[#5dba87]/5 border-[#5dba87]/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
-                : "bg-white/[0.01] border-white/[0.03] hover:border-white/[0.08]"
+                ? "bg-[#5dba87]/10 border-[#5dba87]/25"
+                : "bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.05]"
             }`}
           >
             <span className="text-[10px] font-bold uppercase tracking-wider text-white/30 block">
@@ -165,12 +169,13 @@ export default function WeightTrackerWidget() {
 
           {/* Body Fat KPI */}
           <button
+            type="button"
             onClick={() => setActiveTab("bodyFat")}
             disabled={stats.currentBodyFat == null}
-            className={`p-3 rounded-xl border text-left transition-all duration-300 disabled:opacity-40 ${
+            className={`rounded-xl p-3 text-left transition-all duration-300 disabled:opacity-40 border-[0.3px] ${
               activeTab === "bodyFat"
-                ? "bg-[#818cf8]/5 border-[#818cf8]/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
-                : "bg-white/[0.01] border-white/[0.03] hover:border-white/[0.08]"
+                ? "bg-[#818cf8]/10 border-[#818cf8]/25"
+                : "bg-white/[0.03] border-white/[0.08] hover:bg-white/[0.05]"
             }`}
           >
             <span className="text-[10px] font-bold uppercase tracking-wider text-white/30 block">
@@ -191,7 +196,7 @@ export default function WeightTrackerWidget() {
       )}
 
       {/* Chart container */}
-      <div className="w-full h-[140px] mt-1 relative">
+      <div className="relative mt-3 h-[140px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={filteredData}

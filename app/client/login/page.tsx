@@ -76,7 +76,7 @@ export default function ClientLoginPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-[#0d0d0d] flex flex-col items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <div className="min-h-dvh bg-[#121212] flex flex-col items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
 
       {/* Logo */}
       <div className="mb-10 flex flex-col items-center gap-3">

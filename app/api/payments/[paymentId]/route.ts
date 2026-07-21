@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { resolvePaymentDueDate } from '@/lib/payments/due-date'
 
 function serviceClient() {
   return createServiceClient(
@@ -34,9 +35,48 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const parsed = updateSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Mise à jour invalide' }, { status: 400 })
 
-  const { data, error } = await serviceClient()
+  const db = serviceClient()
+  const patch = { ...parsed.data }
+
+  // If moving to pending/failed without due_date, ensure one exists for auto-reminders
+  if (
+    (patch.status === 'pending' || patch.status === 'failed') &&
+    patch.due_date === undefined
+  ) {
+    const { data: current } = await db
+      .from('subscription_payments')
+      .select('due_date, payment_date, status, reminder_sent_at')
+      .eq('id', params.paymentId)
+      .eq('coach_id', user.id)
+      .maybeSingle()
+
+    if (current && !current.due_date) {
+      patch.due_date = resolvePaymentDueDate({
+        status: patch.status,
+        due_date: null,
+        payment_date: patch.payment_date ?? current.payment_date,
+      })
+    }
+    // Re-open as pending → allow a fresh auto-reminder cycle
+    if (patch.status === 'pending' && current?.status !== 'pending') {
+      ;(patch as Record<string, unknown>).reminder_sent_at = null
+    }
+  } else if (patch.due_date === null && (patch.status === 'pending' || patch.status === 'failed')) {
+    patch.due_date = resolvePaymentDueDate({
+      status: patch.status,
+      due_date: null,
+      payment_date: patch.payment_date,
+    })
+  }
+
+  // Changing due_date on a pending payment re-arms the reminder
+  if (patch.due_date !== undefined && patch.due_date !== null) {
+    ;(patch as Record<string, unknown>).reminder_sent_at = null
+  }
+
+  const { data, error } = await db
     .from('subscription_payments')
-    .update(parsed.data)
+    .update(patch)
     .eq('id', params.paymentId)
     .eq('coach_id', user.id)
     .select()

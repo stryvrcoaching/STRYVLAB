@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useClient } from "@/lib/client-context";
 import { useClientTopBar } from "@/components/clients/useClientTopBar";
 import SessionHistory from "@/components/clients/SessionHistory";
@@ -11,6 +12,8 @@ const WINDOWS = [7, 30, 90, 0] as const;
 
 export default function PerformancesPage() {
   const { clientId } = useClient();
+  const searchParams = useSearchParams();
+  const focusedSessionId = searchParams.get("session_log");
   const [dataVersion, setDataVersion] = useState(0);
   const [focusedSessionDate, setFocusedSessionDate] = useState<string | null>(null);
   const [focusVersion, setFocusVersion] = useState(0);
@@ -65,6 +68,7 @@ export default function PerformancesPage() {
           <div className="space-y-6">
             <SessionHistory
               clientId={clientId}
+              focusedSessionId={focusedSessionId}
               focusedSessionDate={focusedSessionDate}
               focusVersion={focusVersion}
               onSessionsChanged={() => setDataVersion((v) => v + 1)}

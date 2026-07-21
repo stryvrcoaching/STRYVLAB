@@ -39,7 +39,8 @@ const DOCK_LEFT_ITEMS = [
     href: "/coach/comptabilite",
     match: (p: string) =>
       p.startsWith("/coach/comptabilite") ||
-      p.startsWith("/coach/formules"),
+      p.startsWith("/coach/formules") ||
+      p.startsWith("/coach/ma-page"),
   },
   {
     id: "compte",

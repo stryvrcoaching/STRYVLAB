@@ -112,7 +112,7 @@ export default function PushPermissionPrompt() {
   }
 
   return (
-    <div className="fixed inset-x-4 bottom-[calc(var(--client-bottom-nav-reserved)+16px)] z-[80] mx-auto max-w-md rounded-[24px] bg-[#151515] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.72)]">
+    <div className="fixed inset-x-4 bottom-[calc(var(--client-bottom-nav-reserved)+16px)] z-[80] mx-auto max-w-md overflow-hidden rounded-[24px] border border-white/[0.06] bg-[#09090a] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.72)]">
       <button
         type="button"
         aria-label={t('ui.close')}
@@ -120,17 +120,20 @@ export default function PushPermissionPrompt() {
           localStorage.setItem(PROMPT_KEY, PROMPT_VERSION)
           setVisible(false)
         }}
-        className="absolute right-3 top-3 text-white/50"
+        className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04] text-white/45"
       >
-        <X size={16} />
+        <X size={14} />
       </button>
-      <div className="flex gap-3 pr-5">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
+      <div className="flex gap-3 pr-8">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/[0.03] text-[#5dba87]">
           <Bell size={17} />
         </div>
         <div>
-          <p className="text-sm font-semibold text-white">{t('push.title')}</p>
-          <p className="mt-1 text-xs leading-relaxed text-white/60">
+          <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/40">
+            Notifications
+          </p>
+          <p className="mt-1 text-[14px] font-medium text-white">{t('push.title')}</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-white/45">
             {t('push.body')}
           </p>
         </div>
@@ -139,7 +142,7 @@ export default function PushPermissionPrompt() {
         type="button"
         onClick={enableNotifications}
         disabled={busy}
-        className="mt-3 h-10 w-full rounded-xl bg-white text-xs font-bold text-black disabled:opacity-50"
+        className="mt-4 flex h-11 w-full items-center justify-center rounded-xl bg-[#1f8a65] text-[12px] font-semibold text-white transition-[transform,opacity] duration-150 active:scale-[0.96] disabled:opacity-50"
       >
         {busy ? t('push.activating') : t('push.enable')}
       </button>

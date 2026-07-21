@@ -23,14 +23,15 @@ export const checkinReminderSendFunction = inngest.createFunction(
   { id: 'checkin-reminder-send', retries: 1, triggers: [{ cron: '* * * * *' }] },
   async ({ step }) => {
     await step.run('send-push-reminders', async () => {
-      const { data: schedules } = await service()
+      const db = service()
+      const { data: schedules } = await db
         .from('daily_checkin_schedules')
         .select('client_id, moment, scheduled_time, timezone')
 
       if (!schedules || schedules.length === 0) return { sent: 0 }
 
       const clientIds = schedules.map((s) => s.client_id)
-      const { data: configs } = await service()
+      const { data: configs } = await db
         .from('daily_checkin_configs')
         .select('client_id, days_of_week')
         .in('client_id', clientIds)
@@ -40,6 +41,17 @@ export const checkinReminderSendFunction = inngest.createFunction(
         new Set((configs ?? []).map((c) => c.client_id as string))
       )
       if (activeIds.length === 0) return { sent: 0 }
+
+      const { data: preferences } = await db
+        .from('client_preferences')
+        .select('client_id, notif_checkin_reminder')
+        .in('client_id', activeIds)
+      const checkinEnabledByClient = new Map(
+        (preferences ?? []).map((preference) => [
+          preference.client_id as string,
+          preference.notif_checkin_reminder !== false,
+        ]),
+      )
 
       const configByClient = new Map(
         (configs ?? []).map((c) => [c.client_id as string, (c.days_of_week as number[]) ?? []])
@@ -73,6 +85,7 @@ export const checkinReminderSendFunction = inngest.createFunction(
       let sent = 0
       for (const schedule of schedules) {
         const clientId = schedule.client_id as string
+        if (checkinEnabledByClient.get(clientId) === false) continue
         const timezone = (schedule.timezone as string) || 'Europe/Paris'
         const clientDays = configByClient.get(clientId) ?? []
         const clientDay = toDay(now, timezone)
@@ -91,7 +104,6 @@ export const checkinReminderSendFunction = inngest.createFunction(
 
         const date = computePhysiologicalDateInTimezone(now, timezone)
 
-        const db = service()
         const tag = `stryv-checkin-${clientId}-${moment}-${date}`
         const { data: existing } = await db
           .from('coach_client_notifications')
@@ -104,7 +116,7 @@ export const checkinReminderSendFunction = inngest.createFunction(
         if (existing?.length) continue
 
         try {
-          await createClientAppNotification(db, {
+          const result = await createClientAppNotification(db, {
             clientId,
             coachId: null,
             type: 'system_reminder',
@@ -114,7 +126,7 @@ export const checkinReminderSendFunction = inngest.createFunction(
             pushKind: 'checkin',
             pushTag: tag,
           })
-          sent++
+          if (result.created && result.pushed) sent++
         } catch {
           // A failed push must not stop reminders for other clients.
         }

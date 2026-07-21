@@ -288,8 +288,14 @@ export async function GET(req: NextRequest) {
   const { data, error } = await service()
     .from('client_session_logs')
     .select(`
-      id, session_name, logged_at, completed_at, duration_min, notes, created_at,
+      id, session_name, logged_at, completed_at, duration_min, notes, exercise_notes, created_at,
       session_kind, flex_session_id, relation_to_planned_workout,
+      client_session_exercise_comments (
+        id, exercise_name, body, created_at
+      ),
+      training_session_checkins (
+        phase, readiness, exertion, discomfort_level, discomfort_area, created_at
+      ),
       client_set_logs (
         id, exercise_name, set_number, planned_reps, actual_reps, actual_weight_kg, completed, rpe, notes
       )

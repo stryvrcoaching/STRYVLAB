@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { hasCapability } from '@/lib/billing/plans'
+import { hasCapability, type BillingStatus, type CoachPlan } from '@/lib/billing/plans'
+import { isClientAppEnabledForPlanState } from '@/lib/billing/assertClientAppEnabled'
 import { getCoachDataAccessMode } from '@/lib/privacy/retention'
 import { resolveInternalProductFeedbackAccess } from '@/lib/auth/internal-product-feedback-access'
 
@@ -81,6 +82,10 @@ export async function updateSession(request: NextRequest) {
     !pathname.startsWith('/client/onboarding') &&
     !pathname.startsWith('/client/acces-suspendu')
 
+  // API client — same entitlement as STRYVR pages (plan + live billing)
+  const isClientApi =
+    pathname === '/api/client' || pathname.startsWith('/api/client/')
+
   const isClientLogin = pathname.startsWith('/client/login')
 
   // Routes publiques API (pas d'auth requise)
@@ -133,8 +138,15 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Vérification du statut client (accès suspendu)
-  if (isClientProtected && user) {
+  if (isClientApi && !user) {
+    return NextResponse.json(
+      { error: 'Unauthorized', code: 'UNAUTHORIZED' },
+      { status: 401, headers: { 'Cache-Control': 'no-store' } },
+    )
+  }
+
+  // Shared client record + coach entitlement for pages AND /api/client/*
+  if ((isClientProtected || isClientApi) && user) {
     const serviceSupabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -149,30 +161,72 @@ export async function updateSession(request: NextRequest) {
       .from('coach_clients')
       .select('status, coach_id')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
-    if (clientRecord?.status === 'suspended') {
+    if (isClientProtected && clientRecord?.status === 'suspended') {
       const url = request.nextUrl.clone()
       url.pathname = '/client/acces-suspendu'
       return NextResponse.redirect(url)
     }
 
+    if (isClientApi && clientRecord?.status === 'suspended') {
+      return NextResponse.json(
+        { error: 'Accès suspendu', code: 'CLIENT_SUSPENDED' },
+        { status: 403, headers: { 'Cache-Control': 'no-store' } },
+      )
+    }
+
     if (clientRecord?.coach_id) {
       const { data: coachProfile } = await serviceSupabase
         .from('coach_profiles')
-        .select('plan')
+        .select('plan, billing_status, client_limit, team_seats')
         .eq('coach_id', clientRecord.coach_id)
         .maybeSingle()
 
-      const coachPlan = coachProfile?.plan === 'pro' || coachProfile?.plan === 'studio'
-        ? coachProfile.plan
-        : 'solo'
+      const coachPlan: CoachPlan =
+        coachProfile?.plan === 'pro' || coachProfile?.plan === 'studio'
+          ? coachProfile.plan
+          : 'solo'
+      const rawBilling = coachProfile?.billing_status
+      const billingStatus: BillingStatus =
+        rawBilling === 'trialing' ||
+        rawBilling === 'active' ||
+        rawBilling === 'past_due' ||
+        rawBilling === 'canceled'
+          ? rawBilling
+          : 'inactive'
 
-      if (!hasCapability(coachPlan, 'client_app_access')) {
+      // Full entitlement: plan capability AND live billing (trialing|active)
+      const appEnabled = isClientAppEnabledForPlanState({
+        plan: coachPlan,
+        billingStatus,
+        clientLimit: coachProfile?.client_limit ?? null,
+        teamSeats: coachProfile?.team_seats ?? null,
+        capabilities: new Set(
+          hasCapability(coachPlan, 'client_app_access') ? ['client_app_access'] : [],
+        ),
+      })
+
+      if (!appEnabled) {
+        if (isClientApi) {
+          return NextResponse.json(
+            {
+              error: 'L’application client n’est pas active pour ce coach.',
+              code: 'CLIENT_APP_DISABLED',
+            },
+            { status: 403, headers: { 'Cache-Control': 'no-store' } },
+          )
+        }
         const url = request.nextUrl.clone()
         url.pathname = '/client/access/non-active'
         return NextResponse.redirect(url)
       }
+    } else if (isClientApi) {
+      // Authenticated user without a linked client row
+      return NextResponse.json(
+        { error: 'Client not found', code: 'CLIENT_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
+      )
     }
   }
 
@@ -237,7 +291,6 @@ export async function updateSession(request: NextRequest) {
   // - si c'est un coach → /dashboard
   // Ne jamais envoyer un client vers /dashboard
   if ((isAuthRoute || isHomePage) && user) {
-    console.log('[middleware] authenticated user on', pathname, '— user id:', user.id)
     const serviceSupabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -249,7 +302,6 @@ export async function updateSession(request: NextRequest) {
       .eq('user_id', user.id)
       .maybeSingle()
 
-    console.log('[middleware] clientRecord:', clientRecord ? 'found' : 'not found', '— redirecting to:', clientRecord ? '/client' : '/dashboard')
     const url = request.nextUrl.clone()
     url.pathname = clientRecord ? '/client' : '/dashboard'
     return NextResponse.redirect(url)

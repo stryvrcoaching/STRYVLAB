@@ -190,7 +190,13 @@ export const trainingProgressionNotificationsFunction = inngest.createFunction(
         'progress.personal_record',
         { exerciseName: record.exerciseName, weightKg: record.weightKg, reps: record.reps },
         '/client/programme',
-        { session_log_id: sessionLogId, exercise_id: record.exerciseId },
+        {
+          session_log_id: sessionLogId,
+          exercise_id: record.exerciseId,
+          exercise_name: record.exerciseName,
+          weight_kg: record.weightKg,
+          reps: record.reps,
+        },
       )) sent++
     }
 

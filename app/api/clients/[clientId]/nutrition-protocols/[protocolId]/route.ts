@@ -7,6 +7,7 @@ import { closeNutritionProtocolAssignment } from '@/lib/assignments/clientAssign
 import { inferNutritionDayRole } from '@/lib/nutrition/day-role'
 import { createClientAppNotification } from '@/lib/notifications/create-client-app-notification'
 import { setClientTdeeAutoEnabled } from '@/lib/nutrition/tdee-state'
+import { validateProtocolFoodCompatibility } from '@/lib/nutrition/protocol-food-validation'
 
 function serviceClient() {
   return createServiceClient(
@@ -169,6 +170,23 @@ export async function PATCH(
   if (!body.success) return NextResponse.json({ error: body.error }, { status: 400 })
 
   const db = serviceClient()
+  if (body.data.days !== undefined) {
+    const foodValidation = await validateProtocolFoodCompatibility({
+      db,
+      clientId,
+      days: body.data.days,
+    })
+    const blockedFood = foodValidation.issues.find((issue) => issue.status === 'blocked')
+    if (blockedFood) {
+      return NextResponse.json(
+        {
+          error: `${blockedFood.food_name} est incompatible avec le profil alimentaire du client.`,
+          food_compatibility_issues: foodValidation.issues,
+        },
+        { status: 409 },
+      )
+    }
+  }
   const shouldLogProtocolUpdate =
     existing.status === 'shared' &&
     (

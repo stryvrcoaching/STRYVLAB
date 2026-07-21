@@ -94,12 +94,14 @@ export function useNavConfig(): NavConfig {
   // ── Business ──────────────────────────────────────────────────────────────
   if (
     pathname.startsWith("/coach/comptabilite") ||
-    pathname.startsWith("/coach/formules")
+    pathname.startsWith("/coach/formules") ||
+    pathname.startsWith("/coach/ma-page")
   ) {
     return {
       rowA: [
         { id: "comptabilite", label: "Comptabilité", href: "/coach/comptabilite" },
         { id: "formules", label: "Formules", href: "/coach/formules" },
+        { id: "ma-page", label: "Ma page", href: "/coach/ma-page" },
       ],
       cta: { type: "hidden" },
     };

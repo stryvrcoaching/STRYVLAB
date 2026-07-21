@@ -76,8 +76,9 @@ function PhotoLogPageInner() {
 
   const closeToNutrition = () => {
     const params = new URLSearchParams({ date: activeDate })
-    if (returnTab && returnTab !== "suivi") params.set("tab", returnTab)
-    router.push(`/client/nutrition?${params.toString()}`)
+    const route = returnTab === "plan" ? "/client/nutrition/plan" : "/client/nutrition"
+    if (returnTab && returnTab !== "suivi" && returnTab !== "plan") params.set("tab", returnTab)
+    router.push(`${route}?${params.toString()}`)
   }
 
   return (
@@ -97,7 +98,7 @@ function PhotoLogPageInner() {
 
 export default function PhotoLogPage() {
   return (
-    <Suspense fallback={<div className="min-h-dvh bg-[#0d0d0d]" />}>
+    <Suspense fallback={<div className="min-h-dvh bg-[#121212]" />}>
       <PhotoLogPageInner />
     </Suspense>
   )

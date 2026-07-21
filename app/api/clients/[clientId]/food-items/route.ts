@@ -3,6 +3,11 @@ import { createClient as createServerClient } from "@/utils/supabase/server"
 import { createClient as createServiceClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { coachOwnsClient } from "@/lib/security/client-resource-access"
+import { loadClientFoodProfile } from "@/lib/nutrition/food-profile-service"
+import {
+  evaluateFoodCompatibility,
+  sortFoodsByCompatibility,
+} from "@/lib/nutrition/food-compatibility"
 
 function serviceClient() {
   return createServiceClient(
@@ -35,6 +40,7 @@ const searchSchema = z.object({
     .optional()
     .default("name"),
   frequent: z.coerce.boolean().optional().default(false),
+  include_hidden: z.coerce.boolean().optional().default(false),
   limit: z.coerce.number().int().min(1).max(200).optional().default(80),
 })
 
@@ -109,7 +115,8 @@ export async function GET(
   const parsed = searchSchema.safeParse(Object.fromEntries(new URL(req.url).searchParams))
   if (!parsed.success) return NextResponse.json({ error: parsed.error }, { status: 400 })
 
-  const { q, category, subcategory, sort, frequent, limit } = parsed.data
+  const { q, category, subcategory, sort, frequent, include_hidden, limit } = parsed.data
+  const foodProfile = await loadClientFoodProfile(db, clientId)
   const usage = frequent || sort === "frequent" || sort === "recent"
     ? await loadFoodUsage(clientId)
     : new Map<string, { count: number; lastUsedAt: number }>()
@@ -120,7 +127,7 @@ export async function GET(
       `
       id, name_fr, category_l1, category_l2, item_key,
       icon_key, kcal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fiber_per_100g,
-      source, is_verified, client_id
+      source, is_verified, client_id, dietary_tags, allergen_tags, ingredients_known
     `,
     )
     .order("name_fr")
@@ -161,9 +168,15 @@ export async function GET(
       fiber_per_100g: item.fiber_per_100g,
       source: item.source,
       is_verified: item.is_verified,
+      dietary_tags: item.dietary_tags,
+      allergen_tags: item.allergen_tags,
+      ingredients_known: item.ingredients_known,
       usage_count: usage.get(item.id)?.count ?? 0,
       last_used_at: usage.get(item.id)?.lastUsedAt ?? 0,
+      compatibility: evaluateFoodCompatibility(item as any, foodProfile),
     }))
+    .filter((item) => item.compatibility.status !== "blocked")
+    .filter((item) => include_hidden || item.compatibility.status !== "hidden")
     .filter((item) => !frequent || item.usage_count >= 3)
     .sort((a, b) => {
       if (sort === "name_desc") return b.name_fr.localeCompare(a.name_fr)
@@ -179,10 +192,12 @@ export async function GET(
       if (sort === "recent") return b.last_used_at - a.last_used_at || b.usage_count - a.usage_count || a.name_fr.localeCompare(b.name_fr)
       return a.name_fr.localeCompare(b.name_fr)
     })
-    .slice(0, limit)
+  const compatibleItems = sortFoodsByCompatibility(items).slice(0, limit)
 
   return NextResponse.json({
-    data: items,
+    data: compatibleItems,
+    food_profile_status: foodProfile?.allergy_status ?? "unknown",
+    hidden_foods_available: !include_hidden,
   })
 }
 
@@ -239,5 +254,17 @@ export async function POST(
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ data }, { status: 201 })
+  const foodProfile = await loadClientFoodProfile(db, clientId)
+  return NextResponse.json(
+    {
+      data: {
+        ...data,
+        compatibility: evaluateFoodCompatibility(
+          { ...data, dietary_tags: [], allergen_tags: [], ingredients_known: false } as any,
+          foodProfile,
+        ),
+      },
+    },
+    { status: 201 },
+  )
 }

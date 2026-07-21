@@ -56,7 +56,7 @@ export default function CyclePhaseModal({
           />
 
           <motion.div
-            className="client-native-bottom-sheet fixed bottom-0 left-0 right-0 z-[70] bg-[#0d0d0d] rounded-t-[28px] px-5 pt-4 space-y-4"
+            className="client-native-bottom-sheet fixed bottom-0 left-0 right-0 z-[70] bg-[#121212] rounded-t-[28px] px-5 pt-4 space-y-4"
             style={{ maxHeight: '88dvh', paddingBottom: 'var(--client-modal-bottom-padding)' }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}

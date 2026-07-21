@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireAuthedUser, resolveClientForUser, createServiceDb } from '@/lib/training/flexTraining/server'
+import { resolveCatalogExerciseName } from '@/lib/training/flexTraining/catalog'
+import { loadExerciseNameResolver } from '@/lib/i18n/exerciseDisplayName'
+import type { ClientLang } from '@/lib/i18n/clientTranslations'
 
 type Params = { params: { sessionId: string; exerciseLogId: string } }
 
@@ -40,7 +43,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const db = createServiceDb()
   const { data: sessionRow } = await db
     .from('flex_workout_sessions')
-    .select('client_id')
+    .select('client_id, coach_id')
     .eq('id', params.sessionId)
     .maybeSingle()
 
@@ -59,9 +62,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Exercice introuvable' }, { status: 404 })
   }
 
+  const selectingCatalogueExercise = parsed.data.exercise_id !== undefined && parsed.data.exercise_id !== null
   const fullPatch = {
     ...(parsed.data.exercise_id !== undefined ? { exercise_id: parsed.data.exercise_id } : {}),
-    ...(parsed.data.custom_exercise_name !== undefined ? { custom_exercise_name: parsed.data.custom_exercise_name } : {}),
+    ...(selectingCatalogueExercise
+      ? { custom_exercise_name: null }
+      : parsed.data.custom_exercise_name !== undefined ? { custom_exercise_name: parsed.data.custom_exercise_name } : {}),
     ...(parsed.data.muscle_groups !== undefined ? { muscle_groups: parsed.data.muscle_groups } : {}),
     ...(parsed.data.movement_pattern !== undefined ? { movement_pattern: parsed.data.movement_pattern } : {}),
     ...(parsed.data.equipment !== undefined ? { equipment: parsed.data.equipment } : {}),
@@ -85,7 +91,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (updateError && isMissingColumnError(updateError.message)) {
     const fallbackPatch = {
       ...(parsed.data.exercise_id !== undefined ? { exercise_id: parsed.data.exercise_id } : {}),
-      ...(parsed.data.custom_exercise_name !== undefined ? { custom_exercise_name: parsed.data.custom_exercise_name } : {}),
+      ...(selectingCatalogueExercise
+        ? { custom_exercise_name: null }
+        : parsed.data.custom_exercise_name !== undefined ? { custom_exercise_name: parsed.data.custom_exercise_name } : {}),
       ...(parsed.data.muscle_groups !== undefined ? { muscle_groups: parsed.data.muscle_groups } : {}),
       ...(parsed.data.order_index !== undefined ? { order_index: parsed.data.order_index } : {}),
       ...(parsed.data.notes !== undefined ? { notes: parsed.data.notes } : {}),
@@ -107,7 +115,47 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: updateError?.message ?? 'Impossible de mettre à jour l’exercice' }, { status: 500 })
   }
 
-  return NextResponse.json({ exercise: data })
+  if (parsed.data.notes?.trim() && sessionRow.coach_id) {
+    const exerciseName = data.custom_exercise_name ?? 'un exercice'
+    const payload = {
+      flex_session_id: params.sessionId,
+      exercise_log_id: params.exerciseLogId,
+      action_url: `/coach/clients/${client.id}/data/performances/flex-workouts/${params.sessionId}`,
+    }
+    const { data: existing } = await db.from('coach_notifications')
+      .select('id').eq('coach_id', sessionRow.coach_id).eq('status', 'pending')
+      .contains('payload', { flex_session_id: params.sessionId, exercise_log_id: params.exerciseLogId }).maybeSingle()
+    const body = `Le client a laissé un commentaire sur « ${exerciseName} » dans une séance libre.`
+
+    if (existing) {
+      await db.from('coach_notifications').update({ body, payload }).eq('id', existing.id)
+    } else {
+      await db.from('coach_notifications').insert({
+        coach_id: sessionRow.coach_id,
+        client_id: client.id,
+        category: 'training',
+        subcategory: 'exercise_comment',
+        priority: 3,
+        status: 'pending',
+        email_sent: false,
+        title: 'Nouveau commentaire client',
+        body,
+        payload,
+      })
+    }
+  }
+
+  const { data: preferences } = await db
+    .from('client_preferences')
+    .select('language')
+    .eq('client_id', client.id)
+    .maybeSingle()
+  const lang: ClientLang = preferences?.language === 'es' || preferences?.language === 'en' ? preferences.language : 'fr'
+  const catalogName = resolveCatalogExerciseName(data.exercise_id)
+  const display_name = data.custom_exercise_name
+    ?? (catalogName ? (await loadExerciseNameResolver(db, lang))(catalogName, data.exercise_id) : 'Exercice')
+
+  return NextResponse.json({ exercise: { ...data, display_name } })
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {

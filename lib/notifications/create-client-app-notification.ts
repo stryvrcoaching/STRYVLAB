@@ -1,7 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   sendClientPush,
+  clientPushPreferenceForKind,
   type ClientPushKind,
+  type ClientPushPreferenceKey,
 } from '@/lib/notifications/send-client-push'
 import {
   getClientPushCopy,
@@ -44,12 +46,44 @@ type CreateClientAppNotificationParams = {
   payload?: Record<string, unknown> | null
   pushKind?: ClientPushKind
   pushTag?: string | null
+  /** Used only for device-level push tests and other explicit system actions. */
+  bypassPreference?: boolean
+}
+
+function isExternalUrl(url: string) {
+  return url.startsWith('http://') || url.startsWith('https://')
+}
+
+/**
+ * Append notificationId only on in-app (relative) paths.
+ * Never mutate external URLs (Stripe Checkout breaks with extra params / PWA navigation).
+ */
+function withNotificationTracking(url: string, notificationId: string): string {
+  if (isExternalUrl(url)) return url
+  const sep = url.includes('?') ? '&' : '?'
+  return `${url}${sep}notificationId=${encodeURIComponent(notificationId)}`
 }
 
 export async function createClientAppNotification(
   db: SupabaseClient,
   params: CreateClientAppNotificationParams,
 ) {
+  const pushKind = params.pushKind ?? 'system'
+  const preference = clientPushPreferenceForKind[pushKind]
+
+  // A notification setting controls both its in-app card and its push. The
+  // underlying content (programme, chat, bilan…) stays accessible normally.
+  if (!params.bypassPreference && preference) {
+    const { data: preferences } = await db
+      .from('client_preferences')
+      .select(preference)
+      .eq('client_id', params.clientId)
+      .maybeSingle()
+    if ((preferences as Partial<Record<ClientPushPreferenceKey, boolean>> | null)?.[preference] === false) {
+      return { created: false, pushed: false }
+    }
+  }
+
   const lang = await resolveClientLanguage(db, params.clientId)
 
   const localizedCopy = params.copyKey
@@ -69,10 +103,19 @@ export async function createClientAppNotification(
     )
   }
 
+  // Prefer in-app destinations. External Stripe URLs must not be the primary
+  // action_url for the PWA (standalone webviews break Checkout).
+  const requestedAction = params.actionUrl?.trim() || null
+  const safeActionUrl =
+    requestedAction && isExternalUrl(requestedAction)
+      ? '/client/paiement'
+      : requestedAction
+
   const payload = {
     ...(params.payload ?? {}),
-    ...(params.actionUrl
-      ? { action_url: params.actionUrl }
+    ...(safeActionUrl ? { action_url: safeActionUrl } : {}),
+    ...(requestedAction && isExternalUrl(requestedAction)
+      ? { external_payment_url: requestedAction }
       : {}),
   }
 
@@ -94,17 +137,21 @@ export async function createClientAppNotification(
   const isCoachMessage =
     (params.type === 'coach_note' || params.type === 'coach_message')
     && params.payload?.message_kind === 'coach_message'
-  const pushUrl = isCoachMessage
+
+  const basePushUrl = isCoachMessage
     ? `/client?openCoachMessage=${encodeURIComponent(inserted.id)}`
-    : params.actionUrl ?? '/client'
+    : safeActionUrl ?? '/client'
+
   const actionUrl = isCoachMessage
-    ? pushUrl
-    : `${pushUrl}${pushUrl.includes('?') ? '&' : '?'}notificationId=${encodeURIComponent(inserted.id)}`
+    ? basePushUrl
+    : withNotificationTracking(basePushUrl, inserted.id)
+
+  const notificationPayload = { ...payload, action_url: actionUrl, notification_id: inserted.id }
 
   await db
     .from('coach_client_notifications')
     .update({
-      payload: { ...payload, action_url: actionUrl, notification_id: inserted.id },
+      payload: notificationPayload,
     })
     .eq('id', inserted.id)
 
@@ -115,10 +162,10 @@ export async function createClientAppNotification(
     // The push remains useful when the badge calculation is temporarily unavailable.
   }
 
-  await sendClientPush(
+  const pushed = await sendClientPush(
     db,
     params.clientId,
-    params.pushKind ?? 'system',
+    pushKind,
     {
       title,
       body,
@@ -128,5 +175,26 @@ export async function createClientAppNotification(
         ?? `stryv-${params.type}-${Date.now()}`,
       badgeCount,
     },
+    { bypassPreference: params.bypassPreference },
   )
+
+  // Keep a delivery trace with the in-app notification. A scheduled reminder
+  // must not look delivered just because its card was created successfully.
+  // This also gives the client settings screen a useful, actionable signal
+  // when a subscription, VAPID configuration or browser endpoint fails.
+  await db
+    .from('coach_client_notifications')
+    .update({
+      payload: {
+        ...notificationPayload,
+        push_delivery: {
+          status: pushed ? 'sent' : 'failed',
+          attempted_at: new Date().toISOString(),
+          kind: pushKind,
+        },
+      },
+    })
+    .eq('id', inserted.id)
+
+  return { notificationId: inserted.id, created: true, pushed }
 }

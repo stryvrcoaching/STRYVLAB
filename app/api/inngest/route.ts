@@ -10,7 +10,6 @@ import { chatArchiveFunction } from '@/lib/inngest/functions/chat-archive'
 import { chatMorningBriefFunction } from '@/lib/inngest/functions/chat-morning-brief'
 import { chatEveningBriefFunction } from '@/lib/inngest/functions/chat-evening-brief'
 import { checkinDeferReminderFunction } from '@/lib/inngest/functions/checkin-defer-reminder'
-import { clientEngagementRemindersFunction } from '@/lib/inngest/functions/client-engagement-reminders'
 import { assessmentAutomationsFunction } from '@/lib/inngest/functions/assessment-automations'
 import { assessmentPendingRemindersFunction } from '@/lib/inngest/functions/assessment-pending-reminders'
 import { nutritionProgressionEvaluateFunction } from '@/lib/inngest/functions/nutrition-progression-evaluate'
@@ -33,7 +32,6 @@ export const { GET, POST, PUT } = serve({
     chatMorningBriefFunction,
     chatEveningBriefFunction,
     checkinDeferReminderFunction,
-    clientEngagementRemindersFunction,
     assessmentAutomationsFunction,
     assessmentPendingRemindersFunction,
     nutritionProgressionEvaluateFunction,

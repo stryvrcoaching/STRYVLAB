@@ -34,6 +34,7 @@ export async function DELETE(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  revalidatePath("/client")
   revalidatePath("/client/nutrition")
   return NextResponse.json({ ok: true })
 }

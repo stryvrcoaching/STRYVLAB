@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { MoreHorizontal } from "lucide-react"
 import { useClientT } from "@/components/client/ClientI18nProvider"
+import { Message, MessageAvatar, MessageContent, MessageFooter } from "@/components/ui/message"
 import type { ChatAttachment } from "@/lib/chat/attachments"
 import { formatSleepHours, sleepPartsToHoursNumber, splitSleepHours } from "@/lib/client/checkin/sleepTimeFormat"
 
@@ -217,7 +217,7 @@ function TimeInput({
   )
 }
 
-function MessageAvatar({ url, initial }: { url?: string | null; initial: string }) {
+function ConversationAvatar({ url, initial }: { url?: string | null; initial: string }) {
   const [imgError, setImgError] = useState(false)
 
   // Reset error state when URL changes
@@ -291,22 +291,22 @@ export default function ChatBubble({
   };
 
   return (
-    <div
-      className={`flex items-start gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}
+    <Message
+      align={isUser ? "end" : "start"}
+      className="items-start"
       data-chat-message-id={message.id}
       data-observe-visible={!isUser && !message.seen_at ? 'true' : 'false'}
     >
-      {!isUser && (
-        <MessageAvatar url={coachAvatarUrl} initial={initial} />
-      )}
-      {isUser && (
-        <MessageAvatar
-          url={clientAvatarUrl}
-          initial={(clientInitial?.trim() || "C").charAt(0).toUpperCase()}
+      <MessageAvatar className="h-7 min-w-7 bg-transparent p-0">
+        <ConversationAvatar
+          url={isUser ? clientAvatarUrl : coachAvatarUrl}
+          initial={isUser
+            ? (clientInitial?.trim() || "C").charAt(0).toUpperCase()
+            : initial}
         />
-      )}
+      </MessageAvatar>
 
-      <div className={`flex flex-col gap-2 ${isUser ? "items-end" : "items-start"} max-w-[82%]`}>
+      <MessageContent className={`max-w-[82%] gap-1.5 ${isUser ? "items-end" : "items-start"}`}>
         {/* Text bubble */}
         <div className="relative flex items-center message-options-container">
           {isUser && message.message_type !== "checkin_summary" && isMenuOpen && (
@@ -328,16 +328,16 @@ export default function ChatBubble({
             </div>
           )}
           {message.message_type === "checkin_summary" ? (
-            <div className="px-3.5 py-2.5 text-[12px] bg-[#1a1a1a] border border-[#2e2e2e] text-[#b0b0b0] font-medium rounded-xl flex items-center gap-2 whitespace-pre-wrap">
+            <div className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[#181818] px-3.5 py-2.5 text-[12px] font-medium text-[#b0b0b0] whitespace-pre-wrap">
               <span className="text-[14px]">📊</span>
               {message.content}
             </div>
           ) : (
             <div
-              className={`px-3.5 py-2.5 text-[13px] leading-[1.5] ${
+              className={`px-3.5 py-2.5 text-[14px] leading-5 ${
                 isUser
-                ? "bg-[#f2f2f2] text-[#080808] font-medium rounded-2xl rounded-tr-sm cursor-pointer select-none active:opacity-80 transition-opacity"
-                  : `border border-white/[0.07] bg-[#151817] text-[#e1e5e3] rounded-2xl rounded-tl-sm shadow-[0_4px_18px_rgba(0,0,0,0.16)] ${message.from_coach_human ? 'border-[#1f8a65]/45 bg-[#17231e]' : ''}`
+                ? "rounded-xl rounded-br-sm bg-[#222222] font-medium text-white cursor-pointer select-none transition-colors active:bg-[#2e2e2e]"
+                  : "rounded-xl rounded-bl-sm bg-[#181818] text-[#e0e0e0]"
               }`}
               onClick={isUser && message.message_type !== "checkin_summary" ? handleMenuToggle : undefined}
             >
@@ -355,73 +355,45 @@ export default function ChatBubble({
             )}
           </a>
         )}
-        <span className={`px-1 text-[9px] font-medium text-white/25 ${isUser ? "text-right" : "text-left"}`}>
-          {formatMessageTime(message.created_at, lang)}
-        </span>
-
-        {/* Chips */}
         {!isUser && meta?.component === 'chips' && (
-          <div className={`flex flex-wrap gap-1.5 ${answered ? 'opacity-40 pointer-events-none' : ''}`}>
-            {(meta.options ?? []).map(opt => (
+          <div className={`flex flex-wrap gap-1.5 ${answered ? 'pointer-events-none opacity-40' : ''}`}>
+            {(meta.options ?? []).map((option) => (
               <button
-                key={opt.value}
-                onClick={() => !answered && onInteract?.(message.id, meta.key, opt.value)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-[#1a1a1a] rounded-full text-[12px] font-barlow text-[#808080] active:bg-[#f2f2f2] active:text-[#080808] transition-all"
+                key={option.value}
+                onClick={() => !answered && onInteract?.(message.id, meta.key, option.value)}
+                className="flex items-center gap-1 rounded-full bg-[#1a1a1a] px-3 py-1.5 font-barlow text-[12px] text-[#808080] transition-all active:bg-[#f2f2f2] active:text-[#080808]"
               >
-                {opt.emoji && <span>{opt.emoji}</span>}
-                <span>{opt.label}</span>
+                {option.emoji && <span>{option.emoji}</span>}
+                <span>{option.label}</span>
               </button>
             ))}
           </div>
-      )}
-
-      {!isUser && meta?.component === 'time' && (
-        <div className={`px-3.5 py-3 bg-[#111111] rounded-xl ${answered ? 'opacity-40 pointer-events-none' : ''}`}>
-          <TimeInput
-            meta={meta}
-            answered={answered}
-            onInteract={(val) => onInteract?.(message.id, meta.key, val)}
-          />
-        </div>
-      )}
-
-        {/* Slider */}
-        {!isUser && meta?.component === 'slider' && (
-          <div className={`px-3.5 py-3 bg-[#111111] rounded-xl ${answered ? 'opacity-40 pointer-events-none' : ''}`}>
-            <SliderInput
-              meta={meta}
-              answered={answered}
-              onInteract={(val) => onInteract?.(message.id, meta.key, val)}
-            />
+        )}
+        {!isUser && meta?.component === 'time' && (
+          <div className={`rounded-xl bg-[#111111] px-3.5 py-3 ${answered ? 'pointer-events-none opacity-40' : ''}`}>
+            <TimeInput meta={meta} answered={answered} onInteract={(value) => onInteract?.(message.id, meta.key, value)} />
           </div>
         )}
-
-        {/* Number input */}
+        {!isUser && meta?.component === 'slider' && (
+          <div className={`rounded-xl bg-[#111111] px-3.5 py-3 ${answered ? 'pointer-events-none opacity-40' : ''}`}>
+            <SliderInput meta={meta} answered={answered} onInteract={(value) => onInteract?.(message.id, meta.key, value)} />
+          </div>
+        )}
         {!isUser && meta?.component === 'number' && (
-          <div className={`px-3.5 py-3 bg-[#111111] rounded-xl ${answered ? 'opacity-40 pointer-events-none' : ''}`}>
-            {meta.helperText && (
-              <p className="mb-2 max-w-[240px] text-[11px] leading-[1.45] text-[#6f6f6f] font-barlow">
-                {meta.helperText}
-              </p>
-            )}
+          <div className={`rounded-xl bg-[#111111] px-3.5 py-3 ${answered ? 'pointer-events-none opacity-40' : ''}`}>
+            {meta.helperText && <p className="mb-2 max-w-[240px] font-barlow text-[11px] leading-[1.45] text-[#6f6f6f]">{meta.helperText}</p>}
             <div className="flex items-center gap-3">
-              <NumberInput
-                meta={meta}
-                answered={answered}
-                onInteract={(val) => onInteract?.(message.id, meta.key, val)}
-              />
+              <NumberInput meta={meta} answered={answered} onInteract={(value) => onInteract?.(message.id, meta.key, value)} />
               {meta.optional && !answered && (
-                <button
-                  onClick={() => onSkip?.(message.id, meta.key)}
-                  className="text-[11px] text-[#5a5a5a] font-barlow shrink-0 ml-1"
-                >
-                  Passer →
-                </button>
+                <button onClick={() => onSkip?.(message.id, meta.key)} className="ml-1 shrink-0 font-barlow text-[11px] text-[#5a5a5a]">Passer →</button>
               )}
             </div>
           </div>
         )}
-      </div>
-    </div>
+        <MessageFooter className={`px-1 text-[9px] text-white/25 ${isUser ? "justify-end" : "justify-start"}`}>
+          {formatMessageTime(message.created_at, lang)}
+        </MessageFooter>
+      </MessageContent>
+    </Message>
   )
 }

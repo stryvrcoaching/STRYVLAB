@@ -30,7 +30,7 @@ export default function ClientError({
 
   return (
     <div
-      className="fixed inset-0 flex flex-col items-center justify-center bg-[#0d0d0d] px-6 text-white"
+      className="fixed inset-0 flex flex-col items-center justify-center bg-[#121212] px-6 text-white"
       style={{ zIndex: 9999 }}
     >
       <div className="w-full max-w-sm flex flex-col gap-5">

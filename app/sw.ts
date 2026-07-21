@@ -31,11 +31,23 @@ const serwist = new Serwist({
       }),
     },
     {
+      // Static media used by the client shell — cache aggressively after first hit.
+      matcher: ({ url, request }) =>
+        request.destination === "image" ||
+        request.destination === "font" ||
+        url.pathname.startsWith("/logo/") ||
+        url.pathname.startsWith("/images/lclient-dashboard-bg"),
+      handler: new CacheFirst({
+        cacheName: "stryv-client-media-v1",
+      }),
+    },
+    {
       matcher: ({ url }) => url.pathname.startsWith("/client") || url.pathname.startsWith("/sales"),
       handler: async ({ request, event }) => {
+        // Slightly longer network budget for cold 4G; fall back to cache for snappy revisits.
         const networkFirst = new NetworkFirst({
-          cacheName: "stryv-client-v6",
-          networkTimeoutSeconds: 3,
+          cacheName: "stryv-client-v7",
+          networkTimeoutSeconds: 4,
         })
         try {
           return await networkFirst.handle({ request, event })
@@ -45,7 +57,7 @@ const serwist = new Serwist({
             const offlineUrl = `/client/offline?from=${encodeURIComponent(requestUrl.pathname + requestUrl.search)}`
             return Response.redirect(offlineUrl, 302)
           }
-          const cache = await caches.open("stryv-client-v6")
+          const cache = await caches.open("stryv-client-v7")
           const offline = await cache.match("/client/offline")
           return offline ?? new Response("Offline", { status: 503 })
         }
@@ -103,37 +115,64 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const targetUrl = event.notification?.data?.url || '/client'
+  let targetUrl = event.notification?.data?.url || '/client'
+
+  // Legacy payment pushes may still carry a raw Stripe Checkout URL.
+  // Never navigate the PWA to checkout.stripe.com (breaks standalone + expires).
+  try {
+    const parsed = new URL(targetUrl, self.location.origin)
+    const isExternal = parsed.origin !== self.location.origin
+    const isStripe =
+      parsed.hostname.includes('stripe.com') ||
+      parsed.hostname.includes('checkout.stripe.com')
+    if (isExternal && isStripe) {
+      targetUrl = '/client/paiement'
+    }
+  } catch {
+    // keep original
+  }
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      // First try to find a client that is already on the target URL (same pathname)
+      let targetUrlObj: URL
       try {
-        const targetUrlObj = new URL(targetUrl, self.location.origin)
-        const matchingClient = clients.find((client) => {
-          try {
-            const clientUrlObj = new URL(client.url, self.location.origin)
-            return clientUrlObj.pathname === targetUrlObj.pathname
-          } catch (err) {
-            return false
-          }
-        })
-        if (matchingClient) {
-          return matchingClient.focus()
-        }
-      } catch (err) {
-        // Fallback in case URL parsing fails
+        targetUrlObj = new URL(targetUrl, self.location.origin)
+      } catch {
+        return self.clients.openWindow(targetUrl)
       }
 
-      // If not matching, navigate the first available client window
+      const isSameOrigin = targetUrlObj.origin === self.location.origin
+
+      // Cross-origin (should be rare after Stripe rewrite): always open a new window.
+      if (!isSameOrigin) {
+        return self.clients.openWindow(targetUrlObj.href)
+      }
+
+      // Prefer focusing an existing client on the same pathname, then navigate it.
+      const matchingClient = clients.find((client) => {
+        try {
+          const clientUrlObj = new URL(client.url, self.location.origin)
+          return clientUrlObj.pathname === targetUrlObj.pathname
+        } catch {
+          return false
+        }
+      })
+
+      if (matchingClient && 'navigate' in matchingClient) {
+        return (matchingClient as any)
+          .navigate(targetUrlObj.pathname + targetUrlObj.search + targetUrlObj.hash)
+          .then((c: any) => c && c.focus())
+      }
+
       for (const client of clients) {
         if ('navigate' in client) {
-          return (client as any).navigate(targetUrl).then((c: any) => c && c.focus())
+          return (client as any)
+            .navigate(targetUrlObj.pathname + targetUrlObj.search + targetUrlObj.hash)
+            .then((c: any) => c && c.focus())
         }
       }
 
-      // If no window is open, open a new one
-      return self.clients.openWindow(targetUrl)
+      return self.clients.openWindow(targetUrlObj.pathname + targetUrlObj.search + targetUrlObj.hash)
     })
   )
 })

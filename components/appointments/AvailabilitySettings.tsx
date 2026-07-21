@@ -165,8 +165,8 @@ export default function AvailabilitySettings() {
       {/* ── Card abonnement iCal universel ── */}
       <div className="rounded-2xl bg-white/[0.02] border-[0.3px] border-white/[0.08] p-5">
         <div className="flex items-center gap-2.5 mb-5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#86aeb8]/15 shrink-0">
-            <Link2 size={13} className="text-[#86aeb8]" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1f8a65]/15 shrink-0">
+            <Link2 size={13} className="text-[#1f8a65]" />
           </div>
           <div>
             <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/30 leading-none mb-0.5">Universel</p>
@@ -243,7 +243,7 @@ export default function AvailabilitySettings() {
                 {activeGuideTab === 'google' && (
                   <ol className="space-y-2.5 list-none">
                     {[
-                      <>Allez sur <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="text-[#86aeb8] hover:underline inline-flex items-center gap-0.5">calendar.google.com <ExternalLink size={9} className="inline" /></a></>,
+                      <>Allez sur <a href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" className="text-[#1f8a65] hover:underline inline-flex items-center gap-0.5">calendar.google.com <ExternalLink size={9} className="inline" /></a></>,
                       <>Dans le volet gauche, cliquez sur le <span className="text-white/80 font-semibold">+</span> à côté de <span className="text-white/80 font-semibold">Autres agendas</span>.</>,
                       <>Choisissez <span className="text-white/80 font-semibold">À partir de l&apos;URL</span>.</>,
                       <>Collez l&apos;URL copiée ci-dessus, puis cliquez sur <span className="text-white/80 font-semibold">Ajouter l&apos;agenda</span>.</>,
@@ -310,7 +310,7 @@ export default function AvailabilitySettings() {
                 {activeGuideTab === 'outlook' && (
                   <ol className="space-y-2.5 list-none">
                     {[
-                      <>Ouvrez votre calendrier sur <a href="https://outlook.live.com" target="_blank" rel="noopener noreferrer" className="text-[#86aeb8] hover:underline inline-flex items-center gap-0.5">Outlook Web <ExternalLink size={9} className="inline" /></a> ou dans l&apos;application de bureau.</>,
+                      <>Ouvrez votre calendrier sur <a href="https://outlook.live.com" target="_blank" rel="noopener noreferrer" className="text-[#1f8a65] hover:underline inline-flex items-center gap-0.5">Outlook Web <ExternalLink size={9} className="inline" /></a> ou dans l&apos;application de bureau.</>,
                       <>Cliquez sur <span className="text-white/80 font-semibold">Ajouter un calendrier</span> dans le volet gauche.</>,
                       <>Choisissez <span className="text-white/80 font-semibold">S&apos;abonner à partir du web</span>.</>,
                       <>Collez l&apos;URL copiée, donnez un nom à l&apos;agenda, puis cliquez sur <span className="text-white/80 font-semibold">Importer</span>.</>,

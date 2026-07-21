@@ -3,6 +3,7 @@ import type { NutritionPlanFood, NutritionPlanItem } from "@/lib/nutrition/proto
 import {
   computeEquivalentQuantity,
   computePlanMealsTotals,
+  normalizePlanMeals,
   roundPlanTotals,
 } from "@/lib/nutrition/protocol-builder"
 
@@ -63,5 +64,16 @@ describe("nutrition protocol builder", () => {
     expect(totals.calories).toBe(235)
     expect(totals.protein).toBe(46.5)
     expect(totals.fat).toBe(5.4)
+  })
+
+  it("preserves the coach-defined meal order while completing missing standard meals", () => {
+    const meals = normalizePlanMeals([
+      { id: "dinner", title: "Dîner", items: [] },
+      { id: "breakfast", title: "Petit-déjeuner", items: [] },
+      { id: "lunch", title: "Déjeuner", items: [] },
+      { id: "snack", title: "Collation", items: [] },
+    ])
+
+    expect(meals.map((meal) => meal.id)).toEqual(["dinner", "breakfast", "lunch", "snack"])
   })
 })

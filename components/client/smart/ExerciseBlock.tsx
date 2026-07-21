@@ -63,6 +63,7 @@ interface ExerciseBlockProps {
   onSwap: (exId: string) => void;
   onRest: (exId: string) => void;
   onNote: (exId: string) => void;
+  onComment: (exId: string) => void;
   onTempo: (
     exId: string,
     setNum: number,
@@ -93,6 +94,7 @@ export default function ExerciseBlock({
   onSwap,
   onRest,
   onNote,
+  onComment,
   onTempo,
   onDeleteExercise,
   onOpenProgression,
@@ -365,6 +367,7 @@ export default function ExerciseBlock({
         onSwap={() => onSwap(exercise.id)}
         onRest={() => onRest(exercise.id)}
         onNote={() => onNote(exercise.id)}
+        onComment={() => onComment(exercise.id)}
         onTempo={() => {
           if (!tempoTargetSet) return;
           onTempo(exercise.id, tempoTargetSet.set_number, tempoTargetSet.side);

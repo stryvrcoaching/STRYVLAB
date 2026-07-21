@@ -6,6 +6,8 @@ import { ArrowRight, CalendarCheck, ChevronDown, Flame, Loader2, Moon, Sunrise }
 import { Skeleton } from "@/components/ui/skeleton";
 import { getFieldsForFlow } from "@/lib/client/checkin/fieldRegistry";
 import { canonicalizeFields } from "@/lib/client/checkin/legacyFieldMap";
+import { useCoachEntitlements } from "@/components/coach/useCoachEntitlements";
+import PlanUpgradeCard from "@/components/coach/PlanUpgradeCard";
 
 type Moment = { moment: "morning" | "evening"; fields: string[] };
 
@@ -23,6 +25,7 @@ const MORNING_FIELDS = getFieldsForFlow("morning");
 const EVENING_FIELDS = getFieldsForFlow("evening");
 
 export default function CheckinConfigWidget({ clientId }: { clientId: string }) {
+  const { entitlements, loading: entitlementsLoading } = useCoachEntitlements();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +36,14 @@ export default function CheckinConfigWidget({ clientId }: { clientId: string }) 
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
+  const appEnabled = entitlements?.clientAppEnabled === true;
+
   useEffect(() => {
+    if (entitlementsLoading) return;
+    if (!appEnabled) {
+      setLoading(false);
+      return;
+    }
     fetch(`/api/clients/${clientId}/checkin-config`)
       .then((res) => res.json())
       .then((data) => {
@@ -52,7 +62,7 @@ export default function CheckinConfigWidget({ clientId }: { clientId: string }) 
         setError("Erreur réseau");
         setLoading(false);
       });
-  }, [clientId]);
+  }, [clientId, appEnabled, entitlementsLoading]);
 
   async function persist(next: { is_active: boolean; days_of_week: number[]; moments: Moment[] }) {
     setSaving(true);
@@ -108,7 +118,19 @@ export default function CheckinConfigWidget({ clientId }: { clientId: string }) 
     });
   }
 
-  if (loading) {
+  if (!entitlementsLoading && !appEnabled) {
+    return (
+      <PlanUpgradeCard
+        title="Check-ins client (STRYVR)"
+        reason={
+          entitlements?.clientAppBlockedReason ??
+          "Les check-ins dans l’app client sont inclus à partir du plan Pro."
+        }
+      />
+    );
+  }
+
+  if (loading || entitlementsLoading) {
     return (
       <div className="bg-white/[0.02] border-[0.3px] border-white/[0.06] rounded-2xl p-4 space-y-4">
         <Skeleton className="h-4 w-28" />

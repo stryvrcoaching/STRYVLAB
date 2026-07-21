@@ -145,6 +145,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error?.message ?? "Insert failed" }, { status: 500 })
   }
 
+  revalidatePath("/client")
   revalidatePath("/client/nutrition")
   return NextResponse.json({ ok: true, data })
 }

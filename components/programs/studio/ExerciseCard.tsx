@@ -93,6 +93,7 @@ export interface ExerciseData {
   rest_sec: number | null
   rir: number | null
   weight_increment_kg: number | null
+  current_weight_kg: number | null
   notes: string
   image_url: string | null
   movement_pattern: string | null
@@ -123,6 +124,7 @@ interface Props {
   templateId?: string
   supersetGroupColor?: string
   groupSize?: number
+  previousInSameGroup?: boolean
   nextInSameGroup?: boolean
   onUpdate: (patch: Partial<ExerciseData>) => void
   onRemove: () => void
@@ -201,6 +203,7 @@ export default function ExerciseCard({
   templateId,
   supersetGroupColor,
   groupSize = 2,
+  previousInSameGroup = false,
   nextInSameGroup = false,
   onUpdate,
   onRemove,
@@ -262,6 +265,7 @@ export default function ExerciseCard({
       ref={(el) => { setNodeRef(el); exerciseRef(el) }}
       style={{
         ...dragStyle,
+        marginTop: previousInSameGroup ? '-1px' : undefined,
         ...(isInSuperset && supersetGroupColor ? {
           borderColor: `${supersetGroupColor}40`,
           boxShadow: `inset 3px 0 0 ${supersetGroupColor}`,
@@ -269,6 +273,8 @@ export default function ExerciseCard({
       }}
       className={[
         'rounded-xl border-[0.3px] bg-white/[0.02] transition-all duration-200',
+        previousInSameGroup ? 'rounded-t-none' : '',
+        nextInSameGroup ? 'rounded-b-none' : '',
         isSelected ? 'border-[#1f8a65]/60 bg-[#1f8a65]/5 ring-1 ring-[#1f8a65]/30'
         : isHighlighted
           ? 'border-[#1f8a65]/60 ring-1 ring-[#1f8a65]/30'
@@ -278,7 +284,7 @@ export default function ExerciseCard({
       ].join(' ')}
     >
       {/* Superset / Triset / Giant Set badge */}
-      {isInSuperset && (
+      {isInSuperset && !previousInSameGroup && (
         <div
           className="flex items-center gap-1.5 px-3 py-1 border-b-[0.3px]"
           style={{ borderBottomColor: `${supersetGroupColor}20` }}

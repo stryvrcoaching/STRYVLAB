@@ -115,10 +115,15 @@
 
 :root {
   /* ── Gray scale ─────────────────────────────────────────── */
-  --client-chrome-bg: #09090a; /* Status bar, headers and bottom navigation */
-  --c-bg: #080808; /* App background */
-  --c-surface-1: #111111; /* Cards, sheets — L1 */
-  --c-surface-2: #1a1a1a; /* Elevated cards — L2 */
+  /* Page/chrome near-black gray (not pure black). */
+  --client-chrome-bg: #0a0a0a;
+  --client-page-bg: #0a0a0a;
+  /* Accueil hero surface — same as page bg; rounded card edge stays visible via border */
+  --client-hero-bg: #0a0a0a;
+  --client-dock-bg: #121212; /* Floating dock plate (contrasts on page bg) */
+  --c-bg: #0a0a0a; /* App background (near-black gray) */
+  --c-surface-1: #181818; /* Cards, sheets — L1 */
+  --c-surface-2: #1c1c1c; /* Elevated cards — L2 */
   --c-surface-3: #222222; /* Inputs, interactive — L3 */
   --c-hover: #2e2e2e; /* Hover state */
   --c-active: #404040; /* Active / pressed */
@@ -128,9 +133,20 @@
   --c-text-head: #e0e0e0; /* Headings */
   --c-text-emph: #f2f2f2; /* Emphasis / primary btn bg */
 
-  /* ── Client PWA bottom dock ───────────────────────────── */
-  --client-bottom-nav-height: 70px;
-  --client-bottom-nav-gap: 0px;
+  /* ── Client PWA top bar ──────────────────────────────── */
+  --client-top-bar-height: 56px;
+  --client-top-bar-content-gap: 12px;
+  /* Full offset for page content under the fixed ClientTopBar */
+  --client-top-bar-offset: calc(
+    var(--client-top-bar-height) + env(safe-area-inset-top, 0px) +
+      var(--client-top-bar-content-gap)
+  );
+
+  /* ── Client PWA bottom dock (floating, lower on screen) ── */
+  --client-bottom-nav-height: 64px;
+  --client-bottom-nav-gap: max(12px, calc(env(safe-area-inset-bottom, 0px) + 4px));
+  /* No soft fade above the dock — solid mask lives under the plate only */
+  --client-bottom-nav-fade: 0px;
   --client-bottom-nav-reserved: calc(
     var(--client-bottom-nav-height) + var(--client-bottom-nav-gap)
   );
@@ -150,9 +166,14 @@
   bottom: 0 !important;
 }
 
+/* Content padding under fixed ClientTopBar (safe-area included in token) */
+.client-page-top {
+  padding-top: var(--client-top-bar-offset);
+}
+
 html:has([data-client-app]),
 body:has([data-client-app]) {
-  background-color: var(--client-chrome-bg) !important;
+  background-color: var(--client-page-bg, #0a0a0a) !important;
 }
 
 .client-status-bar-surface {
@@ -160,8 +181,19 @@ body:has([data-client-app]) {
   inset: 0 0 auto;
   z-index: 55;
   height: env(safe-area-inset-top, 0px);
-  background: var(--client-chrome-bg);
+  background: var(--client-page-bg, #0a0a0a);
   pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @layer base {
@@ -182,6 +214,12 @@ body:has([data-client-app]) {
   ::selection {
     background: rgba(31, 138, 101, 0.3);
     color: #fff;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
   }
 
   /* iOS Safari baseline — 16px minimum prevents auto-zoom; utility classes override via @layer utilities */
@@ -329,7 +367,7 @@ body:has([data-client-app]) {
   .premium-dashboard-bg {
     position: relative;
     min-height: 100%;
-    background: #0d0d0d;
+    background: #121212;
     overflow: hidden;
   }
 
@@ -493,5 +531,38 @@ body:has([data-client-app]) {
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  /* Fond app client unifié #0a0a0a (shell / pages / overscroll — pas cartes, dock, sheets) */
+  div[data-client-app],
+  div[data-client-app] .min-h-dvh,
+  div[data-client-app] .min-h-\[100dvh\],
+  div[data-client-app] .min-h-screen,
+  div[data-client-app] .min-h-full {
+    background-color: var(--client-page-bg, #0a0a0a) !important;
+  }
+
+  /* Accueil hero : même fond page, surface carte arrondie */
+  div[data-client-app] [data-client-home-hero] {
+    background-color: var(--client-hero-bg, var(--client-page-bg, #0a0a0a)) !important;
+  }
+
+  /* Animations pour les Bottom Sheets et Éléments de l'interface */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 }

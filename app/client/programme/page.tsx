@@ -30,6 +30,8 @@ import {
   selectSessionsForProgramWeek,
   type ProgramCompletionBehavior,
 } from '@/lib/programs/cycleSchedule'
+import { computeWorkoutAlerts } from '@/lib/client/smart/workoutAlerts'
+import { loadExerciseNameResolver } from '@/lib/i18n/exerciseDisplayName'
 
 function getTodayDow(dateIso?: string) {
   const jsDay = dateIso ? new Date(`${dateIso}T12:00:00Z`).getUTCDay() : new Date().getDay();
@@ -60,6 +62,16 @@ function getWindowStart(now: Date, key: VolumeWindowKey, monday: Date) {
   start.setDate(now.getDate() - days)
   start.setHours(0, 0, 0, 0)
   return start
+}
+
+function trainingGoalLabel(goal: unknown) {
+  switch (goal) {
+    case 'hypertrophy': return 'Hypertrophie'
+    case 'strength': return 'Force'
+    case 'endurance': return 'Endurance'
+    case 'fat_loss': return 'Condition physique'
+    default: return undefined
+  }
 }
 
 export default async function ClientProgrammePage({
@@ -104,6 +116,7 @@ export default async function ClientProgrammePage({
     progressLogsResult,
     weekSessionsResult,
     recentFlexSessionsResult,
+    workoutNotificationsResult,
   ] = await Promise.all([
     service
       .from("programs")
@@ -180,6 +193,18 @@ export default async function ClientProgrammePage({
       .lte("completed_at", sunday.toISOString()),
 
     fetchRecentFlexWorkouts(service, client.id, 30),
+
+    service
+      .from('coach_client_notifications')
+      .select('id, payload, created_at')
+      .eq('client_id', client.id)
+      .eq('type', 'system_reminder')
+      .is('dismissed_at', null)
+      .is('read_at', null)
+      .contains('payload', { event: 'personal_record' })
+      .gte('created_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(5),
   ]);
 
   const programs = programsResult?.data;
@@ -187,19 +212,9 @@ export default async function ClientProgrammePage({
   const lang: ClientLang = ["fr", "en", "es"].includes(rawLang)
     ? (rawLang as ClientLang)
     : "fr";
-  const daysShort = cta(lang, "programme.days.short");
   const daysFull = cta(lang, "programme.days.full");
 
-  // Fetch exercise translations for dynamic lookups
-  const { data: exTrans } = await service
-    .from('exercise_translations')
-    .select('exerciseId, name')
-    .eq('lang', lang.toUpperCase());
-
-  const exerciseDict = (exTrans || []).reduce((acc: any, row: any) => {
-    acc[row.exerciseId] = row.name;
-    return acc;
-  }, {} as Record<string, string>);
+  const resolveExerciseName = await loadExerciseNameResolver(service, lang)
 
   const program = programs?.[0] as any;
   if (!program) return <NoProgramPage lang={lang} />;
@@ -274,6 +289,47 @@ export default async function ClientProgrammePage({
     ) as ProgramCompletionBehavior,
   })
 
+  const totalCycleWeeks = explicitWeeks.length || Number(program.weeks) || 0
+  const activeCycleWeek = cycleSchedule.activeWeekPosition
+    ?? (cycleSchedule.isBeforeStart || cycleSchedule.isComplete
+      ? null
+      : cycleSchedule.elapsedWeekIndex + 1)
+  const recentPRs = ((workoutNotificationsResult.data ?? []) as any[])
+    .map((notification) => {
+      const payload = (notification.payload ?? {}) as Record<string, unknown>
+      const exerciseName = typeof payload.exercise_name === 'string'
+        ? payload.exercise_name
+        : null
+      const weightKg = Number(payload.weight_kg)
+      const reps = Number(payload.reps)
+      if (!exerciseName || !Number.isFinite(weightKg) || !Number.isFinite(reps)) return null
+      return {
+        exerciseName,
+        weightKg,
+        reps,
+        date: notification.created_at as string,
+        notificationId: String(notification.id),
+      }
+    })
+    .filter((record): record is {
+      exerciseName: string
+      weightKg: number
+      reps: number
+      date: string
+      notificationId: string
+    } => record !== null)
+  const workoutAlerts = computeWorkoutAlerts({
+    recentPRs,
+    activeMesocycle: activeCycleWeek && totalCycleWeeks > 0
+      ? {
+          name: String(program.name ?? 'Programme'),
+          currentWeek: activeCycleWeek,
+          totalWeeks: totalCycleWeeks,
+          phase: trainingGoalLabel(program.goal),
+        }
+      : null,
+  })
+
   const GENERIC_SLUGS = new Set([
     "dos",
     "biceps",
@@ -311,6 +367,7 @@ export default async function ClientProgrammePage({
               : getSecondaryMusclesFromCatalog(ex.name);
           return {
             ...ex,
+            name: resolveExerciseName(ex.name, ex.catalog_exercise_id ?? ex.catalog_id ?? null),
             primary_muscle: resolvedPrimaryMuscle,
             // Si primary_muscles[] générique → remplacer par primaryMuscle précis
             primary_muscles:
@@ -362,12 +419,12 @@ export default async function ClientProgrammePage({
   const rawLogs: SessionLog[] = (progressLogsResult?.data ?? []) as any[];
 
   // Translate exercise names in logs
-  if (lang !== 'fr' && Object.keys(exerciseDict).length > 0) {
+  if (lang !== 'fr') {
     rawLogs.forEach(log => {
       if (log.client_set_logs) {
         log.client_set_logs.forEach(set => {
-          if (set.exercise_name && exerciseDict[set.exercise_name]) {
-            set.exercise_name = exerciseDict[set.exercise_name];
+          if (set.exercise_name) {
+            set.exercise_name = resolveExerciseName(set.exercise_name);
           }
         });
       }
@@ -527,7 +584,6 @@ export default async function ClientProgrammePage({
       skippedTodayIds={Array.from(skippedTodayIds)}
       todayScheduledSessionIds={Array.from(todayScheduledSessionIds)}
       todayDayOverrideKind={todayDayOverride?.kind ?? null}
-      daysShort={daysShort}
       daysFull={daysFull}
       lang={lang}
       streak={streak}
@@ -537,7 +593,8 @@ export default async function ClientProgrammePage({
       rawLogs={rawLogs}
       volumeCoverage={{ ...volumeCoverage, windows: volumeCoverageByWindow }}
       recentFlexHistory={recentFlexHistory}
-      exerciseDict={exerciseDict}
+      exerciseDict={{}}
+      workoutAlerts={workoutAlerts}
     />
   );
 }
@@ -546,7 +603,7 @@ import { Dumbbell } from "lucide-react";
 
 function NoProgramPage({ lang }: { lang: ClientLang }) {
   return (
-    <div className="min-h-dvh bg-[#0d0d0d] font-barlow overflow-x-hidden">
+    <div className="min-h-dvh bg-[#121212] font-barlow overflow-x-hidden">
       <div className="max-w-lg mx-auto px-5 pt-24 py-16 text-center">
         <Dumbbell size={36} className="text-white/10 mx-auto mb-4" />
         <p className="text-[13px] text-white/40">

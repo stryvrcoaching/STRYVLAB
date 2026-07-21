@@ -142,7 +142,7 @@ export default function FlexWorkoutClientPage({
 
   if (loading) {
     return (
-      <div className="min-h-dvh bg-[#0d0d0d]">
+      <div className="min-h-dvh bg-[#121212]">
         <div className="mx-auto max-w-lg px-5 pt-24">
           <div className="overflow-hidden rounded-xl bg-white/[0.02] p-5">
             <div className="h-3 w-28 animate-pulse rounded bg-white/[0.08]" />
@@ -159,7 +159,7 @@ export default function FlexWorkoutClientPage({
   }
 
   return (
-    <div className="min-h-dvh bg-[#0d0d0d] px-5 pt-24">
+    <div className="min-h-dvh bg-[#121212] px-5 pt-24">
       <div className="mx-auto max-w-lg rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-4">
         <p className="text-[12px] font-semibold text-red-300">{t('flex.error.openSession')}</p>
         {error ? <p className="mt-1 text-[12px] text-red-200/80">{error}</p> : null}

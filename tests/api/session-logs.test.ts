@@ -187,6 +187,32 @@ describe('PATCH /api/session-logs/[logId]', () => {
     expect(body.success).toBe(true)
   })
 
+  it('scales training points to the completed sets', async () => {
+    const fetchSpy = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 200 }))
+
+    mocks.setServiceResults([
+      { data: { id: 'client-1' } },
+      { data: null },
+      { data: { session_name: 'Séance A', coach_clients: { coach_id: 'coach-1', first_name: 'Bob', last_name: 'Smith' } } },
+      { data: null },
+      { data: [{ completed: true }, { completed: false }, { completed: false }, { completed: false }, { completed: false }, { completed: false }] },
+      { data: { session_name: 'Séance A' } },
+      { data: null },
+    ])
+
+    const res = await PATCH(...makePatch('log-1', { completed: true, duration_min: 5 }))
+
+    expect(res.status).toBe(200)
+    expect(mocks.serviceMock.rpc).toHaveBeenCalledWith(
+      'award_client_progression',
+      expect.objectContaining({ p_base_points: 2 }),
+    )
+
+    fetchSpy.mockRestore()
+  })
+
   it('triggers progression evaluation when completing a session with set logs', async () => {
     const fetchSpy = vi
       .spyOn(global, 'fetch')

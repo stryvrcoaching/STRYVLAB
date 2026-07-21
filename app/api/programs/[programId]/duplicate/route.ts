@@ -20,7 +20,7 @@ const PROGRAM_SELECT = `
     program_exercises (
       id, name, sets, reps, rest_sec, rir, notes, position, image_url,
       movement_pattern, equipment_required, primary_muscles, secondary_muscles,
-      group_id, is_compound, is_unilateral, target_rir, weight_increment_kg, tempo, set_prescriptions, superset_rest_mode,
+      group_id, is_compound, is_unilateral, target_rir, weight_increment_kg, current_weight_kg, tempo, set_prescriptions, superset_rest_mode,
       plane, mechanic, unilateral, primary_muscle, primary_activation,
       secondary_muscles_detail, secondary_activations, stabilizers,
       joint_stress_spine, joint_stress_knee, joint_stress_shoulder,
@@ -123,6 +123,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
           is_unilateral: exercise.is_unilateral ?? false,
           target_rir: exercise.target_rir ?? null,
           weight_increment_kg: exercise.weight_increment_kg ?? 2.5,
+          current_weight_kg: exercise.current_weight_kg ?? null,
           tempo: exercise.tempo ?? null,
           set_prescriptions: exercise.set_prescriptions ?? null,
           superset_rest_mode: exercise.superset_rest_mode ?? 'after_round',

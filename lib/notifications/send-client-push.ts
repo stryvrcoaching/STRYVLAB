@@ -11,6 +11,7 @@ export type ClientPushKind =
   | 'checkin'
   | 'coach_message'
   | 'system'
+  | 'essential'
 
 type ClientPushPayload = {
   title: string
@@ -20,7 +21,7 @@ type ClientPushPayload = {
   badgeCount?: number
 }
 
-type ClientPushPreferenceKey =
+export type ClientPushPreferenceKey =
   | 'notif_session_reminder'
   | 'notif_bilan_received'
   | 'notif_program_updated'
@@ -35,7 +36,7 @@ type ClientPushPreferences = Partial<
   Record<ClientPushPreferenceKey, boolean | null>
 >
 
-const preferenceForKind: Record<
+export const clientPushPreferenceForKind: Record<
   ClientPushKind,
   ClientPushPreferenceKey | null
 > = {
@@ -48,6 +49,9 @@ const preferenceForKind: Record<
   meal: 'notif_meal_reminder',
   protein: 'notif_protein_reminder',
   system: 'notif_progress_updates',
+  // Appointment and payment notices are transactional. They remain active
+  // independently from the optional progression/rewards notification setting.
+  essential: null,
 }
 
 export async function sendClientPush(
@@ -73,7 +77,7 @@ export async function sendClientPush(
     console.info('[client-push] skipped because client app access is disabled', { clientId, kind })
     return false
   }
-  const preference = preferenceForKind[kind]
+  const preference = clientPushPreferenceForKind[kind]
   const typedPreferences =
     preferences as ClientPushPreferences | null
 

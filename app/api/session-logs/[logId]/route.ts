@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { awardProgression, trainingPointsForPrescribedSessions } from '@/lib/rewards/progression'
+import { awardProgression, trainingPointsForCompletedSets } from '@/lib/rewards/progression'
 import { inngest } from '@/lib/inngest/client'
 import { z } from 'zod'
 
@@ -71,6 +71,27 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       .eq('client_id', (client as { id: string }).id)
   }
 
+  // Bulk update set logs before calculating progression so an inline completion
+  // request is scored from the same state it persists.
+  if (Array.isArray(set_logs) && set_logs.length > 0) {
+    const validSets = set_logs.filter(s => s.id)
+    if (validSets.length > 0) {
+      await db.from('client_set_logs').upsert(
+        validSets.map(s => ({
+          id: s.id,
+          actual_reps: s.actual_reps ?? null,
+          actual_weight_kg: s.actual_weight_kg ?? null,
+          completed: s.completed ?? false,
+          rpe: s.rpe ?? null,
+          rir_actual: s.rir_actual ?? null,
+          notes: s.notes ?? null,
+          side: s.side ?? null,
+        })),
+        { onConflict: 'id' }
+      )
+    }
+  }
+
   // Notif coach quand la séance est complétée
   if (completed) {
     const { data: log } = await db
@@ -105,17 +126,39 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       })
     }
 
-    const progression = await awardProgression(db, {
-      clientId: (client as { id: string }).id,
-      action: 'training',
-      // The default corresponds to a three-session prescribed week. A later
-      // prescription-aware evaluator can pass the exact weekly session count.
-      basePoints: trainingPointsForPrescribedSessions(3),
-      sourceKey: `session:${params.logId}`,
-      referenceId: params.logId,
-      metadata: { completion: 'full', prescribed_sessions_reference: 3 },
-    })
-    pointsEarned = progression?.already_awarded ? 0 : progression?.awarded_points ?? 0
+    const { data: loggedSets, error: loggedSetsError } = await db
+      .from('client_set_logs')
+      .select('completed')
+      .eq('session_log_id', params.logId)
+
+    if (loggedSetsError) {
+      console.error('[session-logs] unable to calculate completion points', {
+        logId: params.logId,
+        message: loggedSetsError.message,
+      })
+    } else {
+      const plannedSetCount = loggedSets?.length ?? 0
+      const completedSetCount = loggedSets?.filter((set: { completed: boolean }) => set.completed).length ?? 0
+      const basePoints = trainingPointsForCompletedSets(completedSetCount, plannedSetCount)
+
+      if (basePoints > 0) {
+        const progression = await awardProgression(db, {
+          clientId: (client as { id: string }).id,
+          action: 'training',
+          basePoints,
+          sourceKey: `session:${params.logId}`,
+          referenceId: params.logId,
+          metadata: {
+            completion: completedSetCount === plannedSetCount ? 'full' : 'partial',
+            completion_ratio: completedSetCount / plannedSetCount,
+            completed_sets: completedSetCount,
+            planned_sets: plannedSetCount,
+            prescribed_sessions_reference: 3,
+          },
+        })
+        pointsEarned = progression?.already_awarded ? 0 : progression?.awarded_points ?? 0
+      }
+    }
 
     // Insert smart_agenda_events (fire and forget)
     const { data: sessionLog } = await db
@@ -134,26 +177,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       summary: null,
       data: null,
     })
-  }
-
-  // Bulk update set logs — une seule requête par upsert au lieu de N requêtes
-  if (Array.isArray(set_logs) && set_logs.length > 0) {
-    const validSets = set_logs.filter(s => s.id)
-    if (validSets.length > 0) {
-      await db.from('client_set_logs').upsert(
-        validSets.map(s => ({
-          id: s.id,
-          actual_reps: s.actual_reps ?? null,
-          actual_weight_kg: s.actual_weight_kg ?? null,
-          completed: s.completed ?? false,
-          rpe: s.rpe ?? null,
-          rir_actual: s.rir_actual ?? null,
-          notes: s.notes ?? null,
-          side: s.side ?? null,
-        })),
-        { onConflict: 'id' }
-      )
-    }
   }
 
   // Double progression — déclenchée après persistance des set logs pour éviter

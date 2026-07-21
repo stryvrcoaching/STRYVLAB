@@ -3,12 +3,14 @@
 import { useRef, useState } from "react";
 import { Camera, Upload, X, Loader2, Check, ChevronDown, ChevronUp, Info } from "lucide-react";
 import { FieldConfig } from "@/types/assessment";
+import type { AssessmentResponseValue } from "@/types/assessment";
 import MealJournalField from "./MealJournalField";
+import FoodPreferencesField from "./FoodPreferencesField";
 
 interface Props {
   field: FieldConfig;
-  value: string | number | string[] | boolean | undefined;
-  onChange: (value: string | number | string[] | boolean) => void;
+  value: AssessmentResponseValue | undefined;
+  onChange: (value: AssessmentResponseValue) => void;
   previewMode?: boolean;
   // token de la soumission publique — requis pour upload côté client
   submissionToken?: string;
@@ -660,6 +662,26 @@ export default function MetricField({
           onChange={(v) => onChange(v)}
           submissionToken={submissionToken}
           submissionId={submissionId}
+        />
+      </div>
+    );
+  }
+
+  if (input_type === "food_preferences") {
+    const catalogEndpoint = submissionToken
+      ? `/api/assessments/public/${submissionToken}/food-items`
+      : submissionId
+        ? `/api/assessments/submissions/${submissionId}/food-items`
+        : undefined;
+    return (
+      <div>
+        {labelEl}
+        {helper && <p className="text-[11px] text-white/40 mb-3">{helper}</p>}
+        <FoodPreferencesField
+          value={value}
+          onChange={onChange}
+          catalogEndpoint={catalogEndpoint}
+          previewMode={previewMode}
         />
       </div>
     );

@@ -175,6 +175,15 @@ function buildCoachNotificationPresentation(row: any) {
       }
     }
 
+    if (row.category === 'training' && subcategory === 'exercise_comment') {
+      return {
+        category: 'training',
+        categoryLabel: 'Entraînement',
+        title: row.title ?? 'Nouveau commentaire client',
+        body: row.body ?? `${clientName} a laissé un commentaire sur un exercice.`,
+      }
+    }
+
     if ((row.category === 'engagement' && subcategory === 'session_skip') || (row.category === 'program_signal' && subcategory === 'session_not_done')) {
       return {
         category: 'engagement',
@@ -347,7 +356,9 @@ function buildLegacyCoachNotificationPresentation(row: any) {
         categoryLabel: 'Administratif',
         title: 'Paiement reçu',
         body: message || `${clientName} a généré un paiement.`,
-        actionUrl: row.submission_id ? `/coach/paiements/${row.submission_id}` : `/coach/clients/${row.client_id}`,
+        actionUrl: row.submission_id
+          ? `/coach/comptabilite?payment=${row.submission_id}`
+          : `/coach/clients/${row.client_id}`,
       }
     }
 

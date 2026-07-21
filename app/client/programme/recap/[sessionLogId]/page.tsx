@@ -6,6 +6,7 @@ import { CheckCircle2, Clock, Layers, BarChart2, ChevronLeft, TrendingUp, Trendi
 import BodyMap from '@/components/client/BodyMap'
 import { computeMuscleIntensity } from '@/lib/client/muscleDetection'
 import { ct, type ClientLang } from '@/lib/i18n/clientTranslations'
+import { loadExerciseNameResolver } from '@/lib/i18n/exerciseDisplayName'
 import { getPrimaryMuscleFromCatalog, getSecondaryMusclesFromCatalog } from '@/lib/programs/intelligence/catalog-utils'
 import RecapNavButtons from './RecapNavButtons'
 import FeedbackThread from '@/components/client/smart/FeedbackThread'
@@ -28,6 +29,7 @@ export default async function SessionRecapPage({ params, searchParams }: { param
   const prefsRes = await service.from('client_preferences').select('language').eq('client_id', client.id).maybeSingle()
   const rawLang = (prefsRes as any)?.data?.language
   const lang: ClientLang = ['fr', 'en', 'es'].includes(rawLang) ? rawLang as ClientLang : 'fr'
+  const resolveExerciseName = await loadExerciseNameResolver(service, lang)
   const dateLocale = lang === 'fr' ? 'fr-FR' : lang === 'es' ? 'es-ES' : 'en-GB'
 
   // Fetch le session log avec ses sets
@@ -67,7 +69,12 @@ export default async function SessionRecapPage({ params, searchParams }: { param
   // ── Exercices groupés ──
   const exerciseMap: Record<string, { name: string; sets: any[] }> = {}
   for (const s of completedSets) {
-    if (!exerciseMap[s.exercise_name]) exerciseMap[s.exercise_name] = { name: s.exercise_name, sets: [] }
+    if (!exerciseMap[s.exercise_name]) {
+      exerciseMap[s.exercise_name] = {
+        name: resolveExerciseName(s.exercise_name),
+        sets: [],
+      }
+    }
     exerciseMap[s.exercise_name].sets.push(s)
   }
   const exercises = Object.values(exerciseMap)
@@ -135,12 +142,12 @@ export default async function SessionRecapPage({ params, searchParams }: { param
   const volumeDelta = prevVolume > 0 ? Math.round(((totalVolume - prevVolume) / prevVolume) * 100) : null
 
   return (
-    <div className="min-h-dvh bg-[#0d0d0d] font-barlow pb-10 overflow-x-hidden">
+    <div className="min-h-dvh bg-[#121212] font-barlow pb-10 overflow-x-hidden">
       <PointsEarnedOverlay open={pointsEarned > 0} points={pointsEarned} />
 
       {/* Header */}
       <header
-        className="sticky top-0 z-40 bg-[#0d0d0d]"
+        className="sticky top-0 z-40 bg-[#121212]"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="flex items-center gap-3 px-4 py-3">
@@ -256,7 +263,8 @@ export default async function SessionRecapPage({ params, searchParams }: { param
           {Object.keys(sessionLog.exercise_notes ?? {}).length > 0 ? (
             <div className="flex flex-col gap-2">
               {Object.entries(sessionLog.exercise_notes as Record<string, string>).map(([exId, note]) => {
-                const exName = allSets.find((s: any) => s.exercise_id === exId)?.exercise_name ?? exId
+                const rawName = allSets.find((s: any) => s.exercise_id === exId)?.exercise_name ?? exId
+                const exName = resolveExerciseName(rawName)
                 return (
                   <div key={exId} className="bg-white/[0.02] rounded-xl px-3 py-2.5">
                     <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/30 mb-1">{exName}</p>

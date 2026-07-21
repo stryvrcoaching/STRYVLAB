@@ -105,6 +105,20 @@ export function trainingPointsForPrescribedSessions(sessionCount: number) {
   return sessionCount > 0 ? Math.max(1, Math.round(WEEKLY_PROGRESS_REFERENCE.training / sessionCount)) : 0
 }
 
+export function trainingPointsForCompletedSets(
+  completedSetCount: number,
+  plannedSetCount: number,
+  prescribedSessionCount = 3,
+) {
+  const fullSessionPoints = trainingPointsForPrescribedSessions(prescribedSessionCount)
+  const totalSets = Math.max(0, Math.floor(plannedSetCount))
+  const completedSets = Math.max(0, Math.min(totalSets, Math.floor(completedSetCount)))
+
+  if (totalSets === 0 || completedSets === 0) return 0
+
+  return Math.floor(fullSessionPoints * (completedSets / totalSets))
+}
+
 export function nutritionPointsForAdherence(adherence: number) {
   const boundedAdherence = Math.max(0, Math.min(1, adherence))
   return Math.round((WEEKLY_PROGRESS_REFERENCE.nutrition / 7) * boundedAdherence)

@@ -15,6 +15,8 @@ export type InputMode = "composer" | "portion" | "photo_ai" | "voice" | "text" |
 export interface FoodItem {
   id: string
   name_fr: string
+  /** Localized client-facing label returned by the food catalogue API. */
+  name?: string
   category_l1: CategoryL1
   category_l2: string | null
   icon_key: string | null

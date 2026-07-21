@@ -10,7 +10,12 @@ export function SurfaceCard({
   className?: string;
 }) {
   return (
-    <div className={cn("bg-[#09090a] border border-white/[0.04] relative overflow-hidden rounded-[24px] p-4", className)}>
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-2xl bg-[#181818] p-4",
+        className,
+      )}
+    >
       <div className="relative">{children}</div>
     </div>
   );

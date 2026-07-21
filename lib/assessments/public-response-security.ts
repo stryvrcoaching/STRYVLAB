@@ -1,6 +1,10 @@
 import { z } from 'zod'
 import type { BlockConfig, FieldConfig } from '@/types/assessment'
 import { extractTemplateBlocks, type TemplateSnapshotLike } from '@/lib/assessments/templateSnapshot'
+import { foodPreferenceAssessmentSchema } from '@/lib/nutrition/food-preferences'
+import { evaluateCondition } from '@/lib/assessments/condition'
+import { isAdultBirthDate } from '@/lib/assessments/eligibility'
+import type { AssessmentResponseValue, ResponseMap } from '@/types/assessment'
 
 export const MAX_PUBLIC_ASSESSMENT_BODY_BYTES = 512_000
 
@@ -74,6 +78,22 @@ function fieldIndex(blocks: BlockConfig[]) {
   return index
 }
 
+function responseValue(response: PublicAssessmentPayload['responses'][number]): AssessmentResponseValue {
+  if (response.value_json !== undefined) return response.value_json as AssessmentResponseValue
+  if (response.value_number !== undefined) return response.value_number
+  if (response.storage_path !== undefined) return response.storage_path
+  return response.value_text ?? ''
+}
+
+function isMissingRequiredValue(value: AssessmentResponseValue | undefined) {
+  return (
+    value === undefined ||
+    value === null ||
+    value === '' ||
+    (Array.isArray(value) && value.length === 0)
+  )
+}
+
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string')
 }
@@ -104,11 +124,17 @@ export function validatePublicAssessmentResponses(params: {
   clientId: string
   submissionId: string
 }): { ok: true } | { ok: false; error: string } {
-  const fields = fieldIndex(extractTemplateBlocks(params.snapshot))
+  const blocks = extractTemplateBlocks(params.snapshot)
+  const fields = fieldIndex(blocks)
+  const responses: ResponseMap = {}
 
   for (const response of params.payload.responses) {
     const field = fields.get(`${response.block_id}\u001f${response.field_key}`)
     if (!field) return { ok: false, error: 'Le bilan contient un champ inconnu.' }
+    responses[response.block_id] = {
+      ...(responses[response.block_id] ?? {}),
+      [response.field_key]: responseValue(response),
+    }
 
     if (field.input_type === 'number' || field.input_type === 'scale_1_10') {
       if (response.value_number === undefined) {
@@ -157,8 +183,19 @@ export function validatePublicAssessmentResponses(params: {
       continue
     }
 
+    if (field.input_type === 'food_preferences') {
+      if (!foodPreferenceAssessmentSchema.safeParse(response.value_json).success) {
+        return { ok: false, error: 'Le profil alimentaire est invalide ou incomplet.' }
+      }
+      continue
+    }
+
     if (response.value_text === undefined) {
       return { ok: false, error: 'Une réponse textuelle est invalide.' }
+    }
+
+    if (field.key === 'birth_date' && !isAdultBirthDate(response.value_text)) {
+      return { ok: false, error: 'Cette plateforme est réservée aux personnes majeures.' }
     }
 
     if (field.input_type === 'boolean' && !['true', 'false'].includes(response.value_text)) {
@@ -167,6 +204,18 @@ export function validatePublicAssessmentResponses(params: {
 
     if (field.input_type === 'single_choice' && field.options && !field.options.includes(response.value_text)) {
       return { ok: false, error: 'Une option sélectionnée est invalide.' }
+    }
+  }
+
+  if (params.payload.submit) {
+    for (const block of blocks) {
+      for (const field of block.fields) {
+        if (!field.visible || !field.required) continue
+        if (!evaluateCondition(field.show_if, responses)) continue
+        if (isMissingRequiredValue(responses[block.id]?.[field.key])) {
+          return { ok: false, error: `Champ requis manquant : ${field.label}.` }
+        }
+      }
     }
   }
 

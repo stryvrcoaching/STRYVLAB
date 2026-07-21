@@ -58,18 +58,13 @@ export default function CheckinSchedulePage() {
   }
 
   return (
-    <div className="min-h-dvh bg-[#0d0d0d]">
+    <div className="min-h-dvh bg-[#121212]">
       <ClientTopBar
-        section={t("checkin.schedule.section")}
         title={t("checkin.schedule.title")}
         backHref="/client/profil"
       />
-    <main className="min-h-dvh px-4 pt-[88px] pb-24 overflow-x-hidden">
-      <section className="max-w-lg mx-auto bg-white/[0.02] rounded-xl p-4 space-y-4">
-        <p className="text-[10px] uppercase tracking-[0.16em] text-white/40 font-semibold">
-          {t("checkin.schedule.section")}
-        </p>
-        <h1 className="text-[18px] font-bold text-white">{t("checkin.schedule.title")}</h1>
+    <main className="client-page-top min-h-dvh overflow-x-hidden px-4 pb-24">
+      <section className="mx-auto max-w-lg space-y-4 rounded-xl bg-white/[0.02] p-4">
 
         {entries.map((entry) => (
           <div key={entry.moment} className="bg-white/[0.03] rounded-xl p-3">

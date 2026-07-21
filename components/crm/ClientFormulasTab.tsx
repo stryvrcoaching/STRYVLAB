@@ -10,6 +10,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import ActionFeedbackBadge from '@/components/ui/ActionFeedbackBadge'
 import useTimedActionFeedback from '@/components/ui/useTimedActionFeedback'
+import SendPaymentLinkModal from '@/components/crm/SendPaymentLinkModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -80,6 +81,87 @@ const METHOD_LABELS: Record<string, string> = {
 const inputCls = 'w-full h-10 px-3 bg-[#0a0a0a] rounded-xl text-sm text-white outline-none placeholder:text-white/20'
 const selectCls = 'w-full h-10 px-3 bg-[#0a0a0a] rounded-xl text-sm text-white outline-none'
 
+function PaymentRow({
+  payment,
+  invoiceLoading,
+  remindLoading,
+  onDownloadInvoice,
+  onSendInvoice,
+  onSendReminder,
+}: {
+  payment: Payment
+  invoiceLoading: string | null
+  remindLoading: string | null
+  onDownloadInvoice: (paymentId: string) => void
+  onSendInvoice: (paymentId: string) => void
+  onSendReminder: (paymentId: string) => void
+}) {
+  const pCfg = PAYMENT_STATUS[payment.status] ?? PAYMENT_STATUS.pending
+  const dotCls = payment.status === 'paid'
+    ? 'bg-[#1f8a65]'
+    : payment.status === 'pending'
+      ? 'bg-amber-400'
+      : 'bg-red-400'
+  const isPaid = payment.status === 'paid'
+  const isPending = payment.status === 'pending'
+
+  return (
+    <div className="rounded-xl bg-white/[0.04] overflow-hidden">
+      <div className="flex items-center justify-between p-3">
+        <div className="flex items-center gap-3">
+          <div className={`w-2 h-2 rounded-full shrink-0 ${dotCls}`} />
+          <div>
+            <p className="text-[13px] font-semibold text-white">{payment.description || METHOD_LABELS[payment.payment_method]}</p>
+            <p className="text-[11px] text-white/40 mt-0.5">
+              {new Date(payment.payment_date).toLocaleDateString('fr-FR')}
+              {payment.reference && <span className="ml-2">Réf. {payment.reference}</span>}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`text-[11px] font-semibold ${pCfg.textCls}`}>{pCfg.label}</span>
+          <p className="text-sm font-black text-white font-mono">{Number(payment.amount_eur).toFixed(2)} €</p>
+        </div>
+      </div>
+
+      {(isPaid || isPending) && (
+        <div className="flex items-center gap-1.5 px-3 pb-3">
+          {isPaid && (
+            <>
+              <button
+                onClick={() => onDownloadInvoice(payment.id)}
+                disabled={invoiceLoading === payment.id}
+                className="flex items-center gap-1.5 text-[11px] font-semibold text-white/45 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] rounded-lg px-2.5 py-1.5 transition-colors disabled:opacity-40"
+              >
+                {invoiceLoading === payment.id ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />}
+                Télécharger reçu
+              </button>
+              <button
+                onClick={() => onSendInvoice(payment.id)}
+                disabled={invoiceLoading === payment.id}
+                className="flex items-center gap-1.5 text-[11px] font-semibold text-white/45 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] rounded-lg px-2.5 py-1.5 transition-colors disabled:opacity-40"
+              >
+                {invoiceLoading === payment.id ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+                Envoyer reçu
+              </button>
+            </>
+          )}
+          {isPending && (
+            <button
+              onClick={() => onSendReminder(payment.id)}
+              disabled={remindLoading === payment.id}
+              className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-400/70 hover:text-amber-400 bg-amber-400/5 hover:bg-amber-400/10 rounded-lg px-2.5 py-1.5 transition-colors disabled:opacity-40"
+            >
+              {remindLoading === payment.id ? <Loader2 size={11} className="animate-spin" /> : <Bell size={11} />}
+              Envoyer rappel
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ClientFormulasTab({ clientId }: { clientId: string }) {
@@ -115,6 +197,14 @@ export default function ClientFormulasTab({ clientId }: { clientId: string }) {
   })
   const [paySaving, setPaySaving] = useState(false)
   const [stripeLoading, setStripeLoading] = useState<string | null>(null)
+  const [stripeRequestSub, setStripeRequestSub] = useState<Subscription | null>(null)
+
+  const paymentsToFollowUp = payments.filter(
+    (payment) => payment.status === 'pending' || payment.status === 'failed',
+  )
+  const paymentHistory = payments.filter(
+    (payment) => payment.status === 'paid' || payment.status === 'refunded',
+  )
 
   const [formulaForm, setFormulaForm] = useState({
     name: '', description: '', price_eur: '', billing_cycle: 'monthly',
@@ -492,14 +582,10 @@ export default function ClientFormulasTab({ clientId }: { clientId: string }) {
                         <div className="flex flex-wrap gap-2">
                           {sub.formula?.billing_cycle !== 'one_time' && (
                             <button
-                              onClick={() => sendStripeCheckout(sub)}
-                              disabled={stripeLoading === sub.id}
-                              className="flex items-center gap-1.5 text-xs font-semibold text-white bg-[#635BFF]/80 hover:bg-[#635BFF] rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
+                              onClick={() => setStripeRequestSub(sub)}
+                              className="flex items-center gap-1.5 text-xs font-semibold text-white bg-[#635BFF]/80 hover:bg-[#635BFF] rounded-lg px-3 py-2 transition-colors"
                             >
-                              {stripeLoading === sub.id
-                                ? <Loader2 size={12} className="animate-spin" />
-                                : <ExternalLink size={12} />
-                              }
+                              <Send size={12} />
                               Lien Stripe
                             </button>
                           )}
@@ -528,76 +614,51 @@ export default function ClientFormulasTab({ clientId }: { clientId: string }) {
         )}
       </div>
 
-      {/* ── Payments history ─────────────────────────────────────────────────── */}
-      {payments.length > 0 && (
+      {/* ── Payments still requiring a coach action ─────────────────────────── */}
+      {paymentsToFollowUp.length > 0 && (
+        <div className="bg-[#181818] rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <Clock size={14} className="text-amber-400" />
+            <h3 className="text-sm font-bold text-white">Paiements à suivre</h3>
+          </div>
+          <p className="mb-5 text-[11px] text-white/40">
+            Paiements en attente ou échoués — ils ne font pas encore partie de l’historique.
+          </p>
+          <div className="space-y-2">
+            {paymentsToFollowUp.map(payment => (
+              <PaymentRow
+                key={payment.id}
+                payment={payment}
+                invoiceLoading={invoiceLoading}
+                remindLoading={remindLoading}
+                onDownloadInvoice={downloadInvoice}
+                onSendInvoice={sendInvoiceByEmail}
+                onSendReminder={sendReminder}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Completed payment history ───────────────────────────────────────── */}
+      {paymentHistory.length > 0 && (
         <div className="bg-[#181818] rounded-xl p-5">
           <div className="flex items-center gap-2 mb-5">
             <Receipt size={14} className="text-white/40" />
-            <h3 className="text-sm font-bold text-white">Historique des paiements</h3>
+            <h3 className="text-sm font-bold text-white">Historique des encaissements</h3>
           </div>
           <div className="space-y-2">
-            {payments.map(payment => {
-              const pCfg = PAYMENT_STATUS[payment.status] ?? PAYMENT_STATUS.pending
-              const dotCls = payment.status === 'paid' ? 'bg-[#1f8a65]' : payment.status === 'pending' ? 'bg-amber-400' : 'bg-red-400'
-              const isPaid = payment.status === 'paid'
-              const isPending = payment.status === 'pending'
-              return (
-                <div key={payment.id} className="rounded-xl bg-white/[0.04] overflow-hidden">
-                  <div className="flex items-center justify-between p-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full shrink-0 ${dotCls}`} />
-                      <div>
-                        <p className="text-[13px] font-semibold text-white">{payment.description || METHOD_LABELS[payment.payment_method]}</p>
-                        <p className="text-[11px] text-white/40 mt-0.5">
-                          {new Date(payment.payment_date).toLocaleDateString('fr-FR')}
-                          {payment.reference && <span className="ml-2">Réf. {payment.reference}</span>}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-[11px] font-semibold ${pCfg.textCls}`}>{pCfg.label}</span>
-                      <p className="text-sm font-black text-white font-mono">{Number(payment.amount_eur).toFixed(2)} €</p>
-                    </div>
-                  </div>
-
-                  {/* Action buttons */}
-                  {(isPaid || isPending) && (
-                    <div className="flex items-center gap-1.5 px-3 pb-3">
-                      {isPaid && (
-                        <>
-                          <button
-                            onClick={() => downloadInvoice(payment.id)}
-                            disabled={invoiceLoading === payment.id}
-                            className="flex items-center gap-1.5 text-[11px] font-semibold text-white/45 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] rounded-lg px-2.5 py-1.5 transition-colors disabled:opacity-40"
-                          >
-                            {invoiceLoading === payment.id ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />}
-                            Télécharger reçu
-                          </button>
-                          <button
-                            onClick={() => sendInvoiceByEmail(payment.id)}
-                            disabled={invoiceLoading === payment.id}
-                            className="flex items-center gap-1.5 text-[11px] font-semibold text-white/45 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] rounded-lg px-2.5 py-1.5 transition-colors disabled:opacity-40"
-                          >
-                            {invoiceLoading === payment.id ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
-                            Envoyer reçu
-                          </button>
-                        </>
-                      )}
-                      {isPending && (
-                        <button
-                          onClick={() => sendReminder(payment.id)}
-                          disabled={remindLoading === payment.id}
-                          className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-400/70 hover:text-amber-400 bg-amber-400/5 hover:bg-amber-400/10 rounded-lg px-2.5 py-1.5 transition-colors disabled:opacity-40"
-                        >
-                          {remindLoading === payment.id ? <Loader2 size={11} className="animate-spin" /> : <Bell size={11} />}
-                          Envoyer rappel
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+            {paymentHistory.map(payment => (
+              <PaymentRow
+                key={payment.id}
+                payment={payment}
+                invoiceLoading={invoiceLoading}
+                remindLoading={remindLoading}
+                onDownloadInvoice={downloadInvoice}
+                onSendInvoice={sendInvoiceByEmail}
+                onSendReminder={sendReminder}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -902,6 +963,18 @@ export default function ClientFormulasTab({ clientId }: { clientId: string }) {
             </button>
           </form>
         </Modal>
+      )}
+
+      {stripeRequestSub && (
+        <SendPaymentLinkModal
+          isOpen={true}
+          onClose={() => setStripeRequestSub(null)}
+          clientId={clientId}
+          amount={stripeRequestSub.price_override_eur ?? stripeRequestSub.formula?.price_eur ?? 0}
+          formulaName={stripeRequestSub.formula?.name ?? 'Coaching'}
+          formulaId={stripeRequestSub.formula_id}
+          subscriptionId={stripeRequestSub.id}
+        />
       )}
     </div>
   )

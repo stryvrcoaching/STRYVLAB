@@ -116,7 +116,7 @@ export default function SalesPwaPrompt() {
       <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-4 sm:items-center sm:p-6 backdrop-blur-sm">
         <article className="w-full max-w-md overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#121212] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.85)]">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.04] text-[#c6b48b]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.04] text-[#1f8a65]">
               <Smartphone size={20} />
             </div>
             <button
@@ -130,7 +130,7 @@ export default function SalesPwaPrompt() {
           </div>
 
           <div className="mt-5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#c6b48b]">Application mobile</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#1f8a65]">Application mobile</p>
             <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">Ajouter à l'écran d'accueil</h2>
             <p className="mt-2 text-xs leading-relaxed text-white/55">
               Installez STRYV Connect pour suivre vos ventes à tout moment en mode plein écran, et recevoir des alertes en temps réel.
@@ -202,7 +202,7 @@ export default function SalesPwaPrompt() {
           </button>
 
           <div className="flex gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#c6b48b]/10 text-[#c6b48b]">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1f8a65]/10 text-[#1f8a65]">
               {success ? <Sparkles size={18} /> : <Bell size={18} />}
             </div>
             

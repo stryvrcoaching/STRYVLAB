@@ -5,4 +5,5 @@ export { default as AgendaCalendar } from "./AgendaCalendar";
 export { Button } from "./Button";
 export { Card } from "./Card";
 export { GlassCard } from "./glass-card";
+export { default as BorderGlow } from "./BorderGlow";
 // ... autres exports

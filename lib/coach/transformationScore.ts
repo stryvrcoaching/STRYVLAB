@@ -135,24 +135,24 @@ export function getMissingTransformationSignalsReason(
   const hasCheckinField = Object.values(input.checkin.field_averages).some((value) => value != null)
   const hasCheckinRate = input.checkin.response_rate != null
   if (!hasCheckinField && !hasCheckinRate) {
-    missing.push('aucun check-in coach')
+    missing.push('aucun check-in')
   }
   if (input.performance.sessionsCount <= 0) {
-    missing.push('aucune séance loggée')
+    missing.push('aucune séance réalisée')
   }
   const hasBodySeries =
     input.bodyData.weightSeries.length > 0 ||
     input.bodyData.bodyFatSeries.length > 0 ||
     input.bodyData.leanMassSeries.length > 0
   if (!hasBodySeries) {
-    missing.push('aucun bilan corporel')
+    missing.push('aucune mesure corporelle')
   }
 
   if (missing.length === 0) {
-    return 'Aucun signal de transformation interprétable n’est encore disponible sur cette fenêtre.'
+    return 'Pas encore assez de signaux pour calculer un score sur cette période.'
   }
 
-  return `Lecture de transformation indisponible: ${missing.join(', ')}.`
+  return `Score indisponible pour le moment : ${missing.join(', ')}.`
 }
 
 // ─── Weight redistribution ────────────────────────────────────────────────────
@@ -237,17 +237,17 @@ function buildAdherenceExplanation(
 
   return {
     explanation:
-      'Le score d’adhérence combine la réponse aux check-ins et les séances réalisées par rapport à la cible hebdomadaire.',
+      'Ce pilier mesure la régularité des check-ins et des séances par rapport à la cible hebdomadaire.',
     metrics: [
       {
-        label: 'Check-ins répondus',
+        label: 'Check-ins complétés',
         value:
           checkin.response_rate != null
             ? `${checkin.response_rate}%`
             : 'Non disponible',
       },
       {
-        label: 'Séances réalisées vs cible',
+        label: 'Séances réalisées vs objectif',
         value:
           targetSessions > 0
             ? `${sessionsCount}/${Math.round(targetSessions * 10) / 10} (${sessionCompletionPct ?? 0}%)`
@@ -400,7 +400,7 @@ function buildBodyProgressExplanation(
 
   return {
     explanation:
-      'Le score corporel compare la trajectoire du poids, de la masse grasse et de la masse maigre à l’objectif principal du client.',
+      'Ce pilier compare l’évolution du poids, de la masse grasse et de la masse maigre à l’objectif de transformation.',
     metrics,
   }
 }
@@ -450,10 +450,10 @@ function buildPerformanceExplanation(
   if (exercises.length === 0) {
   return {
     explanation:
-      'La performance a besoin de séries exploitables par exercice pour calculer la complétion, le RIR, les événements de surcharge détectés et la stagnation.',
+      'Ce pilier a besoin de séries loggées par exercice pour évaluer la complétion, le RIR, la progression de charge et la stagnation.',
       metrics: [
-        { label: 'Séances détectées', value: String(input.sessionsCount) },
-        { label: 'Exercices analysables', value: '0' },
+        { label: 'Séances prises en compte', value: String(input.sessionsCount) },
+        { label: 'Exercices analysés', value: '0' },
       ],
     }
   }
@@ -471,25 +471,25 @@ function buildPerformanceExplanation(
 
   return {
     explanation:
-      'Le score de performance combine la complétion des sets, le RIR observé, les événements de surcharge enregistrés par le moteur de double progression et la part d’exercices jugés stagnants.',
+      'Ce pilier combine la complétion des sets, le RIR moyen, les progressions de charge et la part d’exercices en stagnation.',
     metrics: [
-      { label: 'Séances détectées', value: String(input.sessionsCount) },
-      { label: 'Complétion des sets', value: `${avgCompletion}%` },
+      { label: 'Séances prises en compte', value: String(input.sessionsCount) },
+      { label: 'Sets complétés', value: `${avgCompletion}%` },
       { label: 'RIR moyen', value: avgRir != null ? `${avgRir}` : 'Non disponible' },
       {
-        label: 'Exercices avec événement de surcharge',
+        label: 'Exercices en progression de charge',
         value: `${overloadingCount}/${exercises.length}`,
       },
       {
-        label: 'Exercices jugés en stagnation',
+        label: 'Exercices en stagnation',
         value: `${stagnantCount}/${exercises.length}`,
       },
       {
-        label: 'Règle de surcharge suivie',
-        value: 'Double progression sur exercices de programme compatibles',
+        label: 'Méthode de progression',
+        value: 'Double progression (programme)',
       },
       {
-        label: 'Surmenage global',
+        label: 'Signes de surmenage',
         value: global_overreaching ? 'Oui' : 'Non',
       },
     ],
@@ -509,11 +509,15 @@ function generateAlerts(
     if (rate != null && rate < 50) {
       alerts.push({
         dimension: 'adherence',
-        message: `Check-in rate : ${rate}% — données insuffisantes`,
+        message: `Check-ins complétés à ${rate}% — il manque des retours pour bien suivre`,
         severity: rate < 30 ? 'high' : 'medium',
       })
     } else {
-      alerts.push({ dimension: 'adherence', message: 'Régularité des séances en baisse', severity: 'medium' })
+      alerts.push({
+        dimension: 'adherence',
+        message: 'La régularité des séances est en baisse',
+        severity: 'medium',
+      })
     }
   }
 
@@ -522,7 +526,7 @@ function generateAlerts(
     if (avgs.sleep_duration != null && avgs.sleep_duration < 6.5) {
       alerts.push({
         dimension: 'recovery',
-        message: `Sommeil moy. ${avgs.sleep_duration.toFixed(1)}h/nuit — sous le seuil de récupération`,
+        message: `Sommeil moyen ${avgs.sleep_duration.toFixed(1)} h/nuit — sous le seuil de bonne récupération`,
         severity: 'high',
       })
     } else if (avgs.stress != null && avgs.stress > 3.5) {
@@ -532,20 +536,24 @@ function generateAlerts(
         severity: 'medium',
       })
     } else {
-      alerts.push({ dimension: 'recovery', message: 'Qualité de récupération insuffisante', severity: 'medium' })
+      alerts.push({
+        dimension: 'recovery',
+        message: 'La qualité de récupération est insuffisante',
+        severity: 'medium',
+      })
     }
   }
 
   if (dims.bodyProgress.dataPoints === 0) {
     alerts.push({
       dimension: 'bodyProgress',
-      message: 'Aucune donnée corporelle sur la période — planifier un bilan',
+      message: 'Aucune mesure corporelle sur la période — un bilan ou un pesage aiderait',
       severity: 'low',
     })
   } else if (dims.bodyProgress.score < 40) {
     alerts.push({
       dimension: 'bodyProgress',
-      message: "Progression corporelle contraire à l'objectif",
+      message: "La progression corporelle s'éloigne de l'objectif",
       severity: 'high',
     })
   }
@@ -553,7 +561,7 @@ function generateAlerts(
   if (dims.performance.score < 50 && dims.performance.dataPoints > 0) {
     alerts.push({
       dimension: 'performance',
-      message: 'Progression en force stagnante sur la période',
+      message: 'La progression en force stagne sur la période',
       severity: dims.performance.score < 30 ? 'high' : 'medium',
     })
   }
@@ -607,7 +615,7 @@ export function computeTransformationScore(input: ComputeScoreInput): Transforma
       weight: w.recovery,
       dataPoints: recoveryRaw.dataPoints,
       explanation:
-        'Le score de récupération reflète l’énergie, le sommeil, le stress et les courbatures sur la fenêtre sélectionnée.',
+        'Ce pilier reflète l’énergie, le sommeil, le stress et les courbatures sur la période analysée.',
       metrics: [
         {
           label: 'Sommeil',

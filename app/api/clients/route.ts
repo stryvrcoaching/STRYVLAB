@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import {
+  assertCoachClientCapacity,
+  ClientLimitReachedError,
+} from '@/lib/billing/clientLimits'
 
 // Service role client — bypasses RLS for coach operations
 function serviceClient() {
@@ -54,7 +58,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Email obligatoire' }, { status: 400 })
   }
 
-  const { data, error } = await serviceClient()
+  const db = serviceClient()
+  try {
+    await assertCoachClientCapacity(db, user.id)
+  } catch (limitError) {
+    if (limitError instanceof ClientLimitReachedError) {
+      return NextResponse.json(
+        {
+          error:
+            'Limite de clients atteinte pour votre plan. Passez à un plan supérieur pour en ajouter.',
+        },
+        { status: 403 },
+      )
+    }
+    throw limitError
+  }
+
+  const { data, error } = await db
     .from('coach_clients')
     .insert({
       coach_id: user.id,
@@ -86,7 +106,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const db = serviceClient()
   const [aiSettingsResult, checkinConfigResult] = await Promise.all([
     db.from('coach_ai_settings_per_client').upsert(
       {

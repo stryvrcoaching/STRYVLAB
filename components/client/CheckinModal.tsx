@@ -358,7 +358,7 @@ export default function CheckinModal({ moment, open, onClose, onSuccess, date }:
 
               {!loading && !done && currentStep ? (
                 <div
-                  className="shrink-0 border-t border-white/[0.06] bg-[#0d0d0d] px-5 pt-3"
+                  className="shrink-0 border-t border-white/[0.06] bg-[#121212] px-5 pt-3"
                   style={{ paddingBottom: 'var(--client-modal-bottom-padding)' }}
                 >
                   <div className="flex gap-2">

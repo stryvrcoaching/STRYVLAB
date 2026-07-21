@@ -1,22 +1,19 @@
+import { Suspense } from "react"
 import { createClient } from "@/utils/supabase/server"
 import { createClient as createServiceClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
 import { resolveClientFromUser } from "@/lib/client/resolve-client"
-import { assertClientAppEnabledForCoach, ClientAppAccessError } from "@/lib/billing/assertClientAppEnabled"
+import {
+  assertClientAppEnabledForCoach,
+  ClientAppAccessError,
+} from "@/lib/billing/assertClientAppEnabled"
 import { resolveClientLanguage } from "@/lib/client/resolve-language"
 import type { ClientLang } from "@/lib/i18n/clientTranslations"
-import { buildChatTodayStrip } from "@/lib/client/chat/today-strip"
-import { listClientNotificationItems } from "@/lib/client/inbox"
-import {
-  extractTemplateName,
-  isSystemAssessmentTemplateName,
-} from "@/lib/assessments/templateSnapshot"
-import {
-  computePhysiologicalDateInTimezone,
-  addDaysToDateKey,
-  utcRangeForPhysiologicalDate,
-} from "@/lib/client/checkin/timeWindows"
 import ClientDashboard from "@/components/client/ClientDashboard"
+import ClientHomeSkeleton from "@/components/client/ClientHomeSkeleton"
+import ClientHomeContent, {
+  type HomeIdentity,
+} from "@/app/client/ClientHomeContent"
 
 function service() {
   return createServiceClient(
@@ -25,21 +22,43 @@ function service() {
   )
 }
 
+function AccessUnavailable() {
+  return (
+    <div className="min-h-dvh bg-[#121212] px-6 py-16 text-white">
+      <div className="mx-auto flex max-w-lg flex-col items-center text-center">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/35">
+          STRYVR
+        </p>
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white">
+          Espace client indisponible
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-white/65">
+          L’espace client n’est pas actif pour ce suivi. Contactez votre coach pour activer
+          l’expérience STRYVR.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Fast gate (auth + client + access) then stream heavy dashboard data.
+ * First paint can show the identity skeleton while queries resolve.
+ */
 export default async function ClientHomePage() {
   const supabase = createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  let firstName: string | null = null
-  let lang: ClientLang = "fr"
+  const langFallback: ClientLang = "fr"
 
   if (!user) {
     return (
       <ClientDashboard
         clientId=""
         clientFirstName={null}
-        lang={lang}
+        lang={langFallback}
         todayStrip={null}
         notifications={[]}
         assessments={{ pending: [], recent: [] }}
@@ -53,7 +72,7 @@ export default async function ClientHomePage() {
     user.id,
     user.email,
     db,
-    "id, first_name, coach_id, timezone, profile_photo_url, training_goal, transformation_phase, created_at, step_target, gender"
+    "id, first_name, coach_id, timezone, profile_photo_url, training_goal, transformation_phase, created_at, step_target, gender",
   )
 
   if (!client) {
@@ -70,231 +89,44 @@ export default async function ClientHomePage() {
     }
   }
 
-  const timezone = (client as any)?.timezone || "Europe/Paris"
-  const todayPhysio = computePhysiologicalDateInTimezone(new Date(), timezone)
-  const { start: todayStartUtc } = utcRangeForPhysiologicalDate(todayPhysio, timezone)
+  const coachId = ((client as any)?.coach_id as string | null | undefined) ?? null
+  const clientId = (client as any)?.id as string
 
+  // Access + language in parallel — both needed before streaming body.
+  let lang: ClientLang = langFallback
   try {
-    const coachId = (client as any)?.coach_id as string | null | undefined
-    if (coachId) {
-      await assertClientAppEnabledForCoach(db, coachId)
-    }
-
-    firstName = (client as any)?.first_name ?? null
-    if ((client as any)?.id) {
-      lang = await resolveClientLanguage(db, (client as any).id as string)
-    }
+    const [, resolvedLang] = await Promise.all([
+      coachId ? assertClientAppEnabledForCoach(db, coachId) : Promise.resolve(null),
+      resolveClientLanguage(db, clientId),
+    ])
+    lang = resolvedLang
   } catch (error) {
     if (error instanceof ClientAppAccessError) {
-      return (
-        <div className="min-h-dvh bg-[#0d0d0d] px-6 py-16 text-white">
-          <div className="mx-auto flex max-w-lg flex-col items-center text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/35">
-              STRYVR
-            </p>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white">
-              Espace client indisponible
-            </h1>
-            <p className="mt-3 text-sm leading-6 text-white/65">
-              L’espace client n’est pas actif pour ce suivi. Contactez votre coach pour activer
-              l’expérience STRYVR.
-            </p>
-          </div>
-        </div>
-      )
+      return <AccessUnavailable />
     }
-
     throw error
   }
 
-  const [todayStrip, notifications, submissionsRes, coachProfileRes, streakRes, progressionRes, walletRes, nextAppointmentRes] = await Promise.all([
-    buildChatTodayStrip(db, (client as any)?.id as string),
-    listClientNotificationItems(db, user.id, (client as any)?.id as string, false, {
-      includeLegacy: false,
-      createdAfter: todayStartUtc.toISOString(),
-    }),
-    db
-      .from("assessment_responses")
-      .select("id, template_snapshot, status, created_at, submitted_at, token, token_expires_at")
-      .eq("client_id", (client as any)?.id as string)
-      .order("created_at", { ascending: false })
-      .limit(20),
-    db
-      .from("coach_profiles")
-      .select("full_name, logo_url")
-      .eq("coach_id", (client as any)?.coach_id as string)
-      .maybeSingle(),
-    db
-      .from("client_streaks")
-      .select("current_streak, longest_streak")
-      .eq("client_id", (client as any)?.id as string)
-      .maybeSingle(),
-    db
-      .from("client_progression_profiles")
-      .select("total_points, level")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-    db
-      .from("client_reward_wallets")
-      .select("earned_points, spent_points")
-      .eq("client_id", (client as any)?.id as string)
-      .eq("coach_id", (client as any)?.coach_id as string)
-      .maybeSingle(),
-    db
-      .from("coaching_appointments")
-      .select("id, title, starts_at, ends_at, client_timezone, meeting_kind, meeting_url, status")
-      .eq("client_id", (client as any)?.id as string)
-      .gte("starts_at", new Date().toISOString())
-      .lte("starts_at", new Date(Date.now() + 14 * 24 * 3600_000).toISOString())
-      .not("status", "in", '("cancelled")')
-      .order("starts_at", { ascending: true })
-      .limit(1)
-      .maybeSingle(),
-  ])
-
-  const startPhysio = addDaysToDateKey(todayPhysio, -6)
-  const { start: startUtc } = utcRangeForPhysiologicalDate(startPhysio, timezone)
-  const { end: endUtc } = utcRangeForPhysiologicalDate(todayPhysio, timezone)
-
-  const [weeklyStepsRes, weeklyComposerMealsRes, weeklyLegacyMealsRes, weeklySessionsRes] = await Promise.all([
-    db.from("client_daily_checkins")
-      .select("daily_steps, date")
-      .eq("client_id", (client as any).id)
-      .gte("date", startPhysio)
-      .lte("date", todayPhysio),
-
-    db.from("nutrition_meals")
-      .select("total_calories, physiological_date")
-      .eq("client_id", (client as any).id)
-      .gte("physiological_date", startPhysio)
-      .lte("physiological_date", todayPhysio),
-
-    db.from("meal_logs")
-      .select("estimated_macros, logged_at")
-      .eq("client_id", (client as any).id)
-      .gte("logged_at", startUtc.toISOString())
-      .lte("logged_at", endUtc.toISOString())
-      .eq("ai_status", "done"),
-
-    db.from("client_session_logs")
-      .select("id, completed_at, client_set_logs(actual_weight_kg, actual_reps, completed)")
-      .eq("client_id", (client as any).id)
-      .not("completed_at", "is", null)
-      .gte("completed_at", startUtc.toISOString())
-      .lte("completed_at", endUtc.toISOString())
-  ])
-
-  const stepsRows = (weeklyStepsRes.data ?? []) as any[]
-  const stepsValues = stepsRows.map(r => r.daily_steps).filter(v => v != null)
-  const weeklyStepAvg = stepsValues.length > 0
-    ? Math.round(stepsValues.reduce((s, v) => s + v, 0) / stepsValues.length)
-    : null
-
-  const compMeals = (weeklyComposerMealsRes.data ?? []) as any[]
-  const legMeals = (weeklyLegacyMealsRes.data ?? []) as any[]
-  const caloriesMap: Record<string, number> = {}
-
-  for (const m of compMeals) {
-    const val = Number(m.total_calories) || 0
-    caloriesMap[m.physiological_date] = (caloriesMap[m.physiological_date] || 0) + val
+  const identity: HomeIdentity = {
+    userId: user.id,
+    clientId,
+    coachId: coachId ?? "",
+    firstName: (client as any)?.first_name ?? null,
+    avatarUrl: (client as any)?.profile_photo_url ?? null,
+    goal: (client as any)?.training_goal ?? null,
+    phase: (client as any)?.transformation_phase ?? null,
+    createdAt: (client as any)?.created_at ?? null,
+    gender: (client as any)?.gender ?? "male",
+    stepTarget: (client as any)?.step_target ?? null,
+    timezone: (client as any)?.timezone || "Europe/Paris",
+    lang,
   }
-  for (const m of legMeals) {
-    const em = m.estimated_macros as Record<string, number> | null
-    const val = em?.calories_kcal ?? 0
-    const dateKey = m.logged_at.split("T")[0]
-    caloriesMap[dateKey] = (caloriesMap[dateKey] || 0) + val
-  }
-
-  const calorieValues = Object.values(caloriesMap)
-  const weeklyCalorieAvg = calorieValues.length > 0
-    ? Math.round(calorieValues.reduce((s, v) => s + v, 0) / calorieValues.length)
-    : null
-
-  const sessionsLogs = (weeklySessionsRes.data ?? []) as any[]
-  let weeklyVolume = 0
-  for (const s of sessionsLogs) {
-    const sets = (s.client_set_logs ?? []) as any[]
-    for (const set of sets) {
-      if (set.completed && set.actual_weight_kg != null && set.actual_reps != null) {
-        weeklyVolume += Number(set.actual_weight_kg) * Number(set.actual_reps)
-      }
-    }
-  }
-
-  const submissions = (submissionsRes as any)?.data ?? []
-  const pending = submissions
-    .filter((submission: any) => {
-      const expired =
-        submission.status === "pending" &&
-        (submission.token_expires_at && new Date(submission.token_expires_at) < new Date())
-
-      return submission.status === "pending" && !expired
-    })
-    .map((submission: any) => ({
-      id: submission.id as string,
-      name: extractTemplateName(submission.template_snapshot),
-      status: submission.status as string,
-      createdAt: submission.created_at as string,
-      submittedAt: submission.submitted_at as string | null,
-      token: submission.token as string | null,
-    }))
-  const recent = submissions
-    .filter((submission: any) => {
-      if (isSystemAssessmentTemplateName(extractTemplateName(submission.template_snapshot))) {
-        return false
-      }
-      const expired =
-        submission.status === "pending" &&
-        (submission.token_expires_at && new Date(submission.token_expires_at) < new Date())
-
-      return submission.status === "completed" || expired
-    })
-    .slice(0, 3)
-    .map((submission: any) => ({
-      id: submission.id as string,
-      name: extractTemplateName(submission.template_snapshot),
-      status: submission.status as string,
-      createdAt: submission.created_at as string,
-      submittedAt: submission.submitted_at as string | null,
-      token: submission.token as string | null,
-    }))
-
-  const legacyStreak = (streakRes as any)?.data
-  const progression = (progressionRes as any)?.data
-  const wallet = (walletRes as any)?.data
-  const dashboardProgression = progression
-    ? {
-        current_streak: legacyStreak?.current_streak ?? 0,
-        longest_streak: legacyStreak?.longest_streak ?? 0,
-        total_points: Number(progression.total_points) || 0,
-        available_points: Math.max(0, (Number(wallet?.earned_points) || 0) - (Number(wallet?.spent_points) || 0)),
-        level: progression.level,
-      }
-    : legacyStreak ?? null
 
   return (
-    <ClientDashboard
-      clientId={(client as any)?.id as string}
-      clientFirstName={firstName}
-      clientAvatarUrl={(client as any)?.profile_photo_url ?? null}
-      clientGoal={(client as any)?.training_goal ?? null}
-      clientPhase={(client as any)?.transformation_phase ?? null}
-      clientCreatedAt={(client as any)?.created_at ?? null}
-      clientGender={(client as any)?.gender ?? "male"}
-      lang={lang}
-      todayStrip={todayStrip}
-      notifications={notifications}
-      assessments={{ pending, recent }}
-      coach={{
-        fullName: (coachProfileRes as any)?.data?.full_name ?? null,
-        avatarUrl: (coachProfileRes as any)?.data?.logo_url ?? null,
-      }}
-      weeklyStepAvg={weeklyStepAvg}
-      stepTarget={(client as any)?.step_target ?? null}
-      weeklyCalorieAvg={weeklyCalorieAvg}
-      weeklyVolume={weeklyVolume}
-      streak={dashboardProgression}
-      nextAppointment={(nextAppointmentRes as any)?.data ?? null}
-    />
+    <Suspense
+      fallback={<ClientHomeSkeleton firstName={identity.firstName} />}
+    >
+      <ClientHomeContent identity={identity} />
+    </Suspense>
   )
 }

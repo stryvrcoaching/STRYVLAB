@@ -96,6 +96,29 @@ function SubSectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Visual group for the profil IA: Pilotage / Orga / Fiche / Compte */
+function ZoneHeader({
+  label,
+  hint,
+}: {
+  label: string
+  hint?: string
+}) {
+  return (
+    <div className="flex items-end justify-between gap-3 pt-2 first:pt-0">
+      <div>
+        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/55">
+          {label}
+        </p>
+        {hint && (
+          <p className="mt-1 text-[11px] leading-snug text-white/30">{hint}</p>
+        )}
+      </div>
+      <div className="mb-1.5 h-px min-w-[48px] flex-1 bg-white/[0.06]" />
+    </div>
+  )
+}
+
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={`bg-white/[0.02] border-[0.3px] border-white/[0.06] rounded-2xl p-4 ${className}`}>
@@ -184,12 +207,38 @@ export default function ProfilPage() {
 
   // ── Access onboarding cue: new client (not yet active/suspended) needs an invite ──
   const accessSectionRef = useRef<HTMLDivElement>(null);
+  const infoSectionRef = useRef<HTMLDivElement>(null);
+  const sportSectionRef = useRef<HTMLDivElement>(null);
+  const formulasSectionRef = useRef<HTMLDivElement>(null);
   const [accessStatus, setAccessStatus] = useState(client.status ?? "inactive");
   useEffect(() => { setAccessStatus(client.status ?? "inactive"); }, [client.status]);
   const needsInvite = accessStatus !== "active" && accessStatus !== "suspended";
   const [phaseOpen, setPhaseOpen] = useState(false);
   const scrollToAccess = useCallback(() => {
     accessSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
+
+  // Deep link from activation hub: ?section=informations|sport|acces|formules
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const section = params.get("section");
+    if (!section) return;
+    const map: Record<string, React.RefObject<HTMLDivElement | null>> = {
+      informations: infoSectionRef,
+      info: infoSectionRef,
+      sport: sportSectionRef,
+      acces: accessSectionRef,
+      access: accessSectionRef,
+      formules: formulasSectionRef,
+      formulas: formulasSectionRef,
+    };
+    const ref = map[section];
+    if (!ref) return;
+    const t = window.setTimeout(() => {
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+    return () => window.clearTimeout(t);
   }, []);
 
   useClientTopBar(
@@ -459,11 +508,19 @@ export default function ProfilPage() {
   return (
     <main className="min-h-screen bg-[#121212]">
       <div className="px-6 pb-24">
-        <div className="grid grid-cols-2 items-start gap-4">
+        <div className="flex flex-col gap-8">
 
-          {/* ── COLONNE GAUCHE : score + fiche client ── */}
-          <div className="flex flex-col gap-4">
-            <TransformationScoreWidget clientId={clientId} />
+          {/* ═══════════════════════════════════════════════════════════════
+              SCORE & PHASE — lecture stratégique (cockpit = header)
+          ═══════════════════════════════════════════════════════════════ */}
+          <section className="flex flex-col gap-4">
+            <ZoneHeader
+              label="Score & phase"
+              hint="Transformation, décision de phase et optimisation"
+            />
+            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+              <div className="flex flex-col gap-4">
+                <TransformationScoreWidget clientId={clientId} />
 
             <Card>
               <div className="flex items-center justify-between gap-2 mb-3">
@@ -472,7 +529,7 @@ export default function ProfilPage() {
                   onClick={() => setPhaseOpen((o) => !o)}
                   className="flex items-center gap-2 flex-1 text-left"
                 >
-                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/40">Phase actuelle</span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/40">Décision de phase</span>
                   <ChevronDown size={13} className={`text-white/30 transition-transform ${phaseOpen ? "rotate-180" : ""}`} />
                 </button>
                 {phaseOpen && (
@@ -589,8 +646,41 @@ export default function ProfilPage() {
                 </div>
               </div>
             </Card>
+              </div>
 
+              <div className="flex flex-col gap-4">
+                <PhaseOptimizationWidget clientId={clientId} />
+              </div>
+            </div>
+          </section>
+
+          {/* ═══════════════════════════════════════════════════════════════
+              ORGA — rendez-vous
+          ═══════════════════════════════════════════════════════════════ */}
+          <section className="flex flex-col gap-4">
+            <ZoneHeader
+              label="Organisation"
+              hint="Rendez-vous planifiés avec le client"
+            />
+            <ClientAppointmentsWidget
+              clientId={clientId}
+              clientFirstName={client?.first_name ?? null}
+              clientLastName={client?.last_name ?? null}
+            />
+          </section>
+
+          {/* ═══════════════════════════════════════════════════════════════
+              FICHE — paramétrage client (rare)
+          ═══════════════════════════════════════════════════════════════ */}
+          <section className="flex flex-col gap-4">
+            <ZoneHeader
+              label="Fiche client"
+              hint="Identité, sport, équipements et réglages de suivi"
+            />
+            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+              <div className="flex flex-col gap-4">
             {/* ── Informations ── */}
+            <div ref={infoSectionRef}>
             <CollapsibleCard
               title="Informations"
               headerRight={!editingCrm ? (
@@ -725,7 +815,7 @@ export default function ProfilPage() {
                             ...d,
                             minor_authorization_status: e.target.checked ? "authorized" : "authorization_required",
                           }))}
-                          className="mt-0.5 h-4 w-4 accent-[#c6b48b]"
+                          className="mt-0.5 h-4 w-4 accent-[#1f8a65]"
                         />
                         J’atteste avoir vérifié l’autorisation du représentant légal pour le suivi et le traitement des données nécessaires.
                       </label>
@@ -774,8 +864,10 @@ export default function ProfilPage() {
                 </div>
               )}
             </CollapsibleCard>
+            </div>
 
             {/* ── Profil sportif + équipement + restrictions ── */}
+            <div ref={sportSectionRef}>
             <CollapsibleCard
               title="Profil sportif"
               headerRight={!editingSport ? (
@@ -889,21 +981,30 @@ export default function ProfilPage() {
               <SubSectionLabel>Équipement disponible</SubSectionLabel>
               <RestrictionsWidget clientId={clientId} section="equipment" />
             </CollapsibleCard>
+            </div>
+              </div>
 
-            {/* Paramètres IA Coach */}
-            <AiCoachSettingsWidget clientId={clientId} />
+              <div className="flex flex-col gap-4">
+                {/* Configuration check-in quotidien */}
+                <CheckinConfigWidget clientId={clientId} />
 
-            {/* Configuration check-in quotidien */}
-            <CheckinConfigWidget clientId={clientId} />
+                {/* Paramètres IA Coach */}
+                <AiCoachSettingsWidget clientId={clientId} />
+              </div>
+            </div>
+          </section>
 
-            {/* Gestion des rendez-vous */}
-            <ClientAppointmentsWidget
-              clientId={clientId}
-              clientFirstName={client?.first_name ?? null}
-              clientLastName={client?.last_name ?? null}
+          {/* ═══════════════════════════════════════════════════════════════
+              COMPTE — accès app, offre, tags
+          ═══════════════════════════════════════════════════════════════ */}
+          <section className="flex flex-col gap-4">
+            <ZoneHeader
+              label="Compte & business"
+              hint="Accès STRYVR, offre commerciale et classification"
             />
-
-            {/* Espace client STRYVR */}
+            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+              <div className="flex flex-col gap-4">
+            {/* Accès app client */}
             <div
               ref={accessSectionRef}
               className={`rounded-2xl transition-[box-shadow,border-color] ${
@@ -912,7 +1013,7 @@ export default function ProfilPage() {
             >
               <Card>
                 <div className="flex items-center justify-between mb-1">
-                  <SectionLabel>Espace client STRYVR</SectionLabel>
+                  <SectionLabel>Accès app client</SectionLabel>
                   {needsInvite && (
                     <span className="flex items-center gap-1 rounded-full bg-[#1f8a65]/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-[#7fe2bf]">
                       Action requise
@@ -927,12 +1028,6 @@ export default function ProfilPage() {
                 />
               </Card>
             </div>
-
-            {/* Formules & abonnement */}
-            <Card>
-              <SectionLabel>Formules & abonnement</SectionLabel>
-              <ClientFormulasTab clientId={clientId} />
-            </Card>
 
             {/* Tags */}
             <Card>
@@ -1026,22 +1121,33 @@ export default function ProfilPage() {
               )}
             </Card>
 
-            {/* Zone dangereuse — toujours tout en bas de la colonne gauche */}
-            <div className="bg-red-950/20 border-[0.3px] border-red-500/20 rounded-2xl px-4 py-3 flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-red-400/60">Zone dangereuse</p>
+            {/* Zone dangereuse */}
+            <div className="flex items-center justify-between rounded-2xl border-[0.3px] border-red-500/20 bg-red-950/20 px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-red-400/60">
+                Zone dangereuse
+              </p>
               <button
+                type="button"
                 onClick={() => setShowDelete(true)}
-                className="text-[12px] text-red-400/60 hover:text-red-400 transition-colors font-medium"
+                className="text-[12px] font-medium text-red-400/60 transition-colors hover:text-red-400"
               >
                 Supprimer ou archiver →
               </button>
             </div>
-          </div>
+              </div>
 
-          {/* ── COLONNE DROITE : optimisation de phase ── */}
-          <div className="flex flex-col gap-4">
-            <PhaseOptimizationWidget clientId={clientId} />
-          </div>
+              <div className="flex flex-col gap-4">
+                {/* Offre & facturation */}
+                <div ref={formulasSectionRef}>
+                <Card>
+                  <SectionLabel>Offre & facturation</SectionLabel>
+                  <ClientFormulasTab clientId={clientId} />
+                </Card>
+                </div>
+              </div>
+            </div>
+          </section>
+
         </div>
       </div>
 

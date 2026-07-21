@@ -14,6 +14,7 @@ import DashboardKanban from '@/components/dashboard/DashboardKanban'
 import DashboardAgenda from '@/components/dashboard/DashboardAgenda'
 import OrgSummary from '@/components/dashboard/OrgSummary'
 import type { DashboardCoachData } from '@/components/dashboard/types'
+import type { CoachActivationSnapshot } from '@/lib/onboarding/coach-activation'
 
 const VIEW_STORAGE_KEY = 'dashboard_active_view'
 
@@ -61,7 +62,7 @@ function DashboardSkeleton() {
 export default function DashboardPage() {
   const router = useRouter()
   const [data, setData] = useState<DashboardCoachData | null>(null)
-  const [onboarding, setOnboarding] = useState<{ hasClient: boolean; hasTemplate: boolean; hasFormula: boolean } | null>(null)
+  const [onboarding, setOnboarding] = useState<CoachActivationSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [view, setView] = useState<DashboardView>(null)
@@ -93,7 +94,9 @@ export default function DashboardPage() {
         .then(([dashJson, onboardingJson]) => {
           if (dashJson.success && dashJson.data) setData(dashJson.data)
           else if (!dashJson.success) setError(true)
-          setOnboarding(onboardingJson)
+          if (onboardingJson?.categories) {
+            setOnboarding(onboardingJson as CoachActivationSnapshot)
+          }
         })
         .catch(() => setError(true))
         .finally(() => setLoading(false))
@@ -133,8 +136,8 @@ export default function DashboardPage() {
   return (
     <main className="bg-[#121212] min-h-screen">
       <div className="p-6 max-w-[1200px] mx-auto">
-        {/* Welcome header — disparaît à 3/3 */}
-        {onboarding && <WelcomeHeader state={onboarding} />}
+        {/* Activation hub — progression + module Apprendre permanent */}
+        {onboarding && <WelcomeHeader snapshot={onboarding} />}
 
         {/* KPIs Business — toujours visible, collapsible */}
         {data && <SummaryPanel data={data} />}

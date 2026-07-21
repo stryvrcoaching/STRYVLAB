@@ -371,8 +371,8 @@ export function SalesLeadDetailWorkspace({ leadId }: { leadId: string }) {
           </article>
 
           {/* Cal.com Demo card */}
-          <article className="rounded-3xl border border-[#c6b48b]/20 bg-[#c6b48b]/[0.02] p-5 sm:p-6 space-y-4">
-            <h2 className="text-sm font-semibold text-[#c6b48b] flex items-center gap-2">
+          <article className="rounded-3xl border border-[#1f8a65]/20 bg-[#1f8a65]/[0.02] p-5 sm:p-6 space-y-4">
+            <h2 className="text-sm font-semibold text-[#1f8a65] flex items-center gap-2">
               <CalendarClock size={16} /> Aide Planification Démo
             </h2>
             <p className="text-xs text-white/55 leading-relaxed">
@@ -417,7 +417,7 @@ export function SalesLeadDetailWorkspace({ leadId }: { leadId: string }) {
                     }}
                     className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-[0.1em] border-b-2 transition ${
                       active
-                        ? 'border-[#c6b48b] text-[#c6b48b] bg-white/[0.02]'
+                        ? 'border-[#1f8a65] text-[#1f8a65] bg-white/[0.02]'
                         : 'border-transparent text-white/45 hover:text-white'
                     }`}
                   >
@@ -523,9 +523,9 @@ export function SalesLeadDetailWorkspace({ leadId }: { leadId: string }) {
                         <button
                           type="button"
                           onClick={() => void toggleTaskCompleted(act)}
-                          className="mt-0.5 shrink-0 rounded-lg border border-white/20 p-1 hover:border-[#c6b48b] hover:bg-white/[0.04] text-white/50 hover:text-white transition"
+                          className="mt-0.5 shrink-0 rounded-lg border border-white/20 p-1 hover:border-[#1f8a65] hover:bg-white/[0.04] text-white/50 hover:text-white transition"
                         >
-                          <CheckSquare size={16} className={isCompletedTask ? 'text-[#c6b48b]' : 'text-white/20'} />
+                          <CheckSquare size={16} className={isCompletedTask ? 'text-[#1f8a65]' : 'text-white/20'} />
                         </button>
                       ) : (
                         <div className="mt-1 shrink-0 rounded-lg bg-white/[0.05] p-2 text-white/50">
@@ -551,7 +551,7 @@ export function SalesLeadDetailWorkspace({ leadId }: { leadId: string }) {
 
                         {isTask && act.due_at ? (
                           <p className="text-[10px] font-semibold text-white/40 flex items-center gap-1">
-                            Échéance : <span className={isCompletedTask ? 'text-white/30' : 'text-[#c6b48b]'}>{formatDate(act.due_at)}</span>
+                            Échéance : <span className={isCompletedTask ? 'text-white/30' : 'text-[#1f8a65]'}>{formatDate(act.due_at)}</span>
                           </p>
                         ) : null}
 

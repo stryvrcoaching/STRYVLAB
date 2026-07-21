@@ -66,15 +66,74 @@ export async function POST(req: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session
         if (session.metadata?.type !== 'coaching') break
 
-        const { client_id, formula_id, subscription_id, coach_id } = session.metadata
+        // Only confirm money received — never mark paid on incomplete/async-unpaid sessions.
+        if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
+          console.info(
+            `[coaching webhook] checkout.session.completed ignored (payment_status=${session.payment_status})`,
+          )
+          break
+        }
+
+        const { client_id, formula_id, subscription_id, coach_id, payment_id } = session.metadata
 
         // Récupère le stripe_subscription_id si mode subscription
         const stripeSubId = typeof session.subscription === 'string'
           ? session.subscription
           : session.subscription?.id ?? null
 
+        let recordedAmountEur: number | null = null
+        let recordedPaymentId: string | null = payment_id || null
+        let recordedDescription: string | null = 'Paiement Stripe'
+
+        // 1. Si on a un payment_id spécifique (demande de paiement standalone ou pré-créé)
+        if (payment_id) {
+          await service
+            .from('subscription_payments')
+            .update({
+              status: 'paid',
+              payment_method: 'stripe',
+              stripe_payment_intent_id: typeof session.payment_intent === 'string'
+                ? session.payment_intent
+                : session.payment_intent?.id ?? null,
+              stripe_checkout_session_id: session.id,
+              payment_date: new Date().toISOString().split('T')[0],
+            })
+            .eq('id', payment_id)
+
+          // Envoyer le reçu email au client
+          const { data: client } = await service
+            .from('coach_clients')
+            .select('first_name, last_name, email')
+            .eq('id', client_id)
+            .single()
+
+          const { data: payment } = await service
+            .from('subscription_payments')
+            .select('amount_eur, description, reference')
+            .eq('id', payment_id)
+            .single()
+
+          if (payment) {
+            recordedAmountEur = Number(payment.amount_eur)
+            recordedDescription = payment.description ?? recordedDescription
+          }
+
+          if (client?.email && payment) {
+            sendPaymentReceiptEmail({
+              to: client.email,
+              clientFirstName: client.first_name,
+              coachName: null,
+              amount: Number(payment.amount_eur),
+              description: payment.description ?? null,
+              paymentDate: new Date().toISOString().split('T')[0],
+              reference: payment.reference ?? null,
+              method: 'stripe',
+            }).catch(e => console.error('Receipt email failed:', e))
+          }
+        }
+
+        // 2. Si on a un abonnement associé, on le met à jour
         if (subscription_id) {
-          // Met à jour l'abonnement existant
           await service
             .from('client_subscriptions')
             .update({
@@ -83,8 +142,8 @@ export async function POST(req: NextRequest) {
               stripe_checkout_session_id: session.id,
             })
             .eq('id', subscription_id)
-        } else {
-          // Crée l'abonnement s'il n'existait pas encore (cas one-time ou flow sans pre-creation)
+        } else if (!payment_id && formula_id) {
+          // Crée l'abonnement s'il n'existait pas encore (uniquement si pas lié à un payment_id direct)
           await service
             .from('client_subscriptions')
             .insert({
@@ -98,9 +157,9 @@ export async function POST(req: NextRequest) {
             })
         }
 
-        // Enregistre le paiement initial (mode payment one-time)
-        if (session.mode === 'payment' && session.amount_total) {
-          await recordPayment(service, {
+        // 3. Enregistre le paiement initial (si pas déjà géré par payment_id et mode payment)
+        if (!payment_id && session.mode === 'payment' && session.amount_total) {
+          const row = await recordPayment(service, {
             coachId: coach_id,
             clientId: client_id,
             subscriptionId: subscription_id ?? null,
@@ -111,6 +170,50 @@ export async function POST(req: NextRequest) {
             description: 'Paiement Stripe',
             method: 'stripe',
           })
+          recordedAmountEur = session.amount_total / 100
+          recordedPaymentId = row?.id ?? null
+        }
+
+        // 4. Notify coach only after confirmed payment
+        if (coach_id && client_id && recordedAmountEur != null) {
+          try {
+            const { data: client } = await service
+              .from('coach_clients')
+              .select('first_name, last_name')
+              .eq('id', client_id)
+              .single()
+
+            const clientName = client
+              ? `${client.first_name ?? ''} ${client.last_name ?? ''}`.trim() || 'Le client'
+              : 'Le client'
+            const amountLabel = new Intl.NumberFormat('fr-FR', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }).format(recordedAmountEur)
+
+            await service.from('coach_notifications').insert({
+              coach_id,
+              client_id,
+              category: 'admin',
+              subcategory: 'payment_received',
+              priority: 3,
+              status: 'pending',
+              email_sent: false,
+              title: 'Paiement reçu',
+              body: `${clientName} a effectué un paiement de ${amountLabel} € via Stripe.`,
+              payload: {
+                payment_id: recordedPaymentId,
+                amount_eur: recordedAmountEur,
+                description: recordedDescription,
+                action_url: recordedPaymentId
+                  ? `/coach/comptabilite?payment=${recordedPaymentId}`
+                  : '/coach/comptabilite',
+                source: 'stripe_checkout',
+              },
+            })
+          } catch (notifErr) {
+            console.error('[coaching webhook] coach payment notif failed:', notifErr)
+          }
         }
         break
       }
@@ -249,7 +352,7 @@ export async function POST(req: NextRequest) {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function recordPayment(
-  service: ReturnType<typeof createServiceClient>,
+  service: any,
   opts: {
     coachId: string
     clientId: string

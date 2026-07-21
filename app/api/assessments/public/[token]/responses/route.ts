@@ -24,22 +24,23 @@ function serviceClient() {
 // POST /api/assessments/public/[token]/responses — sans auth (client)
 export async function POST(
   req: NextRequest,
-  { params }: { params: { token: string } },
+  { params }: { params: Promise<{ token: string }> },
 ) {
+  const { token } = await params;
   const db = serviceClient();
   let pointsEarned = 0;
   const rateLimit = await checkPublicRateLimit({
     db,
     req,
     scope: "public_assessment_write",
-    subject: params.token,
+    subject: token,
     maxRequests: 120,
     windowSeconds: 10 * 60,
   });
 
   if (!rateLimit.allowed) return rateLimitResponse(rateLimit);
 
-  if (!isValidPublicAssessmentToken(params.token)) {
+  if (!isValidPublicAssessmentToken(token)) {
     return NextResponse.json(
       { error: "Lien invalide" },
       { status: 404, headers: { "Cache-Control": "no-store" } },
@@ -56,7 +57,7 @@ export async function POST(
       client:coach_clients(first_name, last_name)
     `,
     )
-    .eq("token", params.token)
+    .eq("token", token)
     .single();
 
   if (!submission) {
@@ -164,7 +165,7 @@ export async function POST(
 
     // Sync profile fields (gender, dob, training_goal, fitness_level, injuries)
     const bilanDate = (submission as any).bilan_date ?? new Date().toISOString().slice(0, 10)
-    await syncProfileFromResponses(db, submission.client_id, submission.coach_id, body.responses as any, bilanDate)
+    await syncProfileFromResponses(db, submission.client_id, submission.coach_id, body.responses as any, bilanDate, submission.id)
 
     // Notification coach explicite avec nom client + nom bilan
     const client = submission.client as {

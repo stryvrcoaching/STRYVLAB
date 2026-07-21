@@ -91,18 +91,17 @@ export default async function ClientBilansPage() {
   });
 
   return (
-    <div className="min-h-dvh bg-[#0d0d0d] font-barlow overflow-x-hidden">
+    <div className="min-h-dvh bg-[#121212] font-barlow overflow-x-hidden">
       <ClientTopBar
-        section={ct(lang, 'bilans.section')}
         title={ct(lang, 'bilans.title')}
         right={
-          <span className="text-[11px] font-medium text-white/30">
+          <span className="text-[12px] font-medium text-white/40">
             {ctp(lang, 'bilans.count', submissions.length)}
           </span>
         }
       />
 
-      <main className="max-w-lg mx-auto px-4 pt-[104px] pb-5 flex flex-col gap-6">
+      <main className="client-page-top mx-auto flex max-w-lg flex-col gap-6 px-4 pb-5">
 
         {/* ── État vide ── */}
         {submissions.length === 0 && (

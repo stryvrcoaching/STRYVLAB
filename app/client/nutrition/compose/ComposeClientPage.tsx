@@ -197,7 +197,7 @@ export default function ComposeClientPage({
   }
 
   const closeToPlanning = useCallback(() => {
-    router.replace(`/client/nutrition?date=${date}&tab=planning`, { scroll: false });
+    router.replace(`/client/nutrition/plan?date=${date}`, { scroll: false });
   }, [date, router]);
 
   function handleCancel() {
@@ -221,7 +221,7 @@ export default function ComposeClientPage({
 
   return (
     <main
-      className="relative min-h-[100dvh] bg-[#0d0d0d]"
+      className="relative min-h-[100dvh] bg-[#121212]"
       style={{
         paddingBottom: "calc(var(--client-sheet-bottom-padding) + 112px)",
         overscrollBehavior: "contain",
@@ -235,25 +235,23 @@ export default function ComposeClientPage({
       />
 
       <div
-        className="sticky top-0 z-50 bg-[#0d0d0d]"
+        className="sticky top-0 z-50 bg-[#121212]"
         style={{ height: "env(safe-area-inset-top, 0px)" }}
       />
 
-      <section className="sticky top-0 z-40 bg-[#0d0d0d]">
+      <section className="sticky top-0 z-40 bg-[#121212]">
         <NutritionEntryHeader
           title={t("compose.title")}
           contextLabel={t("compose.header.planification")}
           date={date}
           consumed={headerConsumed}
           target={target}
-          gender={gender}
-          bodyWeightKg={bodyWeightKg}
           action={{
             icon: Mic,
             label: t("compose.voiceInputAria"),
             onClick: () =>
               router.push(
-                `/client/nutrition/log/voice?date=${date}&return_tab=planning`,
+                `/client/nutrition/log/voice?date=${date}&return_tab=plan`,
               ),
           }}
           onClose={closeToPlanning}

@@ -7,6 +7,7 @@ import {
   useTransform,
   animate,
   AnimatePresence,
+  useReducedMotion,
 } from "framer-motion";
 import { CheckCircle2, Trash2, X } from "lucide-react";
 import { useClientT } from "@/components/client/ClientI18nProvider";
@@ -110,7 +111,7 @@ function Stepper({
       <p className="text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.16em] text-white/30">
         {label}
       </p>
-      <div className="flex items-center gap-2 w-full">
+      <div className="flex items-start gap-2 w-full">
         <button
           type="button"
           onClick={onDecrement}
@@ -363,6 +364,7 @@ export default function SetRow({
   execution_type,
 }: SetRowProps) {
   const { t } = useClientT();
+  const shouldReduceMotion = useReducedMotion();
   const dragX = useMotionValue(0);
   const hasActioned = useRef(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -607,9 +609,25 @@ export default function SetRow({
           className="relative rounded-xl bg-[#1a1a1a] cursor-pointer"
         >
           {isActive && (
-            <div
+            <motion.div
               className="pointer-events-none absolute inset-0 rounded-xl"
-              style={{ boxShadow: "inset 0 0 0 1px rgba(93,186,135,0.9)" }}
+              initial={false}
+              animate={
+                shouldReduceMotion
+                  ? undefined
+                  : {
+                      boxShadow: [
+                        "inset 0 0 0 1px rgba(31, 138, 101, 0.92), 0 0 8px rgba(31, 138, 101, 0.20)",
+                        "inset 0 0 0 1px rgba(31, 138, 101, 1), 0 0 20px rgba(31, 138, 101, 0.48)",
+                        "inset 0 0 0 1px rgba(31, 138, 101, 0.92), 0 0 8px rgba(31, 138, 101, 0.20)",
+                      ],
+                    }
+              }
+              transition={{ duration: 1.8, ease: "easeInOut", repeat: Infinity }}
+              style={{
+                boxShadow:
+                  "inset 0 0 0 1px rgba(31, 138, 101, 0.92), 0 0 12px rgba(31, 138, 101, 0.30)",
+              }}
             />
           )}
           <div className="flex items-center gap-2 px-3 py-2.5">

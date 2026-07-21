@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -15,20 +15,11 @@ import type {
   CoachPhasePreferences,
   PhaseCoachDecision,
 } from "@/lib/coach/phaseEngine/types";
-import PhaseStatusAlert from "@/components/coach/phase-optimization/PhaseStatusAlert";
-import PhaseInsightCard from "@/components/coach/phase-optimization/PhaseInsightCard";
-import PhaseFooterMetricCard from "@/components/coach/phase-optimization/PhaseFooterMetricCard";
 import PhaseCollapsibleSection from "@/components/coach/phase-optimization/PhaseCollapsibleSection";
 import StryvrRangeSlider from "@/components/coach/phase-optimization/StryvrRangeSlider";
 import CoachDocLinkButton from "@/components/coach/docs/CoachDocLinkButton";
 import type { PhaseFooterMetricCards } from "@/lib/coach/phaseEngine/footerMetrics";
-import { Flame } from "lucide-react";
-
-const URGENCY_COLORS: Record<string, string> = {
-  low: "rgba(255,255,255,0.45)",
-  medium: "#f59e0b",
-  high: "#ef4444",
-};
+import type { MetricZone } from "@/components/coach/phase-optimization/MetricZoneBar";
 
 function dataQualityColor(level: string): string {
   const map: Record<string, string> = {
@@ -396,269 +387,103 @@ function phaseBadgeExplanation(
   return decision?.matrix.summary ?? data.microCopy;
 }
 
-export function StrategicPivotAlert({ insight }: { insight: any }) {
-  if (!insight || insight.type !== 'STRATEGIC_PIVOT') return null;
-
-  return (
-    <div className="relative mb-3 overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.02] p-3.5">
-      
-      <div className="flex items-start gap-3">
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] text-white/55">
-          <Flame className="h-3.5 w-3.5 text-[#5eead4]" />
-        </div>
-        
-        <div className="space-y-1">
-          <h4 className="flex items-center gap-2 text-[13px] font-semibold text-white/82">
-            {insight.title}
-            <span className="rounded-full bg-[#1f8a65]/12 px-2 py-0.5 text-[10px] font-medium text-[#5eead4] border border-[#1f8a65]/20">
-              Contrôlé
-            </span>
-          </h4>
-          <p className="text-[11px] leading-relaxed text-white/52">
-            {insight.description}
-          </p>
-          {insight.impact && (
-            <p className="pt-1 text-[10px] text-white/36">
-              <span className="text-white/26">Impact :</span> {insight.impact}
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+function zoneTone(zone: MetricZone | null): string {
+  if (zone === "optimal") return "text-[#7fe0b8]";
+  if (zone === "average") return "text-amber-400";
+  if (zone === "poor") return "text-red-400";
+  return "text-white/45";
 }
 
-function CoachDecisionPanel({ decision }: { decision: PhaseCoachDecision }) {
-  const rhr = decision.baselines.rhr;
-  const confidence = decision.confidenceModel;
-  const rhrValue =
-    rhr.current != null
-      ? `${rhr.current} bpm${
-          rhr.deviationPct != null
-            ? ` (${rhr.deviationPct > 0 ? "+" : ""}${rhr.deviationPct}%)`
-            : ""
-        }`
-      : "—";
-  const confidenceTone =
-    decision.matrix.status === "not_adapted"
-      ? "bg-red-500/12 text-red-300"
-      : decision.matrix.status === "partially_adapted"
-        ? "bg-amber-500/15 text-amber-300"
-        : confidence.level === "high"
-          ? "bg-[#1f8a65]/15 text-[#5eead4]"
-          : confidence.level === "moderate"
-            ? "bg-amber-500/15 text-amber-300"
-            : "bg-white/[0.08] text-white/55";
-  const keySignals = [
-    ...decision.matrix.matchedConditions.slice(0, 2),
-    ...decision.primaryDrivers.slice(0, 2),
-  ].slice(0, 3);
-  const confidenceNoteRaw =
-    confidence.limitations[0] ?? confidence.strengths[0] ?? null;
-  const confidenceNote =
-    confidenceNoteRaw?.includes("Baseline RHR") && rhr.baseline != null
-      ? null
-      : confidenceNoteRaw;
-  const shortTermDays = decision.sevenDayTrajectory.days.slice(0, 3);
-  const uniformShortTerm =
-    shortTermDays.length > 0 &&
-    shortTermDays.every(
-      (day) =>
-        day.focus === shortTermDays[0]?.focus &&
-        day.intensityPct === shortTermDays[0]?.intensityPct,
-    );
+/** Compact hover pill — same pattern as TransformationScore DimPill */
+function HoverPill({
+  label,
+  value,
+  unit,
+  subtitle,
+  detail,
+  toneClass,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  subtitle?: string;
+  detail?: string;
+  toneClass?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const noData = !value || value === "—" || value === "null";
 
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3">
-      <div className="mb-2.5 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/30">
-            Verdict coach
-          </p>
-          <p className="mt-1 text-[13px] font-semibold text-white/80">
-            {decision.headline}
-          </p>
-        </div>
-        <span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-semibold ${confidenceTone}`}>
-          {confidence.scorePct}% fiable
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className="flex min-w-[72px] cursor-default flex-col items-center gap-0.5 rounded-lg bg-white/[0.04] px-2.5 py-1.5 transition-colors hover:bg-white/[0.07]"
+      >
+        <span
+          className={`text-[14px] font-bold tabular-nums leading-none ${
+            noData ? "text-white/20" : toneClass ?? "text-white/75"
+          }`}
+        >
+          {noData ? "—" : value}
+          {!noData && unit ? (
+            <span className="ml-0.5 text-[9px] font-medium text-white/30">
+              {unit}
+            </span>
+          ) : null}
         </span>
-      </div>
+        <span className="text-center text-[8px] font-bold uppercase tracking-[0.04em] leading-tight text-white/25">
+          {label}
+        </span>
+      </button>
 
-      <div className="rounded-lg bg-white/[0.03] px-3 py-2">
-        <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-          Verdict
-        </p>
-        <p className="mt-1 text-[12px] leading-snug text-white/65">
-          {decision.matrix.summary}
-        </p>
-        <p className="mt-1 text-[11px] leading-snug text-white/42">
-          {decision.matrix.rationale}
-        </p>
-      </div>
-
-      <div className="mt-2.5 grid gap-1.5 sm:grid-cols-3">
-        <PhaseFooterMetricCard
-          label="RHR"
-          value={rhrValue}
-          subtitle={
-            rhr.status === "insufficient"
-              ? "base en construction"
-              : rhr.baseline != null
-              ? `base ${rhr.baseline} · n=${rhr.sampleCount}`
-              : `n=${rhr.sampleCount}`
-          }
-          zone={
-            rhr.status === "overload"
-              ? "poor"
-              : rhr.status === "stable"
-                ? "optimal"
-                : null
-          }
-          zoneLabel={
-            rhr.status === "overload"
-              ? "Surcharge"
-              : rhr.status === "stable"
-                ? "Stable"
-                : "En lecture"
-          }
-        />
-        <PhaseFooterMetricCard
-          label="Récupération"
-          value={String(decision.baselines.recovery.capacityPct)}
-          unit="%"
-          subtitle={`fatigue ${decision.baselines.recovery.fatiguePct}%`}
-          zone={
-            decision.baselines.recovery.capacityPct >= 65
-              ? "optimal"
-              : decision.baselines.recovery.capacityPct >= 40
-                ? "average"
-                : "poor"
-          }
-        />
-        <PhaseFooterMetricCard
-          label="Performance"
-          value={
-            decision.baselines.performance.trendPct != null
-              ? String(decision.baselines.performance.trendPct)
-              : "—"
-          }
-          unit={
-            decision.baselines.performance.trendPct != null ? "%" : undefined
-          }
-          subtitle={`${decision.baselines.performance.confidencePct}% confiance`}
-          zone={metricZoneFromPct(decision.baselines.performance.trendPct)}
-        />
-      </div>
-
-      {keySignals.length > 0 && (
-        <div className="mt-2.5">
-          <p className="mb-2 text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-            Points clés
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {keySignals.map((signal) => (
-              <span
-                key={signal}
-                className="rounded-md bg-white/[0.05] px-2 py-0.5 text-[9px] font-medium text-white/45"
-              >
-                {signal}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="mt-2.5 grid gap-1.5 md:grid-cols-2">
-        <div className="rounded-lg border border-white/[0.06] bg-white/[0.025] p-2.5">
-          <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-            Action conseillée
-          </p>
-          <p className="mt-1 text-[12px] leading-snug text-white/65">
-            {decision.recommendation}
-          </p>
-          <p className="mt-1.5 text-[10px] text-white/38">
-            {decision.temporal.summary}
-          </p>
-        </div>
-        <div className="rounded-lg border border-white/[0.06] bg-white/[0.025] p-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-              7 prochains jours
-            </p>
-            <span className="rounded-md bg-white/[0.05] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] text-white/35">
-              {decision.sevenDayTrajectory.strategy.replace(/_/g, " ")}
-            </span>
-          </div>
-          <p className="mt-1 text-[12px] font-semibold text-white/70">
-            {decision.sevenDayTrajectory.title}
-          </p>
-          <p className="mt-1 text-[11px] leading-snug text-white/45">
-            {decision.sevenDayTrajectory.summary}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-2.5 rounded-lg border border-white/[0.06] bg-white/[0.025] p-2.5">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-            Prochains jours
-          </p>
-          {confidenceNote && (
-            <span className="text-[9px] text-white/28">{confidenceNote}</span>
-          )}
-        </div>
-        {uniformShortTerm ? (
-          <div className="rounded-md bg-black/20 px-3 py-1.5">
-            <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-              Jours 1 à 3
-            </p>
-            <p className="mt-1 text-[11px] font-semibold leading-tight text-white/62">
-              {shortTermDays[0]?.focus}
-            </p>
-            <p className="mt-1 text-[9px] text-white/35">
-              Intensité {shortTermDays[0]?.intensityPct}% sur les 3 prochains jours
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-1.5">
-            {shortTermDays.map((day) => (
-              <div key={day.day} className="rounded-md bg-black/20 px-2 py-1.5">
-                <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-                  Jour {day.day}
-                </p>
-                <p className="mt-1 text-[10px] font-semibold leading-tight text-white/60">
-                  {day.focus}
-                </p>
-                <p className="mt-1 text-[9px] text-white/35">
-                  Intensité {day.intensityPct}%
-                </p>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.15 }}
+            className="pointer-events-none absolute bottom-full z-20 mb-2 w-56 max-w-[calc(100vw-2rem)]"
+            style={{ left: "calc(50% - 7rem)" }}
+          >
+            <div className="rounded-xl border-[0.3px] border-white/[0.10] bg-[#1a1a1a] px-3 py-2.5 shadow-xl">
+              <p className="mb-1 text-[10px] font-bold text-white/70">{label}</p>
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] uppercase tracking-[0.1em] text-white/25">
+                  Valeur
+                </span>
+                <span
+                  className={`text-[12px] font-bold tabular-nums ${
+                    noData ? "text-white/20" : toneClass ?? "text-white/70"
+                  }`}
+                >
+                  {noData ? "—" : `${value}${unit ? ` ${unit}` : ""}`}
+                </span>
               </div>
-            ))}
-          </div>
+              {subtitle ? (
+                <p className="mt-1.5 text-[10px] leading-snug text-white/40">
+                  {subtitle}
+                </p>
+              ) : null}
+              {detail ? (
+                <p className="mt-1 text-[10px] leading-snug text-white/35">
+                  {detail}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex justify-center">
+              <div className="-mt-1 h-2 w-2 rotate-45 border-b-[0.3px] border-r-[0.3px] border-white/[0.10] bg-[#1a1a1a]" />
+            </div>
+          </motion.div>
         )}
-          <p className="mt-1.5 text-[9px] leading-snug text-white/30">
-          À valider : {decision.sevenDayTrajectory.days[0]?.exitCriteria.join(" · ")}
-          </p>
-      </div>
-
-      {decision.watchouts.length > 0 && (
-        <div className="mt-2 space-y-1">
-          {decision.watchouts.map((watchout) => (
-            <PhaseStatusAlert key={watchout} message={watchout} tone="medium" />
-          ))}
-        </div>
-      )}
+      </AnimatePresence>
     </div>
   );
-}
-
-function metricZoneFromPct(
-  value: number | null,
-): "poor" | "average" | "optimal" | null {
-  if (value == null) return null;
-  if (value >= 65) return "optimal";
-  if (value >= 40) return "average";
-  return "poor";
 }
 
 function phaseMeterColor(t: number): string {
@@ -715,56 +540,55 @@ function PhaseConfidenceMeter({ score }: { score: number }) {
   );
 }
 
-function oneGlanceStatus(
+function oneGlanceTone(
   decision: PhaseCoachDecision | undefined,
   data?: WidgetData,
-): {
-  label: string;
-  color: string;
-  bg: string;
-} {
+): { label: string; color: string; bg: string } {
   if (data?.insufficientData && !hasMeaningfulPhaseData(data)) {
     return {
-      label: "Données insuffisantes",
+      label: "En attente",
       color: "#f59e0b",
       bg: "rgba(245,158,11,0.15)",
     };
   }
   if (decision?.matrix.status === "not_adapted") {
-    return { label: "Phase non adaptée", color: "#ef4444", bg: "rgba(239,68,68,0.15)" };
+    return { label: "A corriger", color: "#ef4444", bg: "rgba(239,68,68,0.15)" };
   }
   if (decision?.matrix.status === "partially_adapted") {
-    return { label: "Sous surveillance", color: "#f59e0b", bg: "rgba(245,158,11,0.15)" };
+    return {
+      label: "A surveiller",
+      color: "#f59e0b",
+      bg: "rgba(245,158,11,0.15)",
+    };
   }
   if (data?.phaseFit.band === "incoherent") {
-    return { label: "Phase incohérente", color: "#ef4444", bg: "rgba(239,68,68,0.15)" };
+    return { label: "A corriger", color: "#ef4444", bg: "rgba(239,68,68,0.15)" };
   }
   if (data?.phaseFit.band === "fragile") {
-    return { label: "Phase fragile", color: "#f59e0b", bg: "rgba(245,158,11,0.15)" };
+    return { label: "Fragile", color: "#f59e0b", bg: "rgba(245,158,11,0.15)" };
   }
   if (!decision) {
-    return { label: "Analyse en cours", color: "#f59e0b", bg: "rgba(245,158,11,0.15)" };
+    return {
+      label: "En cours",
+      color: "#f59e0b",
+      bg: "rgba(245,158,11,0.15)",
+    };
   }
   if (decision.sevenDayTrajectory.strategy === "deload") {
-    return { label: "Phase non optimale", color: "#ef4444", bg: "rgba(239,68,68,0.15)" };
+    return { label: "A corriger", color: "#ef4444", bg: "rgba(239,68,68,0.15)" };
   }
   if (decision.confidenceModel.level === "high") {
-    return { label: "Phase optimale", color: "#1f8a65", bg: "rgba(31,138,101,0.15)" };
+    return {
+      label: "Optimal",
+      color: "#1f8a65",
+      bg: "rgba(31,138,101,0.15)",
+    };
   }
-  return { label: "Stable à surveiller", color: "#f59e0b", bg: "rgba(245,158,11,0.15)" };
-}
-
-function oneGlanceTone(decision: PhaseCoachDecision | undefined, data?: WidgetData): string {
-  if (data?.insufficientData && !hasMeaningfulPhaseData(data)) return "En attente";
-  if (decision?.matrix.status === "not_adapted") return "A corriger";
-  if (decision?.matrix.status === "partially_adapted") return "A surveiller";
-  if (data?.phaseFit.band === "incoherent") return "A corriger";
-  if (data?.phaseFit.band === "fragile") return "Fragile";
-  if (data?.phaseFit.band === "workable") return "Exploitable";
-  if (!decision) return "En cours";
-  if (decision.sevenDayTrajectory.strategy === "deload") return "A corriger";
-  if (decision.confidenceModel.level === "high") return "Optimal";
-  return "A surveiller";
+  return {
+    label: "A surveiller",
+    color: "#f59e0b",
+    bg: "rgba(245,158,11,0.15)",
+  };
 }
 
 function formatPhaseTarget(value: string | undefined): string {
@@ -783,15 +607,10 @@ function OneGlancePhaseCard({
   copy: ReturnType<typeof getPhaseEngineCopy>;
 }) {
   const decision = data.coachDecision;
-  const status = oneGlanceStatus(decision, data);
   const tone = oneGlanceTone(decision, data);
   const score = data.phaseFit.score;
-  const sevenDay = decision?.sevenDayTrajectory.days.length ?? 7;
-  const fourteenDayText =
-    decision?.sevenDayTrajectory.strategy === "deload"
-      ? "si critères de sortie validés"
-      : "si dynamique stable";
-  const currentStateLabel = copy.adaptiveStateLabels[data.currentState.adaptiveState];
+  const currentStateLabel =
+    copy.adaptiveStateLabels[data.currentState.adaptiveState];
   const targetLabel = data.enginePrescription?.optimalPhase
     ? formatPhaseTarget(data.enginePrescription.optimalPhase)
     : copy.directionLabels[data.recommendedAdjustment.direction];
@@ -799,34 +618,36 @@ function OneGlancePhaseCard({
   const noData =
     data.analysisState === "insufficient_data" ||
     (data.insufficientData && !hasMeaningfulPhaseData(data));
+  const nextAction =
+    decision?.recommendation ??
+    (data.enginePrescription?.clinicalReasoning
+      ? data.enginePrescription.clinicalReasoning
+      : data.microCopy);
+  const horizonLabel = noData
+    ? "—"
+    : (decision?.sevenDayTrajectory.title ??
+      copy.horizonLabels[data.recommendedAdjustment.horizon]);
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
-      <div className="mb-5 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/30">
-            Lecture rapide
-          </p>
-        </div>
-        <div className="max-w-[13rem] text-right">
-          <span
-            className="inline-flex rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em]"
-            style={{ color: status.color, backgroundColor: status.bg }}
-          >
-            {tone}
-          </span>
-          <p className="mt-1 text-[10px] leading-snug text-white/38">
-            {shortReason}
-          </p>
-        </div>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/30">
+          Lecture rapide
+        </p>
+        <span
+          className="inline-flex rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em]"
+          style={{ color: tone.color, backgroundColor: tone.bg }}
+        >
+          {tone.label}
+        </span>
       </div>
 
-      <div className="mb-5 text-center">
-        <p className="text-[10px] text-white/35">Niveau d'optimisation</p>
-        <p className="text-[68px] font-bold leading-none tracking-tight tabular-nums text-white">
+      <div className="mb-4 text-center">
+        <p className="text-[10px] text-white/35">Niveau d&apos;optimisation</p>
+        <p className="text-[56px] font-bold leading-none tracking-tight tabular-nums text-white">
           {noData ? "—" : score}
         </p>
-        <p className="mt-2 text-[13px] tracking-wide text-white/35">
+        <p className="mt-1.5 text-[12px] tracking-wide text-white/35">
           {noData ? "Données insuffisantes" : currentStateLabel}
         </p>
       </div>
@@ -837,91 +658,141 @@ function OneGlancePhaseCard({
         </div>
       )}
 
-      <div className="grid gap-2 md:grid-cols-3">
-        <div className="rounded-lg bg-white/[0.03] px-3 py-2.5">
-          <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-            Etat actuel
-          </p>
-          <p className="mt-1 text-[14px] font-semibold text-white/82">
-            {noData ? "Non lisible" : currentStateLabel}
-          </p>
-          <p className="mt-0.5 text-[10px] text-white/35">
-            {noData ? "Aucun signal disponible" : copy.directionLabels[data.currentState.direction]}
-          </p>
-        </div>
-        <div className="rounded-lg bg-white/[0.03] px-3 py-2.5">
-          <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-            Cap conseillé
-          </p>
-          <p className="mt-1 text-[14px] font-semibold text-white/82">
-            {noData ? "En attente de données" : targetLabel}
-          </p>
-          <p className="mt-0.5 text-[10px] text-white/35">
-            {noData ? "Créer une base de lecture" : copy.urgencyLabels[data.recommendedAdjustment.urgency]}
-          </p>
-        </div>
-        <div className="rounded-lg bg-white/[0.03] px-3 py-2.5">
-          <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-            Horizon
-          </p>
-          <p className="mt-1 text-[14px] font-semibold text-white/82">
-            {noData
-              ? "Aucun horizon fiable"
-              : decision?.sevenDayTrajectory.title ?? copy.horizonLabels[data.recommendedAdjustment.horizon]}
-          </p>
-          <p className="mt-0.5 text-[10px] text-white/35">
-            {noData ? "Attendre les premiers signaux" : `${sevenDay} jours actifs`}
-          </p>
-        </div>
+      {/* 3 key decision pills with hover — mirrors transformation score */}
+      <div className="mb-4 flex flex-wrap justify-center gap-2">
+        <HoverPill
+          label="État"
+          value={noData ? "—" : currentStateLabel}
+          subtitle={
+            noData
+              ? "Aucun signal disponible"
+              : copy.directionLabels[data.currentState.direction]
+          }
+          detail="État adaptatif actuel du client sur la fenêtre analysée."
+        />
+        <HoverPill
+          label="Cap"
+          value={noData ? "—" : targetLabel}
+          subtitle={
+            noData
+              ? "En attente de données"
+              : copy.urgencyLabels[data.recommendedAdjustment.urgency]
+          }
+          detail="Direction énergétique conseillée par le moteur de phase."
+          toneClass="text-[#7fe0b8]"
+        />
+        <HoverPill
+          label="Horizon"
+          value={horizonLabel}
+          subtitle={
+            noData
+              ? "Attendre les premiers signaux"
+              : `${decision?.sevenDayTrajectory.days.length ?? 7} jours actifs`
+          }
+          detail="Fenêtre d’action recommandée pour valider ou ajuster la phase."
+        />
       </div>
 
-      <div className="mt-3 rounded-lg bg-white/[0.03] px-3 py-2.5">
+      {/* Compact action strip */}
+      <div className="rounded-lg bg-white/[0.03] px-3 py-2.5">
         <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-          Pourquoi
+          {noData ? "Pourquoi" : "Action recommandée"}
         </p>
-        <p className="mt-1 text-[11px] leading-snug text-white/52">
-          {shortReason}
+        <p className="mt-1 text-[11px] leading-snug text-white/60">
+          {noData ? shortReason : nextAction}
         </p>
-        {!noData && decision?.recommendation && (
-          <div className="mt-2 border-t border-white/[0.06] pt-2">
-            <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-              Prochaine action
-            </p>
-            <p className="mt-1 text-[11px] leading-snug text-white/65">
-              {decision.recommendation}
-            </p>
-          </div>
+        {!noData && decision?.headline && decision.headline !== nextAction && (
+          <p className="mt-1.5 text-[10px] leading-snug text-white/38">
+            {decision.headline}
+          </p>
         )}
+        {!noData &&
+          decision?.watchouts &&
+          decision.watchouts.length > 0 && (
+            <p className="mt-1.5 text-[10px] leading-snug text-amber-400/70">
+              {decision.watchouts[0]}
+            </p>
+          )}
       </div>
+    </div>
+  );
+}
 
-      <div className="mt-3 grid gap-2 md:grid-cols-2">
-        <div className="rounded-lg bg-white/[0.03] px-2.5 py-2">
-          <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-            Fenêtre 7j
-          </p>
-          <p className="mt-0.5 text-[11px] font-semibold text-white/70">
-            {noData
-              ? "Créer la base"
-              : decision?.sevenDayTrajectory.strategy === "deload"
-                ? "Reconditionnement"
-                : "Maintien / progression"}
-          </p>
-          <p className="text-[9px] text-white/35">
-            {noData ? "Check-ins, séances ou bilan" : `${sevenDay} jours actifs`}
-          </p>
-        </div>
-        <div className="rounded-lg bg-white/[0.03] px-2.5 py-2">
-          <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-            Validation
-          </p>
-          <p className="mt-0.5 text-[11px] font-semibold text-white/70">
-            {noData ? "Première lecture" : "Suivi continu"}
-          </p>
-          <p className="text-[9px] text-white/35">
-            {noData ? "Dès qu'un premier signal remonte" : fourteenDayText}
-          </p>
-        </div>
-      </div>
+function SignalPills({
+  cards,
+}: {
+  cards: PhaseFooterMetricCards;
+}) {
+  const items: Array<{
+    label: string;
+    value: string;
+    unit?: string;
+    subtitle?: string;
+    detail?: string;
+    zone: MetricZone | null;
+    zoneLabel?: string;
+  }> = [
+    {
+      label: "Poids",
+      value: cards.weight.value,
+      unit: cards.weight.unit,
+      subtitle: cards.weight.subtitle,
+      zone: cards.weight.zone,
+      zoneLabel: cards.weight.zoneLabel,
+    },
+    {
+      label: "BF",
+      value: cards.bodyFat.value,
+      unit: cards.bodyFat.unit,
+      subtitle: cards.bodyFat.subtitle,
+      zone: cards.bodyFat.zone,
+      zoneLabel: cards.bodyFat.zoneLabel,
+    },
+    {
+      label: "Sommeil",
+      value: cards.sleep.value,
+      unit: cards.sleep.unit,
+      zone: cards.sleep.zone,
+      zoneLabel: cards.sleep.zoneLabel,
+    },
+    {
+      label: "Performance",
+      value: cards.performance.value,
+      unit: cards.performance.unit,
+      subtitle: cards.performance.subtitle ?? "Tendance de performance (moteur de phase)",
+      zone: cards.performance.zone,
+      zoneLabel: cards.performance.zoneLabel,
+      detail:
+        "Tendance de progression des charges / complétion sur la fenêtre — pas le même calcul que le pilier Performance du score de transformation.",
+    },
+    {
+      label: "RHR",
+      value: cards.rhr.value,
+      unit: cards.rhr.unit,
+      subtitle: cards.rhr.subtitle,
+      zone: cards.rhr.zone,
+      zoneLabel: cards.rhr.zoneLabel,
+    },
+  ];
+
+  return (
+    <div className="flex flex-wrap justify-center gap-2">
+      {items.map((item) => (
+        <HoverPill
+          key={item.label}
+          label={item.label}
+          value={item.value}
+          unit={item.unit}
+          subtitle={item.subtitle ?? item.zoneLabel}
+          detail={
+            item.detail ??
+            (item.zoneLabel
+              ? `Zone : ${item.zoneLabel}`
+              : "Signal suivi pour l’optimisation de phase.")
+          }
+          toneClass={zoneTone(item.zone)}
+        />
+      ))}
     </div>
   );
 }
@@ -934,7 +805,7 @@ export default function PhaseOptimizationWidget({
   const [data, setData] = useState<WidgetData | null>(null);
   const [loading, setLoading] = useState(true);
   const [window, setWindowDays] = useState<7 | 30>(30);
-  const [locale, setLocale] = useState<PhaseEngineLocale>("fr");
+  const [locale] = useState<PhaseEngineLocale>("fr");
   const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
@@ -980,60 +851,41 @@ export default function PhaseOptimizationWidget({
             <Skeleton className="h-2 w-24 bg-white/[0.04]" />
             <Skeleton className="h-7 w-24 rounded-md bg-white/[0.04]" />
           </div>
-
           <div className="mb-5 flex flex-col items-center gap-2 text-center">
-            <Skeleton className="h-[68px] w-[88px] rounded-xl bg-white/[0.04]" />
+            <Skeleton className="h-[56px] w-[72px] rounded-xl bg-white/[0.04]" />
             <Skeleton className="h-3 w-28 rounded-full bg-white/[0.04]" />
           </div>
-
           <div className="mb-4 flex items-end gap-[2.5px]" style={{ height: "44px" }}>
-            {Array.from({ length: 62 }).map((_, i) => {
-              const h = 18 + Math.round(Math.sin((i / 61) * Math.PI) * 12);
+            {Array.from({ length: 40 }).map((_, i) => {
+              const h = 18 + Math.round(Math.sin((i / 39) * Math.PI) * 12);
               return (
                 <div
                   key={i}
-                  className="flex-1 rounded-[1px] bg-white/[0.05] animate-pulse"
+                  className="flex-1 animate-pulse rounded-[1px] bg-white/[0.05]"
                   style={{ height: `${h}px`, animationDelay: `${i * 0.012}s` }}
                 />
               );
             })}
           </div>
-
-          <div className="grid gap-2 md:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="rounded-lg bg-white/[0.03] px-3 py-2.5">
-                <Skeleton className="mb-2 h-2 w-16 bg-white/[0.04]" />
-                <Skeleton className="mb-1.5 h-3.5 w-24 bg-white/[0.04]" />
-                <Skeleton className="h-2.5 w-20 bg-white/[0.04]" />
-              </div>
+          <div className="mb-4 flex justify-center gap-2">
+            {[64, 64, 72].map((w, i) => (
+              <Skeleton
+                key={i}
+                className="h-[48px] rounded-lg bg-white/[0.04]"
+                style={{ width: `${w}px` }}
+              />
             ))}
           </div>
-
-          <div className="mt-3 rounded-lg bg-white/[0.03] px-3 py-2.5">
-            <Skeleton className="mb-2 h-2 w-12 bg-white/[0.04]" />
-            <Skeleton className="mb-1.5 h-2.5 w-full bg-white/[0.04]" />
-            <Skeleton className="h-2.5 w-4/5 bg-white/[0.04]" />
-          </div>
-
-          <div className="mt-3 grid gap-2 md:grid-cols-2">
-            {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="rounded-lg bg-white/[0.03] px-2.5 py-2">
-                <Skeleton className="mb-2 h-2 w-16 bg-white/[0.04]" />
-                <Skeleton className="mb-1.5 h-3 w-24 bg-white/[0.04]" />
-                <Skeleton className="h-2.5 w-20 bg-white/[0.04]" />
-              </div>
-            ))}
-          </div>
+          <Skeleton className="h-14 w-full rounded-lg bg-white/[0.04]" />
         </div>
 
-        <div className="mt-4 divide-y divide-white/[0.06]">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="py-4">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-3 w-3 rounded-full bg-white/[0.04]" />
-                <Skeleton className="h-2.5 w-32 bg-white/[0.04]" />
-              </div>
-            </div>
+        <div className="mt-4 flex justify-center gap-2">
+          {[52, 48, 56, 48, 48].map((w, i) => (
+            <Skeleton
+              key={i}
+              className="h-[48px] rounded-lg bg-white/[0.04]"
+              style={{ width: `${w}px` }}
+            />
           ))}
         </div>
       </div>
@@ -1043,7 +895,7 @@ export default function PhaseOptimizationWidget({
   if (error) {
     return (
       <div className="flex flex-col rounded-2xl border-[0.3px] border-red-500/20 bg-red-950/10 px-6 py-5">
-        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/30 mb-3">
+        <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">
           Phases optimales
         </p>
         <p className="text-[11px] text-red-400/80">
@@ -1055,39 +907,14 @@ export default function PhaseOptimizationWidget({
 
   if (!data) return null;
 
-  const {
-    currentState: cs,
-    recommendedAdjustment: ra,
-    decisionTrace: dt,
-  } = data;
   const copy = getPhaseEngineCopy(locale);
   const ui = copy.widgetUi;
-  const mc = data.metricCards;
   const phasePrefs = data.phasePreferences ?? {
     prioritizePerformance: false,
     aggressiveCutTolerance: 0.5,
     preferredBulkAggressiveness: 0.5,
   };
   const derivedPrefs = data.derivedPhasePreferences ?? phasePrefs;
-  const noData =
-    data.analysisState === "insufficient_data" ||
-    (data.insufficientData && !hasMeaningfulPhaseData(data));
-
-  const alertTone =
-    ra.urgency === "high"
-      ? "high"
-      : ra.urgency === "medium"
-        ? "medium"
-        : "watch";
-
-  const hasSignalReview =
-    data.insights?.strategicPivot ||
-    data.coachDecision?.matrix.matchedConditions.length ||
-    data.constraintFlags.length > 0 ||
-    cs.opportunityStates.length > 0 ||
-    dt.negativeFactors.length > 0 ||
-    dt.conflictingSignals.length > 0;
-
   const coachActive =
     (data.hasCustomPhasePreferences ?? false) ||
     (data.manualOverride?.active ?? false);
@@ -1121,218 +948,18 @@ export default function PhaseOptimizationWidget({
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3.5">
+      <div className="flex flex-1 flex-col gap-4">
         <OneGlancePhaseCard data={data} copy={copy} />
 
-        <PhaseCollapsibleSection title="Actions recommandées" defaultOpen>
-          {noData ? (
-            <PhaseInsightCard>
-              <PhaseStatusAlert
-                message={
-                  data.analysisStateReason ??
-                  "Aucune donnée coach exploitable sur cette fenêtre. Le moteur attend au moins un check-in, une séance, un bilan corporel ou des logs nutrition avant de conclure."
-                }
-                tone="watch"
-                prominent
-              />
-            </PhaseInsightCard>
-          ) : data.enginePrescription ? (
-            <div
-              className={`rounded-xl border p-4 shadow-sm ${
-                data.enginePrescription.vetoActive
-                  ? "border-red-500/50 bg-red-950/20 text-red-400"
-                  : "border-[#5eead4]/30 bg-[#5eead4]/10 text-[#5eead4]"
-              }`}
-            >
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.1em] bg-white/[0.08]">
-                  {data.enginePrescription.optimalPhase.replace(/_/g, " ")}
-                </span>
-                {data.enginePrescription.vetoActive && (
-                  <span className="rounded-md bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-400 border border-red-500/30">
-                    VETO ACTIF
-                  </span>
-                )}
-              </div>
-              <p className={`text-xs leading-relaxed ${data.enginePrescription.vetoActive ? "text-red-200/80" : "text-white/70"}`}>
-                {data.enginePrescription.clinicalReasoning}
-              </p>
-            </div>
-          ) : (
-            <PhaseInsightCard>
-              <div className="mb-2.5 flex flex-wrap items-center gap-2">
-                <span
-                  className="rounded-md px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em]"
-                  style={{
-                    color: URGENCY_COLORS[ra.urgency],
-                    backgroundColor: `${URGENCY_COLORS[ra.urgency]}18`,
-                    border: `0.5px solid ${URGENCY_COLORS[ra.urgency]}40`,
-                  }}
-                >
-                  {copy.urgencyLabels[ra.urgency]}
-                </span>
-                <span className="rounded-md bg-white/[0.05] px-2 py-0.5 text-[9px] font-medium text-white/40">
-                  {copy.horizonLabels[ra.horizon]}
-                </span>
-              </div>
-              <PhaseStatusAlert message={data.microCopy} tone={alertTone} prominent />
-            </PhaseInsightCard>
-          )}
+        {/* Signaux — compact hover pills */}
+        <div>
+          <p className="mb-2.5 text-center text-[8px] font-bold uppercase tracking-[0.12em] text-white/25">
+            Signaux à suivre
+          </p>
+          <SignalPills cards={data.metricCards} />
+        </div>
 
-          {!noData && data.coachDecision && (
-            <CoachDecisionPanel decision={data.coachDecision} />
-          )}
-        </PhaseCollapsibleSection>
-
-        <PhaseCollapsibleSection title="Signaux à suivre">
-          <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-5">
-            <PhaseFooterMetricCard
-              label="Poids"
-              value={mc.weight.value}
-              unit={mc.weight.unit}
-              subtitle={mc.weight.subtitle}
-              zone={mc.weight.zone}
-              zoneLabel={mc.weight.zoneLabel}
-            />
-            <PhaseFooterMetricCard
-              label="BF"
-              value={mc.bodyFat.value}
-              unit={mc.bodyFat.unit}
-              subtitle={mc.bodyFat.subtitle}
-              zone={mc.bodyFat.zone}
-              zoneLabel={mc.bodyFat.zoneLabel}
-            />
-            <PhaseFooterMetricCard
-              label="Sommeil"
-              value={mc.sleep.value}
-              unit={mc.sleep.unit}
-              zone={mc.sleep.zone}
-              zoneLabel={mc.sleep.zoneLabel}
-            />
-            <PhaseFooterMetricCard
-              label="Performance"
-              value={mc.performance.value}
-              unit={mc.performance.unit}
-              zone={mc.performance.zone}
-              zoneLabel={mc.performance.zoneLabel}
-            />
-            <PhaseFooterMetricCard
-              label="RHR"
-              value={mc.rhr.value}
-              unit={mc.rhr.unit}
-              subtitle={mc.rhr.subtitle}
-              zone={mc.rhr.zone}
-              zoneLabel={mc.rhr.zoneLabel}
-            />
-          </div>
-        </PhaseCollapsibleSection>
-
-        <PhaseCollapsibleSection title="Facteurs de décision">
-            <div className="space-y-3">
-            <p className="text-[10px] leading-relaxed text-white/40">
-              Cette section montre les signaux réellement utilisés pour produire le verdict. Un facteur absent n’a pas participé à la décision sur la fenêtre sélectionnée.
-            </p>
-            {!hasSignalReview && (
-              <div className="rounded-lg bg-white/[0.02] px-3 py-2.5 text-[10px] text-white/40">
-                Aucun facteur dominant détecté. Le moteur conserve une lecture neutre et continue de surveiller les prochains check-ins, séances et bilans.
-              </div>
-            )}
-            {data.insights?.strategicPivot && (
-              <StrategicPivotAlert insight={data.insights.strategicPivot} />
-            )}
-            {data.coachDecision?.matrix.matchedConditions &&
-              data.coachDecision.matrix.matchedConditions.length > 0 && (
-                <div className="rounded-lg bg-white/[0.02] px-3 py-2.5">
-                  <p className="mb-2 text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-                    Ce qui déclenche le verdict
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {data.coachDecision.matrix.matchedConditions.map((item) => (
-                      <span
-                        key={item}
-                        className="rounded-md bg-white/[0.05] px-2 py-1 text-[9px] font-medium text-white/45"
-                      >
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-            )}
-            {data.constraintFlags.length > 0 && (
-              <div className="rounded-lg bg-white/[0.02] px-3 py-2.5">
-                <p className="mb-2 text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-                  Points à surveiller
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {data.constraintFlags.map((flag) => (
-                    <span
-                      key={flag}
-                      className="rounded-md bg-white/[0.05] px-2 py-1 text-[9px] text-white/50"
-                    >
-                      {
-                        (copy.reasonMap[flag] ?? flag)
-                          .split(" — ")[0]
-                          .split(" - ")[0]
-                      }
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            <AnimatePresence>
-              {cs.opportunityStates.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="space-y-2 rounded-lg bg-white/[0.02] px-3 py-2.5"
-                >
-                  <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-white/25">
-                    Opportunités
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {cs.opportunityStates.map((op) => (
-                      <span
-                        key={op}
-                        className="rounded-md px-2 py-1 text-[9px] text-[#5eead4]"
-                        style={{
-                          backgroundColor: "rgba(31,138,101,0.12)",
-                          border: "0.5px solid rgba(31,138,101,0.28)",
-                        }}
-                      >
-                        {op.replace(/_/g, " ")}
-                      </span>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            {(dt.negativeFactors.length > 0 || dt.conflictingSignals.length > 0) && (
-              <div className="space-y-2 rounded-lg bg-white/[0.02] px-3 py-2.5 text-[10px] text-white/40">
-                {dt.negativeFactors.length > 0 && (
-                  <p>
-                    <span className="text-white/25">Freins dominants </span>
-                    <span className="text-red-400/75">
-                      {dt.negativeFactors.join(", ")}
-                    </span>
-                  </p>
-                )}
-                {dt.conflictingSignals.length > 0 && (
-                  <p className="text-white/30">
-                    {ui.conflicts} ({Math.round(dt.conflictSeverity * 100)}%) :{" "}
-                    {dt.conflictingSignals
-                      .map((s) =>
-                        s === "override_coach_actif"
-                          ? copy.overrideTraceLabel
-                          : s,
-                      )
-                      .join(", ")}
-                  </p>
-                )}
-              </div>
-            )}
-            </div>
-          </PhaseCollapsibleSection>
-
+        {/* Réglages coach — kept intact */}
         <PhaseCollapsibleSection
           title="Réglages coach"
           badge={
@@ -1344,9 +971,14 @@ export default function PhaseOptimizationWidget({
           }
         >
           <div className="mb-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-            <p className="text-[10px] font-semibold text-white/65">Comment utiliser ces réglages</p>
+            <p className="text-[10px] font-semibold text-white/65">
+              Comment utiliser ces réglages
+            </p>
             <p className="mt-1 text-[10px] leading-relaxed text-white/40">
-              Les préférences modulent la sensibilité du moteur pour ce client. Le réglage manuel remplace la recommandation affichée : utilisez-le seulement lorsqu’un contexte terrain non mesuré justifie de reprendre la main, puis documentez la raison.
+              Les préférences modulent la sensibilité du moteur pour ce client.
+              Le réglage manuel remplace la recommandation affichée : utilisez-le
+              seulement lorsqu’un contexte terrain non mesuré justifie de reprendre
+              la main, puis documentez la raison.
             </p>
           </div>
           <div className="grid gap-2.5 md:grid-cols-2">
@@ -1355,9 +987,19 @@ export default function PhaseOptimizationWidget({
                 {ui.phasePrefs}
               </p>
               <div className="mb-3 space-y-1.5 text-[10px] leading-relaxed text-white/38">
-                <p><span className="text-white/55">Favoriser la performance</span> augmente légèrement la priorité donnée aux performances lorsque leur tendance est fiable.</p>
-                <p><span className="text-white/55">Tolérance au déficit</span> autorise plus ou moins facilement une direction de cut agressive.</p>
-                <p><span className="text-white/55">Tolérance au surplus</span> autorise plus ou moins facilement une prise de masse offensive.</p>
+                <p>
+                  <span className="text-white/55">Favoriser la performance</span>{" "}
+                  augmente légèrement la priorité donnée aux performances lorsque
+                  leur tendance est fiable.
+                </p>
+                <p>
+                  <span className="text-white/55">Tolérance au déficit</span>{" "}
+                  autorise plus ou moins facilement une direction de cut agressive.
+                </p>
+                <p>
+                  <span className="text-white/55">Tolérance au surplus</span>{" "}
+                  autorise plus ou moins facilement une prise de masse offensive.
+                </p>
               </div>
               <PhasePreferencesPanel
                 clientId={clientId}
@@ -1373,7 +1015,9 @@ export default function PhaseOptimizationWidget({
                 {ui.manualOverride}
               </p>
               <p className="mb-3 text-[10px] leading-relaxed text-white/38">
-                Force le cap ou l’état affiché sans effacer le calcul automatique. L’impact est immédiat sur la recommandation visible ; la raison sert de trace pour le suivi coach.
+                Force le cap ou l’état affiché sans effacer le calcul automatique.
+                L’impact est immédiat sur la recommandation visible ; la raison sert
+                de trace pour le suivi coach.
               </p>
               <ManualOverridePanel
                 clientId={clientId}

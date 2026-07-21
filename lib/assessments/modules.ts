@@ -10,6 +10,7 @@ export const MODULE_LABELS: Record<AssessmentModule, string> = {
   measurements: 'Mensurations',
   photos:       'Photos',
   nutrition:    'Nutrition',
+  food_preferences: 'Préférences alimentaires',
   training:     'Entraînement',
   cardio:       'Cardio & Activité',
   wellness:     'Bien-être & Récupération',
@@ -26,6 +27,7 @@ export const MODULE_ICONS: Record<AssessmentModule, string> = {
   measurements: 'Ruler',
   photos:       'Camera',
   nutrition:    'Utensils',
+  food_preferences: 'Heart',
   training:     'Dumbbell',
   cardio:       'Heart',
   wellness:     'Moon',
@@ -42,6 +44,7 @@ export const MODULE_DESCRIPTIONS: Record<AssessmentModule, string> = {
   measurements: 'Circonférences segmentaires (bras, cuisses, mollets…)',
   photos:       'Photos de progression (avant, arrière, profil)',
   nutrition:    'Alimentation, macros, hydratation, comportements alimentaires',
+  food_preferences: 'Allergies, intolérances, cadres alimentaires et aliments préférés',
   training:     'Fréquence, volume, types de séances, style préféré, RPE',
   cardio:       'Activité non-sportive (pas/NEAT), cardio dédié, VO2max, FC',
   wellness:     'Sommeil, stress, énergie, récupération, caféine',
@@ -902,6 +905,22 @@ const NUTRITION_FIELDS: FieldConfig[] = [
 ]
 
 // ------------------------------------------------------------------
+// MODULE : Préférences alimentaires
+// Bloc autonome afin qu'un coach puisse l'ajouter sans dupliquer tout
+// le module Nutrition. La valeur est un objet JSON validé côté serveur.
+// ------------------------------------------------------------------
+const FOOD_PREFERENCES_FIELDS: FieldConfig[] = [
+  {
+    key: 'food_preferences_profile',
+    label: 'Profil alimentaire',
+    input_type: 'food_preferences',
+    required: true,
+    visible: true,
+    helper: 'Déclare les allergies, intolérances, cadres alimentaires et préférences qui doivent être respectés dans Nutrition Studio.',
+  },
+]
+
+// ------------------------------------------------------------------
 // MODULE : Entraînement
 // ------------------------------------------------------------------
 const TRAINING_FIELDS: FieldConfig[] = [
@@ -1709,6 +1728,7 @@ export const DEFAULT_MODULE_FIELDS: Record<AssessmentModule, FieldConfig[]> = {
   measurements: MEASUREMENTS_FIELDS,
   photos:       PHOTOS_FIELDS,
   nutrition:    NUTRITION_FIELDS,
+  food_preferences: FOOD_PREFERENCES_FIELDS,
   training:     TRAINING_FIELDS,
   cardio:       CARDIO_FIELDS,
   wellness:     WELLNESS_FIELDS,
@@ -1728,6 +1748,7 @@ export const MODULE_ORDER: AssessmentModule[] = [
   'measurements',
   'photos',
   'nutrition',
+  'food_preferences',
   'training',
   'cardio',
   'wellness',

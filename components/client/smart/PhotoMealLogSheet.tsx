@@ -1892,7 +1892,7 @@ export default function PhotoMealLogSheet({
         />
 
         {isPagePresentation ? (
-          <div className="h-dvh bg-[#0d0d0d]">
+          <div className="h-dvh bg-[#121212]">
             {renderPageBody()}
           </div>
         ) : (
@@ -1969,7 +1969,7 @@ function ClarificationChatSheet({
             onClick={busy ? undefined : onSkip}
           />
           <motion.div
-            className="client-native-bottom-sheet fixed inset-x-0 bottom-0 z-[141] flex max-h-[88dvh] flex-col overflow-hidden rounded-t-2xl bg-[#0d0d0d] shadow-[0_-18px_60px_rgba(0,0,0,0.45)]"
+            className="client-native-bottom-sheet fixed inset-x-0 bottom-0 z-[141] flex max-h-[88dvh] flex-col overflow-hidden rounded-t-2xl bg-[#121212] shadow-[0_-18px_60px_rgba(0,0,0,0.45)]"
               style={{ paddingBottom: "var(--client-modal-bottom-padding)" }}
             initial={{ y: "100%" }}
             animate={{ y: 0, transition: { type: "spring", stiffness: 280, damping: 30 } }}
@@ -2116,7 +2116,7 @@ function CameraStage({
           : null
 
   return (
-    <div className="relative h-full overflow-hidden bg-[#0d0d0d] text-white">
+    <div className="relative h-full overflow-hidden bg-[#121212] text-white">
       <div className="absolute inset-0">
         <video
           ref={videoRef}
@@ -2130,11 +2130,7 @@ function CameraStage({
         <div className="absolute inset-0 bg-black/38" />
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-10">
           <div className="relative aspect-square w-full max-w-[288px]">
-            <div className="absolute inset-[21%] rounded-[24px] border border-white/14 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]" />
-            <div className="absolute left-0 top-0 h-9 w-9 rounded-tl-[18px] border-l-4 border-t-4 border-white/82" />
-            <div className="absolute right-0 top-0 h-9 w-9 rounded-tr-[18px] border-r-4 border-t-4 border-white/82" />
-            <div className="absolute bottom-0 left-0 h-9 w-9 rounded-bl-[18px] border-b-4 border-l-4 border-white/82" />
-            <div className="absolute bottom-0 right-0 h-9 w-9 rounded-br-[18px] border-b-4 border-r-4 border-white/82" />
+            <div className="absolute inset-[21%] rounded-[20px] ring-1 ring-white/55" />
           </div>
         </div>
       </div>
@@ -2354,7 +2350,7 @@ function StandardShell({
   return (
     <div className="flex h-full flex-col bg-[#080808] text-white">
       <div
-        className="sticky top-0 z-20 flex items-center justify-between border-b border-white/[0.06] bg-[#0d0d0d] px-4"
+        className="sticky top-0 z-20 flex items-center justify-between border-b border-white/[0.06] bg-[#121212] px-4"
         style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)", paddingBottom: "12px" }}
       >
         <button

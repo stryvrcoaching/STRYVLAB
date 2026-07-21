@@ -249,7 +249,7 @@ export default function ProtocolScheduleHeatmap({
               onClick={() => mealPlanDuplication.onModeChange('adapt_to_target')}
               className={`rounded-md border px-2 py-1.5 text-left text-[9px] font-semibold transition-colors ${
                 mealPlanDuplication.mode === 'adapt_to_target'
-                  ? "border-[#86aeb8]/45 bg-[#86aeb8]/15 text-[#c6dce2]"
+                  ? "border-[#1f8a65]/45 bg-[#1f8a65]/15 text-[#7fe2bf]"
                   : "border-white/[0.08] bg-white/[0.03] text-white/50"
               }`}
             >
@@ -260,7 +260,7 @@ export default function ProtocolScheduleHeatmap({
               onClick={() => mealPlanDuplication.onModeChange('exact_copy')}
               className={`rounded-md border px-2 py-1.5 text-left text-[9px] font-semibold transition-colors ${
                 mealPlanDuplication.mode === 'exact_copy'
-                  ? "border-[#86aeb8]/45 bg-[#86aeb8]/15 text-[#c6dce2]"
+                  ? "border-[#1f8a65]/45 bg-[#1f8a65]/15 text-[#7fe2bf]"
                   : "border-white/[0.08] bg-white/[0.03] text-white/50"
               }`}
             >
@@ -451,7 +451,7 @@ export default function ProtocolScheduleHeatmap({
                       isDuplicationSource
                         ? "border-[#1f8a65]/70 bg-[#1f8a65]/20"
                         : isDuplicationTarget
-                          ? "border-[#86aeb8]/70 bg-[#86aeb8]/20"
+                          ? "border-blue-500/50 bg-blue-500/10"
                         : isMealPlanDuplicationMode && assignedPos == null
                           ? "border-white/[0.05] bg-white/[0.015] opacity-45"
                           : isPreviewClear

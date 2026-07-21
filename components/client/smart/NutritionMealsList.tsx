@@ -16,6 +16,7 @@ import {
   Pencil,
   Sparkles,
 } from "lucide-react";
+import { ForkKnife as ForkKnifeIcon } from "@phosphor-icons/react";
 import type { LucideIcon } from "lucide-react";
 import type { NutritionMeal, NutritionEntry } from "@/lib/nutrition/food-items";
 import { FoodIcon } from "@/components/nutrition/FoodIcon";
@@ -25,12 +26,11 @@ import {
   clientLocale,
   type ClientDictKey,
 } from "@/lib/i18n/clientTranslations";
-import type { NutritionMacros } from "./SmartNutritionWidget";
 import type { SmartPrepSlot } from "@/lib/nutrition/simulation-state";
 import { NUTRITION_UI_COLORS } from "@/lib/nutrition/ui-colors";
-import { computeActionableRemaining } from "@/lib/nutrition/actionable-remaining";
 import { queueNutritionLiveRefresh } from "@/lib/client/nutrition-live";
 import { sendClientMutation } from "@/lib/client/offline-mutations";
+import { getFoodDisplayName } from "@/lib/i18n/foodDisplayName";
 
 const MC = {
   prot: NUTRITION_UI_COLORS.protein,
@@ -271,6 +271,7 @@ function EntryRow({
   entry: NutritionEntry & {
     food_items?: {
       name_fr?: string;
+      name?: string;
       category_l1?: string | null;
       category_l2?: string | null;
       icon_key?: string | null;
@@ -284,8 +285,7 @@ function EntryRow({
     newMealTotals: Record<string, number>,
   ) => void;
 }) {
-  const name =
-    entry.food_items?.name_fr ?? (entry as any).food_item?.name_fr ?? "—";
+  const name = getFoodDisplayName(entry.food_items ?? (entry as any).food_item);
   const [editing, setEditing] = useState(false);
   const [qty, setQty] = useState(String(entry.quantity_g));
   const [saving, setSaving] = useState(false);
@@ -344,13 +344,13 @@ function EntryRow({
             step={1}
             value={qty}
             onChange={(e) => setQty(e.target.value)}
-            className="w-14 h-6 bg-white/[0.08] border border-white/[0.12] rounded-lg text-[11px] text-white text-center tabular-nums outline-none focus:border-white/30"
+            className="h-10 w-16 bg-white/[0.08] border border-white/[0.12] rounded-lg text-[12px] text-white text-center tabular-nums outline-none focus:border-white/30"
           />
           <span className="text-[10px] text-white/30">g</span>
           <button
             type="submit"
             disabled={saving}
-            className="h-6 px-2 bg-white/[0.1] rounded-lg text-[10px] text-white/70 hover:text-white active:scale-95 transition-all disabled:opacity-40"
+            className="flex h-10 min-w-10 items-center justify-center rounded-lg bg-white/[0.1] px-2 text-[11px] text-white/70 transition-[background-color,color,transform] hover:text-white active:scale-[0.96] disabled:opacity-40"
           >
             {saving ? "…" : "✓"}
           </button>
@@ -360,7 +360,7 @@ function EntryRow({
               e.stopPropagation();
               setEditing(false);
             }}
-            className="h-6 px-2 bg-white/[0.05] rounded-lg text-[10px] text-white/40 hover:text-white/70"
+            className="flex h-10 min-w-10 items-center justify-center rounded-lg bg-white/[0.05] px-2 text-[11px] text-white/40 transition-colors hover:text-white/70"
           >
             ✕
           </button>
@@ -388,7 +388,7 @@ function EntryRow({
           <button
             onClick={deleteEntry}
             disabled={deleting}
-            className="h-6 w-6 flex items-center justify-center rounded-lg bg-red-500/0 hover:bg-red-500/15 text-white/20 hover:text-red-400 active:scale-95 transition-all disabled:opacity-40"
+            className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/0 text-white/20 transition-[background-color,color,transform] hover:bg-red-500/15 hover:text-red-400 active:scale-[0.96] disabled:opacity-40"
           >
             <Trash2 size={10} />
           </button>
@@ -445,11 +445,11 @@ function MealCard({
       ? meal.photo_log_status === "refined"
         ? {
             label: t("nutrition.photo.badgeRefined"),
-            className: "border-white/[0.12] bg-white/[0.08] text-white/78",
+            className: "bg-white/[0.10] text-white/78",
           }
         : {
             label: t("nutrition.photo.badgeGuided"),
-            className: "border-white/[0.08] bg-white/[0.04] text-white/55",
+            className: "bg-white/[0.055] text-white/55",
           }
       : null;
 
@@ -480,7 +480,7 @@ function MealCard({
       layout
       animate={{ opacity: isDeleting ? 0 : 1 }}
       transition={{ duration: 0.25 }}
-      className="bg-[#111111] rounded-2xl"
+      className="rounded-2xl bg-[#181818]"
     >
       <div
         className="flex items-center px-4 pt-4 pb-3 cursor-pointer select-none"
@@ -495,7 +495,7 @@ function MealCard({
             />
             {photoBadge && (
               <span
-                className={`inline-flex h-5 items-center rounded-full border px-2 text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.12em] ${photoBadge.className}`}
+                className={`inline-flex h-5 items-center rounded-full px-2 text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.12em] ${photoBadge.className}`}
               >
                 {photoBadge.label}
               </span>
@@ -577,7 +577,7 @@ function MealCard({
             <div className="px-4 pb-4 pt-2 flex gap-2">
               <button
                 onClick={onAddMore}
-                className="flex-1 h-8 flex items-center justify-center gap-1.5 bg-white/[0.05] rounded-xl text-[11px] text-white/50 hover:text-white/80 hover:bg-white/[0.08] active:scale-[0.98] transition-all"
+                className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/[0.05] text-[11px] text-white/50 transition-[background-color,color,transform] hover:bg-white/[0.08] hover:text-white/80 active:scale-[0.96]"
               >
                 {t("journal.addIngredients")}
               </button>
@@ -587,14 +587,14 @@ function MealCard({
                     e.stopPropagation();
                     onRefinePhotoMeal();
                   }}
-                  className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.04] text-[11px] text-white/70 active:scale-[0.98] transition-all"
+                  className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/[0.07] text-[11px] text-white/70 transition-[background-color,transform] active:scale-[0.96]"
                 >
                   {t("nutrition.prep.refineLeftovers")}
                 </button>
               )}
               <button
                 onClick={onDelete}
-                className="h-8 w-8 flex items-center justify-center bg-red-500/10 border border-red-500/15 rounded-xl text-red-400 hover:bg-red-500/20 active:scale-95 transition-all"
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-400 transition-[background-color,transform] hover:bg-red-500/20 active:scale-[0.96]"
               >
                 <Trash2 size={12} />
               </button>
@@ -760,13 +760,13 @@ function PrepEntryRow({
             step={1}
             value={qty}
             onChange={(e) => setQty(e.target.value)}
-            className="w-14 h-6 bg-white/[0.08] border border-white/[0.12] rounded-lg text-[11px] text-white text-center tabular-nums outline-none focus:border-white/30"
+            className="h-10 w-16 bg-white/[0.08] border border-white/[0.12] rounded-lg text-[12px] text-white text-center tabular-nums outline-none focus:border-white/30"
           />
           <span className="text-[10px] text-white/30">g</span>
           <button
             type="submit"
             disabled={saving}
-            className="h-6 px-2 bg-white/[0.1] rounded-lg text-[10px] text-white/70 active:scale-95 transition-all disabled:opacity-40"
+            className="flex h-10 min-w-10 items-center justify-center rounded-lg bg-white/[0.1] px-2 text-[11px] text-white/70 transition-[background-color,color,transform] active:scale-[0.96] disabled:opacity-40"
           >
             {saving ? "…" : "✓"}
           </button>
@@ -776,7 +776,7 @@ function PrepEntryRow({
               e.stopPropagation();
               setEditing(false);
             }}
-            className="h-6 px-2 bg-white/[0.05] rounded-lg text-[10px] text-white/40"
+            className="flex h-10 min-w-10 items-center justify-center rounded-lg bg-white/[0.05] px-2 text-[11px] text-white/40"
           >
             ✕
           </button>
@@ -807,7 +807,7 @@ function PrepEntryRow({
             <button
               onClick={deleteEntry}
               disabled={deleting}
-              className="h-6 w-6 flex items-center justify-center rounded-lg bg-red-500/0 hover:bg-red-500/15 text-white/20 hover:text-red-400 active:scale-95 transition-all disabled:opacity-40"
+            className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/0 text-white/20 transition-[background-color,color,transform] hover:bg-red-500/15 hover:text-red-400 active:scale-[0.96] disabled:opacity-40"
             >
               <Trash2 size={10} />
             </button>
@@ -955,10 +955,10 @@ function PrepCard({
       layout
       animate={{ opacity: deleting || isValidating ? 0 : 1 }}
       transition={{ duration: 0.25 }}
-      className={`rounded-2xl overflow-hidden bg-[#111111] ${
+      className={`overflow-hidden rounded-2xl bg-[#181818] ${
         prep.is_active
-          ? "border-[0.3px] border-[#1f8a65]/20 bg-[#1f8a65]/[0.03]"
-          : "border border-transparent"
+          ? "bg-[#1f8a65]/[0.07]"
+          : ""
       }`}
     >
       {/* Header — tap to expand */}
@@ -974,7 +974,7 @@ function PrepCard({
                 {slotLabel}
               </span>
               {sourceBadge && (
-                <span className="rounded-full border-[0.3px] border-[#1f8a65]/25 bg-[#1f8a65]/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-[#7ed8ba]">
+                <span className="rounded-full bg-white/[0.08] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-white/65">
                   {sourceBadge}
                 </span>
               )}
@@ -996,12 +996,12 @@ function PrepCard({
           </div>
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-white/[0.03] px-3 py-2.5">
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-[#121212] px-3 py-2">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/55">
               {t("prep.includeInPreview")}
             </p>
-            <p className="mt-0.5 text-[11px] text-white/38">
+            <p className="mt-0.5 text-[11px] text-white/42">
               {prep.is_active
                 ? t("prep.includedInPreview")
                 : t("prep.excludedFromPreview")}
@@ -1016,17 +1016,16 @@ function PrepCard({
             }}
             aria-pressed={prep.is_active}
             aria-label={t("prep.includeInPreview")}
-            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-              prep.is_active ? "bg-[#1f8a65]/25" : "bg-white/[0.04]"
+            className={`inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-[10px] font-bold uppercase tracking-[0.1em] transition-[background-color,color,transform] active:scale-[0.96] ${
+              prep.is_active
+                ? "bg-[#1f8a65]/18 text-[#7ed8ba]"
+                : "bg-white/[0.07] text-white/50"
             }`}
           >
-            <span
-              className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full transition-transform ${
-                prep.is_active
-                  ? "translate-x-5 bg-[#7ed8ba]"
-                  : "translate-x-0 bg-white"
-              }`}
-            />
+            {prep.is_active && <Check size={13} strokeWidth={2.5} />}
+            <span>
+              {prep.is_active ? t("prep.included") : t("prep.excluded")}
+            </span>
           </button>
         </div>
       </div>
@@ -1099,7 +1098,7 @@ function PrepCard({
                     e.stopPropagation();
                     onAddMore(prep);
                   }}
-                  className="flex-1 h-8 flex items-center justify-center gap-1.5 bg-white/[0.04] rounded-xl text-[11px] text-white/40 hover:text-white/70 hover:bg-white/[0.07] active:scale-[0.98] transition-all"
+                  className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/[0.04] text-[11px] text-white/40 transition-[background-color,color,transform] hover:bg-white/[0.07] hover:text-white/70 active:scale-[0.96]"
                 >
                   {t("journal.addIngredients")}
                 </button>
@@ -1109,7 +1108,7 @@ function PrepCard({
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="h-8 w-8 flex items-center justify-center bg-red-500/10 border border-red-500/15 rounded-xl text-red-400 hover:bg-red-500/20 active:scale-95 transition-all disabled:opacity-40"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-400 transition-[background-color,transform] hover:bg-red-500/20 active:scale-[0.96] disabled:opacity-40"
                 >
                   <Trash2 size={12} />
                 </button>
@@ -1121,7 +1120,7 @@ function PrepCard({
               <button
                 onClick={handleValidate}
                 disabled={isValidating || !canValidateToday}
-                className="w-full h-10 rounded-xl bg-[#f2f2f2] text-[#080808] text-[12px] font-barlow-condensed font-bold uppercase tracking-[0.12em] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#f2f2f2] text-[12px] font-barlow-condensed font-bold uppercase tracking-[0.12em] text-[#080808] transition-transform active:scale-[0.96] disabled:opacity-50"
               >
                 {isValidating ? (
                   "…"
@@ -1146,47 +1145,37 @@ function PrepCard({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-type BilanView = "bilan" | "planning";
+type NutritionListView = "bilan" | "planning";
 
 interface Props {
   initialMeals: NutritionMeal[];
   initialPreps: SmartNutritionPrep[];
   date: string;
-  target: NutritionMacros;
-  consumed: NutritionMacros;
-  initialView?: BilanView;
+  view?: NutritionListView;
   onAddMeal?: () => void;
   onRefinePhotoMeal?: (mealId: string) => void;
   onAddMore?: (mealId: string) => void;
   onEditPrep?: (prep: SmartNutritionPrep) => void;
   onNewPrep?: () => void;
   onPrepValidated?: () => void;
-  gender?: string | null;
-  bodyWeightKg?: number | null;
 }
 
 export default function NutritionMealsList({
   initialMeals,
   initialPreps,
   date,
-  target,
-  consumed,
-  initialView = "bilan",
+  view = "bilan",
   onAddMeal,
   onRefinePhotoMeal,
   onAddMore,
   onEditPrep,
   onNewPrep,
   onPrepValidated,
-  gender,
-  bodyWeightKg,
 }: Props) {
   const { t } = useClientT();
   const router = useRouter();
-  const [view, setView] = useState<BilanView>(initialView);
   const [meals, setMeals] = useState<NutritionMeal[]>(initialMeals);
   const [preps, setPreps] = useState<SmartNutritionPrep[]>(initialPreps);
-  const [localConsumed, setLocalConsumed] = useState(consumed);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{
@@ -1202,14 +1191,6 @@ export default function NutritionMealsList({
     setPreps(initialPreps);
   }, [initialPreps]);
 
-  useEffect(() => {
-    setLocalConsumed(consumed);
-  }, [consumed]);
-
-  useEffect(() => {
-    setView(initialView);
-  }, [initialView]);
-
   // Preps du jour uniquement (planned + logged for past/day state)
   const todayPreps = preps.filter(
     (p) =>
@@ -1218,58 +1199,6 @@ export default function NutritionMealsList({
   );
 
   const todayPlannedPreps = todayPreps.filter((p) => p.status === "planned");
-
-  const simulationPreps = todayPlannedPreps.filter(
-    (prep) => prep.status === "planned" && prep.is_active === true,
-  );
-  const prepKcal = simulationPreps.reduce(
-    (acc, p) => acc + p.total_calories,
-    0,
-  );
-  const prepProtein = simulationPreps.reduce(
-    (acc, p) => acc + p.total_protein_g,
-    0,
-  );
-  const prepCarbs = simulationPreps.reduce(
-    (acc, p) => acc + p.total_carbs_g,
-    0,
-  );
-  const prepFat = simulationPreps.reduce((acc, p) => acc + p.total_fat_g, 0);
-
-  const totalKcal = (localConsumed?.kcal ?? 0) + prepKcal;
-  const totalProtein = (localConsumed?.protein_g ?? 0) + prepProtein;
-  const totalCarbs = (localConsumed?.carbs_g ?? 0) + prepCarbs;
-  const totalFat = (localConsumed?.fat_g ?? 0) + prepFat;
-
-  // Calcul du reste à consommer ajustable en prenant en compte le total simulé (consommé + préparé)
-  const actionable = computeActionableRemaining({
-    target: {
-      kcal: target.kcal,
-      protein_g: target.protein_g,
-      carbs_g: target.carbs_g,
-      fat_g: target.fat_g,
-    },
-    consumed: {
-      kcal: totalKcal,
-      protein_g: totalProtein,
-      carbs_g: totalCarbs,
-      fat_g: totalFat,
-    },
-    profile: { gender, weightKg: bodyWeightKg },
-  });
-
-  const adjustedProtein = Math.max(
-    0,
-    target.protein_g - actionable.compensation.proteinReducedG,
-  );
-  const adjustedCarbs = Math.max(
-    0,
-    target.carbs_g - actionable.compensation.carbsReducedG,
-  );
-  const adjustedFat = Math.max(
-    0,
-    target.fat_g - actionable.compensation.fatReducedG,
-  );
 
   const handlePrepUpdated = (
     prepId: string,
@@ -1464,15 +1393,6 @@ export default function NutritionMealsList({
   ) {
     setValidatingId(prep.id);
     const applyConsumedDelta = options.applyConsumedDelta !== false;
-    if (applyConsumedDelta) {
-      setLocalConsumed((current) => ({
-        ...current,
-        kcal: current.kcal + prep.total_calories,
-        protein_g: current.protein_g + prep.total_protein_g,
-        carbs_g: current.carbs_g + prep.total_carbs_g,
-        fat_g: current.fat_g + prep.total_fat_g,
-      }));
-    }
     setPreps((current) =>
       current.filter(
         (item) => item.id !== prep.id && item.id !== options.originalPrepId,
@@ -1510,120 +1430,13 @@ export default function NutritionMealsList({
 
   return (
     <>
-      {/* ── Toggle Bilan / Planning — remplace le label "Bilan du jour" ── */}
-      <div className="flex items-center justify-between w-full gap-2">
-        <div className="flex gap-1 bg-white/[0.03] rounded-xl p-1 shrink-0">
-          {(["bilan", "planning"] as BilanView[]).map((v) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`px-3 py-1.5 rounded-xl text-[11px] font-barlow-condensed font-bold uppercase tracking-wide transition-all duration-200 ${
-                view === v
-                  ? "bg-[#f2f2f2] text-[#080808] shadow-sm"
-                  : "text-white/40"
-              }`}
-            >
-              {v === "bilan" ? t("journal.summary") : t("nutrition.planning.base")}
-            </button>
-          ))}
-        </div>
-
-        {view === "planning" && (
-          <div className="flex items-end gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-2 py-2 pr-2.5">
-            {/* Calories Gauge */}
-            <div className="flex flex-col items-start gap-[3px] shrink-0">
-              <span className="text-[9px] font-semibold leading-none">
-                <span style={{ color: NUTRITION_UI_COLORS.calories }}>
-                  {Math.round(totalKcal)}
-                </span>
-                <span className="text-white/50">
-                  /{Math.round(target.kcal)}
-                </span>
-              </span>
-              <div className="relative w-[48px] h-[13px] bg-white/[0.06] rounded-xl overflow-hidden">
-                <div
-                  className="h-full transition-all duration-500 ease-out rounded-xl"
-                  style={{
-                    width: `${Math.min(100, (totalKcal / (target.kcal || 1)) * 100)}%`,
-                    backgroundColor: NUTRITION_UI_COLORS.calories,
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Protein Gauge */}
-            <div className="flex flex-col items-start gap-[3px] shrink-0">
-              <span className="text-[9px] font-semibold leading-none">
-                <span style={{ color: NUTRITION_UI_COLORS.protein }}>
-                  {Math.round(totalProtein)}
-                </span>
-                <span className="text-white/50">
-                  /{Math.round(adjustedProtein)}
-                </span>
-              </span>
-              <div className="relative w-[48px] h-[13px] bg-white/[0.06] rounded-xl overflow-hidden">
-                <div
-                  className="h-full transition-all duration-500 ease-out rounded-xl"
-                  style={{
-                    width: `${Math.min(100, (totalProtein / (adjustedProtein || 1)) * 100)}%`,
-                    backgroundColor: NUTRITION_UI_COLORS.protein,
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Carbs Gauge */}
-            <div className="flex flex-col items-start gap-[3px] shrink-0">
-              <span className="text-[9px] font-semibold leading-none">
-                <span style={{ color: NUTRITION_UI_COLORS.carbs }}>
-                  {Math.round(totalCarbs)}
-                </span>
-                <span className="text-white/50">
-                  /{Math.round(adjustedCarbs)}
-                </span>
-              </span>
-              <div className="relative w-[48px] h-[13px] bg-white/[0.06] rounded-xl overflow-hidden">
-                <div
-                  className="h-full transition-all duration-500 ease-out rounded-xl"
-                  style={{
-                    width: `${Math.min(100, (totalCarbs / (adjustedCarbs || 1)) * 100)}%`,
-                    backgroundColor: NUTRITION_UI_COLORS.carbs,
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Fat Gauge */}
-            <div className="flex flex-col items-start gap-[3px] shrink-0">
-              <span className="text-[9px] font-semibold leading-none">
-                <span style={{ color: NUTRITION_UI_COLORS.fat }}>
-                  {Math.round(totalFat)}
-                </span>
-                <span className="text-white/50">
-                  /{Math.round(adjustedFat)}
-                </span>
-              </span>
-              <div className="relative w-[48px] h-[13px] bg-white/[0.06] rounded-xl overflow-hidden">
-                <div
-                  className="h-full transition-all duration-500 ease-out rounded-xl"
-                  style={{
-                    width: `${Math.min(100, (totalFat / (adjustedFat || 1)) * 100)}%`,
-                    backgroundColor: NUTRITION_UI_COLORS.fat,
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* ══ VUE BILAN — repas loggés ══ */}
       {view === "bilan" && (
         <>
           {meals.length === 0 ? (
-            <div className="flex flex-col items-center gap-4 rounded-[24px] border border-white/[0.08] bg-[#111114] px-4 py-10">
+            <div className="flex flex-col items-center gap-4 px-4 py-8">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.04]">
-                <Coffee size={20} className="text-white/15" />
+                <ForkKnifeIcon size={21} weight="duotone" className="text-white/40" />
               </div>
               <p className="text-[13px] text-white/25">
                 {t("journal.noMeals")}

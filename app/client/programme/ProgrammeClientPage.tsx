@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   Dumbbell, Clock, Layers, Target, Timer, Coffee,
-  ChevronRight, Trophy, TrendingUp,
+  ChevronRight, CircleCheck, CircleOff, Play, Trophy, TrendingUp,
 } from 'lucide-react'
 import BodyMap from '@/components/client/BodyMap'
 import { computeMuscleIntensity } from '@/lib/client/muscleDetection'
@@ -16,6 +16,7 @@ import { ct, type ClientLang } from '@/lib/i18n/clientTranslations'
 import type { CycleState } from '@/lib/cycle/cycleEngine'
 import dynamic from 'next/dynamic'
 import { estimateSessionDurationMin } from '@/lib/training/sessionDuration'
+import ClientWeekDayPicker, { getIsoWeekday, getWeekDates } from '@/components/client/ClientWeekDayPicker'
 
 const CycleArcIndicator = dynamic(() => import('@/components/client/cycle/CycleArcIndicator'), { ssr: false })
 const CyclePhaseModal   = dynamic(() => import('@/components/client/cycle/CyclePhaseModal'),   { ssr: false })
@@ -32,6 +33,8 @@ import PeriodSegmentedControl from '@/components/client/smart/PeriodSegmentedCon
 import SectionEyebrow from '@/components/client/smart/SectionEyebrow'
 import { sessionMatchesProgrammeDow } from '@/lib/client/plannedSessions'
 import SkipWorkoutSheet from '@/components/client/SkipWorkoutSheet'
+import WorkoutAlertsFeed from '@/components/client/smart/WorkoutAlertsFeed'
+import type { WorkoutAlert } from '@/lib/client/smart/workoutAlerts'
 
 type Tab = 'seance' | 'performances' | 'historique'
 
@@ -62,7 +65,6 @@ interface Props {
   skippedTodayIds: string[]
   todayScheduledSessionIds: string[]
   todayDayOverrideKind: 'off' | null
-  daysShort: string[]
   daysFull: string[]
   lang: ClientLang
   // Performance
@@ -88,6 +90,7 @@ interface Props {
     href: string
   }[]
   exerciseDict?: Record<string, string>
+  workoutAlerts?: WorkoutAlert[]
 }
 
 const SKIP_REASON_OPTIONS = [
@@ -120,7 +123,6 @@ export default function ProgrammeClientPage({
   skippedTodayIds,
   todayScheduledSessionIds,
   todayDayOverrideKind,
-  daysShort,
   daysFull,
   lang,
   streak,
@@ -131,6 +133,7 @@ export default function ProgrammeClientPage({
   volumeCoverage = { week_start: '', sessions_count: 0, groups: [], windows: undefined },
   recentFlexHistory = [],
   exerciseDict = {},
+  workoutAlerts = [],
 }: Props) {
   const { t } = useClientT()
   const router = useRouter()
@@ -186,6 +189,16 @@ export default function ProgrammeClientPage({
       params.set('dow', String(selectedDow))
     }
 
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  function handleDayChange(date: string) {
+    const nextDow = getIsoWeekday(date)
+    setSelectedDow(nextDow)
+
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', 'seance')
+    params.set('dow', String(nextDow))
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
@@ -346,18 +359,19 @@ export default function ProgrammeClientPage({
   ]
 
   return (
-    <div className="min-h-dvh bg-[#0d0d0d] font-barlow pb-32 overflow-x-hidden">
+    <div className="min-h-dvh bg-[#121212] font-barlow pb-32 overflow-x-hidden">
       <ClientTopBar
         left={
-          <div className="flex gap-1 bg-white/[0.03] rounded-xl p-1">
+          <div className="flex gap-0.5 rounded-xl bg-white/[0.04] p-0.5">
             {TABS.map(({ id, label }) => (
               <button
                 key={id}
+                type="button"
                 onClick={() => handleTabChange(id)}
-                className={`px-3 py-1.5 rounded-xl text-[11px] font-barlow-condensed font-bold uppercase tracking-wide transition-all duration-200 ${
+                className={`rounded-lg px-2.5 py-1.5 text-[12px] font-semibold tracking-[-0.01em] transition-[background-color,color] duration-150 ${
                   tab === id
                     ? 'bg-[#f2f2f2] text-[#080808] shadow-sm'
-                    : 'text-white/40'
+                    : 'text-white/45'
                 }`}
               >
                 {label}
@@ -366,8 +380,8 @@ export default function ProgrammeClientPage({
           </div>
         }
         right={
-          <div className="flex flex-col items-end gap-0.5">
-            <p className="text-[9px] text-white/30 uppercase tracking-[0.12em]">
+          <div className="flex items-center gap-2">
+            <p className="hidden text-right text-[10px] font-medium leading-tight text-white/35 sm:block">
               {ct(lang, 'programme.weeks', { n: String(program.weeks) })} · {ct(lang, 'programme.sessions_count', { n: String(sessions.length) })}
             </p>
             {cycleState?.currentPhase && cycleState.currentCycleDay && (
@@ -394,46 +408,25 @@ export default function ProgrammeClientPage({
         }
       />
 
-      <main className="max-w-lg mx-auto px-5 pt-[102px] flex flex-col gap-4">
+      <main className="client-page-top mx-auto flex max-w-lg flex-col gap-4 px-5">
 
         {/* ══════════════════════════════════════════════════════════════
             TAB — SÉANCE
         ══════════════════════════════════════════════════════════════ */}
         {tab === 'seance' && (
           <>
-            {/* Sélecteur jours */}
-            <div className="flex gap-1">
-              {daysShort.map((d, i) => {
-                const dow = i + 1
-                const hasSession = sessions.some((s: any) => sessionMatchesProgrammeDow(s, dow))
-                const isToday = dow === todayDow
-                const isSelected = dow === selectedDow
-                const cls = `flex-1 flex flex-col items-center py-2 rounded-xl text-[10px] font-bold transition-colors ${
-                  isSelected
-                    ? 'bg-[#f2f2f2] text-[#080808]'
-                    : isToday
-                    ? 'bg-[#f2f2f2]/20 text-[#f2f2f2]'
-                    : hasSession
-                    ? 'bg-white/[0.04] text-white/50 hover:bg-white/[0.07] cursor-pointer'
-                    : 'text-white/20'
-                }`
-                const dot = hasSession && (
-                  <span className={`w-1 h-1 rounded-full mt-1 ${isSelected ? 'bg-[#0d0d0d]' : 'bg-[#f2f2f2]/50'}`} />
-                )
-                if (!hasSession && !isToday) {
-                  return <div key={d} className={cls}><span>{d}</span>{dot}</div>
-                }
-                return (
-                  <button
-                    key={d}
-                    onClick={() => setSelectedDow(dow)}
-                    className={cls}
-                  >
-                    <span>{d}</span>{dot}
-                  </button>
-                )
-              })}
-            </div>
+            <WorkoutAlertsFeed alerts={workoutAlerts} />
+
+            <ClientWeekDayPicker
+              anchorDate={currentDateIso}
+              selectedDate={getWeekDates(currentDateIso)[selectedDow - 1]}
+              locale={lang === 'fr' ? 'fr-FR' : lang === 'es' ? 'es-ES' : 'en-GB'}
+              onSelectDate={handleDayChange}
+              isDateDisabled={(date) => {
+                const dow = getIsoWeekday(date)
+                return dow !== todayDow && !sessions.some((session: any) => sessionMatchesProgrammeDow(session, dow))
+              }}
+            />
 
             {todaySession ? (
               <div className="bg-white/[0.02] rounded-xl overflow-hidden">
@@ -477,9 +470,10 @@ export default function ProgrammeClientPage({
                   {(completedIdsSet.has(todaySession.id) || completedNamesSet.has(todaySession.name)) ? (
                     <div className="flex items-center justify-between w-full bg-[#222222] pl-5 pr-2 py-2 rounded-xl gap-3">
                       <div className="min-w-0">
-                        <span className="block text-[12px] font-bold uppercase tracking-[0.12em] text-[#f2f2f2]">
-                          {ct(lang, 'programme.session.done')}
-                        </span>
+                        <div className="flex min-w-0 items-center gap-1.5 text-[12px] font-bold uppercase tracking-[0.12em] text-[#f2f2f2]">
+                          <span className="truncate">{ct(lang, 'programme.session.done').replace(/\s*[✓✔]$/, '')}</span>
+                          <CircleCheck aria-hidden size={14} strokeWidth={2.5} className="shrink-0 text-[#5dba87]" />
+                        </div>
                         <p className="mt-1 text-[10px] text-white/45">{ct(lang, 'programme.start.flex.alt')}</p>
                       </div>
                       <div className="flex flex-col gap-2">
@@ -558,37 +552,41 @@ export default function ProgrammeClientPage({
                       </Link>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-2">
+                    <div className="pt-1">
                       <Link
                         href={`/client/programme/session/${todaySession.id}?fromDow=${selectedDow}`}
-                        className="flex items-center justify-between w-full bg-[#f2f2f2] pl-5 pr-1.5 py-1.5 rounded-xl hover:bg-[#e0e0e0] active:scale-[0.99] transition-all"
+                        className="group flex min-h-16 items-center justify-between rounded-xl bg-[#f2f2f2] pl-5 pr-2 text-[#080808] transition-colors hover:bg-white active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#181818]"
                       >
-                        <span className="text-[12px] font-barlow-condensed font-bold uppercase tracking-wide text-[#080808]">
+                        <span className="text-[13px] font-barlow-condensed font-bold uppercase tracking-[0.11em]">
                           {ct(lang, 'programme.session.start')}
                         </span>
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/[0.15]">
-                          <Dumbbell size={15} className="text-[#080808]" />
+                        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-black/[0.12] transition-transform group-hover:translate-x-0.5">
+                          <Play size={15} fill="currentColor" aria-hidden="true" />
+                        </div>
+                      </Link>
+                      <Link
+                        href={`/client/flex-workout?sourceWorkoutId=${todaySession.id}`}
+                        className="group mt-2 flex min-h-14 items-center justify-between rounded-xl bg-white/[0.045] pl-4 pr-2 text-white/80 transition-colors hover:bg-white/[0.075] hover:text-white active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#181818]"
+                      >
+                        <span className="flex items-center gap-3 text-[12px] font-barlow-condensed font-bold uppercase tracking-[0.1em]">
+                          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.06]">
+                            <Dumbbell size={15} aria-hidden="true" />
+                          </span>
+                          {ct(lang, 'programme.start.flex')}
+                        </span>
+                        <div className="flex h-9 w-9 items-center justify-center text-white/35 transition-colors group-hover:text-white/75">
+                          <ChevronRight size={17} aria-hidden="true" />
                         </div>
                       </Link>
                       {showSkipAction && (
                         <button
                           onClick={() => setSkipOpen(true)}
-                          className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-left text-[11px] font-semibold text-white/60 transition-colors hover:bg-white/[0.05] hover:text-white/80"
+                          className="mt-3 inline-flex min-h-10 items-center gap-2 px-1 text-[11px] font-medium text-white/40 transition-colors hover:text-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#181818]"
                         >
+                          <CircleOff size={14} aria-hidden="true" />
                           {ct(lang, 'programme.session.cantDo')}
                         </button>
                       )}
-                      <Link
-                        href={`/client/flex-workout?sourceWorkoutId=${todaySession.id}`}
-                        className="flex items-center justify-between w-full rounded-xl border border-white/[0.08] bg-white/[0.02] pl-5 pr-1.5 py-1.5 hover:bg-white/[0.05] active:scale-[0.99] transition-all"
-                      >
-                        <span className="text-[12px] font-barlow-condensed font-bold uppercase tracking-wide text-white/85">
-                          {ct(lang, 'programme.start.flex')}
-                        </span>
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
-                          <Dumbbell size={15} className="text-white/80" />
-                        </div>
-                      </Link>
                     </div>
                   )}
                 </div>

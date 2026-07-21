@@ -1,0 +1,31 @@
+name: Client engagement reminders
+
+# Required repository secret: CRON_SECRET (identical to the production Vercel value).
+
+on:
+  schedule:
+    - cron: '2-59/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: client-engagement-reminders
+  cancel-in-progress: false
+
+jobs:
+  trigger-reminders:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Trigger client reminders
+        env:
+          APP_URL: https://www.stryvlab.com
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          test -n "$CRON_SECRET"
+          curl --fail --silent --show-error \
+            --retry 2 --retry-all-errors \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/client-engagement-reminders"

@@ -156,7 +156,11 @@ export default function NutritionStudio({ clientId, existingProtocol }: Props) {
   });
   const [focusMissingDataKey, setFocusMissingDataKey] =
     useState<MissingDataKey | null>(null);
-  const { feedback: headerFeedback, pushFeedback: pushHeaderFeedback } =
+  const {
+    feedback: headerFeedback,
+    pushFeedback: pushHeaderFeedback,
+    clearFeedback: clearHeaderFeedback,
+  } =
     useTimedActionFeedback<null>();
   const nutritionReality = useNutritionReality(clientId, realityWindow);
   const searchKey = searchParams.toString();
@@ -586,7 +590,7 @@ export default function NutritionStudio({ clientId, existingProtocol }: Props) {
 
   const handleSaveAction = useCallback(async () => {
     try {
-      pushHeaderFeedback(null, "loading", "Enregistrement...");
+      clearHeaderFeedback(null);
       await saveRef.current();
       pushHeaderFeedback(null, "success", "Protocole enregistré");
     } catch (error) {
@@ -596,11 +600,11 @@ export default function NutritionStudio({ clientId, existingProtocol }: Props) {
         error instanceof Error ? error.message : "La sauvegarde a échoué.",
       );
     }
-  }, [pushHeaderFeedback]);
+  }, [clearHeaderFeedback, pushHeaderFeedback]);
 
   const handleShareAction = useCallback(async () => {
     try {
-      pushHeaderFeedback(null, "loading", "Partage en cours...");
+      clearHeaderFeedback(null);
       await shareRef.current();
       pushHeaderFeedback(null, "success", "Protocole partagé");
       await new Promise((resolve) => setTimeout(resolve, 650));
@@ -614,7 +618,7 @@ export default function NutritionStudio({ clientId, existingProtocol }: Props) {
           : "Le protocole ne peut pas encore être partagé.",
       );
     }
-  }, [clientId, pushHeaderFeedback, router]);
+  }, [clearHeaderFeedback, clientId, pushHeaderFeedback, router]);
 
   const rightContent = useMemo(
     () => (
@@ -641,8 +645,8 @@ export default function NutritionStudio({ clientId, existingProtocol }: Props) {
           title={studio.saving ? "Enregistrement..." : "Enregistrer le protocole"}
           aria-label="Enregistrer le protocole"
         >
-          {studio.saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-          <span className="text-[10px] font-semibold">{studio.saving ? "Enregistrement..." : "Enregistrer"}</span>
+          {studio.saving && !studio.sharing ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          <span className="text-[10px] font-semibold">{studio.saving && !studio.sharing ? "Enregistrement..." : "Enregistrer"}</span>
         </button>
         <button
           onClick={handleShareAction}

@@ -18,6 +18,8 @@ describe('privileged payment and administration routes', () => {
       'auth.getUser',
       'requireInternalDashboardAccess',
       'webhooks.constructEvent',
+      'verifyCalWebhookSignature',
+      'verifyWhatsAppSignature',
       'stripe-signature',
       'CRON_SECRET',
       'INTERNAL_API_SECRET',
@@ -32,6 +34,14 @@ describe('privileged payment and administration routes', () => {
     })
 
     expect(missingGuard).toEqual([])
+  })
+
+  it('requires a signed Cal.com webhook before changing sales data', () => {
+    const calendar = readFileSync(join(process.cwd(), 'app/api/sales/cal-webhook/route.ts'), 'utf8')
+
+    expect(calendar).toContain('CAL_WEBHOOK_SECRET')
+    expect(calendar).toContain('x-cal-signature-256')
+    expect(calendar).toContain('verifyCalWebhookSignature')
   })
 
   it('keeps active Stripe webhooks signed and idempotent', () => {

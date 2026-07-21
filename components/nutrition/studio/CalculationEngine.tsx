@@ -782,14 +782,14 @@ export default function CalculationEngine({
               puis le moteur applique les formules de {transformationPhaseToMacroGoal(transformationPhase)} avec les ajustements adaptes.
             </p>
             {phaseProtocolPreview && (
-              <div className="mt-3 rounded-xl border border-[#86aeb8]/25 bg-[#86aeb8]/[0.07] p-3">
-                <p className="text-[10px] font-semibold text-[#c6dce2]">Synchronisation du plan prête</p>
+              <div className="mt-3 rounded-xl border border-[#1f8a65]/25 bg-[#1f8a65]/[0.07] p-3">
+                <p className="text-[10px] font-semibold text-white/90">Synchronisation du plan prête</p>
                 <p className="mt-1 text-[10px] leading-relaxed text-white/55">
                   {phaseProtocolPreview.changedDays} journée{phaseProtocolPreview.changedDays > 1 ? 's' : ''} type et {phaseProtocolPreview.changedMealPlans} plan{phaseProtocolPreview.changedMealPlans > 1 ? 's' : ''} alimentaire{phaseProtocolPreview.changedMealPlans > 1 ? 's' : ''} seront recalibrés en conservant les écarts entre jours, les portions fixes et les limites définies par le coach. Ensuite, enregistre le protocole pour conserver ces changements.
                 </p>
                 {phaseProtocolPreview.warnings.length > 0 && <p className="mt-1 text-[9px] text-amber-200/80">{phaseProtocolPreview.warnings[0]}</p>}
                 <div className="mt-2 flex gap-2">
-                  <button type="button" onClick={onApplyPhaseProtocolPreview} className="rounded-lg bg-[#86aeb8] px-2.5 py-1.5 text-[9px] font-bold text-[#0d0d0d]">Appliquer au plan</button>
+                  <button type="button" onClick={onApplyPhaseProtocolPreview} className="rounded-lg bg-[#1f8a65] px-2.5 py-1.5 text-[9px] font-bold text-white">Appliquer au plan</button>
                   <button type="button" onClick={onDismissPhaseProtocolPreview} className="rounded-lg bg-white/[0.06] px-2.5 py-1.5 text-[9px] font-semibold text-white/60">Conserver tel quel</button>
                 </div>
               </div>

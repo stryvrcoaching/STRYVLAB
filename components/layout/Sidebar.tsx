@@ -20,6 +20,7 @@ import {
   CreditCard,
   Euro,
   MessageSquareWarning,
+  Globe,
 } from "lucide-react";
 
 const NAV_SECTIONS = [
@@ -67,6 +68,12 @@ const NAV_SECTIONS = [
         label: "Formules",
         href: "/coach/formules",
         match: (p: string) => p.startsWith("/coach/formules"),
+      },
+      {
+        icon: Globe,
+        label: "Ma page",
+        href: "/coach/ma-page",
+        match: (p: string) => p.startsWith("/coach/ma-page"),
       },
       {
         icon: Euro,

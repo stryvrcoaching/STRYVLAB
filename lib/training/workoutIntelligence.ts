@@ -219,6 +219,7 @@ export function recommendFollowingWorkoutSet({
 
   const nextSet = exerciseSets[currentIndex + 1]
   if (nextSet.set_type !== 'working') return null
+  if (nextSet.completed) return null
 
   const nextKey = workoutSetKey(completedSet.exercise_id, nextSet.set_number, completedSet.side)
   if (manuallyEdited.has(nextKey)) return null

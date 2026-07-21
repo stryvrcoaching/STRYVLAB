@@ -15,6 +15,7 @@ describe('client reminder scheduling', () => {
   it('spreads hydration reminders from the selected first reminder to 21:00', () => {
     expect(buildHydrationReminderTimes('09:00', 3)).toEqual(['09:00', '15:00', '21:00'])
     expect(buildHydrationReminderTimes('08:00', 1)).toEqual(['08:00'])
+    expect(buildHydrationReminderTimes('09:00', 10)).toHaveLength(10)
   })
 
   it('accepts the five-minute execution window after a scheduled time', () => {

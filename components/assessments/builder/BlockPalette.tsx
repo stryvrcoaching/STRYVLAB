@@ -28,6 +28,7 @@ const ICONS: Record<AssessmentModule, React.ElementType> = {
   measurements: Ruler,
   photos: Camera,
   nutrition: Utensils,
+  food_preferences: Heart,
   training: Dumbbell,
   cardio: Heart,
   wellness: Moon,

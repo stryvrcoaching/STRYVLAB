@@ -508,7 +508,7 @@ export default function ChatPage({ coachAvatarUrl: initialAvatarUrl, coachInitia
 
   return (
     <div
-      className="fixed inset-x-0 top-0 flex flex-col bg-[#0d0d0d]"
+      className="fixed inset-x-0 top-0 flex flex-col bg-[var(--client-page-bg,#0a0a0a)]"
       style={{
         paddingTop: "env(safe-area-inset-top, 0px)",
         bottom: "calc(var(--client-bottom-nav-reserved) + 12px)",

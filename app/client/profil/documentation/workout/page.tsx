@@ -33,14 +33,13 @@ export default async function ClientWorkoutDocumentationIndexPage() {
   const lang = client ? await resolveClientLanguage(service, client.id) : 'fr'
 
   return (
-    <div className="min-h-dvh bg-[#0d0d0d] font-barlow overflow-x-hidden">
+    <div className="min-h-dvh bg-[#121212] font-barlow overflow-x-hidden">
       <ClientTopBar
-        section={ct(lang, 'nav.profil')}
         title={ct(lang, 'profil.docs.workout.meta')}
         backHref="/client/profil"
       />
 
-      <main className="px-4 pb-24 pt-[104px]">
+      <main className="client-page-top px-4 pb-24">
         <DocsIndexPage
           audience="client"
           title={ct(lang, 'profil.docs.workout.indexTitle')}

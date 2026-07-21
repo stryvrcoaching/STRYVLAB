@@ -21,6 +21,7 @@ type QuickCaffeineModalProps = {
   onLogged?: (caffeineMg: number) => void
   onDeleted?: (caffeineMg: number) => void
   date?: string
+  defaultKind?: CaffeineKind
 }
 
 type CaffeineKind = 'coffee' | 'tea'
@@ -116,6 +117,7 @@ export default function QuickCaffeineModal({
   onLogged,
   onDeleted,
   date,
+  defaultKind,
 }: QuickCaffeineModalProps) {
   const { t } = useClientT()
   useBodyScrollLock(open)
@@ -124,7 +126,13 @@ export default function QuickCaffeineModal({
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const [kind, setKind] = useState<CaffeineKind>('coffee')
+  const [kind, setKind] = useState<CaffeineKind>(defaultKind ?? 'coffee')
+
+  useEffect(() => {
+    if (open) {
+      setKind(defaultKind ?? 'coffee')
+    }
+  }, [open, defaultKind])
   const [size, setSize] = useState<CupSize>('medium')
   const [intensity, setIntensity] = useState<IntensityLevel>(3)
 
@@ -232,7 +240,7 @@ export default function QuickCaffeineModal({
       <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-[2px]" onClick={onClose} />
 
       <div
-        className="client-native-bottom-sheet fixed left-0 right-0 bottom-0 z-[70] flex max-h-[88dvh] flex-col rounded-t-[28px] bg-[#0d0d0d] shadow-2xl"
+        className="client-native-bottom-sheet fixed left-0 right-0 bottom-0 z-[70] flex max-h-[88dvh] flex-col rounded-t-[28px] bg-[#121212] shadow-2xl"
         style={{ paddingBottom: 'var(--client-modal-bottom-padding)', transform: 'translateZ(0)' }}
       >
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-white/[0.10]" />
@@ -322,10 +330,9 @@ export default function QuickCaffeineModal({
                 <button
                   key={nextKind}
                   onClick={() => setKind(nextKind)}
-                  className={`flex h-10 items-center justify-between rounded-xl border px-3 transition-all active:scale-[0.98] ${
-                    active ? 'bg-white/[0.06]' : 'border-white/[0.05] bg-white/[0.03]'
+                  className={`flex h-10 items-center justify-between rounded-xl px-3 transition-[background-color,color,transform] active:scale-[0.96] ${
+                    active ? 'bg-white/[0.10]' : 'bg-white/[0.045]'
                   }`}
-                  style={active ? { borderColor: `${item.accent}70` } : undefined}
                 >
                     <span
                       className="text-[11px] font-barlow-condensed font-bold uppercase tracking-[0.16em]"

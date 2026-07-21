@@ -59,8 +59,8 @@ function emailContent(key: CoachTrialOnboardingEmailKey, progress: CoachTrialPro
             title: 'Vous avez lancé le mouvement.',
             copy: `Votre premier client est déjà dans STRYV lab. La prochaine étape est simple : transformez son contexte en un suivi clair, puis ajustez au fil des retours.`,
             tip: 'Commencez par un bilan ou un objectif précis. Un suivi utile se construit avec un premier signal fiable, pas avec une configuration parfaite.',
-            ctaLabel: 'Ouvrir mes athlètes',
-            ctaPath: '/coach/athletes',
+            ctaLabel: 'Ouvrir mes clients',
+            ctaPath: '/coach/clients',
           }
         : {
             subject: 'Le meilleur point de départ pour votre essai',
@@ -69,7 +69,7 @@ function emailContent(key: CoachTrialOnboardingEmailKey, progress: CoachTrialPro
             copy: 'Ne cherchez pas à tout configurer dès aujourd’hui. Ajoutez un premier client et utilisez STRYV lab sur un cas réel : c’est le moyen le plus rapide de voir si l’outil soutient vraiment votre façon de coacher.',
             tip: 'Choisissez un accompagnement actif. Vous pourrez ensuite construire le profil, le bilan, la prescription et les retours dans le même contexte.',
             ctaLabel: 'Ajouter mon premier client',
-            ctaPath: '/coach/athletes',
+            ctaPath: '/coach/clients?create=1',
           }
     }
     case 'workflow':
@@ -81,8 +81,8 @@ function emailContent(key: CoachTrialOnboardingEmailKey, progress: CoachTrialPro
         tip: progress.clientCount > 0
           ? `Vous avez actuellement ${clients}. Prenez un de ces profils et posez une première intention de suivi avant de créer ou d’ajuster sa prescription.`
           : 'Quand vous ajouterez votre premier client, commencez par son objectif et ses contraintes avant de construire le programme.',
-        ctaLabel: progress.clientCount > 0 ? 'Voir mes athlètes' : 'Préparer mon espace coach',
-        ctaPath: progress.clientCount > 0 ? '/coach/athletes' : '/coach/settings',
+        ctaLabel: progress.clientCount > 0 ? 'Voir mes clients' : 'Continuer l’activation',
+        ctaPath: progress.clientCount > 0 ? '/coach/clients' : '/dashboard',
       }
     case 'progress': {
       const elements = [
@@ -99,10 +99,10 @@ function emailContent(key: CoachTrialOnboardingEmailKey, progress: CoachTrialPro
           ? `Depuis le début de votre essai : ${snapshot}. Ce ne sont pas des métriques marketing ; ce sont les éléments concrets de votre environnement de coaching.`
           : 'Votre essai est toujours ouvert. La meilleure prochaine action est de créer un suivi réel plutôt que de parcourir les fonctionnalités une par une.',
         tip: elements.length > 0
-          ? 'Pour la suite, cherchez une boucle complète : un profil, une intention de suivi, une prescription, puis un retour client qui vous aide à ajuster.'
+          ? 'Pour la suite, cherchez une boucle complète : un profil, une intention de suivi, une prescription, puis un retour client qui vous aide à ajuster. Le hub d’activation sur le dashboard reprend la prochaine étape.'
           : 'Un seul client suffit pour tester le cycle complet : contexte → décision → accompagnement → ajustement.',
-        ctaLabel: elements.length > 0 ? 'Continuer dans STRYV lab' : 'Créer un premier suivi',
-        ctaPath: elements.length > 0 ? '/coach' : '/coach/athletes',
+        ctaLabel: elements.length > 0 ? 'Ouvrir mon dashboard' : 'Créer un premier suivi',
+        ctaPath: elements.length > 0 ? '/dashboard' : '/coach/clients?create=1',
       }
     }
     case 'trial_ending':
@@ -111,9 +111,12 @@ function emailContent(key: CoachTrialOnboardingEmailKey, progress: CoachTrialPro
         eyebrow: 'Votre accès',
         title: 'Demain, votre essai arrive à son terme.',
         copy: `Votre accès ${plan === 'pro' ? 'Pro' : plan === 'studio' ? 'Studio' : 'Solo'} reste pleinement disponible jusqu’au ${formatDate(trialEndsAt)}. Ensuite, votre abonnement se poursuivra à ${PLAN_PRICES[plan]}.`,
-        tip: 'Prenez une minute pour vérifier votre formule et vos informations de facturation. Vous gardez le contrôle : la gestion ou la résiliation se fait depuis vos réglages.',
-        ctaLabel: 'Gérer mon abonnement',
-        ctaPath: '/coach/settings',
+        tip:
+          plan === 'solo'
+            ? 'Si vous voulez l’app client STRYVR, passez en Pro depuis Réglages → Plan. Vous gardez le contrôle de la facturation.'
+            : 'Prenez une minute pour vérifier votre formule et vos informations de facturation. Vous gardez le contrôle : la gestion ou la résiliation se fait depuis vos réglages.',
+        ctaLabel: plan === 'solo' ? 'Voir les plans' : 'Gérer mon abonnement',
+        ctaPath: '/coach/settings?section=plan',
       }
   }
 }
@@ -148,7 +151,7 @@ export async function sendCoachTrialOnboardingEmail({
       <p style="margin:0 0 10px;font-size:10px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:#69d0ac;">${escapeHtml(content.eyebrow)}</p>
       <h1 style="max-width:440px;margin:0 0 18px;font-size:30px;line-height:1.14;letter-spacing:-.03em;color:#fff;">${safeTitle}</h1>
       <p style="margin:0 0 24px;font-size:16px;line-height:1.65;color:rgba(255,255,255,.72);">${safeCopy}</p>
-      <div style="margin:0 0 28px;border-left:2px solid #c6b48b;padding:3px 0 3px 14px;"><p style="margin:0;font-size:13px;line-height:1.6;color:rgba(255,255,255,.68);"><strong style="color:#fff;">Le bon repère :</strong> ${safeTip}</p></div>
+      <div style="margin:0 0 28px;border-left:2px solid #1f8a65;padding:3px 0 3px 14px;"><p style="margin:0;font-size:13px;line-height:1.6;color:rgba(255,255,255,.68);"><strong style="color:#fff;">Le bon repère :</strong> ${safeTip}</p></div>
       <a href="${url}" style="display:inline-block;border-radius:10px;background:#1f8a65;padding:13px 18px;color:#fff;text-decoration:none;font-size:14px;font-weight:800;">${safeCta} <span aria-hidden="true">→</span></a>
     `,
     }),

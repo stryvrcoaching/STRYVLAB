@@ -8,7 +8,7 @@ import { useClientT } from '@/components/client/ClientI18nProvider'
 export default function ExpiredTokenPage() {
   const { t } = useClientT()
   return (
-    <div className="min-h-dvh bg-[#0d0d0d] flex flex-col items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <div className="min-h-dvh bg-[#121212] flex flex-col items-center justify-center p-6 overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="mb-8 flex flex-col items-center gap-3">
         <Image src="/logo/logo-stryvr-silver.png" alt="STRYVR" width={48} height={48} className="w-12 h-12 object-contain" />
       </div>

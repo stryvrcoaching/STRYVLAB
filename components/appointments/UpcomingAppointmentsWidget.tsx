@@ -78,7 +78,7 @@ export default function UpcomingAppointmentsWidget({
         </h3>
         <button
           onClick={onNewAppointment}
-          className="flex items-center gap-1 text-xs text-[#c6b48b] hover:text-[#d4c09e] transition-colors"
+          className="flex items-center gap-1 text-xs text-[#1f8a65] hover:text-[#217356] transition-colors"
         >
           <Plus size={12} />
           Planifier
@@ -91,7 +91,7 @@ export default function UpcomingAppointmentsWidget({
           <p className="text-sm text-white/30">Aucun appel dans les 14 prochains jours</p>
           <button
             onClick={onNewAppointment}
-            className="mt-3 text-xs text-[#c6b48b] hover:text-[#d4c09e] transition-colors"
+            className="mt-3 text-xs text-[#1f8a65] hover:text-[#217356] transition-colors"
           >
             Planifier un appel →
           </button>
@@ -118,7 +118,7 @@ export default function UpcomingAppointmentsWidget({
           >
             {/* Icône modalité */}
             <div className="shrink-0 w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
-              <Icon size={14} className="text-[#c6b48b]" />
+              <Icon size={14} className="text-[#1f8a65]" />
             </div>
 
             {/* Infos */}

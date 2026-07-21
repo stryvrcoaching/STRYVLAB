@@ -508,7 +508,7 @@ function ClientProductScene() {
   return (
     <Surface className="p-4 md:p-5">
       <div className="grid gap-4 lg:grid-cols-[290px_minmax(0,1fr)] lg:items-start">
-        <div className="mx-auto w-full max-w-[290px] overflow-hidden rounded-[30px] border border-white/[0.06] bg-[#0d0d0d]">
+        <div className="mx-auto w-full max-w-[290px] overflow-hidden rounded-[30px] border border-white/[0.06] bg-[#121212]">
           <div className="border-b border-white/[0.06] px-4 py-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/35">
               STRYVR

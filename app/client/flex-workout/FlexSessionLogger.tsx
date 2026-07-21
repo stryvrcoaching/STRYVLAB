@@ -6,6 +6,9 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronLeft, Clock, Dumbbell, Flag, MoreHorizontal, Plus, Search, Sparkles, X } from 'lucide-react'
 import exerciseCatalog from '@/data/exercise-catalog.json'
 import ExerciseBlock, { type ExerciseBlockExercise } from '@/components/client/smart/ExerciseBlock'
+import ExerciseNotesPanel from '@/components/client/smart/ExerciseNotesPanel'
+import ExerciseLibrarySheet from '@/components/client/ExerciseLibrarySheet'
+import TrainingCheckinSheet, { type TrainingCheckinValue } from '@/components/client/smart/TrainingCheckinSheet'
 import type { SetRowData, SetType } from '@/components/client/smart/SetRow'
 import useBodyScrollLock, { resetBodyScrollLock } from '@/components/client/useBodyScrollLock'
 import type { FlexWorkoutExerciseRow, FlexWorkoutRelation, FlexWorkoutSessionRow, FlexWorkoutSetRow } from '@/lib/training/flexTraining/types'
@@ -13,7 +16,7 @@ import { summarizeFlexWorkoutSession } from '@/lib/training/flexTraining/summary
 import { getDefaultTempo } from '@/lib/training/tempo'
 import { useClientT } from '@/components/client/ClientI18nProvider'
 import type { SetRecommendation } from '@/lib/training/setRecommendation'
-import { getExerciseHistoryEntries, indexExerciseHistoryEntry } from '@/lib/training/exerciseHistoryKey'
+import { getExerciseHistoryEntries, indexExerciseHistoryEntry, resolveCanonicalExerciseKey } from '@/lib/training/exerciseHistoryKey'
 import {
   buildWorkoutCoachingCues,
   buildWorkoutHistoryReferences,
@@ -22,6 +25,7 @@ import {
   type WorkoutHistoryEntry,
   type WorkoutHistoryIndex,
 } from '@/lib/training/workoutIntelligence'
+import { getExerciseLibraryMovementLabel } from '@/lib/i18n/exerciseLibraryLabels'
 
 type CatalogExercise = {
   id: string
@@ -191,18 +195,22 @@ export default function FlexSessionLogger({
   initialExercises: FlexExerciseState[]
 }) {
   const router = useRouter()
-  const { t } = useClientT()
+  const { lang, t } = useClientT()
   const [exercises, setExercises] = useState<FlexExerciseState[]>(initialExercises)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'error'>('idle')
   const [saveProgress, setSaveProgress] = useState(0)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false)
   const [showFinishConfirm, setShowFinishConfirm] = useState(false)
+  const [showPreCheckin, setShowPreCheckin] = useState(false)
+  const [showPostCheckin, setShowPostCheckin] = useState(false)
   const [showLibrary, setShowLibrary] = useState(false)
   const [showCustom, setShowCustom] = useState(false)
   const [showRename, setShowRename] = useState(false)
   const [swapTarget, setSwapTarget] = useState<string | null>(null)
   const [showNoteInput, setShowNoteInput] = useState<string | null>(null)
+  const [showPersonalNoteInput, setShowPersonalNoteInput] = useState<string | null>(null)
+  const [personalNotes, setPersonalNotes] = useState<Record<string, string>>({})
   const [exerciseNotes, setExerciseNotes] = useState<Record<string, string>>(
     Object.fromEntries(initialExercises.map((exercise) => [exercise.id, exercise.notes ?? ''])),
   )
@@ -221,6 +229,49 @@ export default function FlexSessionLogger({
     session.perceived_difficulty != null ? String(session.perceived_difficulty) : '',
   )
   const [globalRir, setGlobalRir] = useState(session.global_rir != null ? String(session.global_rir) : '')
+
+  const personalExerciseKeys = useMemo(
+    () => [...new Set(exercises.map((exercise) => resolveCanonicalExerciseKey(exercise.display_name)))].join(','),
+    [exercises],
+  )
+
+  useEffect(() => {
+    if (!personalExerciseKeys) return
+    fetch(`/api/client/exercise-notes?exercise_keys=${encodeURIComponent(personalExerciseKeys)}`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (!data?.notes) return
+        setPersonalNotes(Object.fromEntries(data.notes.map((note: { exercise_key: string; body: string }) => [note.exercise_key, note.body])))
+      })
+      .catch(() => {})
+  }, [personalExerciseKeys])
+
+  useEffect(() => {
+    if (localStorage.getItem(`training-checkin-pre:flex:${session.id}`)) return
+    setShowPreCheckin(true)
+  }, [session.id])
+
+  async function saveTrainingCheckin(value: TrainingCheckinValue) {
+    const response = await fetch('/api/client/training-checkins', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        flex_session_id: session.id,
+        phase: value.phase,
+        ...(value.phase === 'pre' ? { readiness: value.score } : { exertion: value.score }),
+        discomfort_level: value.discomfortLevel,
+        discomfort_area: value.discomfortArea || null,
+      }),
+    })
+    if (!response.ok) throw new Error('Impossible d’enregistrer le ressenti')
+    if (value.phase === 'pre') {
+      localStorage.setItem(`training-checkin-pre:flex:${session.id}`, '1')
+      setShowPreCheckin(false)
+    } else {
+      setShowPostCheckin(false)
+      void finishSession()
+    }
+  }
 
   const hasBlockingOverlay =
     sessionMenuOpen ||
@@ -376,7 +427,7 @@ export default function FlexSessionLogger({
       ? {
           ...exercise,
           ...data.exercise,
-          display_name: data.exercise.custom_exercise_name ?? exercise.display_name,
+          display_name: data.exercise.display_name ?? data.exercise.custom_exercise_name ?? exercise.display_name,
           sets: exercise.sets,
         }
       : exercise))
@@ -405,6 +456,7 @@ export default function FlexSessionLogger({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         exercise_id: entry.id,
+        custom_exercise_name: entry.name,
         movement_pattern: entry.movementPattern ?? null,
         equipment: entry.equipment ?? [],
         primary_muscles: entry.primaryMuscles ?? [],
@@ -419,7 +471,7 @@ export default function FlexSessionLogger({
 
     const nextExercise: FlexExerciseState = {
       ...data.exercise,
-      display_name: data.exercise.custom_exercise_name ?? entry.name,
+      display_name: data.exercise.display_name ?? data.exercise.custom_exercise_name ?? entry.name,
       sets: [],
     }
 
@@ -644,9 +696,9 @@ export default function FlexSessionLogger({
   }
 
   return (
-    <div className="min-h-dvh bg-[#0d0d0d] font-barlow overflow-x-hidden">
+    <div className="min-h-dvh bg-[#121212] font-barlow overflow-x-hidden">
       <header
-        className="fixed inset-x-0 top-0 z-40 bg-[#0d0d0d]"
+        className="fixed inset-x-0 top-0 z-40 bg-[#0a0a0a] border-b border-white/[0.04]"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <div className="flex items-center justify-between px-4 py-3">
@@ -751,20 +803,38 @@ export default function FlexSessionLogger({
                     rir: patch.rir_actual !== undefined ? (patch.rir_actual === '' ? null : Number(patch.rir_actual)) : undefined,
                     completed: patch.completed,
                     set_type: patch.set_type as SetType | undefined,
-                  })
+                  }).then((updatedSet) => {
+                    const correctedPerformance = patch.actual_reps !== undefined || patch.actual_weight_kg !== undefined || patch.rir_actual !== undefined
+                    if (targetSet.completed && correctedPerformance) {
+                      triggerFlexRecommendation(updatedSet, buildNextExercisesWithSet(exerciseId, updatedSet))
+                    }
+                  }).catch((error) => setErrorMsg(error instanceof Error ? error.message : t('common.unknownError')))
                 }}
                 onAddSet={(exerciseId) => { void createSet(exerciseId) }}
                 onSwap={(exerciseId) => { setSwapTarget(exerciseId); setShowLibrary(true) }}
                 onRest={() => {}}
-                onNote={(exerciseId) => setShowNoteInput((prev) => prev === exerciseId ? null : exerciseId)}
+                onNote={(exerciseId) => setShowPersonalNoteInput((prev) => prev === exerciseId ? null : exerciseId)}
+                onComment={(exerciseId) => setShowNoteInput((prev) => prev === exerciseId ? null : exerciseId)}
                 onTempo={() => {}}
                 onDeleteExercise={(exerciseId) => { void deleteExercise(exerciseId) }}
                 onOpenProgression={(exerciseId, name) => setProgressionTarget({ exId: exerciseId, name })}
                 resolveTargetRir={(setNumber) => resolveFlexTargetRir(resolveExerciseBlock(exercise), setNumber)}
               />
 
+              {showPersonalNoteInput === exercise.id ? (
+                <ExerciseNotesPanel
+                  mode="personal"
+                  exerciseKey={resolveCanonicalExerciseKey(exercise.display_name)}
+                  exerciseName={exercise.display_name}
+                  programExerciseId={exercise.id}
+                  sessionLogId={null}
+                  initialPersonalNote={personalNotes[resolveCanonicalExerciseKey(exercise.display_name)]}
+                />
+              ) : null}
+
               {showNoteInput === exercise.id ? (
                 <div className="mt-1 px-1">
+                  <p className="mb-1 px-1 text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.14em] text-white/35">Commentaire au coach</p>
                   <textarea
                     autoFocus
                     rows={2}
@@ -773,7 +843,7 @@ export default function FlexSessionLogger({
                     onBlur={() => {
                       void patchExercise(exercise.id, { notes: exerciseNotes[exercise.id] ?? null })
                     }}
-                    placeholder={t('logger.note.placeholder')}
+                    placeholder="Partagez un ressenti ou une question pour votre coach…"
                     className="w-full resize-none rounded-xl bg-white/[0.03] px-3 py-2 text-[12px] text-white/80 placeholder:text-white/20 outline-none"
                   />
                 </div>
@@ -784,7 +854,7 @@ export default function FlexSessionLogger({
       </main>
 
       <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.06] bg-[#0d0d0d] px-4 pt-4"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.06] bg-[#121212] px-4 pt-4"
         style={{ paddingBottom: '16px' }}
       >
         <div className="mx-auto flex max-w-lg gap-3">
@@ -842,7 +912,7 @@ export default function FlexSessionLogger({
       </AnimatePresence>
 
       {showLibrary ? (
-        <LibrarySheet
+        <ExerciseLibrarySheet
           onClose={() => {
             setShowLibrary(false)
             setSwapTarget(null)
@@ -851,14 +921,7 @@ export default function FlexSessionLogger({
             setShowLibrary(false)
             setShowCustom(true)
           }}
-          onSelect={(entry) => {
-            void createCatalogExercise(entry)
-              .then(() => {
-                setShowLibrary(false)
-                setSwapTarget(null)
-              })
-              .catch((error) => setErrorMsg(error instanceof Error ? error.message : t('common.unknownError')))
-          }}
+          onSelect={createCatalogExercise}
         />
       ) : null}
 
@@ -934,7 +997,7 @@ export default function FlexSessionLogger({
                   Continuer
                 </button>
                 <button
-                  onClick={() => void finishSession()}
+                  onClick={() => { setShowFinishConfirm(false); setShowPostCheckin(true) }}
                   className="h-11 flex-1 rounded-xl bg-[#f2f2f2] px-4 font-barlow-condensed text-[12px] font-bold uppercase tracking-[0.12em] text-[#080808]"
                 >
                   Valider
@@ -1057,6 +1120,18 @@ export default function FlexSessionLogger({
           )
         })() : null}
       </AnimatePresence>
+
+      {showPreCheckin ? <TrainingCheckinSheet phase="pre" onSubmit={saveTrainingCheckin} onClose={() => setShowPreCheckin(false)} /> : null}
+      {showPostCheckin ? (
+        <TrainingCheckinSheet
+          phase="post"
+          onSubmit={saveTrainingCheckin}
+          onClose={() => {
+            setShowPostCheckin(false)
+            void finishSession()
+          }}
+        />
+      ) : null}
 
       {/* ── Overlay de sauvegarde flouté plein écran ── */}
       <AnimatePresence>
@@ -1327,7 +1402,7 @@ function CustomExerciseSheet({
           <TextField label={t('logger.field.muscleGroup')} value={draft.muscleGroup} onChange={(value) => setDraft((prev) => ({ ...prev, muscleGroup: value }))} placeholder={t('logger.placeholder.back')} />
           <SelectField label={t('logger.field.movementType')} value={draft.movementPattern} onChange={(value) => setDraft((prev) => ({ ...prev, movementPattern: value }))}>
             <option value="">{t('logger.field.select')}</option>
-            {MOVEMENT_PATTERN_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            {MOVEMENT_PATTERN_OPTIONS.map((option) => <option key={option} value={option}>{getExerciseLibraryMovementLabel(option, lang)}</option>)}
           </SelectField>
           <TextField label={t('logger.field.equipment')} value={draft.equipment} onChange={(value) => setDraft((prev) => ({ ...prev, equipment: value }))} placeholder={t('logger.placeholder.equipment')} />
           <TextField label={t('logger.field.primaryMuscles')} value={draft.primaryMuscles} onChange={(value) => setDraft((prev) => ({ ...prev, primaryMuscles: value }))} placeholder={t('logger.placeholder.primaryMuscles')} />

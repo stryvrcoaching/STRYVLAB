@@ -172,7 +172,7 @@ export default function ClientCheckinMomentPage() {
 
   if (loading) {
     return (
-      <main className="min-h-dvh bg-[#0d0d0d] px-4 pt-[88px] text-white">
+      <main className="min-h-dvh bg-[#121212] px-4 pt-[88px] text-white">
         {uiCopy.loading}
       </main>
     );
@@ -180,14 +180,14 @@ export default function ClientCheckinMomentPage() {
 
   if (!steps.length) {
     return (
-      <main className="min-h-dvh bg-[#0d0d0d] px-4 pt-[88px] text-white">
+      <main className="min-h-dvh bg-[#121212] px-4 pt-[88px] text-white">
         <p className="text-sm text-white/60">{uiCopy.empty}</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-dvh bg-[#0d0d0d] px-4 pt-[max(24px,env(safe-area-inset-top))] text-white" style={{ paddingBottom: "var(--client-sheet-bottom-padding)" }}>
+    <main className="min-h-dvh bg-[#121212] px-4 pt-[max(24px,env(safe-area-inset-top))] text-white" style={{ paddingBottom: "var(--client-sheet-bottom-padding)" }}>
       <section className="relative mx-auto flex min-h-[calc(100dvh-40px-env(safe-area-inset-top))] w-full max-w-lg flex-col rounded-[28px] border border-white/[0.06] bg-white/[0.03]">
         <div className="border-b border-white/[0.06] px-5 pb-4 pt-5">
           <button

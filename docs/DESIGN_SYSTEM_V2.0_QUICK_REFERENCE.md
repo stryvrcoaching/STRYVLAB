@@ -43,16 +43,46 @@
 
 ## Boutons & Inputs
 
+- **Pas de bordure sur les boutons** : utiliser uniquement des nuances de fond.
+- **Inputs noir profond** : fond `#0a0a0a` avec bordure très fine.
+
 ```tsx
-// Input
-<input className="w-full rounded-xl bg-[#0a0a0a] px-4 h-[52px] text-white placeholder:text-white/20 focus:outline-none" />
+// Input standard
+<input className="w-full rounded-xl bg-[#0a0a0a] border-[0.3px] border-white/[0.06] px-4 h-[52px] text-white placeholder:text-white/20 focus:outline-none" />
 
-// Bouton CTA
-<button className="rounded-xl bg-[#1f8a65] text-white hover:bg-[#217356] active:scale-[0.99]">Label</button>
+// Bouton CTA Principal
+<button className="rounded-xl bg-[#1f8a65] text-white hover:bg-[#217356] active:scale-[0.99] transition-all duration-150">Label</button>
 
-// Bouton secondaire
-<button className="rounded-xl bg-white/[0.04] text-white/55 hover:bg-white/[0.08]">Label</button>
+// Bouton CTA Secondaire (sans bordure, fond subtil)
+<button className="rounded-xl bg-white/[0.04] text-white/55 hover:bg-white/[0.08] active:scale-[0.99] transition-all duration-150">Label</button>
+
+// Bouton Discret / Icône seule
+<button className="flex items-center justify-center w-8 h-8 rounded-md text-white/25 hover:text-white/55 hover:bg-white/[0.05] transition-all duration-150">Icon</button>
 ```
+
+---
+
+## Modales d'Information (InfoTooltip / Popovers)
+
+Pour les explications contextuelles (ex: calculs de normes ou détails de métriques) :
+- **Bouton déclencheur** : Icône `Info` discrète (11px, `text-white/25 hover:text-white/55 hover:bg-white/[0.05]`).
+- **Corps de la modal** :
+  - Fond noir très sombre `#0e0e0e`.
+  - Bordure ultra-fine `0.5px solid rgba(255,255,255,0.08)`.
+  - Ombres portées autorisées uniquement ici pour détacher le popover : `boxShadow: '0 8px 32px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4)'`.
+  - Police de description : `text-[11px] text-white/70 leading-[1.65]`.
+  - Section source (si applicable) : bordure haute fine + `text-[9px] text-white/25`.
+  - Fermeture automatique au clic en dehors (click-outside listener).
+
+---
+
+## Nuances de Gris & Layouts
+
+La hiérarchie visuelle repose sur le contraste des surfaces sombres sans charger l'interface de lignes ou d'effets superflus :
+- **Fond unique** : `#121212` (Flat Dark).
+- **Cartes & Blocs de premier niveau** : `bg-white/[0.02]` (ou `#181818`) avec bordure fine `border-[0.3px] border-white/[0.06]`.
+- **Surfaces internes & pliables** : bordure fine `border-white/[0.06]` ou `border-white/[0.015]` pour séparer les sous-zones.
+- **Champs de saisie & tables** : fond noir `#0a0a0a` ou `#0d0d0d` pour creuser la profondeur.
 
 ---
 
@@ -108,11 +138,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 ## Règles Non-Négociables
 
 1. ✅ `#121212` bg app, jamais `#181818` en principal
-2. ✅ `border-[0.3px] border-white/[0.06]` sur tous les blocs
-3. ✅ Pas d'ombres (`shadow-*`) — jamais
+2. ✅ `border-[0.3px] border-white/[0.06]` sur tous les blocs (bordure ultra-fine)
+3. ✅ Pas d'ombres (`shadow-*`) — sauf sur les popovers/tooltips d'info pour les détacher
 4. ✅ Pas de hex hardcodés — utiliser les tokens DS
 5. ✅ Opacités texte : 100, 90, 60, 45, 40, 20 (jamais autres valeurs)
 6. ✅ Accent vert `#1f8a65` uniquement (pas bleu, rouge, autre)
+7. ✅ Pas de bordure sur les boutons (CTA principal/secondaire)
+
 
 ---
 

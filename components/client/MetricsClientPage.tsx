@@ -8,6 +8,7 @@ import ClientTopBar from './ClientTopBar'
 import BodyDataTab from './metrics/BodyDataTab'
 import MesurationsTab from './metrics/MesurationsTab'
 import VitalityTab from './metrics/VitalityTab'
+import { ClientMetricsContentSkeleton } from './skeletons/ClientSkeletons'
 import dynamic from 'next/dynamic'
 import type { BodyDataResponse } from '@/app/api/client/body-data/route'
 import type { VitalityResponse } from '@/app/api/client/vitality/route'
@@ -26,16 +27,8 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'vitalite',     label: 'metrics.tab.vitality' },
 ]
 
-interface Props {
-  clientName: string
-  clientEmail: string
-  avatarInitials: string
-  avatarUrl?: string | null
-  streak: number
-}
-
-export default function MetricsClientPage({ clientName, clientEmail, avatarInitials, avatarUrl, streak }: Props) {
-  const { lang, t } = useClientT()
+export default function MetricsClientPage() {
+  const { t } = useClientT()
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('corps')
   const [bodyData, setBodyData] = useState<BodyDataResponse | null>(null)
@@ -59,14 +52,31 @@ export default function MetricsClientPage({ clientName, clientEmail, avatarIniti
   }, [])
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[#0d0d0d]">
+    <div className="flex min-h-dvh flex-col bg-[#121212]">
       <ClientTopBar
-        section="MON PROFIL"
-        title={t('metrics.title')}
+        left={
+          <div className="flex gap-0.5 rounded-xl bg-white/[0.04] p-0.5">
+            {TABS.map(tabItem => (
+              <button
+                key={tabItem.id}
+                type="button"
+                onClick={() => setTab(tabItem.id)}
+                className={`rounded-lg px-2.5 py-1.5 text-[12px] font-semibold tracking-[-0.01em] transition-[background-color,color] duration-150 ${
+                  tab === tabItem.id
+                    ? 'bg-[#f2f2f2] text-[#080808] shadow-sm'
+                    : 'text-white/45'
+                }`}
+              >
+                {t(tabItem.label as never)}
+              </button>
+            ))}
+          </div>
+        }
         right={
           <button
+            type="button"
             onClick={() => router.push('/client/profil')}
-            className="premium-panel premium-micrograin flex h-9 w-9 items-center justify-center rounded-xl text-white/56 transition-colors active:bg-white/[0.08]"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.04] text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#1f8a65] active:scale-[0.96]"
             aria-label={t('profil.section.prefs')}
           >
             <Gear size={16} />
@@ -74,58 +84,9 @@ export default function MetricsClientPage({ clientName, clientEmail, avatarIniti
         }
       />
 
-      <div className="mx-auto flex w-full max-w-lg flex-col px-4 pb-24 pt-[104px]">
-        <div className="premium-panel premium-micrograin flex items-center gap-3 rounded-[24px] px-4 py-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#111111]">
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={avatarUrl}
-              alt={clientName}
-              className="w-full h-full object-cover"
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-            />
-          ) : (
-            <span className="text-[16px] font-barlow-condensed font-bold text-[#f2f2f2] uppercase">
-              {avatarInitials}
-            </span>
-          )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[14px] font-barlow font-semibold text-white">{clientName}</p>
-            <p className="truncate text-[11px] text-white/40">{clientEmail}</p>
-          </div>
-          {streak > 0 && (
-            <div className="premium-panel premium-micrograin shrink-0 rounded-full px-2.5 py-1">
-              <span className="text-[11px] font-barlow-condensed font-bold text-[#f2f2f2]">
-                🔥 {streak}{lang === 'fr' ? 'j' : 'd'}
-              </span>
-            </div>
-          )}
-        </div>
-
-        <div className="scrollbar-hide mt-4 flex gap-2 overflow-x-auto pb-4">
-          {TABS.map(tabItem => (
-            <button
-              key={tabItem.id}
-              onClick={() => setTab(tabItem.id)}
-              className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.12em] transition-colors ${
-                tab === tabItem.id
-                  ? 'bg-[#f2f2f2] text-[#080808]'
-                  : 'premium-panel premium-micrograin text-[#8a8a8a]'
-              }`}
-            >
-              {t(tabItem.label as never)}
-            </button>
-          ))}
-        </div>
-
+      <div className="client-page-top mx-auto flex w-full max-w-lg flex-col px-4 pb-24">
         {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="premium-panel premium-micrograin h-20 animate-pulse rounded-2xl" />
-            ))}
-          </div>
+          <ClientMetricsContentSkeleton />
         ) : (
           <>
             {tab === 'corps'        && bodyData     && <BodyDataTab    data={bodyData} />}

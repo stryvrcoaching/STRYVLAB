@@ -1,4 +1,5 @@
 import { calcEntryMacros, type FoodItem, type MealType } from "@/lib/nutrition/food-items"
+import type { FoodCompatibility } from "@/lib/nutrition/food-compatibility"
 
 export type NutritionPlanMealId = MealType | string
 
@@ -17,7 +18,9 @@ export type NutritionPlanFood = Pick<
   | "fiber_per_100g"
   | "source"
   | "is_verified"
->
+> & {
+  compatibility?: FoodCompatibility
+}
 
 export type NutritionPlanAlternative = {
   id: string
@@ -68,26 +71,28 @@ export function createEmptyPlanMeals(): NutritionPlanMeal[] {
 }
 
 export function normalizePlanMeals(meals: NutritionPlanMeal[] | undefined): NutritionPlanMeal[] {
-  const byId = new Map((meals ?? []).map((meal) => [meal.id, meal]))
+  const seenIds = new Set<NutritionPlanMealId>()
   const standardIds = new Set(NUTRITION_PLAN_MEALS.map((meal) => meal.id))
 
-  const standardMeals = NUTRITION_PLAN_MEALS.map((meal) => {
-    const existing = byId.get(meal.id)
-    return {
-      ...meal,
-      items: Array.isArray(existing?.items) ? existing.items : [],
-    }
-  })
-
-  const customMeals = (meals ?? [])
-    .filter((meal) => !standardIds.has(meal.id as MealType))
+  const orderedMeals = (meals ?? [])
+    .filter((meal) => {
+      if (seenIds.has(meal.id)) return false
+      seenIds.add(meal.id)
+      return true
+    })
     .map((meal) => ({
       ...meal,
-      title: meal.title || "Repas",
+      title: meal.title || (standardIds.has(meal.id as MealType)
+        ? NUTRITION_PLAN_MEALS.find((standard) => standard.id === meal.id)?.title ?? "Repas"
+        : "Repas"),
       items: Array.isArray(meal.items) ? meal.items : [],
     }))
 
-  return [...standardMeals, ...customMeals]
+  const missingStandardMeals = NUTRITION_PLAN_MEALS
+    .filter((meal) => !seenIds.has(meal.id))
+    .map((meal) => ({ ...meal, items: [] }))
+
+  return [...orderedMeals, ...missingStandardMeals]
 }
 
 export function computePlanItemTotals(item: NutritionPlanItem): NutritionPlanTotals {

@@ -104,7 +104,7 @@ export const appointmentRemindersFunction = inngest.createFunction(
                 ? `${appt.title} à ${timeLabel}`
                 : `${appt.title} commence bientôt.`,
               actionUrl: `/client/rendez-vous/${appt.id}`,
-              pushKind: 'system',
+              pushKind: 'essential',
               pushTag: `stryv-appt-${appt.id}-${delivery.kind}`,
             })
           }

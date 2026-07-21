@@ -1,4 +1,4 @@
-import { FieldCondition, ResponseMap } from '@/types/assessment'
+import { FieldCondition, ResponseMap, type AssessmentResponseValue } from '@/types/assessment'
 
 /**
  * Évalue si un champ doit s'afficher selon sa condition `show_if`.
@@ -14,7 +14,7 @@ export function evaluateCondition(
   if (!condition) return true
 
   // Chercher la valeur du champ déclencheur dans tous les blocs
-  let triggerValue: string | number | string[] | boolean | undefined
+  let triggerValue: AssessmentResponseValue | undefined
   for (const blockResponses of Object.values(allResponses)) {
     if (condition.field_key in blockResponses) {
       triggerValue = blockResponses[condition.field_key]

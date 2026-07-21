@@ -14,10 +14,11 @@ import exerciseCatalog from '@/data/exercise-catalog.json'
 
 const CyclePhasePill = dynamic(() => import('@/components/client/cycle/CyclePhasePill'), { ssr: false })
 import ClientAlternativesSheet from '@/components/client/ClientAlternativesSheet'
+import ExerciseLibrarySheet from '@/components/client/ExerciseLibrarySheet'
 import type { SetRecommendation } from '@/lib/training/setRecommendation'
 import type { HistoryReferenceSelection } from '@/lib/training/historyReference'
 import { getCatalogEntryByName } from '@/lib/programs/intelligence/catalog-utils'
-import { getExerciseHistoryEntries } from '@/lib/training/exerciseHistoryKey'
+import { getExerciseHistoryEntries, resolveCanonicalExerciseKey } from '@/lib/training/exerciseHistoryKey'
 import {
   averagePlannedReps,
   buildWorkoutCoachingCues,
@@ -36,12 +37,15 @@ import type { PlannedSetType, SetPrescription } from '@/lib/programs/setPrescrip
 import TempoGuideModal from '@/components/client/TempoGuideModal'
 import PrepTimeModal, { getPrepTime, hasPrepTimeConfigured, getHapticsEnabled } from '@/components/client/PrepTimeModal'
 import ExerciseBlock, { type ExerciseBlockExercise } from '@/components/client/smart/ExerciseBlock'
+import ExerciseNotesPanel from '@/components/client/smart/ExerciseNotesPanel'
+import TrainingCheckinSheet, { type TrainingCheckinValue } from '@/components/client/smart/TrainingCheckinSheet'
 import SupersetContextMenu from '@/components/client/smart/SupersetContextMenu'
 import useBodyScrollLock, { resetBodyScrollLock } from '@/components/client/useBodyScrollLock'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SetRowData, SetType } from '@/components/client/smart/SetRow'
 import { TRAINING_ACCENT } from '@/lib/nutrition/ui-colors'
 import { REST_END_BUFFER_SEC } from '@/lib/training/restMetrics'
+import { getExerciseLibraryMovementLabel } from '@/lib/i18n/exerciseLibraryLabels'
 
 type CatalogExercise = {
   id: string
@@ -72,10 +76,10 @@ type CustomExerciseDraft = {
 const catalog = exerciseCatalog as CatalogExercise[]
 const UUIDISH_NAME_RE = /^[0-9a-f]{8}(?:[ -][0-9a-f]{4}){3}[ -][0-9a-f]{12}$/i
 const LIBRARY_PAGE_SIZE = 24
-const REST_VISUAL_GREEN = TRAINING_ACCENT
 const REST_TOUCH_START_OFFSET_SEC = 5
 const REST_MODAL_REOPEN_MS = 10_000
 const REST_READY_BUFFER_MS = 5_000
+const SAVE_PROGRESS_DURATION_MS = 12_000
 const MOVEMENT_PATTERN_OPTIONS = [
   'horizontal_push',
   'vertical_push',
@@ -416,7 +420,8 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
   const [elapsed, setElapsed] = useState(0)
   const [saveProgress, setSaveProgress] = useState(0)
   const [exerciseNotes, setExerciseNotes] = useState<Record<string, string>>({})
-  const [showNoteInput, setShowNoteInput] = useState<string | null>(null)
+  const [openExercisePanel, setOpenExercisePanel] = useState<{ exerciseId: string; mode: 'personal' | 'coach' } | null>(null)
+  const [personalNotes, setPersonalNotes] = useState<Record<string, string>>({})
   const [swapTarget, setSwapTarget] = useState<string | null>(null)
   const [swappedExercises, setSwappedExercises] = useState<Record<string, ExerciseSwapOverride>>({})
   const [altSheetTarget, setAltSheetTarget] = useState<number | null>(null)
@@ -462,6 +467,8 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
   const [dissolvedGroupIds, setDissolvedGroupIds] = useState<Set<string>>(new Set())
   const [supersetMenuFor, setSupersetMenuFor] = useState<string | null>(null)
   const [showFinishConfirm, setShowFinishConfirm] = useState(false)
+  const [showPreCheckin, setShowPreCheckin] = useState(false)
+  const [showPostCheckin, setShowPostCheckin] = useState(false)
   const [showLibrary, setShowLibrary] = useState(false)
   const [showCustom, setShowCustom] = useState(false)
   const footerRef = useRef<HTMLDivElement>(null)
@@ -469,6 +476,7 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
 
   // ── Live save ──
   const sessionLogIdRef = useRef<string | null>(null)
+  const [sessionLogId, setSessionLogId] = useState<string | null>(null)
   const [draftReady, setDraftReady] = useState(false)
   const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const noteSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -519,6 +527,7 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
     showHydration ||
     prepTimeTarget !== null ||
     tempoGuideTarget !== null
+  const blockingOverlayRef = useRef(false)
 
   useEffect(() => {
     resetBodyScrollLock()
@@ -526,6 +535,11 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
       resetBodyScrollLock()
     }
   }, [])
+
+  useEffect(() => {
+    blockingOverlayRef.current = hasBlockingOverlay
+    if (hasBlockingOverlay) setRestModalOpen(false)
+  }, [hasBlockingOverlay])
 
   useEffect(() => {
     const handleFocusIn = (e: FocusEvent) => {
@@ -580,13 +594,15 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
 
   const restRemaining = restPrescribed !== null ? restPrescribed - restElapsed : null
   const isOvertime = restRemaining !== null && restRemaining < 0
-  const overtimeLabel = isOvertime ? formatTime(restRemaining!) : null
+  const overtimeSeconds = isOvertime ? Math.abs(restRemaining ?? 0) : 0
+  const overtimeLabel = isOvertime ? `+${formatTime(overtimeSeconds)}` : null
+  const overtimeToneClass = overtimeSeconds > 10 ? 'text-[#b84040]' : 'text-[#f2a03d]'
+  const overtimeSurfaceClass = overtimeSeconds > 10
+    ? 'bg-[#b84040]/10 text-[#b84040]'
+    : 'bg-[#f2a03d]/10 text-[#f2a03d]'
   const isRestBlinking = restRemaining !== null && restRemaining > 0 && restRemaining <= 5
-  const restProgress = restPrescribed !== null && restPrescribed > 0
-    ? Math.max(0, Math.min(restElapsed / restPrescribed, 1))
-    : 0
-  const restVisualColor = REST_VISUAL_GREEN
-  const restOverlayOpacity = isOvertime ? 0.36 : 0.14 + restProgress * 0.42
+  const effectiveRestPrescribed = restPrescribed && restPrescribed > 0 ? restPrescribed : 60
+  const restProgress = Math.max(0, Math.min(restElapsed / effectiveRestPrescribed, 1))
 
   // ── Exercise groups ──
   const exerciseGroups: Exercise[][] = useMemo(() => {
@@ -604,6 +620,11 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
     }
     return groups
   }, [sessionExercises])
+
+  useEffect(() => {
+    if (!sessionLogId || localStorage.getItem(`training-checkin-pre:${sessionLogId}`)) return
+    setShowPreCheckin(true)
+  }, [sessionLogId])
 
   function shouldStartRestAfterSet(
     exId: string,
@@ -658,27 +679,29 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
   }
 
   // ── Recommendation engine ──
-  const triggerRecommendation = useCallback((completedSet: SetLog) => {
-    setSets(prev => {
-      const result = recommendFollowingWorkoutSet({
-        completedSet,
-        sets: prev,
-        exercises: sessionExercises,
-        historyIndex: lastPerformance,
-        goal,
-        level,
-        manuallyEdited,
-        resolveTargetRir: (exercise, setNumber) => resolveExerciseTargetRir(exercise as Exercise, setNumber),
-      })
+  const refreshFollowingRecommendation = useCallback((currentSets: SetLog[], completedSet: SetLog) => {
+    const result = recommendFollowingWorkoutSet({
+      completedSet,
+      sets: currentSets,
+      exercises: sessionExercises,
+      historyIndex: lastPerformance,
+      goal,
+      level,
+      manuallyEdited,
+      resolveTargetRir: (exercise, setNumber) => resolveExerciseTargetRir(exercise as Exercise, setNumber),
+    })
 
-      if (!result) return prev
-      setRecommendations(r => ({ ...r, [result.nextKey]: result.recommendation }))
-      return prev.map(s => {
-        if (s.exercise_id === completedSet.exercise_id && s.set_number === result.nextSet.set_number && s.side === completedSet.side) {
-          return { ...s, actual_weight_kg: formatWeight(result.recommendation.weight_kg), actual_reps: String(result.recommendation.reps) }
+    if (!result) return currentSets
+    setRecommendations(previous => ({ ...previous, [result.nextKey]: result.recommendation }))
+    return currentSets.map(set => {
+      if (set.exercise_id === completedSet.exercise_id && set.set_number === result.nextSet.set_number && set.side === completedSet.side) {
+        return {
+          ...set,
+          actual_weight_kg: formatWeight(result.recommendation.weight_kg),
+          actual_reps: String(result.recommendation.reps),
         }
-        return s
-      })
+      }
+      return set
     })
   }, [sessionExercises, lastPerformance, goal, level, manuallyEdited])
 
@@ -769,6 +792,7 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
               })
             }
             sessionLogIdRef.current = existingId
+            setSessionLogId(existingId)
             setDraftReady(true)
             return
           }
@@ -793,6 +817,7 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
           const newId = data?.session_log?.id
           if (newId) {
             sessionLogIdRef.current = newId
+            setSessionLogId(newId)
             localStorage.setItem(DRAFT_KEY, newId)
           }
         }
@@ -803,6 +828,19 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const exerciseKeys = [...new Set(sessionExercises.map((exercise) => resolveCanonicalExerciseKey(exercise.name)))]
+    if (exerciseKeys.length === 0) return
+
+    fetch(`/api/client/exercise-notes?exercise_keys=${encodeURIComponent(exerciseKeys.join(','))}`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (!data?.notes) return
+        setPersonalNotes(Object.fromEntries(data.notes.map((note: { exercise_key: string; body: string }) => [note.exercise_key, note.body])))
+      })
+      .catch(() => {})
+  }, [sessionExercises])
 
   useEffect(() => {
     return () => { if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current) }
@@ -850,72 +888,20 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
       setSaveProgress(0)
       return
     }
-    const duration = 6000 // 6 secondes
     const start = Date.now()
     const interval = setInterval(() => {
       const elapsedSave = Date.now() - start
-      const pct = Math.min(Math.round((elapsedSave / duration) * 99), 99)
+      const pct = Math.min(Math.round((elapsedSave / SAVE_PROGRESS_DURATION_MS) * 99), 99)
       setSaveProgress(pct)
     }, 50)
     return () => clearInterval(interval)
   }, [saveState])
 
   useEffect(() => {
+    // Rest ending soon notifications disabled per user preference
     if (restNotificationTimeoutRef.current) clearTimeout(restNotificationTimeoutRef.current)
-
-    if (restStartedAt === null || restPrescribed === null || !pendingRestSet || !activeSetKey) {
-      restNotificationKeyRef.current = null
-      return
-    }
-
-    const notificationKey = `${restStartedAt}:${restPrescribed}:${activeSetKey}`
-    if (restNotificationKeyRef.current === notificationKey) return
-
-    const upcomingSet = sets.find((set) => recKey(set.exercise_id, set.set_number, set.side) === activeSetKey)
-    const upcomingExercise = upcomingSet
-      ? sessionExercises.find((exercise) => exercise.id === upcomingSet.exercise_id)
-      : null
-    if (!upcomingSet || !upcomingExercise) return
-
-    const recommendation = recommendations[activeSetKey]
-    const historyReference = historyReferences[activeSetKey] ?? null
-    const reps = recommendation
-      ? String(recommendation.reps)
-      : historyReference
-        ? String(historyReference.reps)
-        : upcomingSet.planned_reps || '—'
-    const weight = recommendation
-      ? `${recommendation.weight_kg} kg`
-      : historyReference
-        ? `${historyReference.weight} kg`
-        : upcomingSet.actual_weight_kg
-          ? `${upcomingSet.actual_weight_kg} kg`
-          : '—'
-    const delayMs = restStartedAt + Math.max(0, restPrescribed - 5) * 1000 - Date.now()
-    const notify = () => {
-      void showRestEndingSoonNotification({
-        title: t('logger.rest.notification.title'),
-        body: t('logger.rest.notification.body', {
-          exercise: displayNameForExercise(upcomingExercise, swappedExercises),
-          set: upcomingSet.set_number,
-          reps,
-          weight,
-        }),
-        url: window.location.pathname,
-      })
-    }
-
-    restNotificationKeyRef.current = notificationKey
-    if (delayMs <= 0) {
-      notify()
-      return
-    }
-
-    restNotificationTimeoutRef.current = setTimeout(notify, delayMs)
-    return () => {
-      if (restNotificationTimeoutRef.current) clearTimeout(restNotificationTimeoutRef.current)
-    }
-  }, [activeSetKey, pendingRestSet, restPrescribed, restStartedAt, sessionExercises, t])
+    restNotificationKeyRef.current = null
+  }, [activeSetKey, pendingRestSet, restPrescribed, restStartedAt])
 
   // ── Hydratation timer ──
   useEffect(() => {
@@ -975,6 +961,10 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
     if (inactivityRef.current) clearTimeout(inactivityRef.current)
     inactivityRef.current = setTimeout(() => {
       if (Date.now() < restSuppressUiUntilRef.current) return
+      if (blockingOverlayRef.current) {
+        scheduleModalOpen(1000)
+        return
+      }
       if (!activeInputRef.current) setRestModalOpen(true)
       else scheduleModalOpen(delayMs)
     }, delayMs)
@@ -1008,7 +998,8 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
     setRestStartedAt(Date.now())
     setRestElapsed(0)
     setPendingRestSet({ exId, setNum, side })
-    setRestModalOpen(true)
+    if (blockingOverlayRef.current) scheduleModalOpen(1000)
+    else setRestModalOpen(true)
   }
 
   function dismissRestModal(delayMs: number) {
@@ -1074,6 +1065,9 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
       if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current)
       const exSetsUpdated = next.filter(s => s.exercise_id === exId)
       saveDebounceRef.current = setTimeout(() => { patchSets(exSetsUpdated) }, 800)
+      if (updated?.completed && (patch.actual_reps !== undefined || patch.actual_weight_kg !== undefined || patch.rir_actual !== undefined)) {
+        return refreshFollowingRecommendation(next, updated)
+      }
       return next
     })
     // Mark manual edit if reps/weight changed
@@ -1143,27 +1137,29 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
 
       // Use confirmed values for PR detection and recommendation
       const confirmedCurrent = next.find(s => s.exercise_id === exId && s.set_number === setNum && s.side === side)
-      if (!wasCompleted && confirmedCurrent) {
-        triggerRecommendation(confirmedCurrent)
+      if (confirmedCurrent) {
         // PR detection
-        const exHistory = getExerciseHistoryEntries(lastPerformance, confirmedCurrent.exercise_name)
-        const historyBest = exHistory.reduce((best, h) => {
-          if (h.weight === null || h.reps === null) return best
-          return h.weight > (best?.weight ?? 0) ? h : best
-        }, null as LastPerf | null)
-        const confirmedReps = parseInt(confirmedCurrent.actual_reps, 10)
-        const confirmedWeight = parseFloat(confirmedCurrent.actual_weight_kg)
-        if (!isNaN(confirmedReps) && !isNaN(confirmedWeight) && confirmedWeight > 0 && confirmedReps > 0) {
-          const isNewPR = !historyBest ||
-            confirmedWeight > (historyBest.weight ?? 0) ||
-            (confirmedWeight === historyBest.weight && confirmedReps > (historyBest.reps ?? 0))
-          if (isNewPR) {
-            const key = recKey(confirmedCurrent.exercise_id, confirmedCurrent.set_number, confirmedCurrent.side)
-            setPrSets(prev => new Set(prev).add(key))
-            setPrFlash(t('logger.pr.new', { weight: formatWeight(confirmedWeight), reps: String(confirmedReps) }))
-            setTimeout(() => setPrFlash(null), 3000)
+        if (!wasCompleted) {
+          const exHistory = getExerciseHistoryEntries(lastPerformance, confirmedCurrent.exercise_name)
+          const historyBest = exHistory.reduce((best, h) => {
+            if (h.weight === null || h.reps === null) return best
+            return h.weight > (best?.weight ?? 0) ? h : best
+          }, null as LastPerf | null)
+          const confirmedReps = parseInt(confirmedCurrent.actual_reps, 10)
+          const confirmedWeight = parseFloat(confirmedCurrent.actual_weight_kg)
+          if (!isNaN(confirmedReps) && !isNaN(confirmedWeight) && confirmedWeight > 0 && confirmedReps > 0) {
+            const isNewPR = !historyBest ||
+              confirmedWeight > (historyBest.weight ?? 0) ||
+              (confirmedWeight === historyBest.weight && confirmedReps > (historyBest.reps ?? 0))
+            if (isNewPR) {
+              const key = recKey(confirmedCurrent.exercise_id, confirmedCurrent.set_number, confirmedCurrent.side)
+              setPrSets(prev => new Set(prev).add(key))
+              setPrFlash(t('logger.pr.new', { weight: formatWeight(confirmedWeight), reps: String(confirmedReps) }))
+              setTimeout(() => setPrFlash(null), 3000)
+            }
           }
         }
+        return refreshFollowingRecommendation(next, confirmedCurrent)
       }
       return next
     })
@@ -1254,7 +1250,9 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
 
   async function createCatalogExercise(entry: CatalogExercise) {
     const exerciseName = resolveCatalogDisplayName(entry) ?? entry.name
-    if (sessionExercises.some((exercise) => exercise.name === exerciseName)) return
+    if (sessionExercises.some((exercise) => exercise.name === exerciseName)) {
+      throw new Error('Cet exercice est déjà dans la séance.')
+    }
 
     await createProgrammeExercise({
       name: exerciseName,
@@ -1282,7 +1280,7 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
 
   // ── Long press Terminer ──
   function onFinishPressStart() {
-    if (allDone) { submitSession(); return }
+    if (allDone) { setShowPostCheckin(true); return }
     longPressStartRef.current = Date.now()
     longPressRef.current = setInterval(() => {
       const e = Date.now() - (longPressStartRef.current ?? Date.now())
@@ -1294,6 +1292,30 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
         setShowFinishConfirm(true)
       }
     }, 16)
+  }
+
+  async function saveTrainingCheckin(value: TrainingCheckinValue) {
+    const logId = sessionLogIdRef.current
+    if (!logId) return
+    const response = await fetch('/api/client/training-checkins', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_log_id: logId,
+        phase: value.phase,
+        ...(value.phase === 'pre' ? { readiness: value.score } : { exertion: value.score }),
+        discomfort_level: value.discomfortLevel,
+        discomfort_area: value.discomfortArea || null,
+      }),
+    })
+    if (!response.ok) throw new Error('Impossible d’enregistrer le ressenti')
+    if (value.phase === 'pre') {
+      localStorage.setItem(`training-checkin-pre:${logId}`, '1')
+      setShowPreCheckin(false)
+    } else {
+      setShowPostCheckin(false)
+      void submitSession()
+    }
   }
 
   function onFinishPressEnd() {
@@ -1352,8 +1374,8 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
       }
 
       const elapsedSave = Date.now() - submitStartTime
-      if (elapsedSave < 6000) {
-        await new Promise(resolve => setTimeout(resolve, 6000 - elapsedSave))
+      if (elapsedSave < SAVE_PROGRESS_DURATION_MS) {
+        await new Promise(resolve => setTimeout(resolve, SAVE_PROGRESS_DURATION_MS - elapsedSave))
       }
       setSaveProgress(100)
       await new Promise(resolve => setTimeout(resolve, 300))
@@ -1390,8 +1412,8 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
         pointsEarned = Number(completeData?.points_earned ?? 0)
 
         const elapsedSave = Date.now() - submitStartTime
-        if (elapsedSave < 6000) {
-          await new Promise(resolve => setTimeout(resolve, 6000 - elapsedSave))
+        if (elapsedSave < SAVE_PROGRESS_DURATION_MS) {
+          await new Promise(resolve => setTimeout(resolve, SAVE_PROGRESS_DURATION_MS - elapsedSave))
         }
         setSaveProgress(100)
         await new Promise(resolve => setTimeout(resolve, 300))
@@ -1447,7 +1469,7 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
 
   if (sessionExercises.length === 0) {
     return (
-      <div className="min-h-dvh bg-[#0d0d0d] flex items-center justify-center overflow-x-hidden">
+      <div className="min-h-dvh bg-[#121212] flex items-center justify-center overflow-x-hidden">
         <p className="text-white/40 text-sm">{t('logger.noExercises')}</p>
       </div>
     )
@@ -1456,10 +1478,10 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-dvh bg-[#0d0d0d] font-barlow overflow-x-hidden">
+    <div className="min-h-dvh bg-[#121212] font-barlow overflow-x-hidden">
       {/* ── Header fixe ── */}
       <header
-        className="fixed inset-x-0 top-0 z-40 bg-[#0d0d0d]"
+        className="fixed inset-x-0 top-0 z-40 bg-[#0a0a0a] border-b border-white/[0.04]"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <div className="flex items-center justify-between px-4 py-3">
@@ -1502,7 +1524,7 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
                   if (Date.now() < restSuppressUiUntilRef.current) return
                   setRestModalOpen(true)
                 }}
-                className="flex items-center gap-1 rounded-lg bg-red-500/10 px-2 py-0.5 text-[10px] font-mono font-bold text-red-400 animate-pulse"
+                className={`flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-mono font-bold ${overtimeSurfaceClass}`}
               >
                 {overtimeLabel}
               </button>
@@ -1627,26 +1649,24 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
                             const exerciseForRest = sessionExercises.find((exercise) => exercise.id === exId)
                             startRest(exId, 0, 'bilateral', exerciseForRest?.rest_sec ?? null)
                           }}
-                          onNote={exId => setShowNoteInput(prev => prev === exId ? null : exId)}
+                          onNote={exId => setOpenExercisePanel((previous) => previous?.exerciseId === exId && previous.mode === 'personal' ? null : { exerciseId: exId, mode: 'personal' })}
+                          onComment={exId => setOpenExercisePanel((previous) => previous?.exerciseId === exId && previous.mode === 'coach' ? null : { exerciseId: exId, mode: 'coach' })}
                           onTempo={handleTempoForSet}
                           onDeleteExercise={exId => setDeletedExerciseIds(prev => new Set(prev).add(exId))}
                           onOpenProgression={(exId, name) => setProgressionTarget({ exId, name })}
                         />
-                        {/* Note inline */}
-                        {showNoteInput === ex.id && (
+                        {openExercisePanel?.exerciseId === ex.id ? (
                           <div className="px-3 pb-3">
-                            <textarea
-                              autoFocus
-                              rows={2}
-                              value={exerciseNotes[ex.id] ?? ''}
-                              onFocus={() => { activeInputRef.current = true }}
-                              onBlur={() => { activeInputRef.current = false }}
-                              onChange={e => setExerciseNotes(prev => ({ ...prev, [ex.id]: e.target.value }))}
-                              placeholder={t('logger.note.placeholder')}
-                              className="w-full bg-white/[0.03] rounded-xl px-3 py-2 text-[12px] text-white/80 placeholder:text-white/20 outline-none resize-none"
+                            <ExerciseNotesPanel
+                              mode={openExercisePanel.mode}
+                              exerciseKey={resolveCanonicalExerciseKey(ex.name)}
+                              exerciseName={ex.name}
+                              programExerciseId={ex.id}
+                              sessionLogId={sessionLogId}
+                              initialPersonalNote={personalNotes[resolveCanonicalExerciseKey(ex.name)]}
                             />
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     ))}
                 </div>
@@ -1676,26 +1696,22 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
                       const exerciseForRest = sessionExercises.find((exercise) => exercise.id === exId)
                       startRest(exId, 0, 'bilateral', exerciseForRest?.rest_sec ?? null)
                     }}
-                    onNote={exId => setShowNoteInput(prev => prev === exId ? null : exId)}
+                    onNote={exId => setOpenExercisePanel((previous) => previous?.exerciseId === exId && previous.mode === 'personal' ? null : { exerciseId: exId, mode: 'personal' })}
+                    onComment={exId => setOpenExercisePanel((previous) => previous?.exerciseId === exId && previous.mode === 'coach' ? null : { exerciseId: exId, mode: 'coach' })}
                     onTempo={handleTempoForSet}
                     onDeleteExercise={exId => setDeletedExerciseIds(prev => new Set(prev).add(exId))}
                     onOpenProgression={(exId, name) => setProgressionTarget({ exId, name })}
                   />
-                  {/* Note inline */}
-                  {showNoteInput === ex.id && (
-                    <div className="mt-1 px-1">
-                      <textarea
-                        autoFocus
-                        rows={2}
-                        value={exerciseNotes[ex.id] ?? ''}
-                        onFocus={() => { activeInputRef.current = true }}
-                        onBlur={() => { activeInputRef.current = false }}
-                        onChange={e => setExerciseNotes(prev => ({ ...prev, [ex.id]: e.target.value }))}
-                        placeholder={t('logger.note.placeholder')}
-                        className="w-full bg-white/[0.03] rounded-xl px-3 py-2 text-[12px] text-white/80 placeholder:text-white/20 outline-none resize-none"
-                      />
-                    </div>
-                  )}
+                  {openExercisePanel?.exerciseId === ex.id ? (
+                    <ExerciseNotesPanel
+                      mode={openExercisePanel.mode}
+                      exerciseKey={resolveCanonicalExerciseKey(ex.name)}
+                      exerciseName={ex.name}
+                      programExerciseId={ex.id}
+                      sessionLogId={sessionLogId}
+                      initialPersonalNote={personalNotes[resolveCanonicalExerciseKey(ex.name)]}
+                    />
+                  ) : null}
                 </div>
               ))
           })}
@@ -1791,17 +1807,13 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
       ) : null}
 
       {showLibrary ? (
-        <LibrarySheet
+        <ExerciseLibrarySheet
           onClose={() => setShowLibrary(false)}
           onCreateCustom={() => {
             setShowLibrary(false)
             setShowCustom(true)
           }}
-          onSelect={(entry) => {
-            void createCatalogExercise(entry)
-              .then(() => setShowLibrary(false))
-              .catch((error) => setErrorMsg(error instanceof Error ? error.message : t('common.unknownError')))
-          }}
+          onSelect={createCatalogExercise}
         />
       ) : null}
 
@@ -1981,26 +1993,18 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
       })()}
 
       {/* ── Rest modal ── */}
-      {restModalOpen && restStartedAt !== null && (() => {
+      {restModalOpen && restStartedAt !== null && !hasBlockingOverlay && (() => {
         const upcoming = resolveUpcomingRestTarget()
-        const timeDisplay = restPrescribed !== null ? formatTime(restPrescribed - restElapsed) : formatTime(restElapsed)
+        const timeDisplay = isOvertime
+          ? `+${formatTime(overtimeSeconds)}`
+          : restPrescribed !== null
+            ? formatTime(restPrescribed - restElapsed)
+            : formatTime(restElapsed)
 
         return (
           <div className="fixed inset-0 z-[100] overflow-hidden bg-[#080808] isolate">
-            {/* Jauge de récupération montante, couleur verte plate et flash (sans transparence) - z-0 pour rester sous le texte */}
-            {/* -bottom-8 et +6rem pour déborder sous l'indicateur d'accueil iOS (Home Indicator) et au-dessus de la barre de statut (Notch / Dynamic Island) */}
-            <motion.div
-              className="absolute inset-x-0 bottom-0 pointer-events-none z-0"
-              style={{
-                backgroundColor: restVisualColor,
-                top: 0,
-                transformOrigin: 'bottom',
-                scaleY: isOvertime ? 1 : restProgress,
-              }}
-              transition={{
-                scaleY: { duration: 1, ease: 'linear' },
-              }}
-            />
+            {/* Ambient green glow header overlay so screen is immediately green-tinted on mount */}
+            <div className="absolute inset-0 bg-gradient-to-b from-[#1f8a65]/25 via-transparent to-transparent pointer-events-none z-0" />
 
             <div
               className="relative z-10 flex min-h-dvh w-full flex-col items-center justify-between px-5 text-center"
@@ -2011,7 +2015,7 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
               }}
             >
               {/* Header avec bouton fermer pour éviter le positionnement absolu conflictuel */}
-              <div className="w-full flex justify-end">
+              <div className="w-full flex justify-end pt-3">
                 <button
                   onClick={() => dismissRestModal(REST_MODAL_REOPEN_MS)}
                   className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#111111] border border-white/[0.04] text-white/50 hover:text-white active:scale-95 transition-transform"
@@ -2031,9 +2035,10 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
                   </p>
 
                   {/* Chrono — agrandi */}
-                  <p className="mt-2.5 text-[6.5rem] font-barlow-condensed font-black leading-[0.85] tracking-tight tabular-nums text-white">
+                  <p className={`mt-2.5 text-[6.5rem] font-barlow-condensed font-black leading-[0.85] tracking-tight tabular-nums ${isOvertime ? overtimeToneClass : 'text-white'}`}>
                     {timeDisplay}
                   </p>
+
                 </div>
 
                 {/* Carte prochaine série */}
@@ -2160,9 +2165,17 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
                 {/* CTA Prêt — principal avec fond opaque gris sombre et texte blanc pur */}
                 <button
                   onClick={markRestReady}
-                  className="w-full h-24 rounded-2xl bg-[#111111] border border-white/[0.04] text-white text-[17px] font-barlow-condensed font-black uppercase tracking-[0.18em] active:scale-[0.98] transition-all hover:border-white/10 flex items-center justify-center"
+                  className="relative flex h-24 w-full items-center justify-center overflow-hidden rounded-2xl border border-white/[0.04] bg-[#111111] text-[17px] font-barlow-condensed font-black uppercase tracking-[0.18em] text-white transition-all hover:border-white/10 active:scale-[0.98]"
                 >
-                  {t('logger.action.ready')}
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-y-0 left-0 transition-[width,background-color] duration-[1000ms] ease-linear"
+                    style={{
+                      width: `${isOvertime ? 100 : restProgress * 100}%`,
+                      backgroundColor: '#1f8a65',
+                    }}
+                  />
+                  <span className="relative z-10">{t('logger.action.ready')}</span>
                 </button>
 
                 {/* Passer le repos — secondaire, texte seul blanc pur sans fond */}
@@ -2191,7 +2204,7 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
                 {t('logger.finish.cancel')}
               </button>
               <button
-                onClick={() => { setShowFinishConfirm(false); submitSession() }}
+                onClick={() => { setShowFinishConfirm(false); setShowPostCheckin(true) }}
                 disabled={saveState === 'saving'}
                 className="flex-1 py-2.5 rounded-xl bg-[#f2f2f2] text-[#080808] text-[13px] font-bold uppercase hover:bg-[#e0e0e0] disabled:opacity-50 transition-colors"
               >
@@ -2201,6 +2214,18 @@ export default function SessionLogger({ clientId, sessionId, session, exercises,
           </div>
         </div>
       )}
+
+      {showPreCheckin ? <TrainingCheckinSheet phase="pre" onSubmit={saveTrainingCheckin} onClose={() => setShowPreCheckin(false)} /> : null}
+      {showPostCheckin ? (
+        <TrainingCheckinSheet
+          phase="post"
+          onSubmit={saveTrainingCheckin}
+          onClose={() => {
+            setShowPostCheckin(false)
+            void submitSession()
+          }}
+        />
+      ) : null}
 
       {/* ── Prep time modal ── */}
       {prepTimeTarget && (
@@ -2346,7 +2371,7 @@ function LibrarySheet({
   onSelect: (exercise: CatalogExercise) => void
   onCreateCustom: () => void
 }) {
-  const { t } = useClientT()
+  const { lang, t } = useClientT()
   const [search, setSearch] = useState('')
   const [muscleGroup, setMuscleGroup] = useState('')
   const [movementPattern, setMovementPattern] = useState('')
@@ -2519,7 +2544,7 @@ function CustomExerciseSheet({
           <TextField label={t('logger.field.muscleGroup')} value={draft.muscleGroup} onChange={(value) => setDraft((prev) => ({ ...prev, muscleGroup: value }))} placeholder={t('logger.placeholder.back')} />
           <SelectField label={t('logger.field.movementType')} value={draft.movementPattern} onChange={(value) => setDraft((prev) => ({ ...prev, movementPattern: value }))}>
             <option value="">{t('logger.field.select')}</option>
-            {MOVEMENT_PATTERN_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            {MOVEMENT_PATTERN_OPTIONS.map((option) => <option key={option} value={option}>{getExerciseLibraryMovementLabel(option, lang)}</option>)}
           </SelectField>
           <TextField label={t('logger.field.equipment')} value={draft.equipment} onChange={(value) => setDraft((prev) => ({ ...prev, equipment: value }))} placeholder={t('logger.placeholder.equipment')} />
           <TextField label={t('logger.field.primaryMuscles')} value={draft.primaryMuscles} onChange={(value) => setDraft((prev) => ({ ...prev, primaryMuscles: value }))} placeholder={t('logger.placeholder.primaryMuscles')} />

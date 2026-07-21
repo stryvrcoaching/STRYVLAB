@@ -150,7 +150,7 @@ describe('computeTransformationScore', () => {
       },
     }))
     expect(result.analysisState).toBe('insufficient_data')
-    expect(result.analysisStateReason).toContain('aucun check-in coach')
+    expect(result.analysisStateReason).toContain('aucun check-in')
     expect(result.analysisStateReason).toContain('aucune séance loggée')
     expect(result.analysisStateReason).toContain('aucun bilan corporel')
   })
@@ -232,7 +232,7 @@ describe('computeTransformationScore', () => {
     }))
 
     expect(result.dimensions.performance.score).toBeGreaterThan(70)
-    expect(result.dimensions.performance.explanation).toContain('événements de surcharge')
+    expect(result.dimensions.performance.explanation).toContain('progressions de charge')
     expect(result.dimensions.performance.metrics?.some((metric) => metric.label === 'Exercices avec événement de surcharge')).toBe(true)
     expect(result.dimensions.performance.metrics?.some((metric) => metric.label === 'Règle de surcharge suivie')).toBe(true)
   })

@@ -43,7 +43,7 @@ export default function ClientTopBarLeft({ pageLabel, client }: ClientTopBarLeft
   return (
     <div className="flex items-center gap-3 min-w-0">
       {/* Avatar — photo ou initiales */}
-      <div className="w-9 h-9 rounded-xl bg-[#1f8a65]/10 border-[0.3px] border-[#1f8a65]/20 flex items-center justify-center shrink-0 overflow-hidden">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/[0.06]">
         {client.profile_photo_url ? (
           <Image
             src={client.profile_photo_url}
@@ -54,7 +54,7 @@ export default function ClientTopBarLeft({ pageLabel, client }: ClientTopBarLeft
             unoptimized
           />
         ) : (
-          <span className="text-[12px] font-bold text-[#1f8a65]">{initials}</span>
+          <span className="text-[12px] font-bold text-white/85">{initials}</span>
         )}
       </div>
 

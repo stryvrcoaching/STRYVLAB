@@ -208,8 +208,13 @@ export default function AssessmentsPage() {
                     {t.is_default && (
                       <Star
                         size={13}
-                        className="text-amber-500 fill-amber-500 shrink-0"
+                        className="text-[#1f8a65] fill-[#1f8a65] shrink-0"
                       />
+                    )}
+                    {t.system_key && (
+                      <span className="rounded-full bg-[#1f8a65]/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[#1f8a65]">
+                        Recommandé par STRYV
+                      </span>
                     )}
                     <span className="text-[10px] bg-white/[0.04] rounded-full px-2 py-0.5 text-white/60">
                       {t.template_type}
@@ -240,23 +245,27 @@ export default function AssessmentsPage() {
                   >
                     <Copy size={14} />
                   </button>
-                  <button
-                    onClick={() =>
-                      router.push(`/coach/assessments/templates/${t.id}/edit`)
-                    }
-                    className="w-9 h-9 rounded-lg bg-white/[0.03] border-button flex items-center justify-center text-white/55 hover:text-[#1f8a65] transition-colors"
-                    title="Modifier"
-                  >
-                    <Edit3 size={15} />
-                  </button>
-                  <button
-                    onClick={() => setDeleteTarget({ id: t.id, name: t.name })}
-                    disabled={deleting === t.id}
-                    className="w-9 h-9 rounded-lg bg-white/[0.03] border-button flex items-center justify-center text-white/55 hover:text-red-500 transition-colors disabled:opacity-40"
-                    title="Supprimer"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  {!t.system_key && (
+                    <>
+                      <button
+                        onClick={() =>
+                          router.push(`/coach/assessments/templates/${t.id}/edit`)
+                        }
+                        className="w-9 h-9 rounded-lg bg-white/[0.03] border-button flex items-center justify-center text-white/55 hover:text-[#1f8a65] transition-colors"
+                        title="Modifier"
+                      >
+                        <Edit3 size={15} />
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget({ id: t.id, name: t.name })}
+                        disabled={deleting === t.id}
+                        className="w-9 h-9 rounded-lg bg-white/[0.03] border-button flex items-center justify-center text-white/55 hover:text-red-500 transition-colors disabled:opacity-40"
+                        title="Supprimer"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}

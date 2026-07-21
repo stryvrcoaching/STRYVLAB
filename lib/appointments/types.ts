@@ -134,7 +134,7 @@ export interface UpdateAppointmentPayload {
 // ─── Payload réponse client ───────────────────────────────────────────────────
 
 export interface RespondAppointmentPayload {
-  action: 'confirm' | 'request_reschedule'
+  action: 'confirm' | 'request_reschedule' | 'cancel'
   reason?: string
 }
 
@@ -148,26 +148,26 @@ export function appointmentDurationMinutes(appt: Pick<CoachingAppointment, 'star
 }
 
 /** Libellé court de la modalité */
-export function meetingKindLabel(kind: MeetingKind, lang: 'fr' | 'en' = 'fr'): string {
-  const labels: Record<MeetingKind, Record<'fr' | 'en', string>> = {
-    video:      { fr: 'Visioconférence', en: 'Video call' },
-    phone:      { fr: 'Téléphone',       en: 'Phone call' },
-    in_person:  { fr: 'Présentiel',      en: 'In person'  },
-    other:      { fr: 'Autre',           en: 'Other'      },
+export function meetingKindLabel(kind: MeetingKind, lang: 'fr' | 'en' | 'es' = 'fr'): string {
+  const labels: Record<MeetingKind, Record<'fr' | 'en' | 'es', string>> = {
+    video:      { fr: 'Visioconférence', en: 'Video call', es: 'Videollamada' },
+    phone:      { fr: 'Téléphone',       en: 'Phone call', es: 'Llamada telefónica' },
+    in_person:  { fr: 'Présentiel',      en: 'In person', es: 'Presencial' },
+    other:      { fr: 'Autre',           en: 'Other', es: 'Otro' },
   }
   return labels[kind]?.[lang] ?? kind
 }
 
 /** Libellé court du statut */
-export function appointmentStatusLabel(status: AppointmentStatus, lang: 'fr' | 'en' = 'fr'): string {
-  const labels: Record<AppointmentStatus, Record<'fr' | 'en', string>> = {
-    scheduled:              { fr: 'Planifié',             en: 'Scheduled'           },
-    awaiting_confirmation:  { fr: 'En attente de confirmation', en: 'Awaiting confirmation' },
-    confirmed:              { fr: 'Confirmé',             en: 'Confirmed'           },
-    reschedule_requested:   { fr: 'Report demandé',       en: 'Reschedule requested'},
-    cancelled:              { fr: 'Annulé',               en: 'Cancelled'           },
-    completed:              { fr: 'Réalisé',              en: 'Completed'           },
-    no_show:                { fr: 'Absent',               en: 'No show'             },
+export function appointmentStatusLabel(status: AppointmentStatus, lang: 'fr' | 'en' | 'es' = 'fr'): string {
+  const labels: Record<AppointmentStatus, Record<'fr' | 'en' | 'es', string>> = {
+    scheduled:              { fr: 'Planifié', en: 'Scheduled', es: 'Programada' },
+    awaiting_confirmation:  { fr: 'En attente de confirmation', en: 'Awaiting confirmation', es: 'Pendiente de confirmación' },
+    confirmed:              { fr: 'Confirmé', en: 'Confirmed', es: 'Confirmada' },
+    reschedule_requested:   { fr: 'Report demandé', en: 'Reschedule requested', es: 'Cambio de fecha solicitado' },
+    cancelled:              { fr: 'Annulé', en: 'Cancelled', es: 'Cancelada' },
+    completed:              { fr: 'Réalisé', en: 'Completed', es: 'Realizada' },
+    no_show:                { fr: 'Absent', en: 'No show', es: 'No se presentó' },
   }
   return labels[status]?.[lang] ?? status
 }
@@ -180,9 +180,20 @@ export function isUpcomingAppointment(appt: Pick<CoachingAppointment, 'starts_at
   )
 }
 
-/** Vrai si le client peut encore répondre */
+/** Vrai si le client peut encore répondre (confirmation requise) */
 export function canClientRespond(appt: Pick<CoachingAppointment, 'status'>): boolean {
   return appt.status === 'awaiting_confirmation'
+}
+
+/**
+ * Vrai si le client peut se désister (annuler) un appel encore à venir.
+ * Interdit pour les statuts terminaux.
+ */
+export function canClientCancel(
+  appt: Pick<CoachingAppointment, 'status' | 'starts_at'>,
+): boolean {
+  if (['cancelled', 'completed', 'no_show'].includes(appt.status)) return false
+  return new Date(appt.starts_at).getTime() > Date.now()
 }
 
 /** Valide une URL de réunion (HTTPS requis) */
@@ -222,4 +233,3 @@ export interface FreeSlot {
   start: string // ISO string
   end: string   // ISO string
 }
-

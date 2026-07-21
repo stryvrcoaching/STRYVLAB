@@ -27,6 +27,7 @@ export type ClientPushCopyKey =
   | 'progress.personal_record'
   | 'progress.gentle_reengagement'
   | 'payment.received'
+  | 'payment.reminder'
   | 'push.enabled'
   | 'generic.notification'
 
@@ -40,6 +41,9 @@ export type ClientPushCopyParams = {
   reps?: number | null
   remainingSessions?: number | null
   inactiveDays?: number | null
+  amount?: number | null
+  dueDate?: string | null
+  formulaName?: string | null
 }
 
 export type ClientPushCopy = {
@@ -546,6 +550,39 @@ const copy: Record<
     es: () => ({
       title: 'Pago confirmado',
       body: 'Tu pago se ha registrado.',
+    }),
+  },
+
+  'payment.reminder': {
+    fr: ({ amount, dueDate, formulaName }) => ({
+      title: 'Rappel de paiement',
+      body: [
+        formulaName ? `${formulaName}` : 'Ton accompagnement',
+        amount != null ? `· ${Number(amount).toFixed(0)} €` : null,
+        dueDate ? `· échéance ${dueDate}` : null,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    }),
+    en: ({ amount, dueDate, formulaName }) => ({
+      title: 'Payment reminder',
+      body: [
+        formulaName ? `${formulaName}` : 'Your coaching',
+        amount != null ? `· ${Number(amount).toFixed(0)} €` : null,
+        dueDate ? `· due ${dueDate}` : null,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    }),
+    es: ({ amount, dueDate, formulaName }) => ({
+      title: 'Recordatorio de pago',
+      body: [
+        formulaName ? `${formulaName}` : 'Tu coaching',
+        amount != null ? `· ${Number(amount).toFixed(0)} €` : null,
+        dueDate ? `· vence ${dueDate}` : null,
+      ]
+        .filter(Boolean)
+        .join(' '),
     }),
   },
 

@@ -18,7 +18,7 @@ export default function MetricsPage({ clientName, clientEmail, avatarInitials, a
   const { t, lang } = useClientT()
 
   return (
-    <div className="flex flex-col min-h-full bg-[#0d0d0d]">
+    <div className="flex flex-col min-h-full bg-[#121212]">
       {/* TopBar */}
       <div className="flex items-center justify-between px-4 pt-12 pb-3 shrink-0">
         <div>

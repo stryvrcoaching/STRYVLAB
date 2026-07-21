@@ -42,12 +42,18 @@ export async function POST(req: NextRequest, { params }: Params) {
   // Verify formula belongs to coach
   const { data: formula } = await serviceClient()
     .from('coach_formulas')
-    .select('id')
+    .select('id, billing_cycle')
     .eq('id', formula_id)
     .eq('coach_id', user.id)
     .single()
 
   if (!formula) return NextResponse.json({ error: 'Formule introuvable' }, { status: 404 })
+
+  const resolvedStart = start_date ?? new Date().toISOString().split('T')[0]
+  // Seed billing cursor so the daily dues cron can create pending payments
+  const resolvedNextBilling =
+    next_billing_date ??
+    (formula.billing_cycle === 'one_time' ? resolvedStart : resolvedStart)
 
   const { data, error } = await serviceClient()
     .from('client_subscriptions')
@@ -56,9 +62,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       client_id: params.clientId,
       formula_id,
       status: status ?? 'active',
-      start_date: start_date ?? new Date().toISOString().split('T')[0],
+      start_date: resolvedStart,
       end_date: end_date ?? null,
-      next_billing_date: next_billing_date ?? null,
+      next_billing_date: resolvedNextBilling,
       price_override_eur: price_override_eur ?? null,
       notes: notes ?? null,
     })

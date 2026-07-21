@@ -10,7 +10,8 @@ function serviceClient() {
 }
 
 // GET /api/assessments/templates/[templateId]
-export async function GET(_req: NextRequest, { params }: { params: { templateId: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ templateId: string }> }) {
+  const { templateId } = await params
   const supabase = createServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
@@ -20,7 +21,7 @@ export async function GET(_req: NextRequest, { params }: { params: { templateId:
   const { data, error } = await serviceClient()
     .from('assessment_templates')
     .select('*')
-    .eq('id', params.templateId)
+    .eq('id', templateId)
     .eq('coach_id', user.id)
     .single()
 
@@ -32,25 +33,44 @@ export async function GET(_req: NextRequest, { params }: { params: { templateId:
 }
 
 // PUT /api/assessments/templates/[templateId]
-export async function PUT(req: NextRequest, { params }: { params: { templateId: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ templateId: string }> }) {
+  const { templateId } = await params
   const supabase = createServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
+  const admin = serviceClient()
+  const { data: existing } = await admin
+    .from('assessment_templates')
+    .select('id, system_key')
+    .eq('id', templateId)
+    .eq('coach_id', user.id)
+    .maybeSingle()
+
+  if (!existing) {
+    return NextResponse.json({ error: 'Template introuvable' }, { status: 404 })
+  }
+  if (existing.system_key) {
+    return NextResponse.json(
+      { error: 'Dupliquez le template recommandé avant de le personnaliser.' },
+      { status: 409 },
+    )
+  }
+
   const body = await req.json()
 
   if (body.is_default) {
-    await serviceClient()
+    await admin
       .from('assessment_templates')
       .update({ is_default: false })
       .eq('coach_id', user.id)
       .eq('is_default', true)
-      .neq('id', params.templateId)
+      .neq('id', templateId)
   }
 
-  const { data, error } = await serviceClient()
+  const { data, error } = await admin
     .from('assessment_templates')
     .update({
       ...(body.name        && { name:          body.name.trim()        }),
@@ -59,7 +79,7 @@ export async function PUT(req: NextRequest, { params }: { params: { templateId: 
       ...(body.blocks      && { blocks:         body.blocks            }),
       ...(body.is_default  !== undefined && { is_default: body.is_default }),
     })
-    .eq('id', params.templateId)
+    .eq('id', templateId)
     .eq('coach_id', user.id)
     .select()
     .single()
@@ -73,7 +93,8 @@ export async function PUT(req: NextRequest, { params }: { params: { templateId: 
 }
 
 // POST /api/assessments/templates/[templateId]/duplicate — duplique le template
-export async function POST(_req: NextRequest, { params }: { params: { templateId: string } }) {
+export async function POST(_req: NextRequest, { params }: { params: Promise<{ templateId: string }> }) {
+  const { templateId } = await params
   const supabase = createServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
@@ -83,7 +104,7 @@ export async function POST(_req: NextRequest, { params }: { params: { templateId
   const { data: source, error: fetchError } = await serviceClient()
     .from('assessment_templates')
     .select('*')
-    .eq('id', params.templateId)
+    .eq('id', templateId)
     .eq('coach_id', user.id)
     .single()
 
@@ -100,6 +121,10 @@ export async function POST(_req: NextRequest, { params }: { params: { templateId
       template_type: source.template_type,
       blocks:        source.blocks,
       is_default:    false,
+      origin:         'coach',
+      system_key:     null,
+      system_version: null,
+      source_template_id: source.id,
     })
     .select()
     .single()
@@ -113,17 +138,36 @@ export async function POST(_req: NextRequest, { params }: { params: { templateId
 }
 
 // DELETE /api/assessments/templates/[templateId]
-export async function DELETE(_req: NextRequest, { params }: { params: { templateId: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ templateId: string }> }) {
+  const { templateId } = await params
   const supabase = createServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
-  const { error } = await serviceClient()
+  const admin = serviceClient()
+  const { data: existing } = await admin
+    .from('assessment_templates')
+    .select('id, system_key')
+    .eq('id', templateId)
+    .eq('coach_id', user.id)
+    .maybeSingle()
+
+  if (!existing) {
+    return NextResponse.json({ error: 'Template introuvable' }, { status: 404 })
+  }
+  if (existing.system_key) {
+    return NextResponse.json(
+      { error: 'Le template recommandé STRYV ne peut pas être supprimé.' },
+      { status: 409 },
+    )
+  }
+
+  const { error } = await admin
     .from('assessment_templates')
     .delete()
-    .eq('id', params.templateId)
+    .eq('id', templateId)
     .eq('coach_id', user.id)
 
   if (error) {

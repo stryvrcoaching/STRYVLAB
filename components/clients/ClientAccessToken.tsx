@@ -10,6 +10,8 @@ import { useRouter } from "next/navigation";
 import ActionFeedbackBadge from "@/components/ui/ActionFeedbackBadge";
 import useTimedActionFeedback from "@/components/ui/useTimedActionFeedback";
 import useActionRequest from "@/components/ui/useActionRequest";
+import { useCoachEntitlements } from "@/components/coach/useCoachEntitlements";
+import PlanUpgradeCard from "@/components/coach/PlanUpgradeCard";
 
 interface Props {
   clientId: string;
@@ -50,6 +52,7 @@ function GuideStep({
 
 export default function ClientAccessToken({ clientId, clientStatus, clientEmail, onStatusChange }: Props) {
   const router = useRouter();
+  const { entitlements, loading: entitlementsLoading } = useCoachEntitlements();
   const [status, setStatus] = useState(clientStatus);
 
   function updateStatus(next: string) {
@@ -186,6 +189,24 @@ export default function ClientAccessToken({ clientId, clientStatus, clientEmail,
 
   const isActive = status === "active";
   const isSuspended = status === "suspended";
+  const appEnabled = entitlements?.clientAppEnabled === true;
+  const blockedReason =
+    entitlements?.clientAppBlockedReason ??
+    "Disponible à partir du plan Pro — active l’app client STRYVR pour vos athlètes.";
+
+  if (!entitlementsLoading && !appEnabled) {
+    return (
+      <PlanUpgradeCard
+        title="Accès application STRYVR"
+        reason={blockedReason}
+        ctaLabel={
+          entitlements?.hasClientAppCapability
+            ? "Réactiver mon abonnement"
+            : "Passer en Pro"
+        }
+      />
+    );
+  }
 
   return (
     <>

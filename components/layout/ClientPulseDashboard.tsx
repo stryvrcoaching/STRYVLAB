@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Client Cockpit — decision seat while coaching one client.
+ * Vision & rules: docs/COCKPIT_PRODUCT_CHARTER.md
+ * Direction engine: lib/coach/cockpit-directions.ts
+ * UI order is fixed: Direction → legend → cycle → gauges → draft impact.
+ */
+
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
@@ -15,10 +22,18 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { calculateMacros } from "@/lib/formulas/macros";
 import { CLIENT_IMPACT_EVENT, type ClientImpactEventDetail } from "@/lib/coach/client-impact-events";
 import { buildCycleCockpitInsight } from "@/lib/coach/cycle-cockpit";
+import { computeCockpitSignals } from "@/lib/coach/cockpit-signals";
+import {
+  filterActiveDirections,
+  markDirectionTreated,
+  snoozeDirection,
+} from "@/lib/coach/cockpit-direction-dismiss";
+import type { GaugeState } from "@/lib/coach/cockpit-directions";
 import type { CycleState } from "@/lib/cycle/cycleEngine";
+import { CockpitDirectionsPanel } from "@/components/coach/CockpitDirectionsPanel";
+import CoachConversationSheet from "@/components/coach/CoachConversationSheet";
 
 type PulseData = {
   client: { first_name: string; last_name: string; profile_photo_url?: string | null; step_target?: number | null };
@@ -28,8 +43,6 @@ type PulseData = {
   performance: any | null;
   cycleState: CycleState | null;
 };
-
-type GaugeState = "aligné" | "à surveiller" | "à corriger" | "à compléter";
 
 const GAUGE_STATE: Record<GaugeState, { label: string; color: string; background: string }> = {
   "aligné": { label: "Aligné", color: "#7fe0b8", background: "rgba(31,138,101,0.16)" },
@@ -51,11 +64,6 @@ function initials(firstName?: string, lastName?: string) {
   return `${firstName?.[0] ?? ""}${lastName?.[0] ?? ""}`.toUpperCase() || "?";
 }
 
-function signed(value: number, suffix = "") {
-  if (!value) return `0${suffix}`;
-  return `${value > 0 ? "+" : ""}${Math.round(value)}${suffix}`;
-}
-
 function energyLabel(value: number | null) {
   if (value == null || Number.isNaN(value)) return "—";
   if (Math.abs(value) < 50) return "maintenance";
@@ -74,10 +82,13 @@ function GaugeCard({
   method,
   live = false,
   tolerance = 12,
+  /** Optional breakdown chips under the chart (e.g. NEAT · EAT) */
+  chips,
 }: {
   icon: typeof Activity;
   title: string;
   state: GaugeState;
+  /** 0–100 position on spectrum (or absolute fill for dual-bar mode) */
   reality: number | null;
   reference?: number | null;
   realityLabel: string;
@@ -86,41 +97,147 @@ function GaugeCard({
   method: string;
   live?: boolean;
   tolerance?: number;
+  chips?: Array<{ label: string; value: string; tone?: "real" | "plan" | "muted" }>;
 }) {
   const stateMeta = GAUGE_STATE[state];
   const hasReality = reality != null && Number.isFinite(reality);
   const hasReference = reference != null && Number.isFinite(reference);
   const zoneStart = hasReference ? clamp(reference! - tolerance) : 20;
   const zoneEnd = hasReference ? clamp(reference! + tolerance) : 80;
-  const markersOverlap = hasReality && hasReference && Math.abs(reality! - reference!) <= 2;
+  const realPct = hasReality ? clamp(reality!) : 0;
+  const planPct = hasReference ? clamp(reference!) : 0;
+
+  // Cap chips to 3 to keep the card scannable
+  const visibleChips = chips?.slice(0, 3);
 
   return (
-    <article className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-3.5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/[0.07] bg-black/20 text-white/60"><Icon size={15} strokeWidth={2.15} /></span>
-          <div className="min-w-0"><h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/80">{title}</h2>{live && <p className="mt-0.5 text-[9px] font-medium text-[#7fe0b8]">Brouillon reflété en direct</p>}</div>
+    <article className="rounded-xl border border-white/[0.07] bg-gradient-to-b from-white/[0.035] to-white/[0.015] p-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.07] bg-black/25 text-white/65"
+            style={{ boxShadow: `inset 0 0 0 1px ${stateMeta.color}22` }}
+          >
+            <Icon size={14} strokeWidth={2.15} />
+          </span>
+          <div className="min-w-0">
+            <h2 className="truncate text-[11px] font-semibold uppercase tracking-[0.1em] text-white/85">
+              {title}
+            </h2>
+            {live && (
+              <p className="mt-0.5 text-[9px] font-medium text-[#7fe0b8]">
+                Brouillon live
+              </p>
+            )}
+          </div>
         </div>
-        <span className="shrink-0 rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.08em]" style={{ color: stateMeta.color, backgroundColor: stateMeta.background }}>{stateMeta.label}</span>
+        <span
+          className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em]"
+          style={{ color: stateMeta.color, backgroundColor: stateMeta.background }}
+        >
+          {stateMeta.label}
+        </span>
       </div>
 
-      <div className="relative mt-4 h-8" aria-label={`${title}. ${realityLabel}${referenceLabel ? `. ${referenceLabel}` : ""}`}>
-        <div className="absolute inset-x-0 top-[13px] h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-          <span className="absolute inset-y-0 rounded-full bg-[#1f8a65]/20" style={{ left: `${zoneStart}%`, width: `${zoneEnd - zoneStart}%` }} />
-          <span className="absolute inset-y-0 left-1/2 w-px bg-white/15" />
+      {/* Dual comparison bars */}
+      <div
+        className="mt-2.5 space-y-1.5"
+        aria-label={`${title}. ${realityLabel}${referenceLabel ? `. ${referenceLabel}` : ""}`}
+      >
+        <div>
+          <div className="mb-0.5 flex items-center justify-between gap-2 text-[10px]">
+            <span className="font-semibold uppercase tracking-[0.08em] text-white/45">
+              Réel
+            </span>
+            <span className="truncate font-semibold tabular-nums text-white/85">
+              {realityLabel}
+            </span>
+          </div>
+          <div className="relative h-2 overflow-hidden rounded-full bg-white/[0.06]">
+            {hasReference && (
+              <span
+                className="absolute inset-y-0 rounded-full bg-[#1f8a65]/15"
+                style={{ left: `${zoneStart}%`, width: `${Math.max(0, zoneEnd - zoneStart)}%` }}
+                aria-hidden
+              />
+            )}
+            <span
+              className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none"
+              style={{
+                width: hasReality ? `${realPct}%` : "0%",
+                background: hasReality
+                  ? `linear-gradient(90deg, ${stateMeta.color}55, ${stateMeta.color})`
+                  : "transparent",
+              }}
+            />
+            {hasReference && (
+              <span
+                className="absolute top-1/2 h-3 w-0.5 -translate-y-1/2 rounded-full bg-white/70 shadow-[0_0_0_2px_rgba(13,13,13,0.85)]"
+                style={{ left: `calc(${planPct}% - 1px)` }}
+                title="Plan"
+                aria-hidden
+              />
+            )}
+          </div>
         </div>
-        {hasReference && !markersOverlap && <span className="absolute top-[5px] h-[22px] w-0.5 -translate-x-1/2 rounded-full bg-white/55 shadow-[0_0_0_2px_rgba(13,13,13,0.9)] transition-[left] duration-300 motion-reduce:transition-none" style={{ left: `${clamp(reference!)}%` }} aria-hidden="true" />}
-        {hasReality && <span className={`absolute top-[10px] h-3 w-3 -translate-x-1/2 rounded-full border-2 bg-[#dbe4df] shadow-[0_0_0_2px_rgba(219,228,223,0.22)] transition-[left] duration-300 motion-reduce:transition-none ${markersOverlap ? "border-white/55" : "border-[#0d0d0d]"}`} style={{ left: `${clamp(reality!)}%` }} aria-hidden="true" />}
+
+        {hasReference && (
+          <div>
+            <div className="mb-0.5 flex items-center justify-between gap-2 text-[9px]">
+              <span className="font-semibold uppercase tracking-[0.08em] text-white/35">
+                Plan
+              </span>
+              <span className="truncate tabular-nums text-white/50">{referenceLabel}</span>
+            </div>
+            <div className="relative h-1 overflow-hidden rounded-full bg-white/[0.05]">
+              <span
+                className="absolute inset-y-0 left-0 rounded-full bg-white/25 transition-[width] duration-500 ease-out motion-reduce:transition-none"
+                style={{ width: `${planPct}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="mt-1 grid gap-1.5 text-[10px] leading-snug sm:grid-cols-2">
-        <p className="text-white/70"><span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[#dbe4df]" />{realityLabel}</p>
-        {referenceLabel && <p className="text-white/45"><span className="mr-1.5 inline-block h-2.5 w-0.5 bg-white/55 align-[-2px]" />{referenceLabel}</p>}
-      </div>
-      <p className="mt-3 flex items-center gap-2 text-[11px] font-medium leading-relaxed text-white/60"><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: stateMeta.color }} />{summary}</p>
-      <details className="group mt-2.5">
-        <summary className="cursor-pointer list-none text-[9px] text-white/32 transition-colors hover:text-white/60"><span className="group-open:hidden">Voir la méthode</span><span className="hidden group-open:inline">Masquer la méthode</span></summary>
-        <p className="mt-1.5 border-l border-white/10 pl-2 text-[9px] leading-relaxed text-white/35">{method}</p>
+      {visibleChips && visibleChips.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {visibleChips.map((chip) => (
+            <span
+              key={`${chip.label}-${chip.value}`}
+              className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-black/20 px-1.5 py-0.5 text-[9px] font-medium text-white/55"
+            >
+              <span className="text-white/35">{chip.label}</span>
+              <span
+                className={
+                  chip.tone === "real"
+                    ? "tabular-nums text-[#dbe4df]"
+                    : chip.tone === "plan"
+                      ? "tabular-nums text-white/70"
+                      : "tabular-nums text-white/60"
+                }
+              >
+                {chip.value}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <p className="mt-2 flex items-start gap-1.5 text-[11px] font-medium leading-snug text-white/70">
+        <span
+          className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
+          style={{ backgroundColor: stateMeta.color }}
+        />
+        {summary}
+      </p>
+      <details className="group mt-1.5">
+        <summary className="cursor-pointer list-none text-[9px] text-white/28 transition-colors hover:text-white/55">
+          <span className="group-open:hidden">Méthode</span>
+          <span className="hidden group-open:inline">Masquer</span>
+        </summary>
+        <p className="mt-1 border-l border-white/10 pl-2 text-[9px] leading-relaxed text-white/32">
+          {method}
+        </p>
       </details>
     </article>
   );
@@ -132,15 +249,15 @@ function CycleGauge({ value, color, label, valueLabel }: { value: number; color:
   const dash = Math.max(0, Math.min(1, value)) * circumference
 
   return (
-    <div className="flex min-w-[82px] flex-col items-center gap-1 text-center">
-      <div className="relative h-12 w-12">
-        <svg className="h-12 w-12 -rotate-90" viewBox="0 0 48 48" aria-hidden="true">
+    <div className="flex min-w-[64px] flex-col items-center gap-0.5 text-center">
+      <div className="relative h-10 w-10">
+        <svg className="h-10 w-10 -rotate-90" viewBox="0 0 48 48" aria-hidden="true">
           <circle cx="24" cy="24" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
           <circle cx="24" cy="24" r={radius} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeDasharray={`${dash} ${circumference}`} />
         </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-white">{valueLabel}</span>
+        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold tabular-nums text-white">{valueLabel}</span>
       </div>
-      <span className="text-[9px] uppercase tracking-[0.1em] text-white/40">{label}</span>
+      <span className="text-[8px] uppercase tracking-[0.1em] text-white/40">{label}</span>
     </div>
   )
 }
@@ -155,84 +272,51 @@ function CycleCockpitCard({ cycleState }: { cycleState: CycleState | null }) {
     training: Dumbbell,
   }
   const regularityLabel = insight.regularity === 'irregular'
-    ? 'Rythme variable · dates réelles prioritaires'
+    ? 'Rythme variable'
     : insight.regularity === 'regular'
-      ? 'Rythme personnel cohérent'
-      : 'Apprentissage en cours'
+      ? 'Rythme cohérent'
+      : 'Apprentissage'
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
-      <div className="flex items-start justify-between gap-3 border-b border-white/[0.06] px-3.5 py-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-black/20" style={{ color: insight.phaseColor }}><CircleDot size={17} /></span>
+    <section className="overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.025]">
+      <div className="flex items-center justify-between gap-2 px-2.5 py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-black/20" style={{ color: insight.phaseColor }}><CircleDot size={14} /></span>
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-white/45">Contexte cycle</p>
-            <p className="truncate text-[13px] font-semibold text-white">{insight.phaseLabel}</p>
+            <p className="truncate text-[12px] font-semibold text-white">
+              {insight.phaseLabel}
+              <span className="ml-1.5 text-[9px] font-medium uppercase tracking-[0.08em] text-white/35">Cycle</span>
+            </p>
           </div>
         </div>
-        <span className="rounded-full bg-white/[0.06] px-2 py-1 text-[9px] font-medium text-white/55">{insight.isEstimated ? 'Estimation' : 'Confirmé'}</span>
-      </div>
-
-      <div className="flex items-center justify-around gap-3 px-3.5 py-3">
-        <CycleGauge value={insight.phaseProgress} color={insight.phaseColor} label="Phase" valueLabel={`J${insight.cycleDay}`} />
-        <CycleGauge value={insight.cycleProgress} color="#dbe4df" label="Cycle" valueLabel={`${insight.cycleDay}/${insight.cycleLength}`} />
-        <p className="min-w-0 text-[10px] leading-relaxed text-white/55">{regularityLabel}{insight.isPeriodStartExpected ? ' · Début à confirmer' : ''}</p>
+        <div className="flex shrink-0 items-center gap-2">
+          <CycleGauge value={insight.phaseProgress} color={insight.phaseColor} label="Phase" valueLabel={`J${insight.cycleDay}`} />
+          <CycleGauge value={insight.cycleProgress} color="#dbe4df" label="Cycle" valueLabel={`${insight.cycleDay}/${insight.cycleLength}`} />
+          <span className="rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[8px] font-medium text-white/50">
+            {insight.isEstimated ? 'Est.' : 'OK'}
+          </span>
+        </div>
       </div>
 
       <div className="grid gap-px border-t border-white/[0.06] bg-white/[0.06] sm:grid-cols-3">
         {insight.signals.map((signal) => {
           const Icon = IconBySignal[signal.key]
           return (
-            <div key={signal.key} className="bg-[#171817] px-3 py-3">
-              <div className="flex items-center gap-1.5" style={{ color: insight.phaseColor }}><Icon size={13} /><p className="text-[9px] font-semibold uppercase tracking-[0.1em]">{signal.label}</p></div>
-              <p className="mt-1.5 text-[10px] leading-relaxed text-white/55">{signal.detail}</p>
+            <div key={signal.key} className="bg-[#171817] px-2 py-1.5">
+              <div className="flex items-center gap-1" style={{ color: insight.phaseColor }}>
+                <Icon size={11} />
+                <p className="text-[8px] font-semibold uppercase tracking-[0.08em]">{signal.label}</p>
+              </div>
+              <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-white/55">{signal.detail}</p>
             </div>
           )
         })}
       </div>
+      <p className="border-t border-white/[0.05] px-2.5 py-1 text-[9px] text-white/35">
+        {regularityLabel}{insight.isPeriodStartExpected ? ' · Début à confirmer' : ''}
+      </p>
     </section>
   )
-}
-
-function inferGoal(value: string | null | undefined): "deficit" | "maintenance" | "surplus" {
-  if (value === "fat_loss") return "deficit";
-  if (value === "hypertrophy" || value === "strength") return "surplus";
-  return "maintenance";
-}
-
-function buildFormulaInput(raw: any, overrides?: { steps?: number | null; workouts?: number | null; cardioFrequency?: number | null; cardioDurationMin?: number | null; cardioTypes?: string[]; cardioRpe?: number | null; sessionDurationMin?: number | null; trainingTypes?: string[]; trainingRir?: number | null }) {
-  const client = raw?.client;
-  if (!client?.weight_kg || !client?.height_cm || !client?.age || !client?.gender) return null;
-  const gender = client.gender === "female" ? "female" : client.gender === "male" ? "male" : null;
-  if (!gender) return null;
-
-  return {
-    weight: Number(client.weight_kg),
-    height: Number(client.height_cm),
-    age: Number(client.age),
-    gender,
-    goal: inferGoal(client.training_goal),
-    bodyFat: client.body_fat_pct ?? undefined,
-    muscleMassKg: client.muscle_mass_kg ?? undefined,
-    bmrKcalMeasured: client.bmr_kcal_measured ?? undefined,
-    steps: Math.max(0, Number(overrides?.steps ?? client.daily_steps ?? 0)),
-    occupationMultiplier: client.occupation_multiplier ?? undefined,
-    workHoursPerWeek: client.work_hours_per_week ?? undefined,
-    workouts: Math.max(0, Number(overrides?.workouts ?? client.weekly_frequency ?? 0)),
-    sessionDurationMin: overrides?.sessionDurationMin ?? client.session_duration_min ?? undefined,
-    trainingCaloriesWeekly: overrides?.sessionDurationMin != null ? undefined : client.training_calories_weekly ?? undefined,
-    trainingTypes: overrides?.trainingTypes ?? undefined,
-    trainingRir: overrides?.trainingRir ?? undefined,
-    cardioFrequency: Math.max(0, Number(overrides?.cardioFrequency ?? client.cardio_frequency ?? 0)),
-    cardioDurationMin: overrides?.cardioDurationMin ?? client.cardio_duration_min ?? undefined,
-    cardioTypes: overrides?.cardioTypes ?? undefined,
-    cardioRpe: overrides?.cardioRpe ?? undefined,
-    sleepDurationH: client.sleep_duration_h ?? undefined,
-    stressLevel: client.stress_level ?? undefined,
-    energyLevel: client.energy_level ?? undefined,
-    caffeineDaily: client.caffeine_daily_mg ?? undefined,
-    alcoholWeekly: client.alcohol_weekly ?? undefined,
-  } as const;
 }
 
 export default function ClientPulseDashboard() {
@@ -244,6 +328,8 @@ export default function ClientPulseDashboard() {
   const [nutritionDraft, setNutritionDraft] = useState<ClientImpactEventDetail["nutrition"] | null>(null);
   const [workoutDraft, setWorkoutDraft] = useState<ClientImpactEventDetail["workout"] | null>(null);
   const [impactRefresh, setImpactRefresh] = useState(0);
+  const [dismissTick, setDismissTick] = useState(0);
+  const [messageDraft, setMessageDraft] = useState<string | null>(null);
 
   useEffect(() => {
     if (!clientId) {
@@ -292,67 +378,36 @@ export default function ClientPulseDashboard() {
     return () => { cancelled = true; if (interval) window.clearInterval(interval); };
   }, [clientId, open, impactRefresh]);
 
-  const baseFormula = useMemo(() => data ? (() => { const input = buildFormulaInput(data.nutritionData); return input ? calculateMacros(input) : null; })() : null, [data]);
-  const coachFormula = useMemo(() => data ? (() => {
-    const plannedSteps = data.client.step_target != null ? Number(data.client.step_target) : null;
-    const plannedTraining = data.nutritionData?.plannedTraining ?? {};
-    const input = buildFormulaInput(data.nutritionData, {
-      steps: plannedSteps,
-      workouts: workoutDraft?.strengthFrequency ?? plannedTraining.strengthFrequency ?? workoutDraft?.weeklyFrequency ?? plannedTraining.weeklyFrequency,
-      cardioFrequency: workoutDraft?.cardioFrequency ?? plannedTraining.cardioFrequency,
-      cardioDurationMin: workoutDraft?.cardioDurationMin ?? plannedTraining.cardioDurationMin,
-      cardioTypes: workoutDraft?.cardioTypes ?? plannedTraining.cardioTypes,
-      cardioRpe: workoutDraft?.cardioRpe ?? plannedTraining.cardioRpe,
-      sessionDurationMin: workoutDraft?.sessionDurationMin ?? plannedTraining.sessionDurationMin,
-      trainingTypes: workoutDraft?.trainingTypes ?? plannedTraining.trainingTypes,
-      trainingRir: workoutDraft?.trainingRir ?? plannedTraining.trainingRir,
-    });
-    return input ? calculateMacros(input) : null;
-  })() : null, [data, workoutDraft]);
-
   if (!clientId || !data) return null;
 
-  const { client, nutrition, nutritionData, checkin, performance } = data;
+  const { client, nutritionData } = data;
   const cycleInsight = buildCycleCockpitInsight(data.cycleState);
-  const averages = checkin?.field_averages ?? {};
-  const summary = nutrition?.summary ?? {};
-  const energy = nutrition?.energy ?? {};
-  const adaptiveTdee = energy.clientTdee != null ? Number(energy.clientTdee) : null;
-  const currentTdee = adaptiveTdee ?? baseFormula?.tdee ?? null;
-  const draftTdee = nutritionDraft?.tdee != null ? Number(nutritionDraft.tdee) : null;
-  const plannedFormulaDelta = coachFormula && baseFormula ? coachFormula.tdee - baseFormula.tdee : 0;
-  const coachTdee = draftTdee ?? (currentTdee != null ? currentTdee + plannedFormulaDelta : coachFormula?.tdee ?? null);
-  const tdeeDelta = coachTdee != null && currentTdee != null ? coachTdee - currentTdee : 0;
-  const targetCalories = nutrition?.trend?.points?.length ? Math.round(nutrition.trend.points.reduce((sum: number, point: any) => sum + Number(point.target?.calories ?? 0), 0) / nutrition.trend.points.length) : null;
-  const actualCalories = nutrition?.trend?.points?.length ? Math.round(nutrition.trend.points.reduce((sum: number, point: any) => sum + Number(point.consumed?.calories ?? 0), 0) / nutrition.trend.points.length) : null;
-  const draftCalories = nutritionDraft?.calories != null ? Number(nutritionDraft.calories) : null;
-  const coachTargetCalories = draftCalories ?? targetCalories;
-  const actualSteps = averages.daily_steps != null ? Number(averages.daily_steps) : nutritionData?.client?.daily_steps != null ? Number(nutritionData.client.daily_steps) : null;
-  const plannedSteps = data.client.step_target != null ? Number(data.client.step_target) : null;
-  const energyReality = actualCalories != null && currentTdee != null ? actualCalories - currentTdee : null;
-  const energyPrescription = coachTargetCalories != null && coachTdee != null ? coachTargetCalories - coachTdee : null;
-  const energyDifference = energyReality != null && energyPrescription != null ? Math.abs(energyReality - energyPrescription) : null;
-  const energyState: GaugeState = energyDifference == null ? "à compléter" : energyDifference <= 150 ? "aligné" : energyDifference <= 350 ? "à surveiller" : "à corriger";
-  const adherence = summary.adherenceCalories != null ? Number(summary.adherenceCalories) * 100 : null;
-  const adherenceState: GaugeState = adherence == null ? "à compléter" : adherence >= 85 ? "aligné" : adherence >= 70 ? "à surveiller" : "à corriger";
-  const activityRatio = actualSteps != null && plannedSteps != null && plannedSteps > 0 ? actualSteps / plannedSteps : null;
-  const activityState: GaugeState = activityRatio == null ? "à compléter" : activityRatio >= 0.8 && activityRatio <= 1.15 ? "aligné" : activityRatio >= 0.6 && activityRatio <= 1.35 ? "à surveiller" : "à corriger";
-  const overreaching = performance?.analysis?.global_overreaching;
-  const recoverySignals = [
-    averages.sleep_duration != null ? clamp(((Number(averages.sleep_duration) - 5) / 3) * 100) : null,
-    averages.energy != null ? clamp(Number(averages.energy) * 10) : null,
-    overreaching === true ? 25 : overreaching === false ? 75 : null,
-  ].filter((value): value is number => value != null);
-  const recovery = recoverySignals.length ? recoverySignals.reduce((total, value) => total + value, 0) / recoverySignals.length : null;
-  const recoveryState: GaugeState = recovery == null ? "à compléter" : recovery >= 70 ? "aligné" : recovery >= 50 ? "à surveiller" : "à corriger";
-  const hasLiveDraft = nutritionDraft != null || workoutDraft != null;
-  const cockpitState: GaugeState = [energyState, adherenceState, activityState, recoveryState].includes("à corriger")
-    ? "à corriger"
-    : [energyState, adherenceState, activityState, recoveryState].includes("à surveiller")
-      ? "à surveiller"
-      : [energyState, adherenceState, activityState, recoveryState].every((state) => state === "à compléter")
-        ? "à compléter"
-        : "aligné";
+  const signals = computeCockpitSignals(clientId, data, {
+    nutrition: nutritionDraft,
+    workout: workoutDraft,
+  });
+  const {
+    energyState,
+    adherenceState,
+    activityState,
+    recoveryState,
+    cockpitState,
+    energyReality,
+    energyPrescription,
+    energyDifference,
+    adherence,
+    activityRatio,
+    actualSteps,
+    plannedSteps,
+    activityBudget,
+    recovery,
+    hasLiveDraft,
+  } = signals;
+
+  // Force re-read dismiss map when dismissTick changes
+  void dismissTick;
+  const directions = filterActiveDirections(clientId, signals.directions);
+  const primaryDirection = directions[0] ?? null;
 
   const toggle = () => {
     const next = !open;
@@ -361,99 +416,351 @@ export default function ClientPulseDashboard() {
   };
   return (
     <>
-      <button type="button" onClick={toggle} aria-expanded={open} aria-label={`${open ? "Fermer" : "Ouvrir"} le cockpit de ${client.first_name}. État : ${GAUGE_STATE[cockpitState].label.toLowerCase()}.`} className={`group flex h-9 items-center gap-2 rounded-xl border px-3 transition-colors ${open ? "border-[#1f8a65]/50 bg-[#1f8a65]/10" : "border-white/[0.08] bg-white/[0.025] hover:border-white/[0.16] hover:bg-white/[0.05]"}`}>
-        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[#1f8a65]/15 text-[9px] font-bold text-[#7fe0b8]">{initials(client.first_name, client.last_name)}</span>
-        <span className="hidden text-[11px] font-semibold text-white/75 sm:inline">Cockpit</span>
-        {cycleInsight && <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/[0.06]" style={{ color: cycleInsight.phaseColor }} aria-label={`Cycle : ${cycleInsight.phaseLabel}`}><CircleDot size={13} /></span>}
-        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: GAUGE_STATE[cockpitState].color }} aria-hidden="true" />
-        {open ? <X size={13} className="text-white/40" /> : <ChevronDown size={13} className="text-white/35 transition-transform group-hover:translate-y-0.5" />}
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-label={`${open ? "Fermer" : "Ouvrir"} le cockpit de ${client.first_name}. ${primaryDirection ? `Direction : ${primaryDirection.title}.` : ""} État : ${GAUGE_STATE[cockpitState].label.toLowerCase()}.`}
+        className={`group flex h-9 max-w-[min(420px,46vw)] items-center gap-2 rounded-xl border px-3 transition-colors ${open ? "border-[#1f8a65]/50 bg-[#1f8a65]/10" : "border-white/[0.08] bg-white/[0.025] hover:border-white/[0.16] hover:bg-white/[0.05]"}`}
+      >
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#1f8a65]/15 text-[9px] font-bold text-[#7fe0b8]">{initials(client.first_name, client.last_name)}</span>
+        <span className="hidden shrink-0 text-[11px] font-semibold text-white/75 sm:inline">Cockpit</span>
+        {primaryDirection && !open && (
+          <span className="hidden min-w-0 truncate text-[11px] font-medium text-white/55 lg:inline">
+            · {primaryDirection.title}
+          </span>
+        )}
+        {cycleInsight && <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white/[0.06]" style={{ color: cycleInsight.phaseColor }} aria-label={`Cycle : ${cycleInsight.phaseLabel}`}><CircleDot size={13} /></span>}
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: GAUGE_STATE[cockpitState].color }} aria-hidden="true" />
+        {open ? (
+          <X size={13} className="shrink-0 text-white/40" />
+        ) : (
+          <ChevronDown
+            size={13}
+            className="shrink-0 text-white/35 transition-transform group-hover:translate-y-0.5"
+          />
+        )}
       </button>
 
+      {/* Horizontal header extension — keeps page readable below */}
       {open && (
-        <aside className="fixed right-4 top-[84px] z-50 max-h-[calc(100vh-104px)] w-[min(440px,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-2xl border border-white/[0.1] bg-[#171817]/[0.98] shadow-2xl shadow-black/40 backdrop-blur-xl">
-          <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-3.5">
-            <div className="flex min-w-0 items-center gap-2.5">
-              {client.profile_photo_url ? <img src={client.profile_photo_url} alt="" className="h-8 w-8 rounded-xl object-cover" /> : <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#1f8a65]/15 text-[11px] font-bold text-[#7fe0b8]">{initials(client.first_name, client.last_name)}</span>}
-              <div className="min-w-0"><p className="truncate text-[13px] font-semibold text-white">{client.first_name} {client.last_name}</p><p className="text-[10px] text-white/35">Cockpit décisionnel · réalité + impact coach</p></div>
-            </div>
-            <button type="button" onClick={toggle} className="rounded-lg p-1.5 text-white/35 hover:bg-white/[0.06] hover:text-white/70" aria-label="Fermer"><X size={15} /></button>
-          </div>
-
-          <div className="space-y-3 p-4">
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.025] px-3 py-2.5">
-              <div className="flex min-w-0 items-center gap-3 text-[10px] font-medium text-white/65" aria-label="Légende des jauges">
-                <span className="flex items-center gap-1.5 whitespace-nowrap"><i aria-hidden="true" className="h-2 w-2 rounded-full border border-[#0d0d0d] bg-[#dbe4df] shadow-[0_0_0_1px_rgba(219,228,223,0.28)]" />Réel</span>
-                <span className="flex items-center gap-1.5 whitespace-nowrap"><i aria-hidden="true" className="h-3 w-0.5 bg-white/55" />Plan</span>
-                <span className="hidden items-center gap-1.5 whitespace-nowrap text-white/45 sm:flex"><i aria-hidden="true" className="h-1.5 w-4 rounded-full bg-[#1f8a65]/30" />Zone attendue</span>
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-40 cursor-default bg-black/25 backdrop-blur-[1px]"
+            aria-label="Fermer le cockpit"
+            onClick={toggle}
+          />
+          <aside
+            className="fixed left-3 right-3 z-50 flex max-h-[min(48vh,520px)] flex-col overflow-hidden rounded-2xl border border-white/[0.1] bg-[#141414]/[0.98] shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl sm:left-4 sm:right-4"
+            style={{ top: "calc(1rem + 3.5rem + 0.35rem)" }}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Cockpit ${client.first_name} ${client.last_name}`}
+          >
+            {/* Extension header — denser chrome */}
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/[0.07] px-3 py-2 sm:px-4">
+              <div className="flex min-w-0 items-center gap-2">
+                {client.profile_photo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={client.profile_photo_url}
+                    alt=""
+                    className="h-7 w-7 rounded-lg object-cover"
+                  />
+                ) : (
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1f8a65]/15 text-[10px] font-bold text-[#7fe0b8]">
+                    {initials(client.first_name, client.last_name)}
+                  </span>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-semibold text-white">
+                    {client.first_name} {client.last_name}
+                    <span className="ml-1.5 hidden font-medium text-white/35 sm:inline">
+                      · Cockpit
+                    </span>
+                  </p>
+                  <p className="truncate text-[11px] font-medium text-white/50">
+                    {primaryDirection
+                      ? primaryDirection.title
+                      : "Réalité vs plan · prochaine action"}
+                  </p>
+                </div>
               </div>
-              <span className="shrink-0 rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.08em]" style={{ color: GAUGE_STATE[cockpitState].color, backgroundColor: GAUGE_STATE[cockpitState].background }}>{GAUGE_STATE[cockpitState].label}</span>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em]"
+                  style={{
+                    color: GAUGE_STATE[cockpitState].color,
+                    backgroundColor: GAUGE_STATE[cockpitState].background,
+                  }}
+                >
+                  {GAUGE_STATE[cockpitState].label}
+                </span>
+                <div
+                  className="hidden items-center gap-2 text-[9px] text-white/40 lg:flex"
+                  aria-label="Légende des jauges"
+                >
+                  <span className="flex items-center gap-1">
+                    <i className="h-1.5 w-3 rounded-full bg-[#7fe0b8]/80" />
+                    Réel
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <i className="h-2.5 w-0.5 bg-white/70" />
+                    Plan
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggle}
+                  className="rounded-lg p-1 text-white/35 hover:bg-white/[0.06] hover:text-white/70"
+                  aria-label="Fermer"
+                >
+                  <X size={14} />
+                </button>
+              </div>
             </div>
 
-            <CycleCockpitCard cycleState={data.cycleState} />
+            {/* Horizontal body: direction | signals */}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <div className="grid gap-0 lg:grid-cols-[minmax(260px,0.9fr)_minmax(0,1.4fr)]">
+                {/* Left: decision */}
+                <div className="space-y-2 border-b border-white/[0.06] p-2.5 sm:p-3 lg:border-b-0 lg:border-r lg:border-white/[0.06]">
+                  <CockpitDirectionsPanel
+                    directions={directions}
+                    compact
+                    onMessage={(dir) => {
+                      if (dir.clientMessage) setMessageDraft(dir.clientMessage);
+                    }}
+                    onTreated={(id) => {
+                      markDirectionTreated(clientId, id);
+                      setDismissTick((t) => t + 1);
+                    }}
+                    onSnooze={(id) => {
+                      snoozeDirection(clientId, id, 7);
+                      setDismissTick((t) => t + 1);
+                    }}
+                  />
+                  {(hasLiveDraft || nutritionDraft || workoutDraft) && (
+                    <section className="rounded-lg border border-[#1f8a65]/35 bg-[#1f8a65]/[0.07] px-2.5 py-2">
+                      <div className="flex items-center gap-1.5">
+                        <SlidersHorizontal size={12} className="text-[#7fe0b8]" />
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-white/75">
+                          Impact brouillon
+                        </p>
+                      </div>
+                      <p className="mt-1 text-[10px] leading-snug text-white/50">
+                        {nutritionDraft
+                          ? "Nutrition Studio reflété avant partage."
+                          : "Workout Studio reflété avant partage."}
+                      </p>
+                      {workoutDraft && (
+                        <p className="mt-1 text-[11px] font-medium tabular-nums text-[#dbe4df]">
+                          {workoutDraft.weeklyFrequency ?? "—"} séances
+                          {workoutDraft.setsWeekly != null
+                            ? ` · ${Math.round(workoutDraft.setsWeekly)} séries`
+                            : ""}
+                        </p>
+                      )}
+                    </section>
+                  )}
+                </div>
 
-            <GaugeCard
-              icon={Zap}
-              title="Énergie & prescription"
-              state={energyState}
-              reality={energyReality == null ? null : clamp(((energyReality + 750) / 1500) * 100)}
-              reference={energyPrescription == null ? null : clamp(((energyPrescription + 750) / 1500) * 100)}
-              realityLabel={`Réel : ${energyLabel(energyReality)}`}
-              referenceLabel={`${hasLiveDraft ? "Brouillon" : "Plan"} : ${energyLabel(energyPrescription)}`}
-              summary={energyDifference == null ? "Apports et dépense requis pour comparer le terrain au plan." : `${Math.round(energyDifference)} kcal/j d’écart avec le plan`}
-              method={`${adaptiveTdee != null ? "TDEE adaptatif" : "TDEE par formule"} comparé aux moyennes d’apports sur 7 jours. La projection du brouillon utilise les paramètres nutrition et entraînement actuellement édités.`}
-              live={hasLiveDraft}
-              tolerance={10}
-            />
-
-            <GaugeCard
-              icon={Utensils}
-              title="Adhérence nutritionnelle"
-              state={adherenceState}
-              reality={adherence}
-              reference={85}
-              realityLabel={`Observée : ${adherence == null ? "—" : `${Math.round(adherence)}%`}`}
-              referenceLabel="Repère : ≥ 85%"
-              summary={adherence == null ? "Aucune adhérence exploitable sur la fenêtre observée." : `${adherence >= 85 ? "+" : "−"}${Math.abs(Math.round(adherence - 85))} points par rapport au repère`}
-              method="Calculé à partir de l’adhérence calorique sur la fenêtre nutritionnelle active. Ce signal décrit l’exécution observée ; il ne prédit pas l’adhérence future."
-              tolerance={15}
-            />
-
-            <GaugeCard
-              icon={Activity}
-              title="Activité quotidienne"
-              state={activityState}
-              reality={activityRatio == null ? null : clamp(activityRatio * 50)}
-              reference={50}
-              realityLabel={`Observée : ${formatK(actualSteps)} pas/j`}
-              referenceLabel={`Plan : ${formatK(plannedSteps)} pas/j`}
-              summary={activityRatio == null ? "Objectif et relevé d’activité requis." : `${Math.round(activityRatio * 100)}% de l’objectif quotidien`}
-              method="Moyenne de pas observée comparée à l’objectif défini dans le profil coach. La zone alignée couvre 80 à 115% de l’objectif."
-              tolerance={8}
-            />
-
-            <GaugeCard
-              icon={Moon}
-              title="Récupération & capacité"
-              state={recoveryState}
-              reality={recovery}
-              reference={65}
-              realityLabel={`Disponibilité : ${recovery == null ? "—" : `${Math.round(recovery)}/100`}`}
-              referenceLabel="Repère : ≥ 65"
-              summary={recovery == null ? "Signaux de sommeil, d’énergie ou de charge requis." : Math.abs(recovery - 65) <= 2 ? "Au niveau du repère de disponibilité" : `${Math.abs(Math.round(recovery - 65))} points ${recovery > 65 ? "au-dessus" : "sous"} du repère`}
-              method="Signal de disponibilité basé sur le sommeil et l’énergie des check-ins, complété par le signal de surcharge observée. C’est une aide à la décision, pas un diagnostic médical."
-              tolerance={15}
-            />
-
-            <section className={`rounded-xl border px-3 py-3 ${hasLiveDraft ? "border-[#1f8a65]/35 bg-[#1f8a65]/[0.07]" : "border-white/[0.06] bg-white/[0.02]"}`}>
-              <div className="flex items-center gap-2"><SlidersHorizontal size={13} className={hasLiveDraft ? "text-[#7fe0b8]" : "text-white/55"} /><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">Impact du coach</p></div>
-              <p className="mt-1.5 text-[10px] leading-relaxed text-white/45">{nutritionDraft ? "Nutrition Studio est reflété avant partage au client." : workoutDraft ? "Workout Studio est reflété dans la projection énergétique avant partage au client." : "Les brouillons Nutrition Studio et Workout Studio apparaissent ici, sans modifier le plan partagé."}</p>
-              {workoutDraft && <p className="mt-2 text-[10px] text-[#dbe4df]">Brouillon entraînement : {workoutDraft.weeklyFrequency ?? "—"} séances{workoutDraft.setsWeekly != null ? ` · ${Math.round(workoutDraft.setsWeekly)} séries` : ""}{workoutDraft.trainingRir != null ? ` · RIR ${Math.round(workoutDraft.trainingRir * 10) / 10}` : ""}{tdeeDelta !== 0 ? ` · impact énergétique ${signed(tdeeDelta, " kcal/j")}` : ""}</p>}
-            </section>
-
-            <div className="flex items-center justify-between border-t border-white/[0.06] pt-3 text-[10px] text-white/30"><span className="flex items-center gap-1.5"><Utensils size={12} /> {nutritionData?.mode === "realtime" ? "Sources temps réel sélectionnées" : "Sources bilan"}</span>{loading && <RefreshCw size={12} className="animate-spin text-white/45" />}</div>
-          </div>
-        </aside>
+                {/* Right: cycle + gauges in compact grid */}
+                <div className="space-y-2 p-2.5 sm:p-3">
+                  <CycleCockpitCard cycleState={data.cycleState} />
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <GaugeCard
+                      icon={Zap}
+                      title="Énergie & prescription"
+                      state={energyState}
+                      reality={
+                        energyReality == null
+                          ? null
+                          : clamp(((energyReality + 750) / 1500) * 100)
+                      }
+                      reference={
+                        energyPrescription == null
+                          ? null
+                          : clamp(((energyPrescription + 750) / 1500) * 100)
+                      }
+                      realityLabel={`Réel : ${energyLabel(energyReality)}`}
+                      referenceLabel={`${hasLiveDraft ? "Brouillon" : "Plan"} : ${energyLabel(energyPrescription)}`}
+                      summary={
+                        energyDifference == null
+                          ? "Apports et dépense requis pour comparer le terrain au plan."
+                          : `${Math.round(energyDifference)} kcal/j d’écart avec le plan`
+                      }
+                      method="TDEE (adaptatif ou formule) vs apports moyens 7j. Brouillon studio inclus dans la projection."
+                      live={hasLiveDraft}
+                      tolerance={10}
+                    />
+                    <GaugeCard
+                      icon={Utensils}
+                      title="Adhérence nutritionnelle"
+                      state={adherenceState}
+                      reality={adherence}
+                      reference={85}
+                      realityLabel={`Observée : ${adherence == null ? "—" : `${Math.round(adherence)}%`}`}
+                      referenceLabel="Repère : ≥ 85%"
+                      summary={
+                        adherence == null
+                          ? "Aucune adhérence exploitable sur la fenêtre observée."
+                          : `${adherence >= 85 ? "+" : "−"}${Math.abs(Math.round(adherence - 85))} pts vs repère`
+                      }
+                      method="Adhérence calorique sur la fenêtre nutritionnelle active."
+                      tolerance={15}
+                    />
+                    <GaugeCard
+                      icon={Activity}
+                      title="Activité (NEAT + EAT)"
+                      state={activityState}
+                      reality={
+                        activityBudget.reality.totalKcalDay != null &&
+                        activityBudget.plan.totalKcalDay != null &&
+                        activityBudget.plan.totalKcalDay > 0
+                          ? clamp(
+                              (activityBudget.reality.totalKcalDay /
+                                activityBudget.plan.totalKcalDay) *
+                                50,
+                            )
+                          : activityRatio == null
+                            ? null
+                            : clamp(activityRatio * 50)
+                      }
+                      reference={50}
+                      realityLabel={
+                        activityBudget.reality.totalKcalDay != null
+                          ? `Réel : ${Math.round(activityBudget.reality.totalKcalDay)} kcal/j`
+                          : actualSteps != null
+                            ? `Réel : ${formatK(actualSteps)} pas/j`
+                            : "Réel : —"
+                      }
+                      referenceLabel={
+                        activityBudget.plan.totalKcalDay != null
+                          ? `Plan : ${Math.round(activityBudget.plan.totalKcalDay)} kcal/j`
+                          : plannedSteps != null
+                            ? `Plan : ${formatK(plannedSteps)} pas/j`
+                            : "Plan : —"
+                      }
+                      summary={activityBudget.summary}
+                      method={activityBudget.method}
+                      tolerance={8}
+                      chips={[
+                        ...(activityBudget.reality.neatKcalDay != null ||
+                        activityBudget.plan.neatKcalDay != null
+                          ? [
+                              {
+                                label: "NEAT",
+                                value:
+                                  activityBudget.reality.neatKcalDay != null
+                                    ? `${Math.round(activityBudget.reality.neatKcalDay)}`
+                                    : "—",
+                                tone: "real" as const,
+                              },
+                            ]
+                          : []),
+                        ...(activityBudget.reality.eatKcalDay != null ||
+                        activityBudget.plan.eatKcalDay != null
+                          ? [
+                              {
+                                label: "EAT",
+                                value:
+                                  activityBudget.reality.eatKcalDay != null
+                                    ? `${Math.round(activityBudget.reality.eatKcalDay)}`
+                                    : activityBudget.plan.eatKcalDay != null
+                                      ? `p${Math.round(activityBudget.plan.eatKcalDay)}`
+                                      : "—",
+                                tone: "real" as const,
+                              },
+                            ]
+                          : []),
+                        ...(actualSteps != null
+                          ? [
+                              {
+                                label: "Pas",
+                                value: `${Math.round(actualSteps)}`,
+                                tone: "muted" as const,
+                              },
+                            ]
+                          : []),
+                        ...(activityBudget.reality.strengthSessionsPerWeek !=
+                          null ||
+                        activityBudget.plan.strengthSessionsPerWeek != null
+                          ? [
+                              {
+                                label: "Séances",
+                                value: `${activityBudget.reality.strengthSessionsPerWeek ?? "—"}/${activityBudget.plan.strengthSessionsPerWeek ?? "—"}`,
+                                tone: "plan" as const,
+                              },
+                            ]
+                          : []),
+                        ...(activityBudget.reality.cardioSessionsPerWeek !=
+                          null
+                          ? [
+                              {
+                                label: "Cardio log",
+                                value: `${activityBudget.reality.cardioSessionsPerWeek}/sem`,
+                                tone: "muted" as const,
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
+                    <GaugeCard
+                      icon={Moon}
+                      title="Récupération & capacité"
+                      state={recoveryState}
+                      reality={recovery}
+                      reference={65}
+                      realityLabel={`Disponibilité : ${recovery == null ? "—" : `${Math.round(recovery)}/100`}`}
+                      referenceLabel="Repère : ≥ 65"
+                      summary={
+                        recovery == null
+                          ? "Signaux de sommeil, d’énergie ou de charge requis."
+                          : Math.abs(recovery - 65) <= 2
+                            ? "Au niveau du repère de disponibilité"
+                            : `${Math.abs(Math.round(recovery - 65))} pts ${recovery > 65 ? "au-dessus" : "sous"} le repère`
+                      }
+                      method="Sommeil + énergie check-in + signal de surcharge. Aide à la décision, pas diagnostic."
+                      tolerance={15}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between border-t border-white/[0.06] pt-1.5 text-[9px] text-white/28">
+                    <span className="flex items-center gap-1">
+                      <Utensils size={11} />
+                      {nutritionData?.mode === "realtime"
+                        ? "Temps réel · pas + séances + activités"
+                        : "Sources bilan"}
+                    </span>
+                    {loading && (
+                      <RefreshCw
+                        size={11}
+                        className="animate-spin text-white/45"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </>
       )}
+
+      <CoachConversationSheet
+        notification={
+          messageDraft
+            ? {
+                clientId,
+                clientName: `${client.first_name} ${client.last_name}`,
+                messageExcerpt: null,
+                draftContent: messageDraft,
+              }
+            : null
+        }
+        onClose={() => setMessageDraft(null)}
+        onSent={() => setMessageDraft(null)}
+      />
     </>
   );
 }

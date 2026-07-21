@@ -2,9 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import ConditionalClientShell from '@/components/client/ConditionalClientShell'
 import ClientRouteMemory from '@/components/client/ClientRouteMemory'
 import ServiceWorkerRegistrar from '@/components/client/ServiceWorkerRegistrar'
-import OfflineMutationSync from '@/components/client/OfflineMutationSync'
-import ClientRealtimeSync from '@/components/client/ClientRealtimeSync'
-import ClientNotificationDeepLinkHandler from '@/components/client/ClientNotificationDeepLinkHandler'
+import DeferredClientRuntime from '@/components/client/DeferredClientRuntime'
 import NativeStatusBar from '@/components/client/NativeStatusBar'
 import { ClientI18nProvider } from '@/components/client/ClientI18nProvider'
 import { createClient } from '@/utils/supabase/server'
@@ -28,11 +26,14 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#09090a',
+  themeColor: '#0a0a0a',
   viewportFit: 'cover',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1, // Prevent iOS auto-zoom on input focus in PWA context
+  // Keep fixed bottom chrome at layout bottom when the soft keyboard opens
+  // (instead of lifting the dock with the visual viewport).
+  interactiveWidget: 'overlays-content',
 }
 
 function service() {
@@ -72,13 +73,11 @@ export default async function ClientLayout({ children }: { children: React.React
     <ClientI18nProvider initialLang={initialLang}>
       <div
         data-client-app
-        className="min-h-dvh bg-[var(--client-chrome-bg)] font-barlow isolate"
+        className="min-h-dvh bg-[var(--client-page-bg,#0a0a0a)] font-barlow isolate"
       >
         <ClientRouteMemory />
         <ServiceWorkerRegistrar />
-        <OfflineMutationSync />
-        <ClientRealtimeSync clientId={clientId} />
-        <ClientNotificationDeepLinkHandler />
+        <DeferredClientRuntime clientId={clientId} />
         <NativeStatusBar />
         <ConditionalClientShell>{children}</ConditionalClientShell>
       </div>

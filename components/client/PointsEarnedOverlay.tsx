@@ -55,7 +55,7 @@ export default function PointsEarnedOverlay({
           animate={{ opacity: 1 }}
           exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.985 }}
           transition={reducedMotion ? { duration: 0.01 } : { duration: EXIT_DURATION_MS / 1000, ease: "easeIn" }}
-          className="fixed inset-0 z-[120] flex min-h-[100dvh] flex-col overflow-hidden bg-[#0d0d0d] px-5 pb-5 pt-[max(env(safe-area-inset-top),20px)] text-white"
+          className="fixed inset-0 z-[120] flex min-h-[100dvh] flex-col overflow-hidden bg-[#121212] px-5 pb-5 pt-[max(env(safe-area-inset-top),20px)] text-white"
         >
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-40 border-b border-white/[0.04]" />
 

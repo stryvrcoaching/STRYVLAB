@@ -2,8 +2,14 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   Bell,
@@ -21,28 +27,56 @@ import {
   Apple,
   Flame,
   Footprints,
+  AlertCircle,
+  CreditCard,
 } from "lucide-react";
-import CheckinModal from "@/components/client/CheckinModal";
-import QuickWaterModal from "@/components/client/QuickWaterModal";
+import { DashboardSignalCard, type SignalTone } from "@/components/client/smart/DashboardSignalCard";
 import ChatTodayStrip from "@/components/client/ChatTodayStrip";
 import dynamic from "next/dynamic";
 import type { CycleState } from "@/lib/cycle/cycleEngine";
-import WeightTrackerWidget from "@/components/client/WeightTrackerWidget";
-import CoachMessageSheet from "@/components/client/CoachMessageSheet";
 import StrivrToken from "@/components/client/StrivrToken";
 import { getProgressionSummary, PROGRESSION_LEVEL_COLORS } from "@/lib/rewards/progression";
 
 const CycleArcIndicator = dynamic(() => import('@/components/client/cycle/CycleArcIndicator'), { ssr: false });
 const CyclePhaseModal = dynamic(() => import('@/components/client/cycle/CyclePhaseModal'), { ssr: false });
+const CheckinModal = dynamic(() => import("@/components/client/CheckinModal"), { ssr: false });
+const QuickWaterModal = dynamic(() => import("@/components/client/QuickWaterModal"), { ssr: false });
+const CoachMessageSheet = dynamic(() => import("@/components/client/CoachMessageSheet"), { ssr: false });
+const WeightTrackerWidget = dynamic(() => import("@/components/client/WeightTrackerWidget"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[120px] animate-pulse rounded-2xl bg-white/[0.02]" />
+  ),
+});
+const ClientTransformationWidget = dynamic(
+  () => import("@/components/client/ClientTransformationWidget"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[140px] animate-pulse rounded-2xl bg-white/[0.02]" />
+    ),
+  },
+);
+
 import { determineSlotForClick } from "@/lib/client/checkin/checkinEngine";
 import { cn } from "@/app/lib/utils";
 import { ct, type ClientLang } from "@/lib/i18n/clientTranslations";
-import type { ClientNotificationItem } from "@/lib/client/inbox";
+import {
+  isHomeSystemNotification,
+  isPersistentHomeAction,
+  type ClientNotificationItem,
+} from "@/lib/client/inbox";
+import HomeNotificationsSection, {
+  type HomeNotificationItem,
+} from "@/components/client/HomeNotificationsSection";
 import type { ChatTodayStripData } from "@/lib/client/chat/today-strip";
-import { Flame as PhosphorFlame, Footprints as PhosphorFootprints, Barbell as PhosphorBarbell } from "@phosphor-icons/react";
 import { emitClientInboxUpdated } from "@/lib/client/inboxEvents";
 import { sendClientMutation } from "@/lib/client/offline-mutations";
 import { useInboxUnreadCount } from "@/lib/client/useInboxUnreadCount";
+import {
+  DASHBOARD_SIGNAL_COLORS,
+  DashboardSectionIcon,
+} from "@/components/client/DashboardSectionIcon";
 
 type AssessmentSummary = {
   id: string;
@@ -92,14 +126,16 @@ type DashboardProps = {
 type PriorityItem = {
   key: string;
   title: string;
+  body?: string | null;
+  eyebrow?: string;
   label: string;
   href?: string;
   onClick?: () => void;
+  notificationId?: string;
+  isPersistent?: boolean;
   icon: React.ElementType;
-  tone: AlertTone;
+  tone: SignalTone;
 };
-
-type AlertTone = "success" | "warning" | "attention" | "info" | "neutral";
 
 // ── Design constants ──────────────────────────────────────────────────────────
 const SECTION_PANEL_CLASS =
@@ -178,19 +214,63 @@ function localeFor(lang: ClientLang) {
   return "fr-FR";
 }
 
-function formatLongDate(lang: ClientLang) {
-  return new Intl.DateTimeFormat(localeFor(lang), {
+function colorForSteps(average: number | null | undefined, target: number) {
+  if (average == null || target <= 0) return DASHBOARD_SIGNAL_COLORS.neutral;
+  const ratio = average / target;
+  if (ratio >= 1) return DASHBOARD_SIGNAL_COLORS.success;
+  if (ratio >= 0.8) return DASHBOARD_SIGNAL_COLORS.warning;
+  if (ratio >= 0.6) return DASHBOARD_SIGNAL_COLORS.attention;
+  return DASHBOARD_SIGNAL_COLORS.critical;
+}
+
+function colorForEnergyGap(gap: number | null, target: number) {
+  if (gap == null || target <= 0) return DASHBOARD_SIGNAL_COLORS.neutral;
+  const ratio = gap / target;
+  if (ratio <= 0) return DASHBOARD_SIGNAL_COLORS.success;
+  if (ratio <= 0.05) return DASHBOARD_SIGNAL_COLORS.warning;
+  if (ratio <= 0.1) return DASHBOARD_SIGNAL_COLORS.attention;
+  return DASHBOARD_SIGNAL_COLORS.critical;
+}
+
+function formatLongDate(lang: ClientLang, timezone?: string | null) {
+  const options: Intl.DateTimeFormatOptions = {
     weekday: "long",
     day: "numeric",
     month: "long",
-  }).format(new Date());
+  };
+  try {
+    return new Intl.DateTimeFormat(localeFor(lang), {
+      ...options,
+      ...(timezone ? { timeZone: timezone } : {}),
+    }).format(new Date());
+  } catch {
+    return new Intl.DateTimeFormat(localeFor(lang), options).format(new Date());
+  }
 }
 
-function getTimeGreeting(lang: ClientLang) {
-  const hour = new Date().getHours();
-  if (lang === "en") return hour < 18 ? "Good morning" : "Good evening";
-  if (lang === "es") return hour < 18 ? "Buenos días" : "Buenas noches";
-  return hour < 18 ? "Bonjour" : "Bonsoir";
+function getTimeGreeting(lang: ClientLang, timezone?: string | null, now = new Date()) {
+  let hour = now.getHours();
+  if (timezone) {
+    try {
+      const value = new Intl.DateTimeFormat("en-GB", {
+        hour: "2-digit",
+        hourCycle: "h23",
+        timeZone: timezone,
+      }).formatToParts(now).find((part) => part.type === "hour")?.value;
+      if (value) hour = Number(value);
+    } catch {
+      // Use the device clock when the saved timezone is invalid.
+    }
+  }
+
+  const key = hour < 5
+    ? 'dashboard.greeting.night'
+    : hour < 12
+      ? 'dashboard.greeting.morning'
+      : hour < 18
+        ? 'dashboard.greeting.afternoon'
+        : 'dashboard.greeting.evening';
+  return ct(lang, key);
 }
 
 function notificationHref(notification: ClientNotificationItem): string {
@@ -198,7 +278,49 @@ function notificationHref(notification: ClientNotificationItem): string {
     typeof notification.payload?.action_url === "string"
       ? notification.payload.action_url
       : null
-  if (actionUrl) return actionUrl
+
+  // Never navigate the PWA to a raw Stripe Checkout URL (expires + breaks in standalone).
+  if (actionUrl) {
+    const isExternal =
+      actionUrl.startsWith("http://") || actionUrl.startsWith("https://");
+    const looksLikeStripe =
+      isExternal &&
+      (actionUrl.includes("checkout.stripe.com") ||
+        actionUrl.includes("stripe.com/c/pay"));
+    if (looksLikeStripe) {
+      const params = new URLSearchParams();
+      if (typeof notification.payload?.payment_id === "string") {
+        params.set("payment_id", notification.payload.payment_id);
+      }
+      if (typeof notification.payload?.subscription_id === "string") {
+        params.set("subscription_id", notification.payload.subscription_id);
+      }
+      if (typeof notification.payload?.formula_id === "string") {
+        params.set("formula_id", notification.payload.formula_id);
+      }
+      const qs = params.toString();
+      return qs ? `/client/paiement?${qs}` : "/client/paiement";
+    }
+    return actionUrl;
+  }
+
+  if (
+    notification.payload?.event === "payment_reminder" ||
+    typeof notification.payload?.payment_id === "string"
+  ) {
+    const params = new URLSearchParams();
+    if (typeof notification.payload?.payment_id === "string") {
+      params.set("payment_id", notification.payload.payment_id);
+    }
+    if (typeof notification.payload?.subscription_id === "string") {
+      params.set("subscription_id", notification.payload.subscription_id);
+    }
+    if (typeof notification.payload?.formula_id === "string") {
+      params.set("formula_id", notification.payload.formula_id);
+    }
+    const qs = params.toString();
+    return qs ? `/client/paiement?${qs}` : "/client/paiement";
+  }
 
   switch (notification.type) {
     case "bilan_pending": {
@@ -224,7 +346,6 @@ function isCoachMessageNotification(notification: ClientNotificationItem) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 import { NUTRITION_UI_COLORS } from '@/lib/nutrition/ui-colors';
-import ClientTransformationWidget from './ClientTransformationWidget';
 
 function ClientAvatar({
   firstName,
@@ -236,7 +357,7 @@ function ClientAvatar({
   const initial = (firstName?.trim().charAt(0) ?? "C").toUpperCase();
 
   return (
-    <div className="bg-[#09090a] border border-white/[0.04] relative h-12 w-12 shrink-0 overflow-hidden rounded-[20px] p-0 shadow-sm">
+    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-[20px] bg-white/[0.04] p-0">
       {avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -314,7 +435,12 @@ function SurfaceCard({
   className?: string;
 }) {
   return (
-    <div className={cn("bg-[#09090a] border border-white/[0.04] relative overflow-hidden rounded-[24px] p-4", className)}>
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-2xl bg-white/[0.02] p-4",
+        className,
+      )}
+    >
       <div className="relative">{children}</div>
     </div>
   );
@@ -341,49 +467,47 @@ function ProgressRail({
   );
 }
 
-const ALERT_TONE_STYLES: Record<AlertTone, { background: string; text: string }> = {
-  success: { background: "bg-[#5dba87]/5 border-[#5dba87]/15", text: "text-[#5dba87]" },
-  warning: { background: "bg-[#f2c94c]/5 border-[#f2c94c]/15", text: "text-[#f2c94c]" },
-  attention: { background: "bg-[#ff8660]/5 border-[#ff8660]/15", text: "text-[#ff8660]" },
-  info: { background: "bg-[#7aa7ff]/5 border-[#7aa7ff]/15", text: "text-[#7aa7ff]" },
-  neutral: { background: "bg-white/[0.03] border-white/[0.08]", text: "text-white/55" },
-};
-
-function ActionAlertButton({ item }: { item: PriorityItem }) {
-  const styles = ALERT_TONE_STYLES[item.tone];
-
-  const content = (
-    <div className={cn("flex items-center justify-between gap-3 w-full px-4 py-3.5 border rounded-2xl text-left active:scale-[0.98] transition shadow-sm", styles.background)}>
-      <div className="flex items-center gap-2.5 min-w-0">
-        <item.icon size={16} className={cn("shrink-0", styles.text)} />
-        <span className="text-[13px] font-medium text-white/90 truncate">
-          {item.title}
-        </span>
-      </div>
-      <div className="flex items-center gap-1 shrink-0">
-        <span className={cn("text-[10px] font-bold uppercase tracking-wider", styles.text)}>
-          {item.label}
-        </span>
-        <ChevronRight size={12} className={styles.text} />
-      </div>
-    </div>
-  );
-
-  if (item.href) {
-    return <Link href={item.href} onClick={item.onClick} className="block w-full">{content}</Link>;
+function notificationEyebrow(notification: ClientNotificationItem, lang: ClientLang): string {
+  const event =
+    typeof notification.payload?.event === "string"
+      ? notification.payload.event
+      : null;
+  if (event === "payment_reminder") return ct(lang, 'dashboard.notifications.category.payment');
+  if (event === "level_up") return ct(lang, 'dashboard.notifications.category.progress');
+  if (notification.type === "bilan_pending") return ct(lang, 'dashboard.notifications.category.assessment');
+  if (
+    notification.type === "coach_message" ||
+    notification.type === "coach_feedback" ||
+    notification.type === "coach_note"
+  ) {
+    return ct(lang, 'dashboard.notifications.category.coach');
   }
-  return <button onClick={item.onClick} className="block w-full">{content}</button>;
+  if (notification.type === "program_assigned" || notification.type === "program_updated") {
+    return ct(lang, 'dashboard.notifications.category.program');
+  }
+  if (notification.type === "tdee_updated") return ct(lang, 'dashboard.notifications.category.nutrition');
+  if (notification.type === "system_reminder") return ct(lang, 'dashboard.notifications.category.reminder');
+  return ct(lang, 'dashboard.notifications.category.alert');
 }
 
-function notificationAlertItem(notification: ClientNotificationItem): PriorityItem {
+function notificationAlertItem(notification: ClientNotificationItem, lang: ClientLang): PriorityItem {
   const isCoachMessage = isCoachMessageNotification(notification);
   const isLevelUp = notification.payload?.event === "level_up";
+  const isPaymentReminder = notification.payload?.event === "payment_reminder";
+  const localizePaymentCopy = (value: string | null | undefined) => {
+    if (!value || lang !== 'es') return value ?? null;
+    return value
+      .replace(/^Rappel de paiement$/i, 'Recordatorio de pago')
+      .replace(/\b(\d+)\s+jours?\b/gi, '$1 días')
+      .replace(/\béchéance\b/gi, 'vence')
+      .replace(/\bjours?\b/gi, 'días');
+  };
   const priority = typeof notification.payload?.priority === "string"
     ? notification.payload.priority
     : null;
-  const tone: AlertTone = priority === "urgent"
+  const tone: SignalTone = priority === "urgent"
     ? "attention"
-    : priority === "important"
+    : priority === "important" || isPaymentReminder
       ? "warning"
       : notification.type === "bilan_pending"
         ? "attention"
@@ -397,6 +521,8 @@ function notificationAlertItem(notification: ClientNotificationItem): PriorityIt
 
   const icon = isLevelUp
     ? Trophy
+    : isPaymentReminder
+      ? CreditCard
     : notification.type === "bilan_pending"
     ? FileText
     : notification.type === "coach_message" || notification.type === "coach_feedback" || notification.type === "coach_note"
@@ -411,8 +537,12 @@ function notificationAlertItem(notification: ClientNotificationItem): PriorityIt
 
   return {
     key: `notification-${notification.id}`,
-    title: isCoachMessage ? (notification.body ?? notification.title) : notification.title,
-    label: "Ouvrir",
+    eyebrow: notificationEyebrow(notification, lang),
+    title: isCoachMessage ? (notification.body ?? notification.title) : isPaymentReminder ? localizePaymentCopy(notification.title) : notification.title,
+    body: isCoachMessage ? null : isPaymentReminder ? localizePaymentCopy(notification.body) : notification.body,
+    label: isPaymentReminder
+      ? ct(lang, 'dashboard.notifications.view')
+      : ct(lang, 'dashboard.notifications.open'),
     href: isCoachMessage ? undefined : notificationHref(notification),
     icon,
     tone,
@@ -442,7 +572,24 @@ export default function ClientDashboard({
   nextAppointment = null,
 }: DashboardProps) {
   const router = useRouter();
-  const { chat: unreadCoachMessages } = useInboxUnreadCount();
+  const searchParams = useSearchParams();
+  const stripeParam = (searchParams as any)?.get("stripe") ?? null;
+  const [stripeStatus, setStripeStatus] = useState<string | null>(stripeParam);
+
+  useEffect(() => {
+    if (stripeParam) {
+      setStripeStatus(stripeParam);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("stripe");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+  }, [stripeParam]);
+
+  const {
+    chat: unreadCoachMessages,
+    refresh: refreshInboxBadge,
+  } = useInboxUnreadCount();
+  // Messagerie badge = chat only (not home system alerts)
   const copy = dashboardCopy(lang);
   const t = useCallback(
     (key: Parameters<typeof ct>[1], vars?: Record<string, string | number>) =>
@@ -461,6 +608,12 @@ export default function ClientDashboard({
   const [cycleModalOpen, setCycleModalOpen] = useState(false);
   const [openCoachMessage, setOpenCoachMessage] = useState<ClientNotificationItem | null>(null);
   const [dismissedNotificationIds, setDismissedNotificationIds] = useState<Set<string>>(new Set());
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setCurrentTime(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const dismissNotifications = useCallback((notificationIds: string[]) => {
     const uniqueIds = [...new Set(notificationIds)].filter(Boolean);
@@ -471,24 +624,95 @@ export default function ClientDashboard({
       uniqueIds.forEach((id) => next.add(id));
       return next;
     });
-    emitClientInboxUpdated();
-
     uniqueIds.forEach((id) => {
-      void sendClientMutation({
-        kind: "notification",
-        url: `/api/client/notifications/${id}`,
-        method: "PATCH",
-      }).then((result) => {
-        if (!result.queued) router.refresh();
-      });
-    });
-  }, [router]);
+      void (async () => {
+        try {
+          const result = await sendClientMutation({
+            kind: "notification",
+            url: `/api/client/notifications/${id}`,
+            method: "PATCH",
+          });
+          if (result.queued) return;
+          if (!result.response?.ok) throw new Error("dismiss_notification_failed");
 
+          emitClientInboxUpdated();
+          await refreshInboxBadge();
+          router.refresh();
+        } catch {
+          setDismissedNotificationIds((current) => {
+            const next = new Set(current);
+            next.delete(id);
+            return next;
+          });
+          emitClientInboxUpdated();
+        }
+      })();
+    });
+  }, [refreshInboxBadge, router]);
+
+  const markNotificationsAsRead = useCallback(async (notificationIds: string[]) => {
+    const uniqueIds = [...new Set(notificationIds)].filter(Boolean);
+    if (uniqueIds.length === 0) return;
+
+    setDismissedNotificationIds((current) => {
+      const next = new Set(current);
+      uniqueIds.forEach((id) => next.add(id));
+      return next;
+    });
+    try {
+      const result = await sendClientMutation({
+        kind: "notification",
+        url: "/api/client/notifications",
+        method: "PATCH",
+        body: { notificationIds: uniqueIds },
+      });
+      if (!result.queued && !result.response?.ok) {
+        throw new Error("mark_notifications_read_failed");
+      }
+      if (!result.queued) {
+        emitClientInboxUpdated();
+        await refreshInboxBadge();
+        router.refresh();
+      }
+    } catch (error) {
+      setDismissedNotificationIds((current) => {
+        const next = new Set(current);
+        uniqueIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      emitClientInboxUpdated();
+      throw error;
+    }
+  }, [refreshInboxBadge, router]);
+
+  // Non-critical: defer cycle status so it doesn't contend with first paint.
   useEffect(() => {
-    fetch('/api/client/cycle/status')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.cycleState) setCycleState(data.cycleState) })
-      .catch(() => {})
+    let cancelled = false;
+    let idleId: number | null = null;
+    let timeoutId: number | null = null;
+
+    const load = () => {
+      fetch("/api/client/cycle/status")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!cancelled && data?.cycleState) setCycleState(data.cycleState);
+        })
+        .catch(() => {});
+    };
+
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(load, { timeout: 2500 });
+    } else {
+      timeoutId = window.setTimeout(load, 900);
+    }
+
+    return () => {
+      cancelled = true;
+      if (idleId != null && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+    };
   }, []);
 
   useEffect(() => {
@@ -548,6 +772,9 @@ export default function ClientDashboard({
     // (ConditionalClientShell renders a <main> with overflow-y-auto)
     let scrollParent: HTMLElement | null = root.parentElement;
     while (scrollParent) {
+      if (scrollParent.tagName === "MAIN") {
+        break;
+      }
       const style = window.getComputedStyle(scrollParent);
       const overflowY = style.overflowY;
       if (overflowY === "auto" || overflowY === "scroll") {
@@ -598,53 +825,152 @@ export default function ClientDashboard({
     }
   }, [todayStrip]);
 
-  // ── Priority items ────────────────────────────────────────────────────────
-  const priorityItems = useMemo<PriorityItem[]>(() => {
-    const items: PriorityItem[] = [];
+  const visibleNotifications = useMemo(
+    () => notifications.filter((notification) => !dismissedNotificationIds.has(notification.id)),
+    [dismissedNotificationIds, notifications],
+  );
 
-    if (assessments.pending[0]) {
+  // Home system notifications — persist until action done (don't require unread only
+  // for bilan/payment; still hide dismissed-for-session noise).
+  const homeSystemNotifications = useMemo(
+    () =>
+      visibleNotifications.filter((notification) => {
+        if (!isHomeSystemNotification(notification)) return false;
+        if (isPersistentHomeAction(notification)) return true;
+        return !notification.read_at;
+      }),
+    [visibleNotifications],
+  );
+
+  const homeNotificationItems = useMemo((): HomeNotificationItem[] => {
+    const items: HomeNotificationItem[] = [];
+
+    // Pending bilans (always until completed)
+    for (const assessment of assessments.pending) {
       items.push({
-        key: `assessment-${assessments.pending[0].id}`,
-        title: assessments.pending[0].name,
+        key: `assessment-${assessment.id}`,
+        eyebrow: t('dashboard.notifications.category.assessment'),
+        title: assessment.name,
+        body: t('dashboard.notifications.assessment.body'),
         label: copy.openAssessment,
-        href: assessments.pending[0].token
-          ? `/bilan/${assessments.pending[0].token}`
+        href: assessment.token
+          ? `/bilan/${assessment.token}`
           : "/client/bilans",
         icon: FileText,
         tone: "attention",
       });
     }
 
-    return items;
-  }, [assessments.pending, copy]);
+    // Check-in pending
+    if ((todayStrip?.checkin?.pendingCount ?? 0) > 0) {
+      items.push({
+        key: "checkin-pending",
+        eyebrow: t('dashboard.notifications.checkin'),
+        title:
+          todayStrip!.checkin.pendingCount === 2
+            ? t('dashboard.notifications.checkin.two')
+            : t('dashboard.notifications.checkin.one'),
+        body: t('dashboard.notifications.checkin.body'),
+        label: t('dashboard.notifications.open'),
+        onClick: handleCheckinClick,
+        icon: MoonStar,
+        tone: "warning",
+      });
+    }
 
-  const visibleNotifications = useMemo(
-    () => notifications.filter((notification) => !dismissedNotificationIds.has(notification.id)),
-    [dismissedNotificationIds, notifications],
-  );
+    // Planned workout session pending for today
+    const pendingTodaySession = (todayStrip?.sessions ?? []).find((s) => !s.completed);
+    if (pendingTodaySession) {
+      items.push({
+        key: `session-pending-${pendingTodaySession.id}`,
+        eyebrow: t('dashboard.notifications.workout'),
+        title: t('dashboard.notifications.workout.pending'),
+        body: pendingTodaySession.name
+          ? t('dashboard.notifications.workout.session', { name: pendingTodaySession.name })
+          : t('dashboard.notifications.workout.body'),
+        label: t('dashboard.notifications.start'),
+        href: `/client/programme/session/${pendingTodaySession.id}`,
+        icon: Dumbbell,
+        tone: "attention",
+      });
+    }
 
-  const alertNotifications = useMemo(
-    () => visibleNotifications.filter((notification) =>
-      notification.payload?.event !== "checkin_reminder" && !isCoachMessageNotification(notification),
-    ),
-    [visibleNotifications],
-  );
+    // Appointment awaiting confirmation (or next appointment as soft signal)
+    if (nextAppointment) {
+      const needsConfirm =
+        nextAppointment.status === "awaiting_confirmation";
+      items.push({
+        key: `appointment-${nextAppointment.id}`,
+        eyebrow: needsConfirm
+          ? t('dashboard.notifications.confirmationRequired')
+          : t('dashboard.notifications.appointment'),
+        title: nextAppointment.title,
+        body: new Intl.DateTimeFormat(localeFor(lang), {
+          weekday: "long",
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: nextAppointment.client_timezone || undefined,
+        }).format(new Date(nextAppointment.starts_at)),
+        label: needsConfirm
+          ? t('dashboard.notifications.confirm')
+          : t('dashboard.notifications.open'),
+        href: `/client/rendez-vous/${nextAppointment.id}`,
+        icon: Calendar,
+        tone: needsConfirm ? "warning" : "info",
+      });
+    }
 
-  const dashboardAlerts = useMemo(
-    () => [...priorityItems, ...alertNotifications.map((notification) => {
-      const item = notificationAlertItem(notification);
-      return {
-        ...item,
+    // Inbox rows (payments, programme, etc.)
+    for (const notification of homeSystemNotifications) {
+      // Skip bilan notifs if already listed from assessments.pending
+      if (
+        notification.type === "bilan_pending" &&
+        assessments.pending.length > 0
+      ) {
+        continue;
+      }
+      const item = notificationAlertItem(notification, lang);
+      const persistent = isPersistentHomeAction(notification);
+      items.push({
+        key: item.key,
+        eyebrow: item.eyebrow,
+        title: item.title,
+        body: item.body,
+        label: item.label,
+        href: item.href,
+        icon: item.icon,
+        tone: item.tone,
+        notificationId: notification.id,
+        isPersistent: persistent,
+        onDismiss: persistent
+          ? undefined
+          : () => dismissNotifications([notification.id]),
         onClick: () => {
-          dismissNotifications([notification.id]);
+          // Persistent actions: navigate without dismissing until truly done
+          if (!persistent) {
+            dismissNotifications([notification.id]);
+          }
           if (isCoachMessageNotification(notification)) {
             setOpenCoachMessage(notification);
           }
         },
-      };
-    })],
-    [alertNotifications, dismissNotifications, priorityItems],
-  );
+      });
+    }
+
+    return items;
+  }, [
+    assessments.pending,
+    copy.openAssessment,
+    dismissNotifications,
+    handleCheckinClick,
+    homeSystemNotifications,
+    nextAppointment,
+    todayStrip,
+    t,
+    lang,
+  ]);
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const heroName = clientFirstName?.trim() || copy.greetingFallback;
@@ -658,7 +984,11 @@ export default function ClientDashboard({
   const waterLogged = todayStrip?.water?.logged ?? 0;
   const waterTarget = todayStrip?.water?.target ?? 0;
   const unreadCount = unreadCoachMessages;
-  const greeting = getTimeGreeting(lang);
+  const greeting = getTimeGreeting(
+    lang,
+    todayStrip?.timezone,
+    new Date(currentTime),
+  );
 
   // ── Gamification Logic ────────────────────────────────────────────────────
   let gamification = null;
@@ -669,7 +999,6 @@ export default function ClientDashboard({
 
     gamification = {
       ...streak,
-      level: progression.level,
       availablePoints,
       levelColor,
       ...progression,
@@ -716,41 +1045,39 @@ export default function ClientDashboard({
         />
       )}
 
-      <div ref={rootRef} className="premium-dashboard-bg text-white">
-        <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-          <video
-            className="h-full w-full object-cover"
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="metadata"
-            poster="/images/lclient-dashboard-bg.jpg"
+      <div
+        ref={rootRef}
+        className="relative isolate min-h-full bg-[#0a0a0a] text-white"
+      >
+          {/* ── FIXED HEADER — logo → strip du jour ── */}
+          <div
+            ref={heroRef}
+            className="fixed top-0 left-1/2 z-30 w-full max-w-xl -translate-x-1/2"
           >
-            <source src="/videos/client-dashboard-bg.mp4" type="video/mp4" />
-          </video>
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,6,7,0.48),rgba(6,6,7,0.82))]" />
-        </div>
-        <div className="premium-dashboard-content">
-
-          {/* ── FIXED HEADER — stays locked at the top of the screen ── */}
-          <div ref={heroRef} className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-xl z-30">
-            <div className="w-full rounded-b-[32px] bg-[var(--client-chrome-bg)] pt-1 shadow-lg shadow-black/40">
+            <div data-client-home-hero className="w-full rounded-b-[32px] border-x-[0.3px] border-b-[0.3px] border-white/[0.06] bg-[#0a0a0a] pt-1 shadow-[0_12px_28px_rgba(0,0,0,0.35)]">
               <div
                 className="mx-auto w-full max-w-xl px-4"
                 style={{ paddingTop: "max(env(safe-area-inset-top), 16px)" }}
               >
-                <div className="flex items-center justify-between pb-3 pt-2.5">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-3 pb-3 pt-2.5">
+                  <div className="flex min-w-0 items-center gap-2">
                     <Image
                       src="/logo/logo-stryvr-silver.png"
                       alt="STRYVR Logo"
                       width={20}
                       height={20}
-                      className="w-5 h-5 object-contain"
+                      className="h-5 w-5 object-contain"
                     />
-                    <span className="text-[12px] font-bold tracking-[0.25em] text-white/90">STRYVR</span>
+                    <span className="text-[12px] font-bold tracking-[0.25em] text-white/90">
+                      STRYVR
+                    </span>
                   </div>
+                  {coach.fullName?.trim() && (
+                    <p className="max-w-[48%] truncate text-right text-[11px] font-medium tracking-wide text-white/40">
+                      <span className="text-white/25">{t('dashboard.coach')} </span>
+                      {coach.fullName.trim()}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex min-w-0 items-center justify-between gap-3 pb-3">
@@ -764,7 +1091,7 @@ export default function ClientDashboard({
                         {clientFirstName?.trim() ? `${greeting}, ${heroName}` : greeting}
                       </h1>
                       <p className="text-[12px] text-white/50 mt-1.5 leading-none font-medium">
-                        {formatLongDate(lang)}
+                        {formatLongDate(lang, todayStrip?.timezone)}
                       </p>
                     </div>
                   </div>
@@ -776,7 +1103,7 @@ export default function ClientDashboard({
                         onClick={() => setIsProgressionExpanded(!isProgressionExpanded)}
                         aria-expanded={isProgressionExpanded}
                         aria-label={`${t('dashboard.points')}: ${gamification.availablePoints}. ${gamification.level}`}
-                        className="flex h-12 min-w-[88px] flex-col justify-center rounded-2xl border border-white/[0.04] bg-[#111111] px-3 text-left transition-colors hover:bg-[#151515] active:scale-[0.98]"
+                        className="flex h-12 min-w-[88px] flex-col justify-center rounded-2xl bg-white/[0.04] px-3 text-left transition-colors hover:bg-white/[0.06] active:scale-[0.98]"
                       >
                         <span className="flex items-center gap-1 text-[14px] font-bold leading-none tabular-nums text-white">
                           {gamification.availablePoints}<StrivrToken size={14} />
@@ -801,7 +1128,7 @@ export default function ClientDashboard({
                           created_at: new Date().toISOString(),
                         })
                       }}
-                      className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.04] bg-[#111111] text-white/75 transition-colors hover:bg-[#151515] active:scale-[0.96]"
+                      className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.04] text-white/75 transition-colors hover:bg-white/[0.06] active:scale-[0.96]"
                     >
                       <MessageSquareText size={18} />
                       {unreadCount > 0 && (
@@ -814,7 +1141,7 @@ export default function ClientDashboard({
                 </div>
 
                 {hasCycleIndicator && cycleState?.currentPhase && cycleState.currentCycleDay && (
-                  <div className="mb-3 flex min-h-[58px] w-full items-center justify-between rounded-2xl border border-white/[0.04] bg-[#111111] px-3.5 py-2 text-left">
+                  <div className="mb-3 flex min-h-[58px] w-full items-center justify-between rounded-2xl bg-[#181818] px-3.5 py-2 text-left">
                     <button
                       type="button"
                       onClick={() => setCycleModalOpen(true)}
@@ -842,7 +1169,7 @@ export default function ClientDashboard({
                 )}
 
                 {!hasCycleIndicator && clientPhase && (
-                  <div className="mb-3 flex min-h-[52px] items-center justify-between rounded-2xl border border-white/[0.04] bg-[#111111] px-3.5 py-2.5">
+                  <div className="mb-3 flex min-h-[52px] items-center justify-between rounded-2xl bg-[#181818] px-3.5 py-2.5">
                     <div>
                       <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-white/35">
                         {t('dashboard.phaseLabel')}
@@ -869,7 +1196,7 @@ export default function ClientDashboard({
                     <div className="border-t border-white/[0.04] py-4">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-white/[0.04] bg-[#111111]" style={{ color: gamification.levelColor }}>
+                          <span className="rounded-lg bg-white/[0.04] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: gamification.levelColor }}>
                             {gamification.level}
                           </span>
                         </div>
@@ -900,7 +1227,7 @@ export default function ClientDashboard({
                   </div>
                 )}
 
-                {/* Today strip — below the hero card, in the shell gradient zone */}
+                {/* Today strip — directly on the hero surface */}
                 <div
                   className="overflow-hidden transition-all duration-300 ease-out"
                   style={{
@@ -908,16 +1235,14 @@ export default function ClientDashboard({
                     opacity: heroCollapsed && !isProgressionExpanded ? 0 : 1,
                   }}
                 >
-                  <div className="border-t border-white/[0.04] py-1.5 pb-2">
-                    <ChatTodayStrip
-                      data={todayStrip}
-                      onCheckinClick={handleCheckinClick}
-                      onWaterClick={() => setWaterOpen(true)}
-                      onRefresh={() => router.refresh()}
-                      className="bg-transparent"
-                      surfaceClassName="border border-white/[0.04] bg-[#111111]"
-                    />
-                  </div>
+                  <ChatTodayStrip
+                    data={todayStrip}
+                    onCheckinClick={handleCheckinClick}
+                    onWaterClick={() => setWaterOpen(true)}
+                    onRefresh={() => router.refresh()}
+                    className="bg-[#0a0a0a]"
+                    surfaceClassName="bg-white/[0.03]"
+                  />
                 </div>
 
               </div>
@@ -925,56 +1250,41 @@ export default function ClientDashboard({
           </div>
 
           {/* ── BODY ── */}
-          <main className="mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pb-28" style={{ paddingTop: `${heroHeight + 16}px` }}>
+          <main className="relative z-10 mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pb-28" style={{ paddingTop: `${heroHeight + 16}px` }}>
 
-            {/* ── Action alert buttons ── */}
-            {dashboardAlerts.length > 0 && (
-              <div className="flex flex-col gap-2.5">
-                {dashboardAlerts.map((item) => (
-                  <ActionAlertButton key={item.key} item={item} />
-                ))}
-              </div>
+            {/* ── Stripe payment status banners ── */}
+            {stripeStatus === "success" && (
+              <DashboardSignalCard
+                body={t('dashboard.payment.success.body')}
+                eyebrow={t('dashboard.notifications.category.payment')}
+                icon={CheckCircle}
+                label="OK"
+                onDismiss={() => setStripeStatus(null)}
+                title={t('dashboard.payment.success.title')}
+                tone="success"
+              />
             )}
 
-            {/* ── Transformation Score Widget ── */}
+            {stripeStatus === "cancelled" && (
+              <DashboardSignalCard
+                body={t('dashboard.payment.cancelled.body')}
+                eyebrow={t('dashboard.notifications.category.payment')}
+                icon={AlertCircle}
+                label={t('dashboard.payment.cancelled.label')}
+                onDismiss={() => setStripeStatus(null)}
+                title={t('dashboard.payment.cancelled.title')}
+                tone="warning"
+              />
+            )}
+
+            {/* ── Notifications (compact + expandable) — system actions only ── */}
+            <HomeNotificationsSection
+              items={homeNotificationItems}
+              onMarkAllRead={markNotificationsAsRead}
+            />
+
+            {/* ── Transformation Score → Balance énergétique (paired, nothing between) ── */}
             <ClientTransformationWidget clientId={clientId} />
-
-            {/* ── Upcoming Coaching Appointment Card ── */}
-            {nextAppointment && (
-              <div 
-                onClick={() => router.push(`/client/rendez-vous/${nextAppointment.id}`)}
-                className="premium-panel bg-[#09090a] border border-[#c6b48b]/20 hover:border-[#c6b48b]/40 rounded-[22px] p-5 flex items-center justify-between shadow-sm cursor-pointer transition-all group"
-              >
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#c6b48b]/10 text-[#c6b48b]">
-                    <Calendar size={18} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#c6b48b]">
-                      {nextAppointment.status === 'awaiting_confirmation' 
-                        ? '⏳ Confirmation requise' 
-                        : '📅 Appel coach'}
-                    </p>
-                    <h3 className="mt-1 text-[15px] font-bold tracking-tight text-white truncate">
-                      {nextAppointment.title}
-                    </h3>
-                    <p className="mt-1 text-[12px] text-white/55 font-medium">
-                      {new Intl.DateTimeFormat('fr-FR', {
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        timeZone: nextAppointment.client_timezone || undefined
-                      }).format(new Date(nextAppointment.starts_at))}
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight size={16} className="text-white/20 group-hover:text-white/55 transition-colors shrink-0" />
-              </div>
-            )}
-
-            {/* ── Progression & Rewards Widget removed from here (now in header) ── */}
 
             {/* ── Weekly Calories Balance Widget ── */}
             {(() => {
@@ -982,8 +1292,8 @@ export default function ClientDashboard({
               const hasCalData = weeklyCalorieAvg != null && calTarget > 0;
 
               let calStatusLabel = t('dashboard.pending');
-              let calStatusColor = "text-white/30 border-white/5 bg-white/[0.01]";
               let isCalGood = false;
+              let calGap: number | null = null;
               let desc = t('dashboard.energy.empty');
 
               if (hasCalData && weeklyCalorieAvg) {
@@ -992,39 +1302,43 @@ export default function ClientDashboard({
 
                 if (isCut) {
                   isCalGood = weeklyCalorieAvg <= calTarget + 50;
+                  calGap = Math.max(0, weeklyCalorieAvg - (calTarget + 50));
                   desc = isCalGood
                     ? t('dashboard.energy.deficit.ok', { avg: weeklyCalorieAvg, target: calTarget })
                     : t('dashboard.energy.deficit.high', { avg: weeklyCalorieAvg, target: calTarget });
                 } else if (isBulk) {
                   isCalGood = weeklyCalorieAvg >= calTarget - 50;
+                  calGap = Math.max(0, (calTarget - 50) - weeklyCalorieAvg);
                   desc = isCalGood
                     ? t('dashboard.energy.surplus.ok', { avg: weeklyCalorieAvg, target: calTarget })
                     : t('dashboard.energy.surplus.low', { avg: weeklyCalorieAvg, target: calTarget });
                 } else {
                   isCalGood = Math.abs(weeklyCalorieAvg - calTarget) <= 100;
+                  calGap = Math.max(0, Math.abs(weeklyCalorieAvg - calTarget) - 100);
                   desc = isCalGood
                     ? t('dashboard.energy.maintenance.ok', { avg: weeklyCalorieAvg, target: calTarget })
                     : t('dashboard.energy.maintenance.off', { avg: weeklyCalorieAvg, target: calTarget });
                 }
 
                 calStatusLabel = isCalGood ? t('dashboard.energy.onTarget') : t('dashboard.energy.offTarget');
-                calStatusColor = isCalGood
-                  ? "text-[#5dba87] border-[#5dba87]/15 bg-[#5dba87]/5"
-                  : "text-[#ff8660] border-[#ff8660]/15 bg-[#ff8660]/5";
               }
+              const calSignalColor = colorForEnergyGap(calGap, calTarget);
 
               return (
-                <SurfaceCard className="bg-[#09090a] border border-white/[0.04] p-5 flex flex-col gap-3 shadow-sm">
+                <SurfaceCard className="flex flex-col gap-3 p-5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-white/[0.03]">
-                        <PhosphorFlame size={15} weight="fill" style={{ color: "#5dba87" }} />
-                      </div>
+                      <DashboardSectionIcon color={calSignalColor}>
+                        <Flame size={15} fill="currentColor" />
+                      </DashboardSectionIcon>
                       <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
                         {t('dashboard.energy.balance')}
                       </p>
                     </div>
-                    <span className={cn("text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border", calStatusColor)}>
+                    <span
+                      className="rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                      style={{ backgroundColor: `${calSignalColor}18`, color: calSignalColor }}
+                    >
                       {calStatusLabel}
                     </span>
                   </div>
@@ -1051,34 +1365,39 @@ export default function ClientDashboard({
               {(() => {
                 const targetSteps = stepTarget ?? 10000;
                 const pct = weeklyStepAvg ? Math.min(100, Math.round((weeklyStepAvg / targetSteps) * 100)) : 0;
+                const stepsColor = colorForSteps(weeklyStepAvg, targetSteps);
 
                 return (
-                  <SurfaceCard className="bg-[#09090a] border border-white/[0.04] p-4 flex flex-col justify-between h-[135px]">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <PhosphorFootprints size={15} weight="fill" style={{ color: "#5dba87" }} />
-                        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/50">
-                          {t('dashboard.avgSteps')}
+                  <SurfaceCard className="h-[152px] p-5">
+                    <div className="flex h-full flex-col justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <DashboardSectionIcon color={stepsColor}>
+                            <Footprints size={15} />
+                          </DashboardSectionIcon>
+                          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
+                            {t('dashboard.avgSteps')}
+                          </p>
+                        </div>
+                        <p className="text-[20px] font-bold text-white mt-3 leading-none">
+                          {weeklyStepAvg ? weeklyStepAvg.toLocaleString(lang === 'fr' ? 'fr-FR' : lang === 'es' ? 'es-ES' : 'en-US') : "—"}
+                        </p>
+                        <p className="text-[10px] text-white/35 mt-1">
+                          {t('dashboard.targetWord')} {targetSteps.toLocaleString(lang === 'fr' ? 'fr-FR' : lang === 'es' ? 'es-ES' : 'en-US')}
                         </p>
                       </div>
-                      <p className="text-[20px] font-bold text-white mt-3 leading-none">
-                        {weeklyStepAvg ? weeklyStepAvg.toLocaleString(lang === 'fr' ? 'fr-FR' : lang === 'es' ? 'es-ES' : 'en-US') : "—"}
-                      </p>
-                      <p className="text-[10px] text-white/35 mt-1">
-                        {t('dashboard.targetWord')} {targetSteps.toLocaleString(lang === 'fr' ? 'fr-FR' : lang === 'es' ? 'es-ES' : 'en-US')}
-                      </p>
-                    </div>
 
-                    <div className="w-full mt-3">
-                      <div className="h-[4px] w-full bg-white/[0.04] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-[#5dba87] rounded-full transition-all duration-500"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between items-center mt-1">
-                        <span className="text-[9px] text-white/30">{t('dashboard.avg7d')}</span>
-                        <span className="text-[9px] font-bold text-[#5dba87]">{pct}%</span>
+                      <div className="w-full pt-3">
+                        <div className="h-[4px] w-full bg-white/[0.04] rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%`, backgroundColor: stepsColor }}
+                          />
+                        </div>
+                        <div className="flex justify-between items-center mt-1">
+                          <span className="text-[9px] text-white/30">{t('dashboard.avg7d')}</span>
+                          <span className="text-[9px] font-bold" style={{ color: stepsColor }}>{pct}%</span>
+                        </div>
                       </div>
                     </div>
                   </SurfaceCard>
@@ -1086,32 +1405,35 @@ export default function ClientDashboard({
               })()}
 
               {/* Workout Volume Card */}
-              <SurfaceCard className="bg-[#09090a] border border-white/[0.04] p-4 flex flex-col justify-between h-[135px]">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <PhosphorBarbell size={15} weight="fill" style={{ color: "#5dba87" }} />
-                    <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/50">
-                      {t('dashboard.volume7d')}
+              <SurfaceCard className="h-[152px] p-5">
+                <div className="flex h-full flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <DashboardSectionIcon color={DASHBOARD_SIGNAL_COLORS.success}>
+                        <Dumbbell size={15} />
+                      </DashboardSectionIcon>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
+                        {t('dashboard.volume7d')}
+                      </p>
+                    </div>
+                    <p className="text-[20px] font-bold text-white mt-3 leading-none">
+                      {weeklyVolume ? `${weeklyVolume.toLocaleString(lang === 'fr' ? 'fr-FR' : lang === 'es' ? 'es-ES' : 'en-US')} kg` : "—"}
+                    </p>
+                    <p className="text-[10px] text-white/35 mt-1">
+                      {t('dashboard.totalLoad')}
                     </p>
                   </div>
-                  <p className="text-[20px] font-bold text-white mt-3 leading-none">
-                    {weeklyVolume ? `${weeklyVolume.toLocaleString(lang === 'fr' ? 'fr-FR' : lang === 'es' ? 'es-ES' : 'en-US')} kg` : "—"}
-                  </p>
-                  <p className="text-[10px] text-white/35 mt-1">
-                    {t('dashboard.totalLoad')}
+
+                  <p className="pt-3 text-[9px] leading-snug text-white/40">
+                    {t('dashboard.totalLoad.desc')}
                   </p>
                 </div>
-
-                <p className="text-[9px] text-white/40 leading-snug">
-                  {t('dashboard.totalLoad.desc')}
-                </p>
               </SurfaceCard>
             </div>
 
             {/* ── Weight & Body Fat Tracker Widget ── */}
             <WeightTrackerWidget />
           </main>
-        </div>
       </div>
     </>
   );

@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { sendPaymentReminderEmail } from '@/lib/email/mailer'
+import { createClientAppNotification } from '@/lib/notifications/create-client-app-notification'
+import { addLocalDays, localIsoDate } from '@/lib/payments/due-date'
 
 // ─── /api/cron/payment-reminders ──────────────────────────────────────────────
-// Called by Vercel Cron daily. Sends one reminder for each pending payment on the
-// coach-selected number of days before its due date.
+// Called by Vercel Cron daily. Sends one reminder per pending payment when:
+//  - due_date is exactly J-{coachDays} (coach setting, default 3), or
+//  - due_date is today (jour J), or
+//  - due_date is overdue (up to 14 days past) and never reminded.
+// Only coaches with notif_payment_reminder = true.
 
 function serviceClient() {
   return createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
 }
 
@@ -17,8 +22,36 @@ function isAuthorizedCronRequest(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   if (!secret) return false
 
-  return req.headers.get('authorization') === `Bearer ${secret}`
-    || req.headers.get('x-cron-secret') === secret
+  return (
+    req.headers.get('authorization') === `Bearer ${secret}` ||
+    req.headers.get('x-cron-secret') === secret
+  )
+}
+
+type PaymentRow = {
+  id: string
+  amount_eur: number
+  due_date: string
+  payment_method: string
+  coach_id: string
+  client_id: string
+  description?: string | null
+  subscription?: { formula?: { name?: string } | null } | null
+}
+
+function shouldRemindPayment(
+  payment: PaymentRow,
+  today: string,
+  coachDays: number,
+): boolean {
+  if (!payment.due_date) return false
+  // Advance reminder: due_date === today + coachDays  (J-N)
+  if (payment.due_date === addLocalDays(today, coachDays)) return true
+  // Day of due
+  if (payment.due_date === today) return true
+  // Overdue catch-up (once, thanks to reminder_sent_at)
+  if (payment.due_date < today) return true
+  return false
 }
 
 async function runPaymentReminders(req: NextRequest) {
@@ -27,49 +60,44 @@ async function runPaymentReminders(req: NextRequest) {
   }
 
   const db = serviceClient()
-  const today = new Date()
+  const today = localIsoDate()
+  const defaultDays = 3
 
-  // Fetch coach profiles with reminders enabled
+  // Only coaches who opted into auto reminders
   const { data: profiles } = await db
     .from('coach_profiles')
     .select('coach_id, notif_payment_reminder, notif_payment_reminder_days')
     .eq('notif_payment_reminder', true)
 
-  const defaultDays = 3
-  const coachTargetDates: Record<string, string> = {}
-
-  if (profiles && profiles.length > 0) {
-    for (const p of profiles) {
-      const days = p.notif_payment_reminder_days ?? defaultDays
-      const target = new Date(today)
-      target.setDate(target.getDate() + days)
-      coachTargetDates[p.coach_id] = target.toISOString().split('T')[0]
-    }
+  if (!profiles || profiles.length === 0) {
+    return NextResponse.json({ sent: 0, message: 'No coaches with payment reminders enabled' })
   }
 
-  const defaultTargetDate = new Date(today)
-  defaultTargetDate.setDate(defaultTargetDate.getDate() + defaultDays)
-  const defaultTargetDateStr = defaultTargetDate.toISOString().split('T')[0]
+  const coachDaysMap: Record<string, number> = {}
+  for (const p of profiles) {
+    coachDaysMap[p.coach_id] = p.notif_payment_reminder_days ?? defaultDays
+  }
+  const enabledCoachIds = Object.keys(coachDaysMap)
 
-  // Fetch pending payments in the J+1 → J+7 window not yet reminded. The due
-  // date is distinct from payment_date: the latter records when a payment was
-  // created or received and must never drive a payment reminder.
-  const maxTarget = new Date(today)
-  maxTarget.setDate(maxTarget.getDate() + 7)
-  const minTarget = new Date(today)
-  minTarget.setDate(minTarget.getDate() + 1)
+  // Window: overdue up to 14 days → upcoming up to 7 days (covers J-1..J-7)
+  const minDue = addLocalDays(today, -14)
+  const maxDue = addLocalDays(today, 7)
 
   const { data: payments, error } = await db
     .from('subscription_payments')
-    .select(`
-      id, amount_eur, due_date, payment_method, coach_id, client_id,
+    .select(
+      `
+      id, amount_eur, due_date, payment_method, coach_id, client_id, description,
       subscription:client_subscriptions(
         formula:coach_formulas(name)
       )
-    `)
+    `,
+    )
     .eq('status', 'pending')
-    .gte('due_date', minTarget.toISOString().split('T')[0])
-    .lte('due_date', maxTarget.toISOString().split('T')[0])
+    .in('coach_id', enabledCoachIds)
+    .not('due_date', 'is', null)
+    .gte('due_date', minDue)
+    .lte('due_date', maxDue)
     .is('reminder_sent_at', null)
 
   if (error) {
@@ -81,18 +109,19 @@ async function runPaymentReminders(req: NextRequest) {
     return NextResponse.json({ sent: 0, message: 'No payments due in window' })
   }
 
-  // Filter by each coach's configured delay
-  const filteredPayments = payments.filter(p => {
-    const targetDate = coachTargetDates[p.coach_id] ?? defaultTargetDateStr
-    return p.due_date === targetDate
+  const filteredPayments = (payments as PaymentRow[]).filter((p) => {
+    const days = coachDaysMap[p.coach_id] ?? defaultDays
+    return shouldRemindPayment(p, today, days)
   })
 
   if (filteredPayments.length === 0) {
-    return NextResponse.json({ sent: 0, message: 'No payments matching coach reminder settings' })
+    return NextResponse.json({
+      sent: 0,
+      message: 'No payments matching coach reminder settings',
+    })
   }
 
-  // Resolve coach info once per coach
-  const coachIds = Array.from(new Set(filteredPayments.map(p => p.coach_id)))
+  const coachIds = Array.from(new Set(filteredPayments.map((p) => p.coach_id)))
   const coachMap: Record<string, { name: string }> = {}
 
   for (const coachId of coachIds) {
@@ -116,23 +145,61 @@ async function runPaymentReminders(req: NextRequest) {
         .eq('id', payment.client_id)
         .single()
 
-      if (!client?.email) continue
-
       const coach = coachMap[payment.coach_id] ?? { name: 'Votre coach' }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sub = payment.subscription as any
-      const formulaName: string = sub?.formula?.name ?? 'Coaching'
+      const sub = payment.subscription as { formula?: { name?: string } } | null
+      const formulaName: string =
+        sub?.formula?.name ?? payment.description ?? 'Coaching'
 
-      await sendPaymentReminderEmail({
-        to: client.email,
-        clientFirstName: client.first_name ?? '',
-        coachName: coach.name,
-        formulaName,
-        amount: Number(payment.amount_eur),
-        dueDate: payment.due_date,
-        paymentMethod: payment.payment_method,
-        fromName: coach.name,
-      })
+      // Skip if neither email nor client id (cannot reach anyone)
+      if (!client?.email && !payment.client_id) {
+        continue
+      }
+
+      if (client?.email) {
+        await sendPaymentReminderEmail({
+          to: client.email,
+          clientFirstName: client.first_name ?? '',
+          coachName: coach.name,
+          formulaName,
+          amount: Number(payment.amount_eur),
+          dueDate: payment.due_date,
+          paymentMethod: payment.payment_method,
+          fromName: coach.name,
+        })
+      }
+
+      try {
+        await createClientAppNotification(db, {
+          clientId: payment.client_id,
+          coachId: payment.coach_id,
+          type: 'system_reminder',
+          copyKey: 'payment.reminder',
+          copyParams: {
+            amount: Number(payment.amount_eur),
+            dueDate: payment.due_date,
+            formulaName,
+          },
+          payload: {
+            event: 'payment_reminder',
+            payment_id: payment.id,
+            priority: 'important',
+          },
+          actionUrl: `/client/paiement?payment_id=${encodeURIComponent(payment.id)}`,
+          pushKind: 'essential',
+          pushTag: `payment-reminder-${payment.id}`,
+        })
+      } catch (notifErr) {
+        // Email may already be sent — don't fail the cron for app notif
+        console.error(
+          `[cron/payment-reminders] in-app notif failed for ${payment.id}:`,
+          notifErr,
+        )
+        // If no email either, do not mark as reminded so we can retry
+        if (!client?.email) {
+          errors.push(payment.id)
+          continue
+        }
+      }
 
       await db
         .from('subscription_payments')
@@ -140,6 +207,7 @@ async function runPaymentReminders(req: NextRequest) {
         .eq('id', payment.id)
 
       sentCount++
+
     } catch (err) {
       console.error(`[cron] Failed for payment ${payment.id}:`, err)
       errors.push(payment.id)
@@ -152,8 +220,6 @@ async function runPaymentReminders(req: NextRequest) {
   })
 }
 
-// Vercel Cron invokes scheduled routes with GET and an Authorization bearer
-// token. POST remains available for the existing internal/manual scheduler.
 export async function GET(req: NextRequest) {
   return runPaymentReminders(req)
 }

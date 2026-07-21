@@ -18,6 +18,7 @@ import {
 import { fetchActiveSmoothingPlanDaysForDates } from '@/lib/nutrition/smoothing/fetch'
 import { inferNutritionDayRole } from '@/lib/nutrition/day-role'
 import { fetchClientTdeeState } from '@/lib/nutrition/tdee-state'
+import { validateProtocolFoodCompatibility } from '@/lib/nutrition/protocol-food-validation'
 
 function serviceClient() {
   return createServiceClient(
@@ -361,6 +362,21 @@ export async function POST(
   if (!body.success) return NextResponse.json({ error: body.error }, { status: 400 })
 
   const db = serviceClient()
+  const foodValidation = await validateProtocolFoodCompatibility({
+    db,
+    clientId,
+    days: body.data.days,
+  })
+  const blockedFood = foodValidation.issues.find((issue) => issue.status === 'blocked')
+  if (blockedFood) {
+    return NextResponse.json(
+      {
+        error: `${blockedFood.food_name} est incompatible avec le profil alimentaire du client.`,
+        food_compatibility_issues: foodValidation.issues,
+      },
+      { status: 409 },
+    )
+  }
   const clientTdeeState = await fetchClientTdeeState(db as any, clientId)
   const tdeeReference = body.data.tdee_reference ?? clientTdeeState?.current_tdee ?? null
 

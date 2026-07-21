@@ -1,27 +1,20 @@
 'use client'
-
-import Link from 'next/link'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { shiftIsoDate } from '@/lib/utils/date'
 import { getNutritionProgressMeta, type NutritionProgressState } from '@/lib/nutrition/progress'
 import { computeNutritionBalance } from '@/lib/nutrition/balance'
 import type { NutritionMacros } from './SmartNutritionWidget'
 import { NUTRITION_UI_COLORS } from '@/lib/nutrition/ui-colors'
 import { useClientT } from '../ClientI18nProvider'
-import { clientLocale } from '@/lib/i18n/clientTranslations'
 
 type Props = {
-  date: string
   consumed: NutritionMacros
   target: NutritionMacros
   onWaterClick?: () => void
   smoothingSlot?: React.ReactNode
   simulationMode?: boolean
-  gender?: string | null
-  bodyWeightKg?: number | null
   compact?: boolean
   micro?: boolean
   showSimulationBadge?: boolean
+  hideHydration?: boolean
 }
 
 const MACRO_KEYS = [
@@ -29,14 +22,6 @@ const MACRO_KEYS = [
   { key: 'carbs_g'   as const, iKey: 'nutrition.carbs' as const,   color: NUTRITION_UI_COLORS.carbs   },
   { key: 'fat_g'     as const, iKey: 'nutrition.fat' as const,     color: NUTRITION_UI_COLORS.fat     },
 ]
-
-const shiftDate = shiftIsoDate
-
-function formatNav(iso: string, locale: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  return new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'short' })
-    .format(new Date(Date.UTC(y, m - 1, d)))
-}
 
 function formatOverflow(value: number, unit: 'g' | 'L'): string | null {
   if (value <= 0) return null
@@ -204,22 +189,17 @@ function MacroSquircleGauge({
 }
 
 export default function SmartNutritionHero({
-  date,
   consumed,
   target,
   onWaterClick,
   smoothingSlot,
   simulationMode = false,
-  gender,
-  bodyWeightKg,
   compact = false,
   micro = false,
   showSimulationBadge = true,
+  hideHydration = false,
 }: Props) {
-  const { lang, t } = useClientT()
-  const locale = clientLocale(lang)
-  const prev = shiftDate(date, -1)
-  const next = shiftDate(date, 1)
+  const { t } = useClientT()
   const balance = computeNutritionBalance(consumed, target)
   const MACROS = MACRO_KEYS.map(m => ({ ...m, label: t(m.iKey as any) }))
 
@@ -233,57 +213,43 @@ export default function SmartNutritionHero({
 
   const waterMeta          = getNutritionProgressMeta(consumed.water_ml, target.water_ml)
   const waterOverflowLabel = formatOverflow((consumed.water_ml - target.water_ml) / 1000, 'L')
-  const cardPadding = micro ? '8px' : compact ? '12px' : '18px'
-  const gaugeGapClass = micro ? 'gap-2 mt-1' : compact ? 'gap-2.5 mt-1.5' : 'gap-3 mt-2'
+  const cardPadding = micro ? '8px' : compact ? '12px' : '14px'
+  const gaugeGapClass = micro ? 'gap-2 mt-1' : compact ? 'gap-2 mt-1' : 'gap-2 mt-1.5'
 
   return (
     <div
-      className="bg-[#111111] rounded-2xl"
-      style={simulationMode ? {
-        padding: cardPadding,
-        backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)',
-        backgroundSize: '18px 18px',
-        backgroundColor: '#111111',
-      } : { padding: cardPadding }}
+      className={`rounded-2xl ${
+        simulationMode
+          ? 'border-[0.3px] border-white/[0.06] bg-[#181818]'
+          : 'bg-[#111111]'
+      }`}
+      style={{ padding: cardPadding }}
     >
 
-      {/* ── Simulation badge ── */}
-      {simulationMode && showSimulationBadge && (
-        <div className={`flex items-center ${micro ? 'mb-1' : compact ? 'mb-1.5' : 'mb-3'}`}>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.08]">
-            <div className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />
-            <span className="text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/82">Simulation</span>
+        {/* ── Simulation badge ── */}
+        {simulationMode && showSimulationBadge && (
+          <div className={`flex items-center ${micro ? 'mb-1' : compact ? 'mb-1.5' : 'mb-3'}`}>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.08]">
+              <div className="w-1.5 h-1.5 rounded-full bg-white/80 animate-pulse" />
+              <span className="text-[9px] font-barlow-condensed font-bold uppercase tracking-[0.18em] text-white/82">Simulation</span>
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* ── Date nav — hidden in simulation ── */}
-      {!simulationMode && (
-        <div className="flex items-center justify-between mb-6">
-          <Link href={`/client/nutrition?date=${prev}`} className="flex items-center gap-1 text-white/50 text-[11px]">
-            <ChevronLeft size={14} />{formatNav(prev, locale)}
-          </Link>
-          <span className="text-[17px] font-black tracking-[-0.02em] text-white">{formatNav(date, locale)}</span>
-          <Link href={`/client/nutrition?date=${next}`} className="flex items-center gap-1 text-white/50 text-[11px]">
-            {formatNav(next, locale)}<ChevronRight size={14} />
-          </Link>
-        </div>
-      )}
+        )}
 
       <div className={`grid grid-cols-4 ${gaugeGapClass}`}>
-        <MacroSquircleGauge
-          label="Calories"
-          valueText={String(Math.round(consumed.kcal))}
-          secondaryText={kcalOverflow > 0 ? `+${kcalOverflow}` : String(Math.round(target.kcal - consumed.kcal))}
-          footerText={kcalRemaining <= 0 || kcalOverflow > 0 ? kcalStatus.label : `${Math.round(target.kcal)}`}
-          progress={target.kcal > 0 ? consumed.kcal / target.kcal : 0}
-          color={kcalGaugeColor}
-          footerColor="rgba(255,255,255,0.4)"
-          compact={compact}
-          micro={micro}
-          animateProgress={!simulationMode}
-        />
-        {MACROS.map(m => {
+          <MacroSquircleGauge
+            label="Calories"
+            valueText={String(Math.round(consumed.kcal))}
+            secondaryText={kcalOverflow > 0 ? `+${kcalOverflow}` : String(Math.round(target.kcal - consumed.kcal))}
+            footerText={kcalRemaining <= 0 || kcalOverflow > 0 ? kcalStatus.label : `${Math.round(target.kcal)}`}
+            progress={target.kcal > 0 ? consumed.kcal / target.kcal : 0}
+            color={kcalGaugeColor}
+            footerColor="rgba(255,255,255,0.4)"
+            compact={compact}
+            micro={micro}
+            animateProgress={!simulationMode}
+          />
+          {MACROS.map(m => {
           const consumedValue = consumed[m.key] ?? 0
           const targetValue = target[m.key] ?? 0
           const overflowValue = Math.max(0, consumedValue - targetValue)
@@ -308,13 +274,14 @@ export default function SmartNutritionHero({
               animateProgress={!simulationMode}
             />
           )
-        })}
+          })}
       </div>
 
-      {!simulationMode && (
+      {!simulationMode && !hideHydration && (
         <button
+          type="button"
           onClick={onWaterClick}
-          className={`${compact ? 'mt-3 pt-2.5' : 'mt-4 pt-3'} w-full text-left group`}
+          className={`${compact ? 'mt-2 pt-2' : 'mt-2.5 pt-2'} group w-full border-t border-white/[0.06] text-left`}
           disabled={!onWaterClick}
         >
           <div className="flex justify-between text-[10px] mb-1.5">
@@ -348,7 +315,6 @@ export default function SmartNutritionHero({
           {smoothingSlot}
         </div>
       ) : null}
-
     </div>
   )
 }

@@ -95,27 +95,27 @@ const SUB_STATUS: Record<string, { label: string; cls: string; dot: string }> =
   {
     active: {
       label: "Actif",
-      cls: "bg-emerald-100 text-emerald-700",
+      cls: "bg-emerald-500/12 text-emerald-400",
       dot: "bg-emerald-400",
     },
     trial: {
       label: "Essai",
-      cls: "bg-blue-100 text-blue-700",
+      cls: "bg-blue-500/12 text-blue-400",
       dot: "bg-blue-400",
     },
     paused: {
       label: "Pausé",
-      cls: "bg-amber-100 text-amber-700",
+      cls: "bg-amber-500/12 text-amber-400",
       dot: "bg-amber-400",
     },
     cancelled: {
       label: "Annulé",
-      cls: "bg-red-100 text-red-700",
+      cls: "bg-red-500/12 text-red-400",
       dot: "bg-red-400",
     },
     expired: {
       label: "Expiré",
-      cls: "bg-gray-100 text-gray-500",
+      cls: "bg-white/8 text-white/40",
       dot: "bg-gray-400",
     },
   };
@@ -123,15 +123,15 @@ const SUB_STATUS: Record<string, { label: string; cls: string; dot: string }> =
 const PAYMENT_STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
   paid: {
     label: "Payé",
-    cls: "bg-emerald-100 text-emerald-700",
+    cls: "bg-emerald-500/12 text-emerald-400",
   },
   pending: {
     label: "En attente",
-    cls: "bg-amber-100 text-amber-700",
+    cls: "bg-amber-500/12 text-amber-400",
   },
   failed: {
     label: "Échoué",
-    cls: "bg-red-100 text-red-700",
+    cls: "bg-red-500/12 text-red-400",
   },
 };
 
@@ -549,7 +549,7 @@ export default function FormulasPage() {
                                   {formula.name}
                                 </h2>
                                 {!formula.is_active && (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/8 text-white/40">
                                     Archivée
                                   </span>
                                 )}

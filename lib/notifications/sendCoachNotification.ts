@@ -17,7 +17,6 @@ export interface NotifyCoachParams {
   clientFirstName: string
   messageExcerpt?: string
 }
-
 export async function notifyCoach(params: NotifyCoachParams): Promise<void> {
   const {
     db, coachId, clientId, chatMessageId,
@@ -60,4 +59,47 @@ export async function notifyCoach(params: NotifyCoachParams): Promise<void> {
       .eq('category', 'safety')
       .eq('status', 'pending')
   }
+}
+
+export async function sendCoachNotification(
+  db: SupabaseClient,
+  params: {
+    coachId: string
+    clientId?: string
+    type: string
+    title: string
+    body: string
+    payload?: any
+  }
+): Promise<void> {
+  const { coachId, type, title, body, payload } = params
+  let clientId = params.clientId
+
+  if (!clientId && payload?.appointment_id) {
+    const { data } = await db
+      .from('coaching_appointments')
+      .select('client_id')
+      .eq('id', payload.appointment_id)
+      .single()
+    clientId = data?.client_id
+  }
+
+  if (!clientId) {
+    throw new Error('clientId is required for coach notification')
+  }
+
+  const category = type === 'appointment' ? 'admin' : 'admin'
+
+  await db.from('coach_notifications').insert({
+    coach_id: coachId,
+    client_id: clientId,
+    category,
+    subcategory: type,
+    priority: 3,
+    status: 'pending',
+    email_sent: false,
+    title,
+    body,
+    payload: payload ?? {},
+  })
 }

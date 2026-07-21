@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import ChatBubble, { type ChatMessage } from "./ChatBubble"
 import { useClientT } from "@/components/client/ClientI18nProvider"
+import MessageScroller from "@/components/ui/MessageScroller"
 
 interface ChatConversationProps {
   messages: ChatMessage[]
@@ -86,26 +87,17 @@ export default function ChatConversation({
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
   const locallySeenIdsRef = useRef<Set<string>>(new Set())
 
-  useLayoutEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    const frame = window.requestAnimationFrame(() => {
-      container.scrollTop = container.scrollHeight
-    })
-
-    return () => window.cancelAnimationFrame(frame)
-  }, [messages.length, isLoading])
+  const displayMessages = messages.filter((message) => message?.message_type !== "checkin_summary")
 
   useEffect(() => {
-    for (const message of messages) {
+    for (const message of displayMessages) {
       if (message.seen_at) locallySeenIdsRef.current.add(message.id)
     }
-  }, [messages])
+  }, [displayMessages])
 
   useEffect(() => {
     if (!onMessagesSeen) return
-    const root = containerRef.current
+    const root = containerRef.current?.closest<HTMLDivElement>('[data-message-scroller-viewport="true"]')
     if (!root) return
 
     const timers = new Map<string, number>()
@@ -166,7 +158,7 @@ export default function ChatConversation({
   const items: Item[] = []
   let lastDate = ""
   // Safely iterate over messages, ignoring any null/undefined entries or those missing created_at
-  for (const msg of messages) {
+  for (const msg of displayMessages) {
     if (!msg || typeof msg.created_at !== "string") {
       continue; // skip malformed message
     }
@@ -178,8 +170,18 @@ export default function ChatConversation({
     items.push({ type: "message", msg })
   }
 
+  const latestUserMessageId = [...displayMessages].reverse().find((message) => message?.role === "user")?.id
+  const transcriptKey = `${displayMessages.map((message) => message?.id ?? "missing").join(",")}:${isLoading ? "loading" : "ready"}`
+
   return (
-    <div ref={containerRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3 flex flex-col gap-3" style={{ overscrollBehaviorY: 'contain' }}>
+    <MessageScroller
+      contentKey={transcriptKey}
+      anchorId={latestUserMessageId}
+      className="px-4 py-3"
+      label={t("chat.scrollToLatest")}
+      newMessagesLabel={t("chat.newMessages")}
+    >
+      <div ref={containerRef} className="flex flex-col gap-3" style={{ overscrollBehaviorY: 'contain' }}>
       {items.map(item =>
         item.type === "separator" ? (
           <div key={item.key} className="flex items-center justify-center py-2">
@@ -188,20 +190,21 @@ export default function ChatConversation({
             </span>
           </div>
         ) : (
-          <ChatBubble
-            key={item.msg.id}
-            message={item.msg}
-            coachAvatarUrl={coachAvatarUrl}
-            coachInitial={coachInitial}
-            clientAvatarUrl={clientAvatarUrl}
-            clientInitial={clientInitial}
-            onInteract={onInteract}
-            onSkip={onSkip}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            isMenuOpen={activeMenuId === item.msg.id}
-            onMenuToggle={(isOpen) => setActiveMenuId(isOpen ? item.msg.id : null)}
-          />
+          <div key={item.msg.id} data-message-scroller-id={item.msg.id}>
+            <ChatBubble
+              message={item.msg}
+              coachAvatarUrl={coachAvatarUrl}
+              coachInitial={coachInitial}
+              clientAvatarUrl={clientAvatarUrl}
+              clientInitial={clientInitial}
+              onInteract={onInteract}
+              onSkip={onSkip}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              isMenuOpen={activeMenuId === item.msg.id}
+              onMenuToggle={(isOpen) => setActiveMenuId(isOpen ? item.msg.id : null)}
+            />
+          </div>
         )
       )}
 
@@ -223,6 +226,7 @@ export default function ChatConversation({
         </div>
       )}
 
-    </div>
+      </div>
+    </MessageScroller>
   )
 }

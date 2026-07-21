@@ -65,6 +65,7 @@ import { queueNutritionLiveRefresh } from "@/lib/client/nutrition-live";
 import { sendClientMutation } from "@/lib/client/offline-mutations";
 import type { ClientLang } from "@/lib/i18n/clientTranslations";
 import { constructLoggedAt } from "@/lib/nutrition/physiological-date";
+import { getFoodDisplayName } from "@/lib/i18n/foodDisplayName";
 
 type ClientTranslate = ReturnType<typeof useClientT>["t"];
 
@@ -1539,8 +1540,8 @@ function NutritionLogContentImpl(
     <div
       className={
         embedded
-          ? `flex flex-col bg-[#0d0d0d] ${externalScroll ? "" : "h-full"}`
-          : "min-h-dvh bg-[#0d0d0d] flex flex-col overflow-x-hidden"
+          ? `flex flex-col bg-[#121212] ${externalScroll ? "" : "h-full"}`
+          : "min-h-dvh bg-[#121212] flex flex-col overflow-x-hidden"
       }
     >
       {/* TopBar — hidden in embedded mode */}
@@ -1982,7 +1983,7 @@ function NutritionLogContentImpl(
                           <FoodIcon food={item} size={42} />
                           <div className="flex-1 min-w-0">
                             <p className="text-[13px] font-medium text-white">
-                              {item.name_fr}
+                              {getFoodDisplayName(item)}
                             </p>
                             <div className="flex items-center gap-2 mt-1">
                               <span className="text-[11px] text-white/40">
@@ -2069,7 +2070,7 @@ function NutritionLogContentImpl(
                               )}
                             </div>
                             <p className="mt-1 text-[16px] font-black text-white truncate">
-                              {selectedItem.name_fr}
+                              {getFoodDisplayName(selectedItem)}
                             </p>
                             <p className="mt-1 text-[12px] text-white/62 leading-relaxed">
                               {quantitySuggestion
@@ -2257,7 +2258,7 @@ function NutritionLogContentImpl(
         ref={footerRef}
         className={`${
           embedded && !externalScroll ? "shrink-0" : "fixed inset-x-0 bottom-0"
-        } z-[60] bg-[#0d0d0d]`}
+        } z-[60] bg-[#121212]`}
         style={
           embedded && !externalScroll
             ? undefined
@@ -2322,7 +2323,7 @@ function NutritionLogContentImpl(
                       >
                         <FoodIcon food={d.food_item} size={34} />
                         <span className="text-[12px] text-white/82 flex-1 truncate">
-                          {d.food_item.name_fr}
+                          {getFoodDisplayName(d.food_item)}
                         </span>
                         <span className="text-[11px] text-white/40 mx-2">
                           {d.quantity_g}g
@@ -2369,7 +2370,7 @@ function NutritionLogContentImpl(
                     >
                       <FoodIcon food={d.food_item} size={34} />
                       <span className="text-[12px] text-white/80 flex-1 truncate">
-                        {d.food_item.name_fr}
+                        {getFoodDisplayName(d.food_item)}
                       </span>
                       <span className="text-[11px] text-white/40 mx-2">
                         {d.quantity_g}g
@@ -2914,7 +2915,7 @@ function QuickSearch({
                   >
                     <FoodIcon food={item} size={42} className="mb-1" />
                     <p className="text-[12px] font-semibold leading-tight text-white whitespace-normal break-words">
-                      {item.name_fr}
+                      {getFoodDisplayName(item)}
                     </p>
                     <p className="mt-1 text-[10px] text-white/38">
                       {item.kcal_per_100g} kcal/100g
@@ -2965,7 +2966,7 @@ function QuickSearch({
                       <FoodIcon food={item} size={42} />
                       <div className="min-w-0 flex-1 text-left">
                         <p className="text-[12px] font-semibold leading-tight text-white whitespace-normal break-words">
-                          {item.name_fr}
+                          {getFoodDisplayName(item)}
                         </p>
                         <p className="mt-0.5 text-[10px] text-white/38">
                           {item.kcal_per_100g} kcal/100g
@@ -2993,7 +2994,7 @@ function QuickSearch({
             <div className="min-w-0 flex-1">
               <div className="min-w-0">
                 <span className="block text-[13px] font-semibold leading-tight text-white whitespace-normal break-words">
-                  {item.name_fr}
+                  {getFoodDisplayName(item)}
                 </span>
               </div>
               <div className="mt-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap">
@@ -3155,7 +3156,7 @@ function CustomFoodForm({
               <option
                 key={value}
                 value={value}
-                className="bg-[#0d0d0d] text-white"
+                className="bg-[#121212] text-white"
               >
                 {label}
               </option>
@@ -3175,7 +3176,7 @@ function CustomFoodForm({
               <option
                 key={value}
                 value={value}
-                className="bg-[#0d0d0d] text-white"
+                className="bg-[#121212] text-white"
               >
                 {SUBCATEGORY_LABELS_T[value]}
               </option>
@@ -3366,7 +3367,7 @@ function MyFoodsManager({
                   <FoodIcon food={item} size={42} />
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-semibold text-white">
-                      {item.name_fr}
+                      {getFoodDisplayName(item)}
                     </p>
                     <p className="text-[11px] text-white/40 mt-1">
                       {CATEGORY_LABELS_T[visibleSelection.category]} ·{" "}
@@ -3544,7 +3545,7 @@ function EditableCustomFoodForm({
               <option
                 key={value}
                 value={value}
-                className="bg-[#0d0d0d] text-white"
+                className="bg-[#121212] text-white"
               >
                 {label}
               </option>
@@ -3564,7 +3565,7 @@ function EditableCustomFoodForm({
               <option
                 key={value}
                 value={value}
-                className="bg-[#0d0d0d] text-white"
+                className="bg-[#121212] text-white"
               >
                 {SUBCATEGORY_LABELS_T[value]}
               </option>

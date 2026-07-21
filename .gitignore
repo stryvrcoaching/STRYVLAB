@@ -59,3 +59,22 @@ out/*
 # generated service worker
 public/sw.js
 public/sw.js.map
+
+# Local asset originals (compressed copies live in public/)
+.assets-backup/
+
+# Local diagnostic exports can contain bundled runtime traces. Keep them out of Git.
+audit-cafe-*.txt
+cafe-*.txt
+
+# Local AI/editor tooling and its generated state are not part of the product.
+.agents/
+.claude/
+.codex/
+.impeccable/
+docs/superpowers/
+
+# Local investigation artifacts.
+build_progress.log
+output_i18n.txt
+*.patch

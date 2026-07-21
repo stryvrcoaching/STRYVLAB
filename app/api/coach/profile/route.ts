@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { PLAN_LIMITS, type BillingStatus, type CoachPlan } from '@/lib/billing/plans'
+import { buildCoachEntitlements } from '@/lib/billing/coach-entitlements'
 import { z } from 'zod'
 
 function serviceClient() {
@@ -38,48 +39,68 @@ export async function GET() {
     phone:      meta.phone_number ?? null,
   }
 
+  const db = serviceClient()
+  const { count: clientCount } = await db
+    .from('coach_clients')
+    .select('id', { count: 'exact', head: true })
+    .eq('coach_id', user.id)
+
   if (data) {
     // Profile exists — fill null fields with auth metadata values
+    const profile = {
+      ...data,
+      full_name:  data.full_name  ?? fromMeta.full_name,
+      brand_name: data.brand_name ?? fromMeta.brand_name,
+      pro_email:  data.pro_email  ?? fromMeta.pro_email,
+      phone:      data.phone      ?? fromMeta.phone,
+      client_count: clientCount ?? 0,
+    }
     return NextResponse.json({
-      profile: {
-        ...data,
-        full_name:  data.full_name  ?? fromMeta.full_name,
-        brand_name: data.brand_name ?? fromMeta.brand_name,
-        pro_email:  data.pro_email  ?? fromMeta.pro_email,
-        phone:      data.phone      ?? fromMeta.phone,
-      }
+      profile,
+      entitlements: buildCoachEntitlements({
+        plan: profile.plan,
+        billing_status: profile.billing_status,
+        client_limit: profile.client_limit,
+      }),
     })
   }
 
   // No profile yet — return fully pre-filled from auth metadata
+  const emptyProfile = {
+    ...fromMeta,
+    logo_url:    null,
+    siret:       null,
+    address:     null,
+    vat_number:  null,
+    notif_payment_reminder:      true,
+    notif_payment_reminder_days: 3,
+    notif_bilan_completed:       true,
+    notif_onboarding_emails:     true,
+    notif_inbox_assessments:     true,
+    notif_inbox_training:        true,
+    notif_inbox_messages:        true,
+    notif_inbox_checkins:        true,
+    notif_inbox_nutrition:       true,
+    notif_inbox_health_progress: true,
+    notif_inbox_administrative:  true,
+    plan:                        'solo' as const,
+    billing_status:              'inactive' as const,
+    client_limit:                PLAN_LIMITS.solo.clientLimit,
+    team_seats:                  PLAN_LIMITS.solo.teamSeats,
+    has_ai_llm:                  false,
+    ai_tone:                     null,
+    ai_notif_email:              true,
+    ai_notif_sms:                false,
+    ai_escalation_threshold:     null,
+    client_count:                clientCount ?? 0,
+  }
   return NextResponse.json({
-    profile: {
-      ...fromMeta,
-      logo_url:    null,
-      siret:       null,
-      address:     null,
-      vat_number:  null,
-      notif_payment_reminder:      true,
-      notif_payment_reminder_days: 3,
-      notif_bilan_completed:       true,
-      notif_onboarding_emails:     true,
-      notif_inbox_assessments:     true,
-      notif_inbox_training:        true,
-      notif_inbox_messages:        true,
-      notif_inbox_checkins:        true,
-      notif_inbox_nutrition:       true,
-      notif_inbox_health_progress: true,
-      notif_inbox_administrative:  true,
-      plan:                        'solo',
-      billing_status:              'inactive',
-      client_limit:                PLAN_LIMITS.solo.clientLimit,
-      team_seats:                  PLAN_LIMITS.solo.teamSeats,
-      has_ai_llm:                  false,
-      ai_tone:                     null,
-      ai_notif_email:              true,
-      ai_notif_sms:                false,
-      ai_escalation_threshold:     null,
-    }
+    profile: emptyProfile,
+    entitlements: buildCoachEntitlements({
+      plan: emptyProfile.plan,
+      billing_status: emptyProfile.billing_status,
+      client_limit: emptyProfile.client_limit,
+    }),
   })
 }
 

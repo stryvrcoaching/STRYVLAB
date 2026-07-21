@@ -8,6 +8,7 @@ import {
   AssessmentTemplate,
   ResponseMap,
   TemplateType,
+  type AssessmentResponseValue,
 } from "@/types/assessment";
 import { AssessmentModule } from "@/types/assessment";
 import { createDefaultBlock } from "@/lib/assessments/modules";
@@ -48,7 +49,7 @@ function ClientPreview({
   function setValue(
     blockId: string,
     fieldKey: string,
-    value: string | number | string[] | boolean,
+    value: AssessmentResponseValue,
   ) {
     setResponses((prev) => ({
       ...prev,

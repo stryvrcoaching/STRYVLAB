@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 
-const STATUS_BAR_COLOR = "#09090a"
+const STATUS_BAR_COLOR = "#0a0a0a"
 
 export default function NativeStatusBar() {
   useEffect(() => {

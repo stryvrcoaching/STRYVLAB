@@ -138,7 +138,7 @@ async function notifyClientInApp(
     title: copy.title,
     body: copy.body,
     actionUrl: `/client/rendez-vous/${appt.id}`,
-    pushKind: 'system',
+    pushKind: 'essential',
     pushTag: `stryv-appt-${appt.id}-${kind}`,
   })
 }

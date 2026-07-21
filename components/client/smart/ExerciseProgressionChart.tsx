@@ -139,7 +139,7 @@ export default function ExerciseProgressionChart({ rawLogs }: Props) {
   return (
     <div className="rounded-2xl bg-[#161616] p-4">
       <p className="mb-3 px-1 text-[10px] font-barlow-condensed font-bold uppercase tracking-[0.16em] text-white/40">
-        Progression par exercice
+        {t('programme.progressionByExercise')}
       </p>
 
       <div className="mb-3 flex gap-2 overflow-x-auto pb-1 px-1 -mx-1 snap-x">

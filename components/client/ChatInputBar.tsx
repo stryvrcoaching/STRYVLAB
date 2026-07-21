@@ -10,13 +10,15 @@ interface ChatInputBarProps {
   editContent?: string
   onCancelEdit?: () => void
   compact?: boolean
+  onFocusChange?: (focused: boolean) => void
 }
 
-export default function ChatInputBar({ onSend, disabled, editContent, onCancelEdit, compact = false }: ChatInputBarProps) {
+export default function ChatInputBar({ onSend, disabled, editContent, onCancelEdit, compact = false, onFocusChange }: ChatInputBarProps) {
   const { lang, t } = useClientT()
   const [value, setValue] = useState("")
   const [isRecording, setIsRecording] = useState(false)
   const [interimText, setInterimText] = useState("")
+  const [isFocused, setIsFocused] = useState(false)
   const recognitionRef = useRef<any>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -35,7 +37,7 @@ export default function ChatInputBar({ onSend, disabled, editContent, onCancelEd
     const ta = textareaRef.current
     if (!ta) return
     ta.style.height = "auto"
-    ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`
+    ta.style.height = `${Math.min(ta.scrollHeight, 144)}px`
   }, [displayValue])
 
   const stopRecording = useCallback(() => {
@@ -111,8 +113,15 @@ export default function ChatInputBar({ onSend, disabled, editContent, onCancelEd
     }
   }
 
+  const setComposerFocus = (focused: boolean) => {
+    setIsFocused(focused)
+    onFocusChange?.(focused)
+  }
+
+  const canSend = Boolean(value.trim()) && !disabled
+
   return (
-    <div className={`shrink-0 flex flex-col ${compact ? "bg-transparent" : "border-t border-white/[0.04] bg-[#0d0d0d]"}`}>
+    <div className={`shrink-0 flex flex-col ${compact ? "bg-transparent" : "bg-[var(--client-page-bg,#0a0a0a)]"}`}>
       {editContent !== undefined && editContent !== null && (
         <div className="flex items-center justify-between px-4 py-1.5 bg-[#111111] border-b border-white/[0.04] text-[11px] text-[#808080] font-barlow">
           <span>{t('chat.input.editing')}</span>
@@ -125,7 +134,7 @@ export default function ChatInputBar({ onSend, disabled, editContent, onCancelEd
           </button>
         </div>
       )}
-      <div className={`flex items-end gap-2 ${compact ? "p-0" : "px-3 py-2.5"}`}>
+      <div className={`flex items-end gap-2 ${compact ? "p-0" : `mx-3 my-2.5 rounded-[12px] p-1.5 transition-colors ${isFocused ? "bg-[#222222]" : "bg-[#181818]"}`}`}>
         <button
           type="button"
           onClick={toggleRecording}
@@ -149,15 +158,17 @@ export default function ChatInputBar({ onSend, disabled, editContent, onCancelEd
           disabled={disabled}
           readOnly={isRecording}
           rows={1}
-          className={`min-h-10 min-w-0 flex-1 resize-none rounded-xl px-3.5 py-2 text-[13px] font-barlow leading-relaxed text-[#e0e0e0] placeholder-[#5a5a5a] outline-none transition-colors disabled:opacity-50 ${compact ? "bg-transparent" : "bg-[#111111]"}`}
-          style={{ overflowY: "auto", maxHeight: "120px" }}
+          onFocus={() => setComposerFocus(true)}
+          onBlur={() => setComposerFocus(false)}
+          className="min-h-11 min-w-0 flex-1 resize-none rounded-xl bg-transparent px-3.5 py-3 font-barlow text-[14px] leading-5 text-[#e0e0e0] placeholder-[#808080] outline-none transition-colors disabled:opacity-50"
+          style={{ overflowY: "auto", maxHeight: "144px" }}
         />
 
         <button
           type="button"
           onClick={handleSend}
-          disabled={!value.trim() || disabled}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f2f2f2] text-[#080808] transition-all active:scale-95 disabled:opacity-30"
+          disabled={!canSend}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors active:scale-[0.97] disabled:opacity-50 ${canSend ? "bg-[#1f8a65] text-white" : "bg-[#222222] text-white/35"}`}
           aria-label={t('common.send')}
         >
           <ArrowRight size={16} weight="bold" />

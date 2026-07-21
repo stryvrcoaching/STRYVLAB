@@ -17,6 +17,16 @@ describe('computeWorkoutAlerts', () => {
     expect(computeWorkoutAlerts([])).toEqual([])
   })
 
+  it('surfaces persisted PRs and a new mesocycle in the session inbox', () => {
+    const r = computeWorkoutAlerts({
+      recentPRs: [{ exerciseName: 'Développé couché', weightKg: 95, reps: 5, deltaKg: 2.5 }],
+      activeMesocycle: { name: 'Hypertrophie', currentWeek: 1, totalWeeks: 6, phase: 'Hypertrophie' },
+    })
+
+    expect(r.map((alert) => alert.code)).toEqual(['pr_broken', 'mesocycle_start'])
+    expect(r[0].body).toContain('+2.5 kg')
+  })
+
   it('triggers overreaching critical when avg_rir <= 1 and completion < 0.8', () => {
     const rows = [mk({ avg_rir: 1, completion_rate: 0.7, overreaching: true })]
     const r = computeWorkoutAlerts(rows)

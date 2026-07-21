@@ -14,7 +14,7 @@ import SectionEyebrow from '@/components/client/smart/SectionEyebrow'
 import TdeeChart from '@/components/client/smart/TdeeChart'
 import KcalVariationChart from '@/components/client/smart/KcalVariationChart'
 import TdeeVsIntakeChart from '@/components/client/smart/TdeeVsIntakeChart'
-import { ct, type ClientLang, type ClientDictKey } from '@/lib/i18n/clientTranslations'
+import { clientLocale, ct, type ClientLang, type ClientDictKey } from '@/lib/i18n/clientTranslations'
 import type { NutritionMacros } from '@/components/client/smart/SmartNutritionWidget'
 import type { NutritionMeal } from '@/lib/nutrition/food-items'
 import type { SmartNutritionPrep } from '@/components/client/smart/SmartNutritionPrepList'
@@ -26,6 +26,8 @@ import { NUTRITION_LIVE_EVENT, consumeNutritionLiveRefreshQueue, type NutritionL
 import { prefetchNutritionRoutes, warmNutritionFlows } from '@/lib/client/prefetch-nutrition-flows'
 import { localizeNutritionScenarioLabel } from '@/lib/nutrition/scenario-labels'
 import type { SmartPrepSlot } from '@/lib/nutrition/simulation-state'
+import { computeActionableRemaining } from '@/lib/nutrition/actionable-remaining'
+import ClientWeekDayPicker from '@/components/client/ClientWeekDayPicker'
 
 const CycleArcIndicator = dynamic(() => import('@/components/client/cycle/CycleArcIndicator'), { ssr: false })
 const CyclePhaseModal   = dynamic(() => import('@/components/client/cycle/CyclePhaseModal'),   { ssr: false })
@@ -44,7 +46,7 @@ type DayPoint = {
   targetFat: number
 }
 
-type Tab = 'suivi' | 'planning' | 'tendances'
+type Tab = 'suivi' | 'plan' | 'tendances'
 
 interface Props {
   initialTab?: Tab
@@ -82,7 +84,7 @@ interface Props {
 
 const TABS: { id: Tab; labelKey?: ClientDictKey; label?: string }[] = [
   { id: 'suivi',     labelKey: 'nutrition.tab.suivi'     },
-  { id: 'planning',  label: 'Plan' },
+  { id: 'plan',      label: 'Plan' },
   { id: 'tendances', labelKey: 'nutrition.tab.tendances' },
 ]
 
@@ -113,7 +115,7 @@ export default function NutritionClientPage({
   const [photoMealRefineId, setPhotoMealRefineId] = useState<string | null>(null)
 
   // ── TanStack Query : snapshot live nutrition ──────────────────────────────
-  const snapshotQueryKey = ['nutrition-today', date] as const
+  const snapshotQueryKey = useMemo(() => ['nutrition-today', date] as const, [date])
 
   type NutritionSnapshot = {
     consumed: NutritionMacros
@@ -156,6 +158,48 @@ export default function NutritionClientPage({
       total_fiber_g: Number(prep.total_fiber_g ?? 0),
     }))
   }, [liveSnapshot.preps, preps, lang])
+
+  const planSummary = useMemo(() => {
+    const activePlannedPreps = livePreps.filter(
+      prep => prep.status === 'planned' && prep.is_active === true,
+    )
+    const planned = activePlannedPreps.reduce(
+      (total, prep) => ({
+        kcal: total.kcal + prep.total_calories,
+        protein_g: total.protein_g + prep.total_protein_g,
+        carbs_g: total.carbs_g + prep.total_carbs_g,
+        fat_g: total.fat_g + prep.total_fat_g,
+      }),
+      { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 },
+    )
+    const projected: NutritionMacros = {
+      ...liveConsumed,
+      kcal: (liveConsumed.kcal ?? 0) + planned.kcal,
+      protein_g: (liveConsumed.protein_g ?? 0) + planned.protein_g,
+      carbs_g: (liveConsumed.carbs_g ?? 0) + planned.carbs_g,
+      fat_g: (liveConsumed.fat_g ?? 0) + planned.fat_g,
+    }
+    const actionable = computeActionableRemaining({
+      target: {
+        kcal: target.kcal,
+        protein_g: target.protein_g,
+        carbs_g: target.carbs_g,
+        fat_g: target.fat_g,
+      },
+      consumed: projected,
+      profile: { gender, weightKg: bodyWeightKg },
+    })
+
+    return {
+      projected,
+      adjustedTarget: {
+        ...target,
+        protein_g: Math.max(0, target.protein_g - actionable.compensation.proteinReducedG),
+        carbs_g: Math.max(0, target.carbs_g - actionable.compensation.carbsReducedG),
+        fat_g: Math.max(0, target.fat_g - actionable.compensation.fatReducedG),
+      },
+    }
+  }, [bodyWeightKg, gender, liveConsumed, livePreps, target])
 
   const fetchLiveNutritionSnapshot = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: snapshotQueryKey })
@@ -202,13 +246,13 @@ export default function NutritionClientPage({
     setTab(nextTab)
     startTransition(() => {
       const params = new URLSearchParams(window.location.search)
-      if (nextTab === 'suivi') {
-        params.delete('tab')
-      } else {
+      params.delete('tab')
+      if (nextTab === 'tendances') {
         params.set('tab', nextTab)
       }
       const query = params.toString()
-      router.replace(query ? `/client/nutrition?${query}` : '/client/nutrition', { scroll: false })
+      const route = nextTab === 'plan' ? '/client/nutrition/plan' : '/client/nutrition'
+      router.replace(query ? `${route}?${query}` : route, { scroll: false })
     })
   }, [router])
 
@@ -221,9 +265,8 @@ export default function NutritionClientPage({
   const openNewMealLog = useCallback(() => {
     prefetchNutritionRoutes(router, date)
     const params = new URLSearchParams({ date })
-    if (tab !== 'suivi') params.set('return_tab', tab)
     router.push(`/client/nutrition/log?${params.toString()}`)
-  }, [date, router, tab])
+  }, [date, router])
 
   const openPhotoMealRefine = useCallback((mealId: string) => {
     setPhotoMealRefineId(mealId)
@@ -233,9 +276,8 @@ export default function NutritionClientPage({
   const handleAddMore = useCallback((mealId: string) => {
     prefetchNutritionRoutes(router, date)
     const params = new URLSearchParams({ date, meal_id: mealId })
-    if (tab !== 'suivi') params.set('return_tab', tab)
     router.push(`/client/nutrition/log?${params.toString()}`)
-  }, [date, router, tab])
+  }, [date, router])
 
   // Ouvrir le composer (mode guide) pour créer/éditer un prep
   const openPrepEdit = useCallback((prep: SmartNutritionPrep) => {
@@ -252,15 +294,16 @@ export default function NutritionClientPage({
 
   // ── TopBar left: onglets ─────────────────────────────────────────────────
   const topBarLeft = (
-    <div className="flex gap-1 bg-white/[0.03] rounded-xl p-1">
+    <div className="flex gap-0.5 rounded-xl bg-white/[0.04] p-0.5">
       {TABS.map(({ id, labelKey, label }) => (
         <button
           key={id}
+          type="button"
           onClick={() => updateTab(id)}
-          className={`px-3 py-1.5 rounded-xl text-[11px] font-barlow-condensed font-bold uppercase tracking-wide transition-all duration-200 ${
+          className={`rounded-lg px-2.5 py-1.5 text-[12px] font-semibold tracking-[-0.01em] transition-[background-color,color] duration-150 ${
             tab === id
               ? 'bg-[#f2f2f2] text-[#080808] shadow-sm'
-              : 'text-white/40'
+              : 'text-white/45'
           }`}
         >
           {labelKey ? ct(lang, labelKey) : label}
@@ -271,7 +314,7 @@ export default function NutritionClientPage({
 
   // ── TopBar right: badge jour + arc cycle ─────────────────────────────────
   const topBarRight = (
-    <div className="flex flex-col items-end gap-0.5">
+    <div className="flex items-center gap-2">
       {dayTypeBadge}
       {cycleState?.currentPhase && cycleState.currentCycleDay && (
         <>
@@ -297,13 +340,13 @@ export default function NutritionClientPage({
   )
 
   return (
-    <div className="min-h-dvh bg-[#0d0d0d] font-barlow overflow-x-hidden">
+    <div className="min-h-dvh bg-[#121212] font-barlow overflow-x-hidden">
       <ClientTopBar left={topBarLeft} right={topBarRight} />
 
-      <main className="max-w-[480px] mx-auto px-4 pt-[102px] flex flex-col gap-3">
+      <main className="client-page-top mx-auto flex max-w-[480px] flex-col gap-3 px-4">
 
         {/* ══ SUIVI ══ */}
-        {(tab === 'suivi' || tab === 'planning') && (
+        {(tab === 'suivi' || tab === 'plan') && (
           <>
             {cycleSyncPhase && cycleSyncAdjustment && (
               <CycleSyncBanner
@@ -312,21 +355,29 @@ export default function NutritionClientPage({
                 cycleDay={cycleDay ?? undefined}
               />
             )}
-            <SmartNutritionHero
-              date={date}
-              consumed={liveConsumed}
-              target={target}
-              onWaterClick={() => setWaterOpen(true)}
+            <ClientWeekDayPicker
+              anchorDate={date}
+              selectedDate={date}
+              locale={clientLocale(lang)}
+              continuous
+              onSelectDate={(selectedDate) => {
+                const route = tab === 'plan' ? '/client/nutrition/plan' : '/client/nutrition'
+                router.push(`${route}?date=${selectedDate}`)
+              }}
             />
-            <SmartAlertsFeed alerts={alerts} />
+            <SmartNutritionHero
+              consumed={tab === 'plan' ? planSummary.projected : liveConsumed}
+              target={tab === 'plan' ? planSummary.adjustedTarget : target}
+              onWaterClick={tab === 'plan' ? undefined : () => setWaterOpen(true)}
+              hideHydration={tab === 'plan'}
+            />
+            {tab === 'suivi' && <SmartAlertsFeed alerts={alerts} />}
             <NutritionMealsList
               key={date}
               initialMeals={liveMeals}
               initialPreps={livePreps}
               date={date}
-              target={target}
-              consumed={liveConsumed}
-              initialView={tab === 'planning' ? 'planning' : 'bilan'}
+              view={tab === 'plan' ? 'planning' : 'bilan'}
               onAddMeal={openNewMealLog}
               onRefinePhotoMeal={openPhotoMealRefine}
               onAddMore={handleAddMore}
@@ -336,8 +387,6 @@ export default function NutritionClientPage({
                 void fetchLiveNutritionSnapshot()
                 router.refresh()
               }}
-              gender={gender}
-              bodyWeightKg={bodyWeightKg}
             />
           </>
         )}

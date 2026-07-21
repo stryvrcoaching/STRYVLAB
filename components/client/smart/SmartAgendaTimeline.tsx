@@ -25,7 +25,7 @@ const KIND_CONFIG: Record<
     tint: "text-white/80",
   },
   checkin: { Icon: Moon, bg: "bg-white/[0.06]", tint: "text-[#b0b0b0]" },
-  appointment: { Icon: CalendarBlank, bg: "bg-[#c6b48b]/15", tint: "text-[#c6b48b]" },
+  appointment: { Icon: CalendarBlank, bg: "bg-[#1f8a65]/15", tint: "text-[#1f8a65]" },
 };
 
 export default function SmartAgendaTimeline({

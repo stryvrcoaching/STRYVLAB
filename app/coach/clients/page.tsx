@@ -271,6 +271,22 @@ export default function CoachClientsPage() {
   useDockActions({
     NEW_CLIENT: () => setShowModal(true),
   });
+
+  // Deep link from onboarding hub: /coach/clients?create=1
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("create") === "1") {
+      setShowModal(true);
+      params.delete("create");
+      const next = params.toString();
+      const path = next
+        ? `${window.location.pathname}?${next}`
+        : window.location.pathname;
+      window.history.replaceState({}, "", path);
+    }
+  }, []);
+
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

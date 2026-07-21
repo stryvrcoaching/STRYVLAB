@@ -76,7 +76,7 @@ export default function SkipWorkoutSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby="skip-workout-sheet-title"
-        className="client-native-bottom-sheet fixed left-0 right-0 bottom-0 z-[70] flex max-h-[88dvh] flex-col rounded-t-[28px] bg-[#0d0d0d] shadow-2xl"
+        className="client-native-bottom-sheet fixed left-0 right-0 bottom-0 z-[70] flex max-h-[88dvh] flex-col rounded-t-[28px] bg-[#121212] shadow-2xl"
         style={{ paddingBottom: 'var(--client-modal-bottom-padding)' }}
       >
         <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-white/[0.10]" />
@@ -112,10 +112,10 @@ export default function SkipWorkoutSheet({
                   type="button"
                   aria-pressed={selected}
                   onClick={() => onReasonChange(option.key)}
-                  className={`w-full rounded-xl border px-4 py-3 text-left text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
+                  className={`w-full rounded-xl px-4 py-3 text-left text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
                     selected
-                      ? 'border-white/40 bg-white/[0.045] text-white'
-                      : 'border-white/[0.08] bg-white/[0.03] text-white/55 hover:bg-white/[0.045] hover:text-white/80'
+                      ? 'bg-white/[0.12] text-white'
+                      : 'bg-white/[0.045] text-white/55 hover:bg-white/[0.07] hover:text-white/80'
                   }`}
                 >
                   {option.label}
@@ -138,20 +138,20 @@ export default function SkipWorkoutSheet({
               rows={3}
               maxLength={500}
               placeholder={notePlaceholder}
-              className="min-h-[88px] w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-[12px] leading-relaxed text-white outline-none placeholder:text-white/20 focus:border-white/25 focus:ring-2 focus:ring-white/10"
+              className="min-h-[88px] w-full resize-none rounded-xl bg-[#0d0d0d] px-4 py-3 text-[12px] leading-relaxed text-white outline-none placeholder:text-white/20 focus:ring-2 focus:ring-white/10"
             />
           </div>
 
           {error && <p className="mt-3 text-[11px] text-[#f39a9a]">{error}</p>}
         </div>
 
-        <footer className="shrink-0 border-t border-white/[0.07] px-5 pt-3">
+        <footer className="shrink-0 bg-[#121212] px-5 pt-3">
           <div className="flex gap-2">
             <button
               type="button"
               onClick={close}
               disabled={submitting}
-              className="min-h-12 flex-1 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 text-[12px] font-semibold text-white/60 transition-colors hover:bg-white/[0.045] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              className="min-h-12 flex-1 rounded-xl bg-white/[0.06] px-4 text-[12px] font-semibold text-white/60 transition-colors hover:bg-white/[0.09] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
             >
               {cancelLabel}
             </button>

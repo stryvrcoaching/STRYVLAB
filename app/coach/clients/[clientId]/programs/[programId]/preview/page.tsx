@@ -159,7 +159,7 @@ export default async function ProgramPreviewPage({ params }: Params) {
               </div>
 
               {/* Exercises */}
-              <div className="divide-y divide-white/30">
+              <div className="divide-y divide-white/[0.06]">
                 {exercises.map((ex: any, i: number) => (
                   <div key={ex.id} className="px-4 py-3 flex items-start gap-3">
                     <span className="w-5 h-5 rounded-full bg-surface-light text-secondary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">

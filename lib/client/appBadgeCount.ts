@@ -1,17 +1,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { buildChatTodayStrip } from '@/lib/client/chat/today-strip'
 import { getClientInboxUnreadCount } from '@/lib/client/inbox'
 
-/** The sole count shown on the installed-app icon. */
+/**
+ * OS app icon badge = grand total of all client signals
+ * (messagerie + home system + nutrition).
+ */
 export async function getClientAppBadgeCount(
   db: SupabaseClient,
   clientId: string,
 ): Promise<number> {
-  const [inbox, todayStrip] = await Promise.all([
-    getClientInboxUnreadCount(db, '', clientId),
-    buildChatTodayStrip(db, clientId),
-  ])
-
-  return inbox.total + (todayStrip.checkin.pendingCount ?? 0)
+  const breakdown = await getClientInboxUnreadCount(db, '', clientId)
+  return breakdown.total
 }

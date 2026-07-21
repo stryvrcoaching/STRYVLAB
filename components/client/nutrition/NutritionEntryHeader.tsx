@@ -31,8 +31,6 @@ type Props = {
   date: string
   consumed: NutritionMacros
   target: NutritionMacros
-  gender?: string | null
-  bodyWeightKg?: number | null
   action: HeaderAction
   onClose: () => void
   closeLabel: string
@@ -50,8 +48,6 @@ export default function NutritionEntryHeader({
   date,
   consumed,
   target,
-  gender,
-  bodyWeightKg,
   action,
   onClose,
   closeLabel,
@@ -120,12 +116,9 @@ export default function NutritionEntryHeader({
         style={{ borderBottom: "0.3px solid rgba(255,255,255,0.06)" }}
       >
         <SmartNutritionHero
-          date={date}
           consumed={consumed}
           target={target}
           simulationMode
-          gender={gender}
-          bodyWeightKg={bodyWeightKg}
           compact
           micro={false}
           showSimulationBadge={false}

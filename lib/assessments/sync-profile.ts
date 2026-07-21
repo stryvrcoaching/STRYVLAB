@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { AssessmentResponse } from "@/types/assessment";
+import { syncClientFoodProfile } from "@/lib/nutrition/food-profile-service";
 
 // Maps bilan primary_goal options → coach_clients.training_goal enum
 const GOAL_MAP: Record<string, string> = {
@@ -65,6 +66,7 @@ export async function syncProfileFromResponses(
   coachId: string,
   responses: AssessmentResponse[],
   bilanDate: string, // YYYY-MM-DD
+  submissionId?: string,
 ) {
   const profileUpdate: Record<string, unknown> = {};
 
@@ -124,6 +126,21 @@ export async function syncProfileFromResponses(
 
   if (Object.keys(profileUpdate).length > 0) {
     await db.from("coach_clients").update(profileUpdate).eq("id", clientId);
+  }
+
+  const foodPreferences = responses.find(
+    (response) => response.field_key === "food_preferences_profile",
+  );
+  if (foodPreferences?.value_json) {
+    await syncClientFoodProfile(db, {
+      clientId,
+      coachId,
+      value: foodPreferences.value_json,
+      sourceType: "assessment",
+      sourceId: submissionId ?? null,
+      actorId: null,
+      confirmAllergyRemoval: true,
+    });
   }
 
   // P1 — injuries_active / injuries_history → metric_annotations (type='injury')

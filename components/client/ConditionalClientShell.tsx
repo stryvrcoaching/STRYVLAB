@@ -31,7 +31,6 @@ interface Props {
 export default function ConditionalClientShell({ children }: Props) {
   const pathname = usePathname()
   const isAuthPath = SHELLLESS_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
-  const isDashboard = pathname === '/client'
 
   useEffect(() => {
     if (isAuthPath) return
@@ -70,21 +69,26 @@ export default function ConditionalClientShell({ children }: Props) {
     <TourProvider>
       <div
         className="fixed inset-0 flex flex-col overflow-hidden"
-        style={{ background: 'var(--client-chrome-bg)' }}
+        style={{ background: "var(--client-page-bg, #0a0a0a)" }}
       >
         <main
           className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
           style={{
-            paddingTop: isDashboard ? 0 : 'env(safe-area-inset-top, 0px)',
-            paddingBottom: 'calc(var(--client-bottom-nav-reserved) + 20px)',
-            overflowAnchor: 'none',
-            WebkitOverflowScrolling: 'touch',
-            overscrollBehavior: 'none',
+            // Safe-area is owned by fixed chrome (ClientTopBar / home hero),
+            // not by the scroll shell — avoids double top offset.
+            paddingTop: 0,
+            // Clear floating dock (no extra fade band above the plate)
+            paddingBottom: "calc(var(--client-bottom-nav-reserved) + 8px)",
+            background: "var(--client-page-bg, #0a0a0a)",
+            overflowAnchor: "none",
+            WebkitOverflowScrolling: "touch",
+            overscrollBehavior: "none",
           }}
         >
           {children}
         </main>
       </div>
+      {/* Floating BottomNav — soft fade only, no solid block under the dock */}
       <BottomNav />
       <OnboardingTour />
       <PushPermissionPrompt />
