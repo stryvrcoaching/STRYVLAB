@@ -1,4 +1,5 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { inngest } from '@/lib/inngest/client'
 import { createClientAppNotification } from '@/lib/notifications/create-client-app-notification'
 import type {
   ClientPushCopyKey,
@@ -246,3 +247,21 @@ export async function runClientEngagementReminders(
 
     return { sent }
 }
+
+/**
+ * Executes the reminders that are configured by the client: training,
+ * hydration, meal logging and protein target.  This must stay registered in
+ * the Inngest route; an API cron endpoint also exists for manual recovery,
+ * but is not the scheduler used by the application.
+ */
+export const clientEngagementRemindersFunction = inngest.createFunction(
+  {
+    id: 'client-engagement-reminders',
+    retries: 1,
+    triggers: [{ cron: '*/5 * * * *' }],
+  },
+  async ({ step }) => step.run(
+    'send-client-engagement-reminders',
+    () => runClientEngagementReminders(service()),
+  ),
+)

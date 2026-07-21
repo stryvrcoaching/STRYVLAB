@@ -18,6 +18,7 @@ import {
   trainingProgressionNotificationsFunction,
 } from '@/lib/inngest/functions/training-progression-notifications'
 import { appointmentRemindersFunction } from '@/lib/inngest/functions/appointment-reminders'
+import { clientEngagementRemindersFunction } from '@/lib/inngest/functions/client-engagement-reminders'
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -38,5 +39,6 @@ export const { GET, POST, PUT } = serve({
     trainingProgressionNotificationsFunction,
     trainingEngagementRemindersFunction,
     appointmentRemindersFunction,
+    clientEngagementRemindersFunction,
   ],
 })
