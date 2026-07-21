@@ -50,7 +50,7 @@ interface Props {
 }
 
 const inputClass =
-  "mt-1.5 block h-10 w-full min-w-0 rounded-xl bg-[#121212] px-3 text-[13px] tabular-nums text-white outline-none transition-[background-color,box-shadow] focus:bg-white/[0.06] focus:ring-2 focus:ring-[#1f8a65]/20";
+  "mt-2 block h-12 w-full min-w-0 rounded-xl border-[0.3px] border-white/[0.08] bg-[#0a0a0a] px-3.5 text-[14px] font-medium tabular-nums text-white [color-scheme:dark] outline-none transition-[border-color,background-color,box-shadow] hover:border-white/[0.14] focus:border-[#1f8a65]/70 focus:bg-white/[0.04] focus:ring-2 focus:ring-[#1f8a65]/20";
 
 type PushStatus = {
   subscription: boolean;
@@ -267,52 +267,60 @@ export default function NotificationsPanel({ preferences: initialPrefs }: Props)
             {t("notif.preferenceError")}
           </p>
         ) : null}
-        <div className="overflow-hidden rounded-2xl bg-white/[0.035]">
-          <PrefToggle
-            label={t("notif.sessionReminder")}
-            value={prefs.notif_session_reminder}
-            onChange={() => togglePref("notif_session_reminder")}
-          />
-          <PrefToggle
-            label={t("notif.bilanReceived")}
-            value={prefs.notif_bilan_received}
-            onChange={() => togglePref("notif_bilan_received")}
-          />
-          <PrefToggle
-            label={t("notif.programUpdated")}
-            value={prefs.notif_program_updated}
-            onChange={() => togglePref("notif_program_updated")}
-          />
-          <PrefToggle
-            label={t("notif.checkinReminder")}
-            value={prefs.notif_checkin_reminder}
-            onChange={() => togglePref("notif_checkin_reminder")}
-          />
-          <PrefToggle
-            label={t("notif.hydrationReminder")}
-            value={prefs.notif_hydration_reminder}
-            onChange={() => togglePref("notif_hydration_reminder")}
-          />
-          <PrefToggle
-            label={t("notif.mealReminder")}
-            value={prefs.notif_meal_reminder}
-            onChange={() => togglePref("notif_meal_reminder")}
-          />
-          <PrefToggle
-            label={t("notif.proteinReminder")}
-            value={prefs.notif_protein_reminder}
-            onChange={() => togglePref("notif_protein_reminder")}
-          />
-          <PrefToggle
-            label={t("notif.coachMessages")}
-            value={prefs.notif_coach_messages}
-            onChange={() => togglePref("notif_coach_messages")}
-          />
-          <PrefToggle
-            label={t("notif.progressUpdates")}
-            value={prefs.notif_progress_updates}
-            onChange={() => togglePref("notif_progress_updates")}
-          />
+        <div className="space-y-3">
+          <NotificationPreferenceGroup title={t("notif.coachingGroup")}>
+            <PrefToggle
+              label={t("notif.coachMessages")}
+              value={prefs.notif_coach_messages}
+              onChange={() => togglePref("notif_coach_messages")}
+            />
+            <PrefToggle
+              label={t("notif.bilanReceived")}
+              value={prefs.notif_bilan_received}
+              onChange={() => togglePref("notif_bilan_received")}
+            />
+            <PrefToggle
+              label={t("notif.programUpdated")}
+              value={prefs.notif_program_updated}
+              onChange={() => togglePref("notif_program_updated")}
+            />
+          </NotificationPreferenceGroup>
+
+          <NotificationPreferenceGroup title={t("notif.dailyGroup")}>
+            <PrefToggle
+              label={t("notif.sessionReminder")}
+              value={prefs.notif_session_reminder}
+              onChange={() => togglePref("notif_session_reminder")}
+            />
+            <PrefToggle
+              label={t("notif.checkinReminder")}
+              value={prefs.notif_checkin_reminder}
+              onChange={() => togglePref("notif_checkin_reminder")}
+            />
+            <PrefToggle
+              label={t("notif.hydrationReminder")}
+              value={prefs.notif_hydration_reminder}
+              onChange={() => togglePref("notif_hydration_reminder")}
+            />
+            <PrefToggle
+              label={t("notif.mealReminder")}
+              value={prefs.notif_meal_reminder}
+              onChange={() => togglePref("notif_meal_reminder")}
+            />
+            <PrefToggle
+              label={t("notif.proteinReminder")}
+              value={prefs.notif_protein_reminder}
+              onChange={() => togglePref("notif_protein_reminder")}
+            />
+          </NotificationPreferenceGroup>
+
+          <NotificationPreferenceGroup title={t("notif.progressGroup")}>
+            <PrefToggle
+              label={t("notif.progressUpdates")}
+              value={prefs.notif_progress_updates}
+              onChange={() => togglePref("notif_progress_updates")}
+            />
+          </NotificationPreferenceGroup>
         </div>
       </section>
 
@@ -329,7 +337,7 @@ export default function NotificationsPanel({ preferences: initialPrefs }: Props)
             {t("notif.scheduleDescription")}
           </p>
 
-          <div className="space-y-7">
+          <div className="space-y-3">
             {prefs.notif_checkin_reminder ? (
               <ScheduleCard icon={Bell} title={t("checkin.schedule.section")}>
                 <p className="text-[12px] leading-snug text-white/45">
@@ -373,20 +381,14 @@ export default function NotificationsPanel({ preferences: initialPrefs }: Props)
                     ))}
                   </div>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-2.5">
+                <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                   {schedule.training_reminder_times.map((time, index) => (
-                    <label key={index} className="text-[11px] font-medium text-white/50">
-                      {index === 0 ? t("notif.planned") : t("notif.ifNotDone")}
-                      <input
-                        type="time"
-                        step="300"
-                        value={time}
-                        onChange={(e) =>
-                          setTrainingReminderTime(index, e.target.value)
-                        }
-                        className={inputClass}
-                      />
-                    </label>
+                    <ReminderTimeField
+                      key={index}
+                      label={index === 0 ? t("notif.planned") : t("notif.ifNotDone")}
+                      value={time}
+                      onChange={(value) => setTrainingReminderTime(index, value)}
+                    />
                   ))}
                 </div>
               </ScheduleCard>
@@ -397,24 +399,19 @@ export default function NotificationsPanel({ preferences: initialPrefs }: Props)
                 <p className="text-[12px] leading-snug text-white/45">
                   {t("notif.hydrationDescription")}
                 </p>
-                <div className="mt-4 grid grid-cols-[minmax(0,1fr)_104px] items-end gap-2.5">
-                  <label className="min-w-0 text-[11px] font-medium text-white/50">
-                    {t("notif.firstAlert")}
-                    <input
-                      type="time"
-                      step="300"
-                      value={schedule.hydration_reminder_first_time}
-                      onChange={(e) => {
-                        setSchedule((c) => ({
-                          ...c,
-                          hydration_reminder_first_time: e.target.value,
-                        }));
-                        setScheduleState("idle");
-                      }}
-                      className={inputClass}
-                    />
-                  </label>
-                  <div className="rounded-xl bg-[#121212] px-3 py-2 text-right">
+                <div className="mt-4 grid grid-cols-[minmax(0,1fr)_108px] items-end gap-2.5">
+                  <ReminderTimeField
+                    label={t("notif.firstAlert")}
+                    value={schedule.hydration_reminder_first_time}
+                    onChange={(value) => {
+                      setSchedule((c) => ({
+                        ...c,
+                        hydration_reminder_first_time: value,
+                      }));
+                      setScheduleState("idle");
+                    }}
+                  />
+                  <div className="rounded-xl border-[0.3px] border-white/[0.08] bg-[#0a0a0a] px-3 py-2.5 text-right">
                     <p className="text-[10px] uppercase tracking-[0.12em] text-white/35">{t("notif.perDay")}</p>
                     <p className="mt-0.5 text-[17px] font-bold tabular-nums text-white">
                       {schedule.hydration_reminder_count}
@@ -437,7 +434,7 @@ export default function NotificationsPanel({ preferences: initialPrefs }: Props)
                   }}
                   className="mt-4 w-full accent-[#1f8a65]"
                 />
-                <div className="mt-4 rounded-xl bg-[#121212] px-3 py-2.5">
+                <div className="mt-4 rounded-xl border-[0.3px] border-white/[0.06] bg-[#0a0a0a] px-3 py-2.5">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35">
                     {t("notif.schedulePreview")}
                   </p>
@@ -457,7 +454,7 @@ export default function NotificationsPanel({ preferences: initialPrefs }: Props)
 
             {showNutritionSchedule ? (
               <ScheduleCard icon={Utensils} title={t("notif.nutritionTitle")}>
-                <div className="mt-4 grid grid-cols-2 gap-2.5">
+                <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                   {prefs.notif_meal_reminder ? (
                     <>
                       <ReminderTimeField
@@ -646,7 +643,7 @@ function ScheduleCard({
   children: ReactNode;
 }) {
   return (
-    <section className="py-1">
+    <section className="rounded-2xl border-[0.3px] border-white/[0.07] bg-white/[0.035] p-4">
       <div className="flex items-center gap-2.5">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#1f8a65]/12 text-[#5dba87]">
           <Icon size={15} strokeWidth={2.2} />
@@ -692,5 +689,22 @@ function PrefToggle({
         />
       </button>
     </div>
+  );
+}
+
+function NotificationPreferenceGroup({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-2xl border-[0.3px] border-white/[0.07] bg-white/[0.035]">
+      <p className="border-b-[0.3px] border-white/[0.07] px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">
+        {title}
+      </p>
+      <div>{children}</div>
+    </section>
   );
 }
