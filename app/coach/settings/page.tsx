@@ -1366,7 +1366,10 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                <WhatsappAgentSettings />
+                <WhatsappAgentSettings
+                  savedPhone={persistedProfile.phone}
+                  aiEnabled={persistedProfile.has_ai_llm}
+                />
               </>
             )}
 

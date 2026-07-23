@@ -5,11 +5,20 @@ import { Loader2, MessageCircle } from 'lucide-react'
 
 type AgentState = {
   agent: { enabled: boolean; phone_e164: string; action_policy: 'confirm_all'; proactive_alerts_enabled: boolean } | null
-  phoneConfigured: boolean
+}
+
+type WhatsappAgentSettingsProps = {
+  /** Values confirmed by the profile save endpoint, not the current form draft. */
+  savedPhone: string | null
   aiEnabled: boolean
 }
 
-export default function WhatsappAgentSettings() {
+function hasE164Phone(value: string | null) {
+  const digits = value?.replace(/\D/g, '') ?? ''
+  return /^[1-9][0-9]{7,14}$/.test(digits)
+}
+
+export default function WhatsappAgentSettings({ savedPhone, aiEnabled }: WhatsappAgentSettingsProps) {
   const [state, setState] = useState<AgentState | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -42,7 +51,8 @@ export default function WhatsappAgentSettings() {
   }
 
   const enabled = state?.agent?.enabled === true
-  const canEnable = state?.aiEnabled && state.phoneConfigured
+  const phoneConfigured = hasE164Phone(savedPhone)
+  const canEnable = aiEnabled && phoneConfigured
 
   return (
     <div className="rounded-xl border-[0.3px] border-white/[0.06] bg-[#0a0a0a] p-4">
@@ -71,8 +81,8 @@ export default function WhatsappAgentSettings() {
       </div>
 
       {!state && !error && <p className="mt-3 text-[11px] text-white/35">Chargement…</p>}
-      {state && !state.aiEnabled && <p className="mt-3 text-[11px] text-white/45">Activez d’abord l’IA Coach ci-dessus.</p>}
-      {state && !state.phoneConfigured && <p className="mt-3 text-[11px] text-white/45">Ajoutez puis enregistrez votre numéro WhatsApp dans le profil professionnel.</p>}
+      {!aiEnabled && <p className="mt-3 text-[11px] text-white/45">Activez d’abord l’IA Coach ci-dessus.</p>}
+      {!phoneConfigured && <p className="mt-3 text-[11px] text-white/45">Ajoutez puis enregistrez votre numéro WhatsApp dans le profil professionnel.</p>}
       {enabled && <p className="mt-3 text-[11px] text-[#1f8a65]">Actif pour le numéro +{state?.agent?.phone_e164} · lecture seule</p>}
       {error && <p className="mt-3 text-[11px] text-red-400">{error}</p>}
     </div>
