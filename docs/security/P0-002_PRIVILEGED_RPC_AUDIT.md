@@ -63,3 +63,16 @@ Before turning a review script into a deployable migration:
 - No changes to production or the connected Supabase database have been made.
 - No claim of passed integration tests, resolved warnings, or regulatory compliance.
 - PR remains **draft** and **must not be merged** as a security fix while deployment identity and callers remain unverified.
+
+## Production project identity confirmed — 2026-10-11
+
+The Vercel account owning STRYV Lab has now been connected and inspected:
+- Team: `stryvlabs-projects`; Vercel project: `stryvlab`.
+- Verified production domains: `www.stryvlab.com` and `stryvlab.com` (redirect).
+- Production-target Vercel deployment records point to `stryvrcoaching/STRYVLAB`, commit `caa901055bcb4687b4dcdbb9465f8e1a49aaf302`.
+- The configured `NEXT_PUBLIC_SUPABASE_URL` for the production-targeted environment resolves to project ref **`gdwboxpscwdvfrnxlnvb`**, the same connected Supabase project where privileged function grants were independently inspected.
+- No API keys, service-role credentials, or other secrets were accessed for this identification.
+
+**Updated conclusion:** the 12 flagged `SECURITY DEFINER` grants are present in STRYV Lab's configured production database. They are not merely a potentially unrelated project. Their operational impact still requires safe staging tests; no exploitation or DDL writes have been attempted.
+
+**Note:** Vercel's `latestDeployment` property currently shows a preview generated from this review branch; do not mistake preview status `READY` for production release. The PR is draft, no migration is applied, and the original audit's open questions about RPC call sites and staging remain.
