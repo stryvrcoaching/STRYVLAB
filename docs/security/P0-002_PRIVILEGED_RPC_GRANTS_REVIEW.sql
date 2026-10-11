@@ -45,25 +45,26 @@ BEGIN
   SELECT COUNT(*) INTO exposed_count
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
   WHERE n.nspname = 'public'
-    AND p.oid::regprocedure::text IN (
-      'public.award_client_progression(uuid,text,integer,text,uuid,timestamp with time zone,jsonb)',
-      'public.award_client_progression_v2(uuid,text,integer,text,uuid,timestamp with time zone,jsonb)',
-      'public.cancel_client_reward_redemption(uuid,uuid,uuid)',
-      'public.cancel_client_tracking_pause(uuid,uuid,text,date)',
-      'public.create_coach_tracking_pause(uuid,uuid,date,date,text,text)',
-      'public.decide_client_tracking_pause(uuid,uuid,boolean)',
-      'public.increment_llm_budget(uuid,date)',
-      'public.redeem_client_reward(uuid,uuid,text,text,text,text,text,text,text)',
-      'public.request_client_tracking_pause(uuid,date,date,text,text)',
-      'public.sync_program_frequency_from_sessions()',
-      'public.sync_progression_identity_on_client_link()',
-      'public.sync_template_frequency_from_sessions()'
+    AND p.proname IN (
+      'award_client_progression',
+      'award_client_progression_v2',
+      'cancel_client_reward_redemption',
+      'cancel_client_tracking_pause',
+      'create_coach_tracking_pause',
+      'decide_client_tracking_pause',
+      'increment_llm_budget',
+      'redeem_client_reward',
+      'request_client_tracking_pause',
+      'sync_program_frequency_from_sessions',
+      'sync_progression_identity_on_client_link',
+      'sync_template_frequency_from_sessions'
     )
     AND (has_function_privilege('anon', p.oid, 'EXECUTE')
       OR has_function_privilege('authenticated', p.oid, 'EXECUTE'));
-  -- The regprocedure pretty-printing may differ by schema/search_path:
-  -- also check by function names listed below in the verification query.
-  RAISE NOTICE 'Remaining exposed privileged functions (candidate check): %', exposed_count;
+  IF exposed_count <> 0 THEN
+    RAISE EXCEPTION 'P0-002 privilege check failed: % functions still exposed', exposed_count;
+  END IF;
+  RAISE NOTICE 'All 12 privileged functions have direct public execution disabled in this transaction';
 END;
 $review$;
 
