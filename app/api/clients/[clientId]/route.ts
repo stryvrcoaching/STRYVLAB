@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { canDeleteOrphanClientAuthUser } from '@/lib/security/client-auth-deletion'
 import { createClient as createServerClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import {
@@ -273,31 +274,24 @@ export async function DELETE(
   }
 
   const authUserId = (clientRow as Record<string, unknown>).user_id as string | null | undefined
-  const clientEmail = (clientRow as Record<string, unknown>).email as string | null | undefined
 
+  // An email address is not proof that an Auth identity belongs to this client.
+  // Never search for and delete Auth users by email. Only a previously linked
+  // user_id may be eligible, and only after checking remaining references.
   if (authUserId) {
-    // Never delete the coach's own auth account
-    if (authUserId === user.id) {
-      console.warn('DELETE client — skipping auth deletion: client user_id matches coach user_id', authUserId)
-    } else {
+    const canDeleteAuth = await canDeleteOrphanClientAuthUser({
+      db: service,
+      authUserId,
+      requestingCoachId: user.id,
+    })
+
+    if (canDeleteAuth) {
       const { error: authDeleteError } = await service.auth.admin.deleteUser(authUserId)
       if (authDeleteError) {
-        console.error('DELETE auth user (by id):', authDeleteError)
+        console.error('DELETE client — linked Auth deletion failed:', authDeleteError)
       }
-    }
-  } else if (clientEmail) {
-    // Fallback: find auth user by email — only delete if not the coach's own account
-    const { data: listData, error: listError } = await service.auth.admin.listUsers()
-    if (!listError && listData) {
-      const authUser = listData.users.find((u) => u.email === clientEmail)
-      if (authUser && authUser.id !== user.id) {
-        const { error: authDeleteError } = await service.auth.admin.deleteUser(authUser.id)
-        if (authDeleteError) {
-          console.error('DELETE auth user (by email):', authDeleteError)
-        }
-      } else if (authUser?.id === user.id) {
-        console.warn('DELETE client — skipping auth deletion: email matches coach account', clientEmail)
-      }
+    } else {
+      console.warn('DELETE client — Auth account retained: shared account, coach account, or unverifiable references')
     }
   }
 
