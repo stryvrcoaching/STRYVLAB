@@ -58,6 +58,8 @@ const pdfPreviewCsp = [
   "worker-src 'self'",
 ].join("; ");
 
+const complementsCsp = defaultCsp.replace(/img-src[^;]*/, "img-src 'self' data: blob: https:");
+
 const nextConfig = {
   images: {
     unoptimized: true,
@@ -109,6 +111,15 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: defaultCsp,
           },
+        ],
+      },
+
+      // Standalone catalogue: product photos are loaded from verified HTTPS merchant URLs.
+      // Keep the rest of the global security headers unchanged.
+      {
+        source: "/complements/index.html",
+        headers: [
+          { key: "Content-Security-Policy", value: complementsCsp },
         ],
       },
 
