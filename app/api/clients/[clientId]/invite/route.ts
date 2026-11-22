@@ -196,7 +196,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { data: created, error: createError } = await db.auth.admin.createUser({
       email: client.email,
       email_confirm: true,
-      password: crypto.randomUUID(), // placeholder — overwritten when client sets their password
+      password: `Aa1!${crypto.randomUUID()}`, // placeholder — overwritten when client sets their password
     })
 
     if (createError || !created?.user) {
