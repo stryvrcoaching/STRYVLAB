@@ -16,14 +16,13 @@ function service() {
 
 type Params = { params: { clientId: string } }
 
-/**
- * Find an auth user by email without listUsers() pagination truncation.
- * listUsers() defaults to 50 — we use perPage: 1000 to cover real-world scale.
- */
 async function findAuthUserByEmail(db: ReturnType<typeof service>, email: string) {
-  const { data, error } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 })
-  if (error || !data) return null
-  return data.users.find((u) => u.email === email) ?? null
+  const { data: userId, error: lookupError } = await db.rpc('find_auth_user_id_by_email', { p_email: email })
+  if (lookupError) throw lookupError
+  if (!userId) return null
+  const { data, error } = await db.auth.admin.getUserById(userId)
+  if (error) throw error
+  return data.user
 }
 
 function hasActivatedClientAccount(
@@ -103,7 +102,33 @@ export async function POST(req: NextRequest, { params }: Params) {
     ? `${coachFirstName}${coachLastName ? ' ' + coachLastName : ''}`
     : null
 
-  const existingUser = await findAuthUserByEmail(db, client.email)
+  let existingUser: Awaited<ReturnType<typeof findAuthUserByEmail>>
+  try {
+    existingUser = await findAuthUserByEmail(db, client.email)
+  } catch (error) {
+    console.error('Auth user lookup failed:', error)
+    return NextResponse.json({ error: 'Impossible de vérifier le compte client' }, { status: 500 })
+  }
+
+  if (existingUser) {
+    const { data: otherClient, error: linkError } = await db
+      .from('coach_clients')
+      .select('id')
+      .eq('user_id', existingUser.id)
+      .neq('id', params.clientId)
+      .limit(1)
+      .maybeSingle()
+    if (linkError) {
+      console.error('Client link lookup failed:', linkError)
+      return NextResponse.json({ error: 'Impossible de vérifier l’accès client' }, { status: 500 })
+    }
+    if (otherClient) {
+      return NextResponse.json(
+        { error: 'Ce compte STRYVR est déjà lié à un autre suivi client.' },
+        { status: 409 },
+      )
+    }
+  }
 
   if (existingUser) {
     const isSuspended = client.status === 'suspended'
@@ -111,19 +136,17 @@ export async function POST(req: NextRequest, { params }: Params) {
     const hasActivatedAccount = hasActivatedClientAccount(existingUser, hasCompletedPassword)
 
     if (isSuspended) {
-      // Suspended: unban + send reactivation email with login link
-      const { error: unbanError } = await db.auth.admin.updateUserById(existingUser.id, {
-        ban_duration: 'none',
-      })
-      if (unbanError) {
-        console.error('unban error:', unbanError)
-        return NextResponse.json({ error: 'Impossible de réactiver le compte' }, { status: 500 })
-      }
-
-      await db
+      // Reactivate only this coach's client relationship.
+      const { error: reactivateError } = await db
         .from('coach_clients')
         .update({ status: 'active', user_id: existingUser.id })
         .eq('id', params.clientId)
+        .eq('coach_id', user.id)
+
+      if (reactivateError) {
+        console.error('Reactivate client error:', reactivateError)
+        return NextResponse.json({ error: 'Impossible de réactiver le client' }, { status: 500 })
+      }
 
       try {
         await sendReactivationEmail({
@@ -142,8 +165,6 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     // User exists but is NOT suspended — send reconnection flow only once we have
     // a strong signal that the account was already activated.
-    await db.auth.admin.updateUserById(existingUser.id, { ban_duration: 'none' })
-
     if (hasActivatedAccount) {
       await db
         .from('coach_clients')

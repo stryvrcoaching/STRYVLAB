@@ -22,32 +22,18 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   // Vérifier ownership
   const { data: client } = await db
     .from('coach_clients')
-    .select('id, email, user_id')
+    .select('id')
     .eq('id', params.clientId)
     .eq('coach_id', user.id)
     .single()
 
   if (!client) return NextResponse.json({ error: 'Client introuvable' }, { status: 404 })
 
-  // Bannir le compte Supabase si il existe (ban_duration 87600h = ~10 ans = suspension permanente).
-  // Priorité : user_id stocké sur coach_clients (défini après invite).
-  // Fallback : recherche par email via listUsers (perPage: 1000 pour éviter la troncature à 50).
-  const clientRecord = client as { id: string; email: string | null; user_id?: string | null }
-
-  if (clientRecord.user_id) {
-    await db.auth.admin.updateUserById(clientRecord.user_id, { ban_duration: '87600h' })
-  } else if (clientRecord.email) {
-    const { data: usersData } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 })
-    const supabaseUser = usersData?.users?.find((u: { email?: string }) => u.email === clientRecord.email)
-    if (supabaseUser) {
-      await db.auth.admin.updateUserById(supabaseUser.id, { ban_duration: '87600h' })
-    }
-  }
-
-  // Mettre à jour le statut en DB
+  // Unlink this coach relationship so its RLS access ends without disabling
+  // the user's account for other coaches.
   const { error } = await db
     .from('coach_clients')
-    .update({ status: 'suspended' })
+    .update({ status: 'suspended', user_id: null })
     .eq('id', params.clientId)
     .eq('coach_id', user.id)
 

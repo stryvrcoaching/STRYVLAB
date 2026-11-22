@@ -176,6 +176,21 @@ export async function updateSession(request: NextRequest) {
       )
     }
 
+    if (isClientProtected && !clientRecord && user.email) {
+      const { data: suspendedProfile } = await serviceSupabase
+        .from('coach_clients')
+        .select('id')
+        .ilike('email', user.email)
+        .eq('status', 'suspended')
+        .limit(1)
+        .maybeSingle()
+      if (suspendedProfile) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/client/acces-suspendu'
+        return NextResponse.redirect(url)
+      }
+    }
+
     if (clientRecord?.coach_id) {
       const { data: coachProfile } = await serviceSupabase
         .from('coach_profiles')

@@ -197,7 +197,7 @@ export async function DELETE(
 
   const { data: clientRow, error: fetchError } = await service
     .from('coach_clients')
-    .select('id, user_id, email')
+    .select('id')
     .eq('id', params.clientId)
     .eq('coach_id', user.id)
     .single()
@@ -270,35 +270,6 @@ export async function DELETE(
   if (clientDeleteError) {
     console.error('DELETE coach_clients:', clientDeleteError)
     return NextResponse.json({ error: 'Suppression client impossible' }, { status: 500 })
-  }
-
-  const authUserId = (clientRow as Record<string, unknown>).user_id as string | null | undefined
-  const clientEmail = (clientRow as Record<string, unknown>).email as string | null | undefined
-
-  if (authUserId) {
-    // Never delete the coach's own auth account
-    if (authUserId === user.id) {
-      console.warn('DELETE client — skipping auth deletion: client user_id matches coach user_id', authUserId)
-    } else {
-      const { error: authDeleteError } = await service.auth.admin.deleteUser(authUserId)
-      if (authDeleteError) {
-        console.error('DELETE auth user (by id):', authDeleteError)
-      }
-    }
-  } else if (clientEmail) {
-    // Fallback: find auth user by email — only delete if not the coach's own account
-    const { data: listData, error: listError } = await service.auth.admin.listUsers()
-    if (!listError && listData) {
-      const authUser = listData.users.find((u) => u.email === clientEmail)
-      if (authUser && authUser.id !== user.id) {
-        const { error: authDeleteError } = await service.auth.admin.deleteUser(authUser.id)
-        if (authDeleteError) {
-          console.error('DELETE auth user (by email):', authDeleteError)
-        }
-      } else if (authUser?.id === user.id) {
-        console.warn('DELETE client — skipping auth deletion: email matches coach account', clientEmail)
-      }
-    }
   }
 
   return NextResponse.json({ mode: 'delete', clientId: params.clientId })
