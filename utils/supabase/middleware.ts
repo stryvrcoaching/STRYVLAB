@@ -96,6 +96,13 @@ export async function updateSession(request: NextRequest) {
   const isApiMutation =
     pathname.startsWith('/api/') &&
     !['GET', 'HEAD', 'OPTIONS'].includes(request.method)
+  const mutationOwner = request.headers.get('x-client-user-id')
+  if (isClientApi && isApiMutation && user && mutationOwner && mutationOwner !== user.id) {
+    return NextResponse.json(
+      { error: 'Le compte a changé. Reconnectez le compte ayant enregistré cette saisie.', code: 'CLIENT_SESSION_CHANGED' },
+      { status: 409, headers: { 'Cache-Control': 'no-store' } },
+    )
+  }
   const isCancellationMutationExempt =
     pathname.startsWith('/api/privacy/') ||
     pathname === '/api/stripe/coach-platform/checkout' ||
