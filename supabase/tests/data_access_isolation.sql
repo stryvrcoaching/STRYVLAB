@@ -55,8 +55,11 @@ DO $$ BEGIN
   UPDATE storage.objects SET name = 'security-isolation-replaced'
     WHERE bucket_id = 'profile-photos';
   ASSERT NOT FOUND, 'Authenticated accounts must not replace profile photos directly';
-  DELETE FROM storage.objects WHERE bucket_id = 'profile-photos';
-  ASSERT NOT FOUND, 'Authenticated accounts must not delete profile photos directly';
+  BEGIN
+    DELETE FROM storage.objects WHERE bucket_id = 'profile-photos';
+    ASSERT NOT FOUND, 'Authenticated accounts must not delete profile photos directly';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
 END $$;
 RESET ROLE;
 
