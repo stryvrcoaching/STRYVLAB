@@ -15,32 +15,32 @@ export default function OfflineMutationSync() {
   const [offline, setOffline] = useState(false)
   const [syncing, setSyncing] = useState(false)
 
-  const refreshState = useCallback(() => {
-    setPending(getPendingOfflineMutationCount())
+  const refreshState = useCallback(async () => {
+    setPending(await getPendingOfflineMutationCount())
     setOffline(navigator.onLine === false)
   }, [])
 
   const sync = useCallback(async () => {
     if (navigator.onLine === false) {
-      refreshState()
+      await refreshState()
       return
     }
 
     setSyncing(true)
-    const result = await flushOfflineMutations()
-    refreshState()
-    if (result.synced > 0) router.refresh()
-    setSyncing(false)
+    try {
+      const result = await flushOfflineMutations()
+      await refreshState()
+      if (result.synced > 0) router.refresh()
+    } finally {
+      setSyncing(false)
+    }
   }, [refreshState, router])
 
   useEffect(() => {
-    refreshState()
-    if (navigator.onLine && getPendingOfflineMutationCount() > 0) {
-      void sync()
-    }
-    const unsubscribe = subscribeToOfflineMutations(refreshState)
+    void sync()
+    const unsubscribe = subscribeToOfflineMutations(() => { void refreshState() })
     const handleOnline = () => { void sync() }
-    const handleOffline = () => refreshState()
+    const handleOffline = () => { void refreshState() }
 
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 const PAYMENT_METHODS = [
   "card",
@@ -78,7 +79,11 @@ export async function PATCH(request: NextRequest) {
     ...(typeof body.confirmations_auto_send === "boolean" ? { confirmations_auto_send: body.confirmations_auto_send } : {}),
   };
 
-  const { data, error } = await supabase
+  const service = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+  const { data, error } = await service
     .from("coach_payment_settings")
     .upsert({ coach_id: user.id, ...updates }, { onConflict: "coach_id" })
     .select(`
